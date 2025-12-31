@@ -114,9 +114,17 @@
             z-index: 1;
         }
 
+        .login-form,
         .login-main,
         .login-footer {
             width: 100%;
+        }
+
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            flex: 1;
         }
 
         .login-main {
@@ -692,54 +700,56 @@
 <body>
 
     <div class="login-card">
-        <div class="login-main">
-            <div class="logo-container">
-                <img src="./assets/images/logo-dpto-medico-large.png" alt="Logo Departamento Médico" class="logo-img">
-            </div>
+        <form id="login-form" class="login-form" autocomplete="on">
+            <div class="login-main">
+                <div class="logo-container">
+                    <img src="./assets/images/logo-dpto-medico-large.png" alt="Logo Departamento Médico" class="logo-img">
+                </div>
 
-            <h2 class="subtitle">Inicia sesión en tu cuenta</h2>
+                <h2 class="subtitle">Inicia sesión en tu cuenta</h2>
 
-            <div class="divider"></div>
+                <div class="divider"></div>
 
-            <div class="form-group">
-                <input type="email" id="email" placeholder="Usuario" autocomplete="email">
-            </div>
-            <div class="form-group password-wrapper">
-                <input type="password" id="password" placeholder="Contraseña" autocomplete="current-password">
-                <div class="toggle-password" onclick="togglePassword()">
-                    <!-- Eye Open Icon (Default Hidden) -->
-                    <svg id="eye-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                        stroke-linejoin="round">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                        <circle cx="12" cy="12" r="3"></circle>
-                    </svg>
-                    <!-- Eye Closed Icon (Initially hidden or handled via JS props, simpler to just swap path or stick to simple toggle class) -->
+                <div class="form-group">
+                    <input type="email" id="email" name="username" placeholder="Usuario" autocomplete="username">
+                </div>
+                <div class="form-group password-wrapper">
+                    <input type="password" id="password" name="password" placeholder="Contraseña" autocomplete="current-password">
+                    <div class="toggle-password" onclick="togglePassword()">
+                        <!-- Eye Open Icon (Default Hidden) -->
+                        <svg id="eye-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                        <!-- Eye Closed Icon (Initially hidden or handled via JS props, simpler to just swap path or stick to simple toggle class) -->
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div class="login-footer">
-            <button id="btn-ingresar" class="login-btn" onclick="login()">Ingresar</button>
+            <div class="login-footer">
+                <button id="btn-ingresar" class="login-btn" type="submit">Ingresar</button>
 
-            <div class="biometric-option">
-                <button type="button" class="biometric-btn" aria-label="Usar Face ID o huella">
-                    <svg class="biometric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M12 3a7 7 0 0 1 7 7v1"></path>
-                        <path d="M5 11v-1a7 7 0 0 1 14 0v1"></path>
-                        <path d="M8 11v2a4 4 0 0 0 8 0v-2"></path>
-                        <path d="M9 17a3 3 0 0 0 6 0v-1"></path>
-                        <path d="M7 19a5 5 0 0 0 10 0v-2"></path>
-                    </svg>
-                    <span>Usar Face ID / Huella</span>
-                </button>
+                <div class="biometric-option">
+                    <button type="button" class="biometric-btn" id="biometric-btn" aria-label="Usar Face ID o huella">
+                        <svg class="biometric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 3a7 7 0 0 1 7 7v1"></path>
+                            <path d="M5 11v-1a7 7 0 0 1 14 0v1"></path>
+                            <path d="M8 11v2a4 4 0 0 0 8 0v-2"></path>
+                            <path d="M9 17a3 3 0 0 0 6 0v-1"></path>
+                            <path d="M7 19a5 5 0 0 0 10 0v-2"></path>
+                        </svg>
+                        <span>Usar Face ID / Huella</span>
+                    </button>
+                </div>
+
+                <a href="#" class="forgot-password" onclick="openModal(event)">¿Olvidaste tu contraseña?</a>
+
+                <p id="error-msg" class="error"></p>
             </div>
-
-            <a href="#" class="forgot-password" onclick="openModal(event)">¿Olvidaste tu contraseña?</a>
-
-            <p id="error-msg" class="error"></p>
-        </div>
+        </form>
     </div>
 
     <!-- Forgot Password Modal -->
@@ -760,11 +770,47 @@
 
     <!-- FIREBASE AND AUTH LOGIC DO NOT TOUCH -->
     <script type="module">
-        import { signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+        import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
         import { doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
         import { getFirebase } from "/assets/js/common/firebaseClient.js";
 
         const { auth, db } = getFirebase();
+        const loginForm = document.getElementById('login-form');
+        const biometricOption = document.querySelector('.biometric-option');
+        const biometricBtn = document.getElementById('biometric-btn');
+        const supportsCredentials = Boolean(window.PasswordCredential && navigator.credentials);
+
+        if (!supportsCredentials && biometricOption) {
+            biometricOption.style.display = 'none';
+        }
+
+        if (loginForm) {
+            loginForm.addEventListener('submit', (event) => {
+                event.preventDefault();
+                window.login();
+            });
+        }
+
+        if (supportsCredentials && biometricBtn) {
+            biometricBtn.addEventListener('click', async () => {
+                try {
+                    const credential = await navigator.credentials.get({
+                        password: true,
+                        mediation: 'optional'
+                    });
+                    if (!credential) return;
+                    const emailInput = document.getElementById('email');
+                    const passwordInput = document.getElementById('password');
+                    if (emailInput && credential.id) emailInput.value = credential.id;
+                    if (passwordInput && credential.password) passwordInput.value = credential.password;
+                    if (credential.id && credential.password) {
+                        window.login();
+                    }
+                } catch (error) {
+                    console.info('Credenciales no disponibles o acción cancelada.', error);
+                }
+            });
+        }
 
         // One-shot cleanup for legacy root SW + caches.
         const cleanupRootServiceWorker = async () => {
@@ -870,6 +916,7 @@
         };
 
         window.login = async () => {
+            if (loginInProgress) return;
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value.trim();
             const errorMsg = document.getElementById('error-msg');
@@ -931,6 +978,15 @@
                 sessionStorage.setItem('isLoggedIn', 'true');
                 localStorage.setItem('user_nombre', displayName);
 
+                if (supportsCredentials && loginForm && window.PasswordCredential) {
+                    try {
+                        const creds = new PasswordCredential(loginForm);
+                        await navigator.credentials.store(creds);
+                    } catch (error) {
+                        console.info('No se pudo guardar credenciales.', error);
+                    }
+                }
+
                 // Overlay is already active; keep it brief before redirecting
                 setTimeout(() => {
                     window.location.replace(getRedirectTarget());
@@ -966,9 +1022,7 @@
             btn.classList.remove("loading");
         }
 
-        document.getElementById('password').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') window.login();
-        });
+        // El submit del formulario gestiona el Enter.
     </script>
 
 </body>
