@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asistente Médico IA - Boti Brisa</title>
+    
+    <!-- 1. Tailwind CSS (Estilos) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. Configuración de Módulos (Import Map) -->
+    <!-- Esto permite usar 'import' como si estuvieras en un proyecto profesional de Node.js -->
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "lucide-react": "https://esm.sh/lucide-react@0.292.0",
+        "@google/generative-ai": "https://esm.sh/@google/generative-ai"
+      }
+    }
+    </script>
+
+    <!-- 3. Babel (Para entender JSX en el navegador) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        /* Animaciones personalizadas */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .animate-in { animation: fadeIn 0.3s ease-out; }
+        .slide-in-from-bottom-4 { animation: slideUp 0.5s ease-out; }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            overscroll-behavior: contain;
+        }
+
+        #root {
+            height: 100%;
+        }
+
+        .dm-chat-frame {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .dm-chat-messages {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+        }
+
+        .dm-ai-loader {
+            position: fixed;
+            inset: 0;
+            background: #f1f5f9;
+            display: grid;
+            place-items: center;
+            z-index: 9999;
+        }
+
+        .dm-ai-loader__card {
+            width: min(440px, 92vw);
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+        }
+
+        .dm-ai-loader__line {
+            height: 12px;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #e2e8f0, #f8fafc, #e2e8f0);
+            background-size: 200% 100%;
+            animation: dmLoaderPulse 1.2s ease-in-out infinite;
+            margin-bottom: 10px;
+        }
+
+        .dm-ai-loader__line--title {
+            width: 60%;
+            height: 14px;
+        }
+
+        .dm-ai-loader__line--short {
+            width: 40%;
+        }
+
+        @keyframes dmLoaderPulse {
+            0% { background-position: 0% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        @media (min-width: 1024px) {
+            .dm-avatar-ring {
+                border: 1px solid var(--color-brisa-500, #7AB800);
+                border-radius: 999px;
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.10);
+                outline: none;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 h-screen w-screen overflow-hidden relative">
+
+    <div id="app-loader" class="dm-ai-loader" aria-hidden="true">
+        <div class="dm-ai-loader__card">
+            <div class="dm-ai-loader__line dm-ai-loader__line--title"></div>
+            <div class="dm-ai-loader__line"></div>
+            <div class="dm-ai-loader__line"></div>
+            <div class="dm-ai-loader__line dm-ai-loader__line--short"></div>
+        </div>
+    </div>
+
+    <!-- Contenedor Raíz donde React montará la app -->
+    <div id="root"></div>
+
+    <!-- 4. Tu Código React -->
+    <script type="text/babel" data-type="module" charset="utf-8">
+        // UI REDESIGN PC Iteración 2 (2025-12-24)
+        import React, { useState, useEffect, useRef } from 'react';
+        import { createRoot } from 'react-dom/client';
+        // Importamos todos los iconos que usas
+        import { Send, X, Paperclip, Mic, MicOff } from 'lucide-react';
+        import { doc, getDoc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+        import { getFirebase } from '../assets/js/common/firebase.js';
+        // HELPER: Convierte archivos de imagen a Base64 para que Gemini los vea
+        const convertirImagenABase64 = (file) => {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => {
+                    // Quitamos el prefijo "data:image/jpeg;base64," para enviar solo los datos puros
+                    const base64String = reader.result.split(',')[1];
+                    resolve(base64String);
+                };
+                reader.onerror = (error) => reject(error);
+            });
+        };
+
+        // HELPER AVANZADO: Limpia Markdown y prepara el texto para una lectura natural
+        const limpiarTextoParaVoz = (texto) => {
+            if (!texto) return "";
+            return texto
+                // 1. Eliminar bloques de código o metadatos
+                .replace(/```[\s\S]*?```/g, ' código omitido. ')
+                // 2. Eliminar citas tipo o [1]
+                .replace(/"/g, '')
+                .replace(/\[\d+\]/g, '')
+                // 3. Limpiar Markdown (Negritas, Cursivas, Encabezados)
+                .replace(/\*\*(.*?)\*\*/g, '$1') // Dejar solo el texto de la negrita
+                .replace(/\*(.*?)\*/g, '$1')     // Dejar solo el texto de la cursiva
+                .replace(/#{1,6}\s?/g, '')       // Quitar hashtags de títulos
+                .replace(/`/g, '')               // Quitar acentos de código
+                // 4. Limpiar Listas para que no diga "Guión" o "Asterisco"
+                .replace(/^\s*[\-\*]\s+/gm, ', ') // Reemplaza viñetas por pausas breves
+                // 5. Normalizar puntuación y espacios
+                .replace(/\n\n/g, '. ')          // Párrafos dobles son puntos aparte
+                .replace(/\n/g, ', ')            // Saltos simples son comas
+                .replace(/\s+/g, ' ')            // Quitar espacios extra
+                .trim();
+        };
+        // Variable global para guardar la charla fuera de la funcion
+        // El 'role: user' eres tu, 'role: model' es Boti.
+        let historialClinico = [];
+        const openAiConfig = { apiKey: null };
+        const gestionarApiKey = async () => {
+            if (openAiConfig.apiKey) return openAiConfig.apiKey;
+            const { db } = getFirebase();
+            const docRef = doc(db, 'configuracion', 'api_keys');
+            try {
+                const snapshot = await getDoc(docRef);
+                if (snapshot.exists()) {
+                    const data = snapshot.data() || {};
+                    const storedKey = typeof data.openai === 'string'
+                        ? data.openai.trim()
+                        : typeof data.openaiApiKey === 'string'
+                            ? data.openaiApiKey.trim()
+                            : typeof data.apiKey === 'string'
+                                ? data.apiKey.trim()
+                                : '';
+                    if (storedKey) {
+                        openAiConfig.apiKey = storedKey;
+                        return storedKey;
+                    }
+                }
+            } catch (error) {
+                console.warn('No se pudo leer la API Key desde Firestore.', error);
+            }
+            const promptedKey = window.prompt("Ingrese la API Key por única vez para guardarla en BD");
+            const cleanKey = typeof promptedKey === 'string' ? promptedKey.trim() : '';
+            if (!cleanKey) {
+                throw new Error('openai_key_missing');
+            }
+            openAiConfig.apiKey = cleanKey;
+            try {
+                await setDoc(
+                    docRef,
+                    { openai: cleanKey, updatedAt: serverTimestamp() },
+                    { merge: true }
+                );
+            } catch (error) {
+                console.warn('No se pudo guardar la API Key en Firestore.', error);
+            }
+            return cleanKey;
+        };
+
+        // AHORA EL WIDGET ACEPTA EL NOMBRE DEL USUARIO DESDE "AFUERA"
+        const MedicalChatWidget = ({ nombreUsuario = "Doctor/a" }) => {
+            const isEmbedMode = new URLSearchParams(window.location.search).get('embed') === '1';
+            const AI_STATE_KEY = 'dm_ai_state_v1';
+            const RESET_ONCE_KEY = 'dm_ai_reset_once_v1';
+            const shouldResetOnce = (() => {
+                try {
+                    return localStorage.getItem(RESET_ONCE_KEY) !== 'done';
+                } catch (error) {
+                    return false;
+                }
+            })();
+            const storedState = (() => {
+                if (shouldResetOnce) return {};
+                try {
+                    const raw = localStorage.getItem(AI_STATE_KEY);
+                    return raw ? JSON.parse(raw) : {};
+                } catch (error) {
+                    return {};
+                }
+            })();
+            const urlModel = new URLSearchParams(window.location.search).get('model');
+            const initialModel = (urlModel === 'gpt' || urlModel === 'gemini')
+                ? urlModel
+                : (storedState.selectedModel || 'gemini');
+            const [isChatOpen, setIsChatOpen] = useState(isEmbedMode);
+            const [isExpanded, setIsExpanded] = useState(isEmbedMode);
+            const [isModelPickerOpen, setIsModelPickerOpen] = useState(false);
+            const [selectedModel, setSelectedModel] = useState(initialModel);
+            const [messagesByModel, setMessagesByModel] = useState(storedState.messagesByModel || {});
+            const [resetOncePending, setResetOncePending] = useState(shouldResetOnce);
+            const messages = messagesByModel[selectedModel] || [];
+
+            const updateMessagesForModel = (modelKey, updater) => {
+                setMessagesByModel((prev) => {
+                    const current = prev[modelKey] || [];
+                    const next = typeof updater === 'function' ? updater(current) : updater;
+                    return { ...prev, [modelKey]: next };
+                });
+            };
+
+            const updateMessages = (updater) => {
+                updateMessagesForModel(selectedModel, updater);
+            };
+            const [inputText, setInputText] = useState('');
+            const [isTyping, setIsTyping] = useState(false);
+            const [selectedFile, setSelectedFile] = useState(null); // Nuevo estado para la imagen
+            // --- SISTEMA DE VOZ AVANZADO (V2) ---
+            const [isListening, setIsListening] = useState(false);
+            const [autoSpeak, setAutoSpeak] = useState(false); // Lectura autom�tica
+            const [isSpeaking, setIsSpeaking] = useState(false); // �Est� hablando ahora?
+            const [isPaused, setIsPaused] = useState(false);     // �Est� en pausa?
+
+            // Referencia para no perder el control del audio
+            const synth = window.speechSynthesis;
+
+            // FUNCIÓN PRINCIPAL: HABLAR (V3 - Natural)
+            const speakText = (rawText) => {
+                // 1. Detener audio anterior
+                stopSpeaking();
+                if (!rawText) return;
+
+                // 2. Limpieza agresiva para naturalidad
+                const cleanText = limpiarTextoParaVoz(rawText);
+
+                // 3. Configuración del objeto de voz
+                const utterance = new SpeechSynthesisUtterance(cleanText);
+                
+                // 4. BÚSQUEDA DE LA MEJOR VOZ POSIBLE (PRIORIDAD: GOOGLE > MICROSOFT > NATIVA)
+                const voices = synth.getVoices();
+                
+                // Intentamos encontrar una voz en español que suene humana
+                const bestVoice = voices.find(v => 
+                    (v.name.includes('Google') && v.lang.includes('es')) || // Google suele ser la mejor en Chrome
+                    (v.name.includes('Microsoft') && v.lang.includes('es') && v.name.includes('Online')) || // Microsoft Edge Online
+                    (v.name.includes('Mexico') || v.name.includes('Argentina')) // Preferencia regional
+                );
+
+                // Si encontramos una voz "Premium", la usamos
+                if (bestVoice) {
+                    utterance.voice = bestVoice;
+                    utterance.rate = 1.0;  // Velocidad normal
+                    utterance.pitch = 1.0; // Tono natural
+                    console.log("🗣️ Voz seleccionada:", bestVoice.name); // Para depurar
+                } else {
+                    // Fallback: Cualquier voz en español
+                    const anySpanish = voices.find(v => v.lang.includes('es'));
+                    if (anySpanish) utterance.voice = anySpanish;
+                }
+
+                // Eventos
+                utterance.onstart = () => { setIsSpeaking(true); setIsPaused(false); };
+                utterance.onend = () => { setIsSpeaking(false); setIsPaused(false); };
+                utterance.onerror = () => { setIsSpeaking(false); setIsPaused(false); };
+
+                synth.speak(utterance);
+            };
+            // CONTROLES MANUALES
+            const stopSpeaking = () => {
+                synth.cancel();
+                setIsSpeaking(false);
+                setIsPaused(false);
+            };
+
+            const togglePause = () => {
+                if (synth.paused) {
+                    synth.resume();
+                    setIsPaused(false);
+                } else if (synth.speaking) {
+                    synth.pause();
+                    setIsPaused(true);
+                }
+            };
+
+            // LECTURA AUTOM�TICA (Hook)
+            useEffect(() => {
+                if (autoSpeak && messages.length > 0) {
+                    const lastMsg = messages[messages.length - 1];
+                    // Solo leemos si es el bot y no es un error
+                    if ((lastMsg.role === 'ai' || lastMsg.role === 'model') && !lastMsg.text.startsWith("Error")) {
+                        // Peque�o delay para naturalidad
+                        setTimeout(() => speakText(lastMsg.text), 300);
+                    }
+                }
+            }, [messages, autoSpeak]);
+
+            // Carga de voces inicial (Chrome fix)
+            useEffect(() => {
+                synth.onvoiceschanged = () => { console.log("Voces listas"); };
+            }, []);
+
+            // MICROFONO (Speech to Text) - Igual que antes
+            const toggleListening = () => {
+                if (isListening) {
+                    window.speechRecognition?.stop();
+                    setIsListening(false);
+                    return;
+                }
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SpeechRecognition) return alert("Navegador no compatible");
+                
+                const recognition = new SpeechRecognition();
+                recognition.lang = 'es-AR';
+                recognition.onstart = () => setIsListening(true);
+                recognition.onresult = (e) => setInputText(prev => prev + " " + e.results[0][0].transcript);
+                recognition.onend = () => setIsListening(false);
+                recognition.start();
+            };
+            const fileInputRef = useRef(null); // Referencia oculta al selector de archivos
+
+            // Maneja cuando el usuario elige una foto
+            const handleFileSelect = (e) => {
+                const file = e.target.files[0];
+                if (file) setSelectedFile(file);
+            };
+            const [imageError, setImageError] = useState(false);
+            
+            const messagesEndRef = useRef(null);
+            const textareaRef = useRef(null);
+            const aiEndpointRef = useRef(null);
+            const aiLoggedRef = useRef(false);
+
+            useEffect(() => {
+                const loader = document.getElementById('app-loader');
+                if (loader) loader.remove();
+                try {
+                    window.parent?.postMessage({ type: 'dm-ai-ready' }, window.location.origin);
+                } catch (error) {
+                    // no-op
+                }
+            }, []);
+
+            useEffect(() => {
+                try {
+                    const sanitized = Object.fromEntries(
+                        Object.entries(messagesByModel || {}).map(([key, list]) => [
+                            key,
+                            (list || []).map(({ image, ...rest }) => rest)
+                        ])
+                    );
+                    localStorage.setItem('dm_ai_state_v1', JSON.stringify({
+                        selectedModel,
+                        messagesByModel: sanitized
+                    }));
+                    if (!isEmbedMode) {
+                        localStorage.setItem('dm_ai_model', selectedModel);
+                    }
+                } catch (error) {
+                    // no-op
+                }
+            }, [selectedModel, messagesByModel]);
+
+            const getAllParams = () =>
+                new URLSearchParams(
+                    (window.parent && window.parent !== window
+                        ? window.parent.location.search
+                        : window.location.search) || ""
+                );
+            const isDebugAi = getAllParams().get("debugAi") === "1";
+            const PROD_AI_ENDPOINT = "https://us-central1-departamento-medico-brisa.cloudfunctions.net/aiChat";
+            const EMU_AI_ENDPOINT = "http://127.0.0.1:5001/departamento-medico-brisa/us-central1/aiChat";
+            const resolveAiEndpoint = () => {
+                const params = getAllParams();
+                const forcedEndpoint = params.get("aiEndpoint");
+
+                // 1. Prioridad: Si hay una URL forzada en los parametros, usarla.
+                if (forcedEndpoint) return forcedEndpoint;
+
+                // 2. Por defecto: Usar SIEMPRE la conexion directa a Google Cloud.
+                // Esto arregla el error en Netlify y evita el error 404 de /api/ai.
+                return PROD_AI_ENDPOINT;
+            };
+            if (!aiEndpointRef.current) {
+                aiEndpointRef.current = resolveAiEndpoint();
+            }
+            const AI_ENDPOINT = aiEndpointRef.current;
+            useEffect(() => {
+                if (aiLoggedRef.current) return;
+                console.info("[AI] endpoint:", AI_ENDPOINT);
+                aiLoggedRef.current = true;
+            }, [AI_ENDPOINT]);
+            const buildAiErrorMessage = (status, data) => {
+                const detail = data?.error || "unknown";
+                return `AI error HTTP ${status}: ${detail}`;
+            };
+            const handleAiFailure = (provider, status, data, fallbackMessage) => {
+                if (!isDebugAi) return fallbackMessage;
+                console.info({ endpoint: AI_ENDPOINT, provider, status, data });
+                return buildAiErrorMessage(status, data);
+            };
+            const getAuthToken = async () => {
+                try {
+                    if (window.parent && window.parent !== window && typeof window.parent.dmGetAuthToken === 'function') {
+                        return await window.parent.dmGetAuthToken();
+                    }
+                } catch (error) {
+                    // no-op
+                }
+                try {
+                    if (typeof window.dmGetAuthToken === 'function') {
+                        return await window.dmGetAuthToken();
+                    }
+                } catch (error) {
+                    // no-op
+                }
+                return null;
+            };
+            // --- FUNCI�N FINAL "RESCATE 2:00 AM" ---
+            const obtenerRespuestaGemini = async (nuevoMensajeUsuario, imagenBase64 = null, history = []) => {
+                
+                // USAMOS SOLO LOS MODELOS QUE APARECIERON EN TU LISTA VERDE
+                // Intento 1: La joya de la corona (2.5 Flash) que tienes activada
+                const MODELO_PRIMARIO = "gemini-2.5-flash"; 
+                
+                // Intento 2: La versi�n "Lite" (Ligera) que suele tener menos restricciones de cuota
+                const MODELO_RESPALDO = "gemini-2.0-flash-lite-preview-02-05";
+
+                try {
+                    // SAFETY CHECK: Definimos nombre por defecto si falla
+                    const nombreFinal = (typeof nombreUsuario !== 'undefined') ? nombreUsuario : "Doctor/a";
+                    const fechaHoy = new Date().toLocaleString();
+
+                    // GESTI�N DE PROTOCOLOS (Si existe la funci�n)
+                    let contextoAdicional = "";
+                    if (typeof buscarEnProtocolos === 'function') {
+                        const protocolosEncontrados = buscarEnProtocolos(nuevoMensajeUsuario);
+                        if (protocolosEncontrados && protocolosEncontrados.length > 0) {
+                            console.log("?? Protocolo activado");
+                            contextoAdicional = `ATENCI�N: USA ESTE PROTOCOLO INTERNO:\n${protocolosEncontrados.map(p => `--- ${p.titulo} ---\n${p.contenido}`).join('\n')}`;
+                        }
+                    }
+
+                    // INICIALIZACI�N SEGURA DEL HISTORIAL
+                    // Si por alguna raz�n historialClinico no existe, lo creamos al vuelo para no romper nada
+                    let historialParaEnvio = [];
+                    if (typeof historialClinico !== 'undefined') {
+                        historialParaEnvio = historialClinico;
+                    } else {
+                        historialParaEnvio = []; 
+                    }
+
+                    if (historialParaEnvio.length === 0) {
+                        const promptSistema = `
+                        ACT�A COMO: "Boti Brisa", Asesor M�dico Corporativo.
+                        CONTEXTO: Hoy es ${fechaHoy}. Usuario: ${nombreFinal}.
+                        DIRECTRICES: Prioriza protocolos internos. Tono ejecutivo.
+                        `;
+                        historialParaEnvio.push({ role: "user", parts: [{ text: promptSistema }] });
+                        historialParaEnvio.push({ role: "model", parts: [{ text: "Entendido. Iniciando sistema m�dico." }] });
+                    }
+
+                    // PREPARAR MENSAJE
+                    const textoFinal = contextoAdicional 
+                        ? `${contextoAdicional}\n\nCONSULTA: ${nuevoMensajeUsuario}`
+                        : nuevoMensajeUsuario;
+
+                    const partesUsuario = [{ text: textoFinal }];
+                    
+                    if (imagenBase64) {
+                        partesUsuario.push({
+                            inline_data: { mime_type: "image/jpeg", data: imagenBase64 }
+                        });
+                    }
+
+                    const token = await getAuthToken();
+                    if (!token) {
+                        return "Necesitas iniciar sesi\u00f3n para usar el asistente.";
+                    }
+
+                    // Agregamos al historial
+                    historialParaEnvio.push({ role: "user", parts: partesUsuario });
+
+                    const historyContents = (Array.isArray(history) ? history : [])
+                        .map((message) => {
+                            if (!message || typeof message !== 'object') return null;
+                            const role = typeof message.role === 'string' ? message.role.toLowerCase() : '';
+                            const mappedRole = role === 'user'
+                                ? 'user'
+                                : (role === 'ai' || role === 'assistant' || role === 'model')
+                                    ? 'model'
+                                    : '';
+                            if (!mappedRole) return null;
+                            const text = typeof message.text === 'string' ? message.text.trim() : '';
+                            if (!text) return null;
+                            return { role: mappedRole, parts: [{ text }] };
+                        })
+                        .filter(Boolean);
+
+                    const requestOptions = {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            provider: "gemini",
+                            model: MODELO_PRIMARIO,
+                            fallbackModel: MODELO_RESPALDO,
+                            prompt: textoFinal,
+                            historyContents,
+                            contents: historialParaEnvio,
+                            debug: isDebugAi
+                        })
+                    };
+
+                    const response = await fetch(AI_ENDPOINT, requestOptions);
+
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok || !data?.ok) {
+                        historialParaEnvio.pop();
+                        return handleAiFailure(
+                            "gemini",
+                            response.status,
+                            data,
+                            "Error de conexi�n. Intente refrescar la p�gina."
+                        );
+                    }
+                    const respuestaBot =
+                        data?.text ||
+                        data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+                        "Sin respuesta clinica.";
+
+                    // Guardamos la respuesta
+                    historialParaEnvio.push({ role: "model", parts: [{ text: respuestaBot }] });
+                    
+                    // Actualizamos la variable global si existe
+                    if (typeof historialClinico !== 'undefined') historialClinico = historialParaEnvio;
+
+                    return respuestaBot;
+
+                } catch (error) {
+                    console.error("? ERROR FINAL:", error);
+                    return handleAiFailure(
+                        "gemini",
+                        0,
+                        { error: error?.message || "request_failed" },
+                        "Error de conexi�n. Intente refrescar la p�gina."
+                    );
+                }
+            };
+
+            // ==========================================
+            // MOTOR 2: OPENAI GPT (via proxy seguro)
+            // ==========================================
+
+            const obtenerRespuestaGPT = async (nuevoMensajeUsuario, imagenBase64 = null, history = []) => {
+                try {
+                    const token = await getAuthToken();
+                    if (!token) return "Necesitas iniciar sesi\u00f3n para usar el asistente.";
+                    const apiKey = await gestionarApiKey();
+                    if (!apiKey) {
+                        return "No se pudo obtener la API Key de OpenAI.";
+                    }
+
+                    let contextoAdicional = "";
+                    if (typeof buscarEnProtocolos === 'function') {
+                        const protocolosEncontrados = buscarEnProtocolos(nuevoMensajeUsuario);
+                        if (protocolosEncontrados && protocolosEncontrados.length > 0) {
+                            contextoAdicional = `ATENCION: PROTOCOLO INTERNO DETECTADO:\n${protocolosEncontrados.map(p => `--- ${p.titulo} ---\n${p.contenido}`).join('\n')}`;
+                        }
+                    }
+
+                    const textoFinal = contextoAdicional
+                        ? `${contextoAdicional}\n\nCONSULTA: ${nuevoMensajeUsuario}`
+                        : nuevoMensajeUsuario;
+
+                    const previousMessages = (Array.isArray(history) ? history : [])
+                        .map((message) => {
+                            if (!message || typeof message !== 'object') return null;
+                            const role = typeof message.role === 'string' ? message.role.toLowerCase() : '';
+                            const mappedRole = role === 'user'
+                                ? 'user'
+                                : (role === 'ai' || role === 'assistant' || role === 'model')
+                                    ? 'assistant'
+                                    : '';
+                            if (!mappedRole) return null;
+                            const content = typeof message.text === 'string' ? message.text.trim() : '';
+                            if (!content) return null;
+                            return { role: mappedRole, content };
+                        })
+                        .filter(Boolean);
+
+                    const response = await fetch(AI_ENDPOINT, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            provider: "openai",
+                            prompt: textoFinal,
+                            previousMessages,
+                            openaiApiKey: apiKey
+                        })
+                    });
+
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok || !data?.ok) {
+                        return handleAiFailure(
+                            "openai",
+                            response.status,
+                            data,
+                            data?.error || "aiChat failed"
+                        );
+                    }
+                    return data.text || "Sin respuesta clinica.";
+                } catch (error) {
+                    return handleAiFailure(
+                        "openai",
+                        0,
+                        { error: error?.message || "request_failed" },
+                        "No se pudo contactar a ChatGPT. Intenta nuevamente."
+                    );
+                }
+            };
+
+            // --- ICONOS DE LAS IAs (SVGs Inline) ---
+            const OpenAILogo = () => (
+                <svg viewBox="0 0 24 24" className="w-6 h-6" aria-hidden="true">
+                <path
+                    fill="#0a0a0a"
+                    d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"
+                />
+                </svg>
+            );
+
+            const GeminiLogo = () => (
+                <svg viewBox="0 0 24 24" className="w-6 h-6" aria-hidden="true">
+                <defs>
+                    <linearGradient id="geminiGradient" x1="3" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stopColor="#4285f4" />
+                    <stop offset="45%" stopColor="#7b61ff" />
+                    <stop offset="100%" stopColor="#db4437" />
+                    </linearGradient>
+                </defs>
+                <path
+                    fill="url(#geminiGradient)"
+                    d="M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81"
+                />
+                </svg>
+            );
+
+            const models = {
+                gpt: {
+                    id: 'gpt',
+                    name: 'Chat GPT',
+                    shortName: 'Chat GPT',
+                    color: 'bg-[#10a37f]',
+                    hoverColor: 'hover:bg-[#0d8a6a]',
+                    buttonColor: 'bg-white',
+                    buttonHoverColor: 'hover:bg-slate-50',
+                    ringColor: 'ring-[#10a37f]',
+                    icon: <OpenAILogo />
+                },
+                gemini: {
+                    id: 'gemini',
+                    name: 'Gemini Pro',
+                    shortName: 'Gemini Pro',
+                    color: 'bg-[#1d4ed8]',
+                    hoverColor: 'hover:bg-[#1e40af]',
+                    buttonColor: 'bg-white',
+                    buttonHoverColor: 'hover:bg-slate-50',
+                    ringColor: 'ring-[#1d4ed8]',
+                    icon: <GeminiLogo />
+                }
+            };
+
+            const isGemini = selectedModel === "gemini";
+            const THEME = isGemini ? { accent: "#1565C0" } : { accent: "#7AB800" };
+            const accent = THEME.accent;
+            const accentSoftBorder = isGemini ? "rgba(21,101,192,0.35)" : "rgba(122,184,0,0.35)";
+            const activeModelMeta = isGemini ? models.gemini : models.gpt;
+            const modelName = isGemini ? "Gemini Pro" : "ChatGPT";
+
+            const toggleModel = () => {
+                setSelectedModel(isGemini ? "gpt" : "gemini");
+            };
+
+            const requestClosePanel = () => {
+                try {
+                    if (window.parent?.__dmAssistantShell?.closeChat) {
+                        window.parent.__dmAssistantShell.closeChat();
+                        return;
+                    }
+                } catch (error) {
+                    // no-op
+                }
+                try {
+                    window.parent?.postMessage({ type: "dm-ai-close" }, window.location.origin);
+                } catch (error) {
+                    // no-op
+                }
+            };
+
+            useEffect(() => {
+                try {
+                    window.parent?.postMessage({ type: 'dm-ai-model', model: selectedModel }, window.location.origin);
+                } catch (error) {
+                    // no-op
+                }
+            }, [selectedModel]);
+
+            useEffect(() => {
+                const handleExternalModel = (event) => {
+                    if (event.origin !== window.location.origin) return;
+                    const payload = event.data || {};
+                    if (payload.type !== 'dm-ai-select-model') return;
+                    const nextModel = payload.model;
+                    if (!models[nextModel]) return;
+                    setSelectedModel(nextModel);
+                    setIsChatOpen(true);
+                    setIsModelPickerOpen(false);
+                };
+                window.addEventListener('message', handleExternalModel);
+                return () => window.removeEventListener('message', handleExternalModel);
+            }, [isChatOpen]);
+
+            const botImageSrc = "./boti-brisa.jpg";
+            const getGreetingText = (modelKey) => (
+                `Hola. Soy Boti Brisa. Estoy operando con el modelo ${models[modelKey].name}. ¿Cómo puedo asistirte hoy?`
+            );
+
+            const renderBotAvatar = (className) => {
+                if (imageError) {
+                    return (
+                        <div className={`flex items-center justify-center bg-gradient-to-br from-slate-700 via-slate-600 to-slate-400 text-white font-bold ${className}`}>
+                            BB
+                        </div>
+                    );
+                }
+                return (
+                    <img
+                        src={botImageSrc}
+                        alt="Boti Brisa"
+                        className={className}
+                        style={{ objectPosition: 'center top' }}
+                        loading="lazy"
+                        onError={() => setImageError(true)}
+                    />
+                );
+            };
+
+            useEffect(() => {
+                if (textareaRef.current) {
+                    textareaRef.current.style.height = 'auto';
+                    textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
+                }
+            }, [inputText]);
+
+            useEffect(() => {
+                if (!resetOncePending || !isChatOpen) return;
+                setMessagesByModel({});
+                if (typeof historialClinico !== 'undefined') {
+                    historialClinico = [];
+                }
+                try {
+                    localStorage.removeItem(AI_STATE_KEY);
+                    localStorage.setItem(RESET_ONCE_KEY, 'done');
+                } catch (error) {
+                    // no-op
+                }
+                setResetOncePending(false);
+            }, [resetOncePending, isChatOpen]);
+
+            useEffect(() => {
+                if (!isChatOpen) return;
+                updateMessages((prev) => {
+                    const greetingText = getGreetingText(selectedModel);
+                    const greetingIndex = prev.findIndex(
+                        (msg) => msg.role === 'system' && (msg.kind === 'greeting' || (msg.text || '').startsWith('Hola. Soy Boti Brisa'))
+                    );
+                    if (greetingIndex === -1) {
+                        const greetingMessage = {
+                            id: Date.now(),
+                            role: 'system',
+                            text: greetingText,
+                            model: 'system',
+                            kind: 'greeting'
+                        };
+                        return prev.length === 0 ? [greetingMessage] : [greetingMessage, ...prev];
+                    }
+                    const updated = [...prev];
+                    updated[greetingIndex] = {
+                        ...updated[greetingIndex],
+                        text: greetingText,
+                        kind: 'greeting'
+                    };
+                    return updated;
+                });
+            }, [selectedModel, isChatOpen]);
+
+            useEffect(() => {
+                messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            }, [messages, isTyping, isChatOpen, isExpanded]);
+
+            useEffect(() => {
+                if (!isChatOpen) {
+                    setIsModelPickerOpen(false);
+                }
+            }, [isChatOpen]);
+
+            const handleModelSelect = (modelKey) => {
+                setSelectedModel(modelKey);
+                setIsChatOpen(true);
+                setIsModelPickerOpen(false);
+            };
+
+            const clearChat = () => {
+                setMessagesByModel({});
+                if (typeof historialClinico !== 'undefined') {
+                    historialClinico = [];
+                }
+                try {
+                    localStorage.removeItem('dm_ai_state_v1');
+                } catch (error) {
+                    // no-op
+                }
+            };
+
+            // --- TU NUEVA FUNCI�N 'HANDLE SEND' MEJORADA ---
+            const handleSend = async () => {
+                if (!inputText.trim() && !selectedFile) return; // Evita enviar vac�os
+
+                // 1. Preparamos el mensaje visual
+                const newUserMsg = { 
+                    id: Date.now(), 
+                    role: 'user', 
+                    text: inputText,
+                    image: selectedFile ? URL.createObjectURL(selectedFile) : null // Para mostrarla en el chat
+                };
+
+                const historyForRequest = [...messages];
+                updateMessages((prev) => [...prev, newUserMsg]);
+                setInputText('');
+                setIsTyping(true);
+                
+                // Guardamos la imagen actual para procesarla y luego limpiamos el estado
+                const fileToUpload = selectedFile; 
+                setSelectedFile(null); // Limpiamos el "clip" inmediatamente
+
+                try {
+                    let responseText = "";
+                    
+                    // 2. Procesamos la imagen si existe
+                    let base64Image = null;
+                    if (fileToUpload) {
+                        base64Image = await convertirImagenABase64(fileToUpload);
+                    }
+
+                    // --- SELECTOR DE CEREBRO ---
+                    if (selectedModel === 'gpt') {
+                        responseText = await obtenerRespuestaGPT(newUserMsg.text, base64Image, historyForRequest);
+                    } else {
+                        responseText = await obtenerRespuestaGemini(newUserMsg.text, base64Image, historyForRequest);
+                    }
+                    
+                    updateMessages((prev) => [
+                        ...prev,
+                        { id: Date.now() + 1, role: 'ai', text: responseText, model: selectedModel }
+                    ]);
+                } catch (error) {
+                    updateMessages((prev) => [
+                        ...prev,
+                        { id: Date.now() + 1, role: 'system', text: "Error al enviar el mensaje o imagen." }
+                    ]);
+                } finally {
+                    setIsTyping(false);
+                }
+            };
+
+            const handleKeyPress = (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                }
+            };
+
+            const renderMessageText = (text) => {
+                if (!text) return null;
+                return text.split('\n').map((line, i) => (
+                    <React.Fragment key={i}>
+                        {line.split(/(\*\*.*?\*\*)/).map((part, j) => {
+                            if (part.startsWith('**') && part.endsWith('**')) {
+                                return <strong key={j}>{part.slice(2, -2)}</strong>;
+                            }
+                            return part;
+                        })}
+                        <br />
+                    </React.Fragment>
+                ));
+            };
+
+            const shellClass = isEmbedMode
+                ? "w-full h-full flex flex-col items-center justify-stretch font-sans text-slate-800 pointer-events-auto"
+                : "fixed z-50 bottom-4 left-1/2 -translate-x-1/2 md:bottom-8 font-sans text-slate-800 flex flex-col items-center pointer-events-none";
+            const panelClass = isEmbedMode
+                ? "w-full h-full max-h-none rounded-none"
+                : (isExpanded
+                    ? "fixed inset-4 md:inset-auto md:w-[600px] md:h-[80vh] md:bottom-32 md:left-1/2 md:-translate-x-1/2 z-50"
+                    : "w-[calc(100vw-32px)] md:w-[380px] h-[550px] max-h-[calc(100vh-140px)]");
+            const panelSpacingClass = isEmbedMode ? "" : "mb-4";
+            const modelPickerClass = `flex flex-row gap-3 mb-4 items-center justify-center transition-all duration-300 pointer-events-auto 
+                    ${(!isChatOpen || isModelPickerOpen) ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-10 scale-90 pointer-events-none absolute bottom-20'}
+                `;
+            const modelPicker = (
+                <div className={modelPickerClass}>
+                    <div className="absolute inset-0 -z-10 bg-white/0 rounded-full blur-xl"></div>
+                    {Object.values(models).map((model) => {
+                        const isSelected = selectedModel === model.id;
+                        return (
+                        <div key={model.id} className="group relative flex flex-col items-center">
+                            <button
+                                onClick={() => handleModelSelect(model.id)}
+                                className={`
+                                dm-ai-model-btn dm-avatar-ring w-12 h-12 rounded-full shadow-sm flex items-center justify-center transition-all duration-300 border border-slate-200/70
+                                ${model.buttonColor || model.color} ${model.buttonHoverColor || model.hoverColor}
+                                ${isSelected ? `ring-1 ring-offset-1 ${model.ringColor || 'ring-blue-400'} scale-110` : 'hover:scale-110 opacity-95 hover:opacity-100'}
+                                `}
+                                title={`Seleccionar ${model.name}`}
+                            >
+                                {model.icon}
+                            </button>
+                            <span className={`
+                                absolute -top-8 text-[10px] font-bold px-2 py-0.5 rounded shadow-sm transition-all duration-200 whitespace-nowrap
+                                ${isSelected ? 'bg-slate-800 text-white opacity-100 translate-y-0' : 'bg-white text-slate-600 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0'}
+                            `}>
+                                {model.shortName}
+                            </span>
+                        </div>
+                        );
+                    })}
+                </div>
+            );
+
+            return (
+                <div className={shellClass}>
+                
+                {/* --- 1. VENTANA DE CHAT --- */}
+                {isChatOpen && (
+                    <div
+                        className={`pointer-events-auto overflow-hidden bg-white border border-gray-200 shadow-xl rounded-3xl lg:rounded-[2rem] flex flex-col transition-all duration-300 origin-bottom ${panelSpacingClass} ${panelClass} dm-chat-frame`}
+                        style={{ borderColor: accentSoftBorder }}
+                    >
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-4 py-3" style={{ backgroundColor: accent }}>
+                        <div className="flex items-center gap-3">
+                            {renderBotAvatar("w-8 h-8 rounded-full")}
+                            <span className="text-white font-bold tracking-tight">Boti Brisa - Asistente IA</span>
+                        </div>
+                        <button
+                            onClick={requestClosePanel}
+                            className="p-2 rounded-full text-white hover:bg-white/15 active:bg-white/20 transition"
+                            title="Cerrar"
+                            aria-label="Cerrar"
+                        >
+                            <X size={18} />
+                        </button>
+                    </div>
+
+                    {/* Sub-header */}
+                    <div className="bg-gray-50 border-b border-black/5 px-4 py-3 flex items-center justify-between gap-3">
+                        <div className="bg-white border border-black/5 shadow-sm rounded-full px-3 py-2 flex items-center gap-2">
+                            <span className="w-5 h-5 flex items-center justify-center">
+                                {activeModelMeta?.icon}
+                            </span>
+                            <span className="text-sm font-medium text-slate-800">{modelName}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <span className="text-xs text-slate-500">Change Model</span>
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={isGemini}
+                                aria-label="Change model"
+                                onClick={toggleModel}
+                                className="relative inline-flex h-6 w-11 items-center rounded-full transition"
+                                style={{ backgroundColor: accent }}
+                            >
+                                <span
+                                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${isGemini ? "translate-x-5" : "translate-x-1"}`}
+                                />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Chat Body */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 relative dm-chat-messages">
+                        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: "radial-gradient(#000 1px, transparent 1px)", backgroundSize: "20px 20px" }}></div>
+                        {messages.map((msg) => (
+                            <div key={msg.id} className={`flex w-full group ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            <div
+                                className={`max-w-[85%] px-4 py-3 text-sm shadow-sm leading-relaxed ${
+                                    msg.role === 'user'
+                                        ? 'text-white rounded-2xl rounded-tr-none'
+                                        : msg.role === 'system'
+                                        ? 'bg-slate-100 text-slate-600 rounded-xl text-center text-xs border border-slate-200 w-full mb-2'
+                                        : 'bg-white border border-slate-200 text-slate-700 rounded-2xl rounded-tl-none'
+                                }`}
+                                style={msg.role === 'user' ? { backgroundColor: accent } : undefined}
+                            >
+                                {renderMessageText(msg.text)}
+                            </div>
+                            </div>
+                        ))}
+                        {isTyping && (
+                        <div className="flex justify-start"><div className="bg-white px-4 py-3 rounded-2xl rounded-tl-none shadow-sm flex gap-1"><span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span><span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce delay-100"></span></div></div>
+                        )}
+                        <div ref={messagesEndRef} />
+                    </div>
+
+                    {/* Chat Input Redise�ado */}
+                    <div className="p-3 bg-white border-t border-slate-100 relative">
+                        
+                        {/* Previsualizaci�n de imagen (Pop-up flotante) */}
+                        {selectedFile && (
+                            <div className="absolute -top-16 left-4 bg-white p-2 rounded-xl shadow-lg border border-slate-200 flex items-center gap-3 animate-in slide-in-from-bottom-4">
+                                <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-slate-100">
+                                    <img src={URL.createObjectURL(selectedFile)} alt="Preview" className="w-full h-full object-cover" />
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] text-slate-500 font-medium truncate max-w-[120px]">Adjunto</span>
+                                    <span className="text-[10px] text-slate-400 truncate max-w-[120px]">{selectedFile.name}</span>
+                                </div>
+                                <button onClick={() => setSelectedFile(null)} className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-red-500 transition-colors">
+                                    <X size={14} />
+                                </button>
+                            </div>
+                        )}
+
+                        <div className="flex items-center gap-2 min-h-[52px] bg-slate-50 border border-slate-200 rounded-2xl px-2 py-2 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                            
+                            {/* Input de archivo oculto + Bot�n Clip */}
+                            <input 
+                                type="file" 
+                                ref={fileInputRef} 
+                                className="hidden" 
+                                accept="image/*"
+                                onChange={handleFileSelect} 
+                            />
+                            <button 
+                                onClick={() => fileInputRef.current?.click()}
+                                className={`p-2 rounded-xl transition-all duration-200 mb-0.5 ${selectedFile ? 'text-blue-600 bg-blue-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50'}`}
+                                title="Adjuntar imagen cl�nica"
+                            >
+                                <Paperclip size={20} />
+                            </button>
+                            {/* NUEVO: Boton Microfono */}
+                            <button 
+                                onClick={toggleListening}
+                                className={`p-2 rounded-xl transition-all duration-200 mb-0.5 ${isListening ? 'bg-red-500 text-white animate-pulse shadow-md' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50'}`}
+                                title="Dictar por voz"
+                            >
+                                {isListening ? <MicOff size={20} /> : <Mic size={20} />}
+                            </button>
+
+                            {/* �rea de Texto */}
+                            <textarea 
+                                ref={textareaRef} 
+                                value={inputText} 
+                                onChange={(e) => setInputText(e.target.value)} 
+                                onKeyDown={handleKeyPress} 
+                                placeholder={selectedFile ? "A�ade un comentario a la imagen..." : "Escriba su consulta..."} 
+                                className="w-full flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-sm leading-5 resize-none py-2.5 min-h-[44px] text-slate-700 max-h-32 placeholder:text-slate-400" 
+                                rows={1} 
+                                style={{ height: '44px' }} 
+                            />
+                            
+                            {/* Bot�n Enviar */}
+                            <button 
+                                onClick={handleSend} 
+                                disabled={(!inputText.trim() && !selectedFile) || isTyping} 
+                                className={`p-2.5 rounded-xl mb-0.5 transition-all duration-300 shadow-sm ${(!inputText.trim() && !selectedFile) ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' : 'text-white hover:brightness-95 active:brightness-90 hover:shadow-md active:scale-95'}`}
+                                style={(!inputText.trim() && !selectedFile) || isTyping ? undefined : { backgroundColor: accent }}
+                            >
+                                <Send size={18} />
+                            </button>
+                        </div>
+                    </div>
+                    </div>
+                )}
+
+                {/* --- 2. BARRA HORIZONTAL DE MODELOS --- */}
+                {!isEmbedMode && modelPicker}
+
+                {/* --- 3. BOTÓN PRINCIPAL (Boti Brisa) --- */}
+                {!isEmbedMode && (
+                <div className="relative group pointer-events-auto">
+                    {isChatOpen && (
+                    <button
+                        type="button"
+                        onClick={() => setIsModelPickerOpen((prev) => !prev)}
+                        className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 cursor-pointer"
+                        title="Cambiar modelo"
+                    >
+                        <span className={`w-9 h-9 rounded-full border border-slate-200/70 shadow-sm flex items-center justify-center ${models[selectedModel].buttonColor || models[selectedModel].color}`}>
+                            {models[selectedModel].icon}
+                        </span>
+                    </button>
+                    )}
+                    <button 
+                    onClick={() => setIsChatOpen(!isChatOpen)}
+                    className={`relative w-20 h-20 md:w-24 md:h-24 rounded-full shadow-lg border border-white/80 overflow-hidden transition-all duration-300 hover:scale-105 active:scale-95 bg-white
+                        ${isChatOpen ? 'ring-1 ring-slate-200/80' : ''}
+                    `}
+                    >
+                        {renderBotAvatar("absolute inset-0 w-full h-full object-cover")}
+                    </button>
+
+                    {!isChatOpen && (
+                    <div className="absolute top-0 left-1 w-6 h-6 bg-emerald-500 rounded-full border border-white/90 shadow-sm z-30 flex items-center justify-center text-white text-[9px] font-bold tracking-wide text-center leading-none">
+                        IA
+                    </div>
+                    )}
+                </div>
+                )}
+
+                </div>
+            );
+        };
+
+        const root = createRoot(document.getElementById('root'));
+        
+        // AQU� ES DONDE TU P�GINA LE PASAR� EL NOMBRE REAL DEL USUARIO LOGUEADO
+        // Por ahora, lo ponemos "a mano" para probar:
+        // Usamos \u00E1 para 'á' y \u00F1 para 'ñ' para evitar errores de encoding
+        root.render(<MedicalChatWidget nombreUsuario="Dr. Hern\u00E1n" />);
+    </script>
+</body>
+</html>

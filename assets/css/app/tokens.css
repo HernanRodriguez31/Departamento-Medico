@@ -1,0 +1,46 @@
+:root {
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-14: 56px;
+
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+
+  --shadow-1: 0 6px 16px rgba(15, 23, 42, 0.08);
+  --shadow-2: 0 12px 30px rgba(15, 23, 42, 0.12);
+  --shadow-3: 0 20px 40px rgba(15, 23, 42, 0.12);
+
+  --blur-sm: 12px;
+  --blur-md: 16px;
+  --blur-lg: 20px;
+
+  --color-brisa-50: #f4f7ef;
+  --color-brisa-100: #eef6e8;
+  --color-brisa-200: #dff0c1;
+  --color-brisa-400: #9ad100;
+  --color-brisa-500: #7ab800;
+  --color-brisa-600: #5e8f00;
+  --color-brisa-700: #446700;
+
+  --color-neutral-0: #ffffff;
+  --color-neutral-50: #f8fafc;
+  --color-neutral-100: #f1f5f9;
+  --color-neutral-200: #e2e8f0;
+  --color-neutral-500: #64748b;
+  --color-neutral-700: #334155;
+  --color-neutral-900: #0f172a;
+  --color-border-subtle: rgba(15, 23, 42, 0.08);
+
+  --font-sans: "Manrope", "Helvetica Neue", Arial, sans-serif;
+  --text-title-xl: clamp(1.6rem, 1.2rem + 1.6vw, 2.4rem);
+  --text-title-lg: clamp(1.25rem, 1.05rem + 0.9vw, 1.8rem);
+  --text-title-md: clamp(1.05rem, 0.95rem + 0.4vw, 1.25rem);
+  --text-body: 0.95rem;
+  --text-caption: 0.75rem;
+}

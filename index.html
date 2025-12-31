@@ -1,0 +1,4065 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+    <title>Dto Médico</title>
+    <meta name="description" content="Espacio de trabajo colaborativo para el crecimiento colectivo.">
+    <meta name="application-name" content="Dto Médico">
+    <meta name="apple-mobile-web-app-title" content="Dto Médico">
+    <meta name="theme-color" content="#7AB800">
+    <script>
+        // Mobile guard: send small screens to the app shell unless ?desktop=1 is present.
+        (() => {
+            const isMobile = window.matchMedia('(max-width: 1024px)').matches;
+            if (!isMobile) return;
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('desktop') === '1') return;
+            window.location.replace(`/app/index.html${window.location.hash || ''}`);
+        })();
+    </script>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/assets/icons/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Dto Médico | Brisa salud y bienestar">
+    <meta property="og:description" content="Espacio de trabajo colaborativo para el crecimiento colectivo.">
+    <meta property="og:image" content="/assets/images/og-dto-medico.jpg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:title" content="Dto Médico | Brisa salud y bienestar">
+    <meta property="twitter:description" content="Espacio de trabajo colaborativo para el crecimiento colectivo.">
+    <meta property="twitter:image" content="/assets/images/og-dto-medico.jpg">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <!-- Tailwind para foro -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brisa: {
+                            DEFAULT: '#7AB800',
+                            light: '#8bc71a',
+                            dark: '#689f00'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Manrope', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/variables.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/structure.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="assets/css/pages/index.css">
+    <link rel="stylesheet" href="assets/css/core-contrast.css">
+
+    <style>
+        /* Fondo general igual al de comités */
+        body {
+            background-color: var(--body-color);
+            --dm-page-bg: none;
+            background-image: none;
+        }
+
+        /* Card principal */
+        .section-card {
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 16px 50px rgba(15, 23, 42, 0.06);
+            transition: transform 200ms ease, box-shadow 200ms ease;
+        }
+
+        .section-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+        }
+
+        /* Textarea del foro */
+        .forum-textarea {
+            --forum-line-height: 1.4rem;
+            --forum-min-lines: 1.5;
+            --forum-max-lines: 5;
+            line-height: var(--forum-line-height);
+            min-height: calc(var(--forum-line-height) * var(--forum-min-lines));
+            max-height: calc(var(--forum-line-height) * var(--forum-max-lines));
+            resize: none;
+            overflow-y: hidden;
+        }
+
+        /* Popover de likes en el foro */
+        .dm-like-popover {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            min-width: 220px;
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            box-shadow: 0 18px 38px rgba(15, 23, 42, 0.12);
+            padding: 10px 12px;
+            color: #111827;
+            font-size: 12px;
+            line-height: 1.4;
+            z-index: 30;
+        }
+
+        .dm-like-popover::before {
+            content: '';
+            position: absolute;
+            top: -6px;
+            right: 12px;
+            width: 10px;
+            height: 10px;
+            background: #ffffff;
+            border-left: 1px solid #e5e7eb;
+            border-top: 1px solid #e5e7eb;
+            transform: rotate(45deg);
+        }
+
+        .dm-like-popover__title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #6b7280;
+            margin-bottom: 6px;
+        }
+
+        .dm-like-name {
+            font-size: 12px;
+            color: #111827;
+            padding: 2px 0;
+        }
+
+        .dm-like-empty {
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        /* Bordes decorativos (si los usa el foro general) */
+        .card-accent {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card-accent--left::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 6px;
+            height: 100%;
+            background: linear-gradient(180deg, rgba(122, 184, 0, 0.9), rgba(122, 184, 0, 0.55));
+            border-top-left-radius: inherit;
+            border-bottom-left-radius: inherit;
+        }
+
+        .card-accent--top::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, #7AB800, #2563EB);
+            border-top-left-radius: inherit;
+            border-top-right-radius: inherit;
+        }
+
+        /* Hero Card Container */
+        .referente-hero-card {
+            position: relative;
+            border-radius: 1.75rem;
+            background: #ffffff;
+            box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+            overflow: hidden;
+            margin-bottom: 2rem;
+            padding: 1rem 0;
+            /* Vertical breathing room */
+        }
+
+        .referente-hero-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 6px;
+            background: linear-gradient(90deg, #7AB800, #a9db2f);
+        }
+
+        /* Hero card content layout */
+        .referente-hero {
+            display: flex;
+            align-items: center;
+            gap: 3.5rem;
+            /* More air */
+            max-width: 92%;
+            /* Wider */
+            margin: 2rem auto;
+        }
+
+        .referente-hero-photo {
+            flex-shrink: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .referente-hero-photo img {
+            width: 160px;
+            height: 160px;
+            /* Big increase */
+            border-radius: 999px;
+            object-fit: cover;
+            box-shadow: none;
+        }
+
+        .referente-hero-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+
+        .referente-hero-name {
+            font-size: 2.2rem;
+            /* Huge impact */
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            color: #111827;
+            margin-bottom: 0.3rem;
+        }
+
+        .referente-hero-role {
+            font-size: 1.05rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: #7AB800;
+            margin-bottom: 0.3rem;
+        }
+
+        .referente-hero-subrole {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #4b5563;
+            margin-bottom: 0.8rem;
+        }
+
+        .referente-hero-desc {
+            font-size: 1.05rem;
+            color: #6b7280;
+            line-height: 1.6;
+            max-width: 95%;
+        }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+            .referente-hero-card {
+                padding: 0.5rem 0;
+            }
+
+            .referente-hero {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+                max-width: 100%;
+                margin: 1.2rem 1.25rem 1.6rem;
+                gap: 1.25rem;
+                padding-left: 0 !important;
+                /* Reset desktop padding */
+            }
+
+            .referente-hero-photo img {
+                width: 120px;
+                height: 120px;
+                /* Still notable on mobile */
+            }
+
+            .referente-hero-body {
+                align-items: center;
+                text-align: center;
+            }
+
+            .referente-hero-name {
+                font-size: 1.55rem;
+                margin-bottom: 0.2rem;
+            }
+
+            .referente-hero-role {
+                font-size: 0.82rem;
+                letter-spacing: 0.08em;
+                margin-bottom: 0.35rem;
+            }
+
+            .referente-hero-subrole {
+                font-size: 0.95rem;
+                margin-bottom: 0.6rem;
+            }
+
+            .referente-hero-desc {
+                font-size: 0.95rem;
+                line-height: 1.45;
+                max-width: 100%;
+            }
+        }
+
+        /* --- LEADER CARD (Tier 2) --- */
+        .leader-card {
+            background: #FFFFFF;
+            border-radius: 1.5rem;
+            padding: 2rem 1.5rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+            position: relative;
+            overflow: hidden;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .leader-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: #7AB800;
+            /* Solid Corporate Green */
+        }
+
+        .leader-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Leader Specific Overrides */
+        .leader-card .referente__img-wrapper {
+            width: 125px;
+            height: 125px;
+            margin-bottom: 1.5rem;
+            box-shadow: none;
+            border-radius: 999px;
+            /* Ensure circle */
+            border: none;
+            background: transparent;
+        }
+
+        /* Ensure image fits wrapper */
+        .leader-card .referente__img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .leader-card .referente__name {
+            font-size: 1.35rem;
+            /* Elegant reduction for prolijo look */
+            color: #111827;
+            margin-bottom: 0.4rem;
+        }
+
+        .leader-card .referente__role {
+            font-size: 0.85rem;
+            /* Precise hierarchy */
+            letter-spacing: 0.08em;
+            margin-bottom: 0.5rem;
+        }
+
+        .leader-card .referente__desc {
+            font-size: 0.95rem;
+            line-height: 1.6;
+            color: #6b7280;
+        }
+
+        /* --- COORDINATOR CARD (Tier 3) --- */
+        .coordinator-card-tier {
+            background: #FFFFFF;
+            border-radius: 1.5rem;
+            /* Match Leaders radius */
+            padding: 2rem 1.5rem;
+            /* Increased vertical padding */
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+            /* More visible neat gray shadow */
+            position: relative;
+            overflow: hidden;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            transition: all 0.3s ease;
+            border: none;
+        }
+
+        .coordinator-card-tier::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: #7AB800;
+        }
+
+        .coordinator-card-tier:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.12);
+        }
+
+        .coordinator-card-tier .coordinator__img-wrapper {
+            width: 125px;
+            /* Increased to 125px */
+            height: 125px;
+            margin-bottom: 1.2rem;
+            border-radius: 999px;
+            box-shadow: none;
+            border: none !important;
+            /* Force removal */
+            background: transparent !important;
+            padding: 0;
+            /* Safety */
+            overflow: hidden;
+            /* Ensure zoom doesn't spill */
+        }
+
+        .coordinator-card-tier:hover .coordinator__img-wrapper {
+            box-shadow: none;
+            transform: none;
+        }
+
+        .coordinator-card-tier .coordinator__img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scale(1.15);
+            /* Aggressive zoom to hide white edges */
+            display: block;
+        }
+
+        .coordinator-card-tier .coordinator__name {
+            font-size: 1.1rem;
+            color: #1F2937;
+            margin-bottom: 0.2rem;
+        }
+
+        .coordinator-card-tier .coordinator__role {
+            font-size: 0.85rem;
+            color: #7AB800;
+            font-weight: 600;
+        }
+
+
+    </style>
+    <style>
+        /* CONTENEDOR RAÍZ */
+        #brisa-chat-root {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 21500;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+        }
+
+        /* BURBUJA PRINCIPAL (Médicos conectados) */
+        .brisa-chat-bubble {
+            position: fixed;
+            bottom: var(--dm-fab-bottom);
+            left: 28px;
+            width: 58px;
+            height: 58px;
+            border-radius: 999px;
+            background: radial-gradient(circle at 20% 0%, #8fcd1f, #5a8a00);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.24);
+            cursor: pointer;
+            pointer-events: auto;
+            opacity: 0;
+            transform: translateY(24px);
+            animation: fab-float-up 0.6s ease-out 0.25s forwards;
+        }
+
+        .brisa-chat-bubble-icon {
+            width: 26px;
+            height: 26px;
+            color: #ffffff;
+        }
+
+        .brisa-chat-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 4px;
+            border-radius: 999px;
+            background: #e53935;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 600;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(229, 57, 53, 0.35);
+        }
+
+        /* PANEL LISTA DE MÉDICOS CONECTADOS */
+        .brisa-chat-panel {
+            position: fixed;
+            bottom: calc(var(--dm-fab-bottom) + 66px);
+            left: 28px;
+            width: 260px;
+            max-height: 420px;
+            background: rgba(255, 255, 255, 0.94);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            z-index: 21501;
+            border-radius: 18px;
+            border: 1px solid rgba(255, 255, 255, 0.65);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
+            overflow: hidden;
+            display: none;
+            pointer-events: auto;
+        }
+
+        .brisa-chat-panel-header {
+            padding: 10px 14px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .brisa-chat-panel-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #243220;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .brisa-chat-online-count {
+            font-size: 12px;
+            font-weight: 800;
+            color: #7ab800;
+        }
+
+        .brisa-chat-panel-subtitle {
+            font-size: 11px;
+            color: #6b7280;
+        }
+
+        .brisa-chat-panel-body {
+            max-height: 360px;
+            overflow-y: auto;
+        }
+
+        .brisa-chat-section-label {
+            padding: 6px 14px 4px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #9ca3af;
+        }
+
+        .brisa-chat-row {
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: background 0.15s ease;
+            position: relative;
+        }
+
+        .brisa-chat-row:hover {
+            background: rgba(122, 184, 0, 0.06);
+        }
+
+        .brisa-chat-row-main {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+
+        .brisa-chat-name {
+            font-size: 13px;
+            font-weight: 500;
+            color: #111827;
+        }
+
+        .brisa-chat-meta {
+            font-size: 11px;
+            color: #6b7280;
+        }
+
+        .brisa-chat-status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: #9ca3af;
+            box-shadow: 0 0 0 0 rgba(122, 184, 0, 0.55);
+        }
+
+        .brisa-chat-status-dot--online {
+            background: #7ab800;
+            box-shadow: 0 0 8px 0 rgba(122, 184, 0, 0.9);
+        }
+
+        .brisa-chat-icon-btn {
+            width: 24px;
+            height: 24px;
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            background: rgba(122, 184, 0, 0.08);
+            cursor: pointer;
+        }
+
+        .brisa-chat-icon-btn svg {
+            width: 16px;
+            height: 16px;
+            color: #5a8a00;
+        }
+
+        .brisa-chat-row--disabled {
+            cursor: default;
+        }
+
+        .brisa-chat-row--disabled:hover {
+            background: transparent;
+        }
+
+        .brisa-chat-row--unread {
+            background: linear-gradient(90deg, rgba(122, 184, 0, 0.08), rgba(122, 184, 0, 0));
+        }
+
+        .brisa-chat-row-unread {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            min-width: 16px;
+            height: 16px;
+            padding: 0 6px;
+            border-radius: 999px;
+            background: #e53935;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 700;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 6px 12px rgba(229, 57, 53, 0.35);
+        }
+
+        /* VENTANA DE CHAT */
+        .brisa-chat-window {
+            position: fixed;
+            bottom: 84px;
+            left: 292px;
+            width: 320px;
+            max-height: 420px;
+            background: linear-gradient(160deg, rgba(255, 255, 255, 0.98), rgba(247, 249, 252, 0.95));
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border-radius: 18px;
+            border: 1px solid rgba(15, 23, 42, 0.05);
+            box-shadow: 0 14px 38px rgba(15, 23, 42, 0.16);
+            display: none;
+            flex-direction: column;
+            pointer-events: auto;
+        }
+
+        .brisa-chat-window-header {
+            padding: 8px 12px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.9));
+            border-radius: 18px 18px 0 0;
+        }
+
+        .brisa-chat-window-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #111827;
+            flex: 1;
+        }
+
+        .brisa-chat-window-subtitle {
+            font-size: 11px;
+            color: #6b7280;
+            text-align: center;
+            padding: 0 16px;
+        }
+
+        .brisa-chat-window-actions {
+            display: flex;
+            gap: 4px;
+        }
+
+        .brisa-chat-pill-btn {
+            width: 26px;
+            height: 26px;
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.4);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(180deg, #ffffff, #f4f6f8);
+        }
+
+        .brisa-chat-pill-btn svg {
+            width: 14px;
+            height: 14px;
+            color: #4b5563;
+        }
+
+        .brisa-chat-pill-btn:hover {
+            box-shadow: 0 6px 12px rgba(15, 23, 42, 0.08);
+            transform: translateY(-1px);
+        }
+
+        .brisa-chat-pill-btn[data-tooltip] {
+            position: relative;
+        }
+
+        .brisa-chat-pill-btn[data-tooltip]:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            top: -36px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ffffff;
+            color: #4b5563;
+            padding: 6px 10px;
+            border-radius: 10px;
+            border: 1px solid #d1d5db;
+            font-size: 11px;
+            white-space: nowrap;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+            opacity: 1;
+            pointer-events: none;
+            transition: opacity 120ms ease, transform 120ms ease;
+        }
+
+        .brisa-chat-pill-btn[data-tooltip]::after {
+            content: '';
+            opacity: 0;
+        }
+
+        .brisa-chat-pill-btn[data-tooltip]:hover::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-bottom-color: #d1d5db;
+            opacity: 1;
+            transition: opacity 120ms ease;
+        }
+
+        .brisa-chat-window-body {
+            padding: 8px 8px 6px;
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .brisa-chat-msg {
+            max-width: 80%;
+            border-radius: 14px;
+            padding: 6px 8px;
+            padding-right: 26px;
+            font-size: 12px;
+            line-height: 1.35;
+            display: inline-flex;
+            flex-direction: column;
+            gap: 2px;
+            position: relative;
+        }
+
+        .brisa-chat-msg--me {
+            margin-left: auto;
+            background: linear-gradient(135deg, #7ab800, #5a8a00);
+            color: #ffffff;
+        }
+
+        .brisa-chat-msg--other {
+            margin-right: auto;
+            background: rgba(243, 244, 246, 0.96);
+            color: #111827;
+        }
+
+        .brisa-chat-msg-author {
+            font-size: 10px;
+            font-weight: 600;
+            opacity: 0.8;
+        }
+
+        .brisa-chat-msg-time {
+            font-size: 10px;
+            opacity: 0.7;
+            align-self: flex-end;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 6px;
+            width: 100%;
+        }
+
+        .brisa-chat-window-footer {
+            padding: 6px 8px 8px;
+            border-top: 1px solid rgba(0, 0, 0, 0.04);
+            display: flex;
+            gap: 4px;
+        }
+
+        .brisa-chat-input {
+            flex: 1;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.8);
+            padding: 6px 10px;
+            font-size: 12px;
+            outline: none;
+        }
+
+        .brisa-chat-input:focus {
+            border-color: #7ab800;
+            box-shadow: 0 0 0 1px rgba(122, 184, 0, 0.35);
+        }
+
+        .brisa-chat-send-btn {
+            border-radius: 999px;
+            border: none;
+            padding: 0 12px;
+            background: linear-gradient(135deg, #7ab800, #5a8a00);
+            color: #fff;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .brisa-chat-send-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        /* PÍLDORA MINIMIZADA */
+        .brisa-chat-pill {
+            position: fixed;
+            bottom: 18px;
+            left: 86px;
+            height: 34px;
+            max-width: 220px;
+            padding: 0 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(209, 213, 219, 0.85);
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
+            display: none;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            pointer-events: auto;
+        }
+
+        .brisa-chat-pill-tray {
+            position: fixed;
+            bottom: 18px;
+            left: 86px;
+            display: flex;
+            flex-direction: column-reverse;
+            gap: 8px;
+            align-items: flex-start;
+            z-index: 9999;
+            pointer-events: auto;
+        }
+
+        .brisa-chat-pill--tray {
+            position: static;
+            width: 210px;
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            padding-left: 10px;
+            padding-right: 10px;
+        }
+
+        .brisa-chat-pill-label {
+            font-size: 12px;
+            color: #111827;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .brisa-chat-pill-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            background: #7ab800;
+        }
+
+        .brisa-chat-pill-actions {
+            display: flex;
+            gap: 4px;
+            margin-left: 6px;
+            margin-left: auto;
+        }
+
+        .brisa-chat-status-icon {
+            font-size: 11px;
+            vertical-align: middle;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 18px;
+            margin-left: 2px;
+        }
+
+        .brisa-chat-status-icon--pending {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.25);
+            padding: 1px 4px;
+            border-radius: 10px;
+        }
+
+        .brisa-chat-status-icon--sent {
+            color: #e5e7eb;
+            background: rgba(255, 255, 255, 0.18);
+            padding: 1px 4px;
+            border-radius: 10px;
+        }
+
+        .brisa-chat-status-icon--read {
+            color: #0ea5e9;
+            background: rgba(14, 165, 233, 0.12);
+            padding: 1px 4px;
+            border-radius: 10px;
+            font-weight: 700;
+        }
+
+        .brisa-chat-delete-btn {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            border: none;
+            background: transparent;
+            color: #ffffff;
+            font-size: 12px;
+            cursor: pointer;
+            opacity: 0.7;
+        }
+
+        .brisa-chat-delete-btn:hover {
+            opacity: 1;
+            transform: scale(1.05);
+        }
+
+        .brisa-chat-toast {
+            position: fixed;
+            left: 18px;
+            bottom: 140px;
+            padding: 10px 14px;
+            border-radius: 12px;
+            background: rgba(17, 24, 39, 0.85);
+            color: #fff;
+            font-size: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.25s ease;
+            pointer-events: none;
+            z-index: 10000;
+        }
+
+        .brisa-chat-toast.is-visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .brisa-chat-mini-modal {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: flex-end;
+            justify-content: center;
+            padding: 0 16px 120px;
+            background: rgba(0, 0, 0, 0.08);
+            z-index: 10000;
+            pointer-events: auto;
+        }
+
+        .brisa-chat-mini-modal.is-visible {
+            display: flex;
+        }
+
+        .brisa-chat-mini-card {
+            background: #ffffff;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            border-radius: 14px;
+            box-shadow: 0 14px 36px rgba(0, 0, 0, 0.12);
+            padding: 12px;
+            width: min(260px, 90vw);
+            pointer-events: auto;
+        }
+
+        .brisa-chat-mini-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 8px;
+        }
+
+        .brisa-chat-mini-input {
+            width: 100%;
+            border: 1px solid rgba(148, 163, 184, 0.6);
+            border-radius: 10px;
+            padding: 8px 10px;
+            font-size: 13px;
+            margin-bottom: 10px;
+        }
+
+        .brisa-chat-mini-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .brisa-chat-mini-btn {
+            border: 1px solid rgba(148, 163, 184, 0.45);
+            background: #ffffff;
+            color: #374151;
+            border-radius: 10px;
+            padding: 6px 10px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .brisa-chat-mini-btn--danger {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: #fff;
+            border: none;
+        }
+
+        .brisa-chat-pill-btn-mini {
+            width: 20px;
+            height: 20px;
+            border-radius: 8px;
+            border: 1px solid rgba(148, 163, 184, 0.45);
+            background: linear-gradient(180deg, #ffffff, #f4f6f8);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 11px;
+            color: #4b5563;
+            transition: transform 0.12s ease, box-shadow 0.12s ease;
+        }
+
+        .brisa-chat-pill-btn-mini:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 12px rgba(15, 23, 42, 0.06);
+        }
+
+        .brisa-chat-pill--blink {
+            animation: brisa-pill-blink 1s infinite;
+        }
+
+        @keyframes brisa-pill-blink {
+
+            0%,
+            100% {
+                background: rgba(255, 255, 255, 0.9);
+            }
+
+            50% {
+                background: linear-gradient(135deg, #7ab800, #5a8a00);
+                color: #fff;
+            }
+        }
+
+        /* MOBILE (simple ajuste) */
+        @media (max-width: 768px), (display-mode: standalone) {
+            .brisa-chat-bubble {
+                bottom: calc(var(--bottom-nav-h) + 16px + env(safe-area-inset-bottom));
+            }
+
+            .brisa-chat-panel {
+                left: 10px;
+                bottom: calc(var(--bottom-nav-h) + 84px + env(safe-area-inset-bottom));
+                width: 230px;
+            }
+
+            .brisa-chat-window {
+                left: 10px;
+                right: 10px;
+                width: auto;
+                bottom: calc(var(--bottom-nav-h) + 84px + env(safe-area-inset-bottom));
+            }
+
+            .brisa-chat-pill {
+                left: 78px;
+                right: auto;
+                max-width: 50vw;
+                bottom: calc(var(--bottom-nav-h) + 16px + env(safe-area-inset-bottom));
+            }
+
+            .brisa-chat-pill-tray {
+                bottom: calc(var(--bottom-nav-h) + 16px + env(safe-area-inset-bottom));
+            }
+
+            .brisa-chat-toast {
+                bottom: calc(var(--bottom-nav-h) + 120px + env(safe-area-inset-bottom));
+            }
+
+            .brisa-chat-mini-modal {
+                padding-bottom: calc(var(--bottom-nav-h) + 56px + env(safe-area-inset-bottom));
+            }
+        }
+
+        /* User panel */
+        .user-panel {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .user-panel-trigger {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            cursor: pointer;
+            color: #374151;
+            font-size: 0.9rem;
+            font-weight: 600;
+            padding: 0.45rem 0.75rem;
+            border-radius: 999px;
+            border: 0.5px solid rgba(148, 163, 184, 0.28);
+            background: #f5f7fa;
+            transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+        }
+
+        .user-panel-trigger:hover {
+            color: #111827;
+            background: #eef1f5;
+            border-color: rgba(148, 163, 184, 0.45);
+        }
+
+        .user-panel-icon {
+            width: 20px;
+            height: 20px;
+            color: #16a34a;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .user-panel-toggle {
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            background: transparent;
+            color: #9ca3af;
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+        }
+
+        .user-panel-toggle:hover {
+            color: #6b7280;
+            border-color: rgba(0, 0, 0, 0.18);
+            background: rgba(0, 0, 0, 0.03);
+            transform: translateY(-1px);
+        }
+
+        .user-panel-name {
+            color: #16a34a;
+            font-weight: 700;
+        }
+
+        .ui-info {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            border-radius: 999px;
+            background: #e7f5dc;
+            color: #2FAE50;
+            font-weight: 700;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .ui-tooltip {
+            position: absolute;
+            background: #fff;
+            color: #444;
+            border: 1px solid #e9e9e9;
+            box-shadow: 0 12px 24px rgba(0,0,0,0.12);
+            border-radius: 12px;
+            padding: 10px 12px;
+            font-size: 13px;
+            line-height: 1.35;
+            max-width: 360px; width: max-content;
+            width: max-content;
+            z-index: 1200;
+            display: none;
+            }
+
+        .user-menu__row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 2px;
+        }
+        .user-menu__row--primary {
+            padding-top: 6px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .user-menu__row--subtle {
+            border-bottom: 1px solid #e5e7eb;
+            padding-top: 10px;
+            padding-bottom: 10px;
+            color: #333;
+            font-weight: 500;
+        }
+        .user-menu__user {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+            font-size: 15px;
+            color: #0f172a;
+        }
+        .user-menu__avatar {
+            width: 26px;
+            height: 26px;
+            color: #16a34a;
+        }
+        .user-menu__label {
+            font-size: 13px;
+            color: #333;
+            flex: 1;
+        }
+        .user-menu__logout {
+            border: none;
+            background: transparent;
+            padding: 8px 2px;
+            color: #444;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: left;
+            width: 100%;
+        }
+        .user-menu__logout:hover {
+            color: #dc2626;
+            text-decoration: underline;
+        }
+
+        .push-toggle-inline {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: -2px;
+            font-size: 13px;
+        }
+        .push-toggle-label {
+            font-weight: 600;
+            color: #0f172a;
+        }
+        .push-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+        .push-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .push-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #d1d5db;
+            transition: 0.2s;
+            border-radius: 999px;
+        }
+        .push-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: #fff;
+            transition: 0.2s;
+            border-radius: 50%;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        }
+        .push-switch input:checked + .push-slider {
+            background-color: #7AB800;
+        }
+        .push-switch input:checked + .push-slider:before {
+            transform: translateX(20px);
+        }
+        .push-toggle-hint {
+            font-size: 11px;
+            color: #6b7280;
+        }
+
+        .push-banner {
+            position: fixed;
+            right: 16px;
+            bottom: 16px;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+            padding: 14px 16px;
+            max-width: 340px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .push-banner.hidden { display: none; }
+        .push-banner-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+        .push-banner button {
+            border: 0;
+            border-radius: 10px;
+            padding: 9px 12px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .push-banner-allow {
+            background: #22c55e;
+            color: #fff;
+        }
+        .push-banner-later {
+            background: #f3f4f6;
+            color: #111827;
+        }
+
+        .user-panel {
+            margin-left: 1rem;
+        }
+
+        .user-panel-dropdown {
+            position: absolute;
+            top: 3rem;
+            right: 0;
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 12px;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+            padding: 1rem;
+            width: 220px;
+            z-index: 200;
+        }
+
+        .user-panel-dropdown.hidden {
+            display: none;
+        }
+
+        .user-panel-info {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #111827;
+        }
+
+        .user-panel-question {
+            margin-top: 0.25rem;
+            font-size: 0.9rem;
+            color: #4b5563;
+            line-height: 1.4;
+        }
+
+        .logout-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .logout-btn {
+            flex: 1;
+            padding: 0.5rem 0.75rem;
+            border: 1.5px solid #16a34a;
+            background: transparent;
+            color: #16a34a;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .logout-btn:hover {
+            background: rgba(22, 163, 74, 0.08);
+            transform: translateY(-1px);
+        }
+
+        .logout-btn.cancel {
+            border-color: rgba(107, 114, 128, 0.35);
+            color: #374151;
+            background: #f9fafb;
+        }
+
+        .logout-btn.cancel:hover {
+            background: #f3f4f6;
+            transform: translateY(-1px);
+        }
+
+        .logout-btn.confirm {
+            border-color: #dc2626;
+            color: #dc2626;
+        }
+
+        .logout-btn.confirm:hover {
+            background: rgba(220, 38, 38, 0.08);
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+
+<body>
+
+    <header class="header" id="header">
+        <div class="container header__container">
+            <div class="header__left">
+                <div class="logo-wrapper">
+                    <a href="#" class="logo logo-brisa">
+                        <img src="assets/images/logo-brisa-transparent.png" alt="Brisa Salud y Bienestar"
+                            class="logo-img-brisa" width="200" height="85" decoding="async">
+                    </a>
+                    <a href="#" class="logo logo-heart">
+                        <img src="assets/images/logo-brisa-heart.png" alt="Brisa Salud y Bienestar" class="logo-img-heart"
+                            width="80" height="70" decoding="async">
+                    </a>
+                </div>
+            </div>
+
+            <div class="header__center">
+                <!-- Dynamic Header Title -->
+                <div class="header__title-center">Departamento Médico</div>
+            </div>
+
+            <div class="header__right">
+                <div class="header__actions">
+                    <div class="nav-notifications">
+                        <button id="dm-notif-btn" class="dm-notif-btn" type="button" aria-label="Notificaciones"
+                            aria-haspopup="menu" aria-expanded="false">
+                            <i data-lucide="bell"></i>
+                            <span id="dm-notif-badge" class="dm-notif-badge" hidden>0</span>
+                        </button>
+                        <span id="dm-msg-indicator" class="dm-msg-indicator" aria-label="Mensajes no leídos">
+                            <span id="dm-msg-badge" class="dm-msg-badge">0</span>
+                        </span>
+                        <div id="dm-notif-dropdown" class="dm-notif-dropdown" role="menu" aria-label="Notificaciones"
+                            hidden>
+                            <div class="dm-notif-dropdown__header">
+                                <span class="dm-notif-dropdown__title">Notificaciones</span>
+                                <button id="dm-notif-markall" class="dm-notif-dropdown__markall" type="button">Marcar leídas</button>
+                            </div>
+                            <div id="dm-notif-list" class="dm-notif-list"></div>
+                            <div class="dm-notif-dropdown__footer">
+                                <span class="dm-notif-dropdown__hint">Solo se muestran las últimas 12.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="user-panel" data-dm-user-menu data-variant="desktop">
+                        <div id="user-panel-trigger" class="user-panel-trigger" data-dm-user-trigger aria-haspopup="menu"
+                            aria-expanded="false">
+                            <span class="user-panel-icon" data-dm-user-avatar>
+                                <img class="user-avatar-img" data-dm-user-avatar-img
+                                    src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="Avatar"
+                                    loading="lazy" decoding="async" hidden>
+                                <span class="user-avatar-initials" data-dm-user-avatar-initials>DM</span>
+                            </span>
+                            <span id="user-display-name" class="user-name" data-dm-user-trigger-name>Dr. …</span>
+                            <span id="user-info-trigger" class="ui-info" aria-label="Información usuario">i</span>
+                        </div>
+                        <div id="user-panel-dropdown" class="user-panel-dropdown" data-dm-user-dropdown role="menu" hidden>
+                            <div class="user-menu__row user-menu__row--primary">
+                                <span class="user-menu__avatar" data-dm-user-avatar>
+                                    <img class="user-avatar-img" data-dm-user-avatar-img
+                                        src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="Avatar"
+                                        loading="lazy" decoding="async" hidden>
+                                    <span class="user-avatar-initials" data-dm-user-avatar-initials>DM</span>
+                                </span>
+                                <span id="user-panel-info" class="user-menu__user" data-dm-user-fullname>Usuario</span>
+                            </div>
+                            <div class="user-menu__row user-menu__row--subtle" data-dm-user-notif-toggle-row>
+                                <span class="user-menu__label">Notificaciones</span>
+                                <label class="push-switch">
+                                    <input id="push-toggle-menu" type="checkbox" aria-label="Notificaciones"
+                                        data-dm-user-notif-toggle data-dm-user-notif-external="1" />
+                                    <span class="push-slider"></span>
+                                </label>
+                                <span id="push-info-trigger" class="ui-info" aria-label="Información de notificaciones">i</span>
+                            </div>
+                            <div class="user-menu__row user-menu__row--subtle user-menu__row--photo"
+                                data-dm-user-avatar-upload-row>
+                                <span class="user-menu__label">Cambiar imagen de perfil</span>
+                                <label class="user-menu__action" for="profile-photo-input">Agregar</label>
+                                <input id="profile-photo-input" type="file" accept="image/*" data-dm-user-avatar-input hidden>
+                            </div>
+                            <div id="push-toggle-hint" class="push-toggle-hint" style="padding-top:2px;"></div>
+                            <button id="user-panel-logout" class="user-menu__logout" type="button" data-dm-user-logout>
+                                Cerrar sesión
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </header>
+  <!-- Desktop quick navigation sidebar (only desktop) -->
+  <aside id="dmDesktopSidebar" class="dm-desktop-sidebar" aria-label="Accesos rápidos">
+    <div class="dm-desktop-sidebar__inner">
+      <nav class="dm-cubes" aria-label="Accesos rápidos">
+        <button class="dm-cube" type="button" data-target="#kpi" aria-label="KPI">
+          <div class="dm-cube__content">
+            <span class="dm-cube__icon"><i data-lucide="bar-chart-3"></i></span>
+            <span class="dm-cube__label dm-cube__label--short">KPI</span>
+          </div>
+        </button>
+
+        <button class="dm-cube" type="button" data-target="#referentes" aria-label="Estructura">
+          <div class="dm-cube__content">
+            <span class="dm-cube__icon"><i data-lucide="network"></i></span>
+            <span class="dm-cube__label dm-cube__label--long">Estructura</span>
+          </div>
+        </button>
+
+        <button class="dm-cube" type="button" data-target="#comites" aria-label="Comités">
+          <div class="dm-cube__content">
+            <span class="dm-cube__icon">
+              <!-- Comités icon (custom) -->
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+            </span>
+            <span class="dm-cube__label dm-cube__label--long">Comités</span>
+          </div>
+        </button>
+
+        <button class="dm-cube" type="button" data-target="#carrete" aria-label="Registro gráfico">
+          <div class="dm-cube__content">
+            <span class="dm-cube__icon"><i data-lucide="image"></i></span>
+            <span class="dm-cube__label dm-cube__label--long">Registro<br>Gráfico</span>
+          </div>
+        </button>
+
+        <button class="dm-cube" type="button" data-target="#foro" aria-label="Foro">
+          <div class="dm-cube__content">
+            <span class="dm-cube__icon"><i data-lucide="message-square-text"></i></span>
+            <span class="dm-cube__label dm-cube__label--short">Foro</span>
+          </div>
+        </button>
+
+        <!-- Space for the Assistant bot (desktop only). JS moves #dmAssistantFab here on desktop -->
+        <div id="dmDesktopSidebarBotSlot" class="dm-desktop-sidebar__bot-slot" aria-label="Asistente IA"></div>
+      </nav>
+    </div>
+  </aside>
+
+
+    <div id="chat"></div>
+
+    <main class="main">
+        <!-- HERO / INTRO -->
+        <section id="estructura-hero" class="section text-center" style="padding-top: 9rem; padding-bottom: 1rem;">
+            <div class="container">
+                <h1 class="section__title mb-2">Departamento Médico</h1>
+                <p class="section__subtitle mb-2">Un ecosistema que potencia el talento</p>
+                <p class="section__description mb-1" style="font-size: 1.15rem;">
+                    Un espacio diseñado para conectar tus capacidades con el resto del equipo. Facilitamos la
+                    colaboración para impulsar juntos la excelencia médica y el desarrollo profesional.
+                </p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center max-w-3xl mx-auto w-full px-4 opacity-0 animate-fade-in-up"
+                    style="animation-delay: 0.2s; animation-fill-mode: forwards;">
+                    <!-- Button 1: Documento Estructural -->
+                    <a href="https://panamericanenergy.sharepoint.com/:w:/t/DepartamentoMdico/IQCn9k1SWqvHQ7LwvVmqlXc7Ab3PcoOW1hEzfo1loMO35fk?e=ZOxDy9"
+                        target="_blank" rel="noopener noreferrer"
+                        class="flex-1 group relative flex items-center justify-center gap-3 px-6 py-4 bg-white border border-gray-200 rounded-xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] hover:shadow-[0_8px_30px_-4px_rgba(37,99,235,0.2)] hover:border-blue-200 hover:-translate-y-1 transition-all duration-300">
+                        <div
+                            class="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors duration-300">
+                            <i data-lucide="file-text" class="w-6 h-6"></i>
+                        </div>
+                        <span
+                            class="font-bold text-gray-700 group-hover:text-blue-700 text-sm sm:text-base leading-tight">Documento
+                            Estructural</span>
+                    </a>
+
+                    <!-- Button 2: Documento de Conformación -->
+                    <a href="https://panamericanenergy.sharepoint.com/:w:/t/DepartamentoMdico/IQDGM2EdNEL1Tb8NrYRdkc_MATLevPm_etGV-klGCdtGrCI?e=luZdoc"
+                        target="_blank" rel="noopener noreferrer"
+                        class="flex-1 group relative flex items-center justify-center gap-3 px-6 py-4 bg-white border border-gray-200 rounded-xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] hover:shadow-[0_8px_30px_-4px_rgba(122,184,0,0.25)] hover:border-brisa hover:-translate-y-1 transition-all duration-300">
+                        <div
+                            class="p-2 bg-lime-50 text-brisa rounded-lg group-hover:bg-brisa group-hover:text-white transition-colors duration-300">
+                            <i data-lucide="users" class="w-6 h-6"></i>
+                        </div>
+                        <span
+                            class="font-bold text-gray-700 group-hover:text-brisa text-sm sm:text-base leading-tight">Documento
+                            de
+                            Conformación</span>
+                    </a>
+                </div>
+
+                <!-- Decorative Heart Logo -->
+                <div class="hero-logo">
+                    <img src="assets/images/logo-brisa-heart.png" alt="Brisa Heart" class="hero-logo__img"
+                        width="873" height="1024" decoding="async">
+                </div>
+            </div>
+        </section>
+
+        <!-- MISION -->
+        <section class="section" id="mision" style="padding-top: 1rem;">
+            <div class="container">
+                <div class="section__header">
+                    <h2 class="section__title medium-title">Misión y Objetivos</h2>
+                </div>
+                <div class="mision__container">
+                    <div class="mision__item">
+                        <h3>Misión</h3>
+                        <p>Garantizar la salud integral en todo el ciclo de la energía. Unificamos los estándares de
+                            atención tanto en la exigencia del <strong>Upstream</strong> como en la complejidad
+                            industrial del <strong>Downstream</strong>.</p>
+                    </div>
+                    <div class="mision__item">
+                        <h3>Visión</h3>
+                        <p>Ser el modelo de referencia en medicina empresarial, eliminando barreras geográficas para
+                            brindar la misma excelencia en <strong>áreas remotas</strong>, <strong>refinerías</strong> y
+                            <strong>sedes corporativas</strong>.
+                        </p>
+                    </div>
+                    <div class="mision__item">
+                        <h3>Valores</h3>
+                        <ul>
+                            <li><strong>Estandarización:</strong> Calidad única en cada sector.</li>
+                            <li><strong>Adaptabilidad:</strong> Gestión de riesgo remoto e industrial.</li>
+                            <li><strong>Equidad:</strong> El mismo cuidado para cada colaborador.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- KPI – Nuestras métricas -->
+        <section id="kpi" class="hero-dashboard" aria-label="KPI — Nuestras métricas">
+            <div class="container">
+                <div class="section__header">
+                    <h2 class="section__title medium-title">KPI's - Indicadores.</h2>
+                    <p class="section__subtitle section__subtitle--brisa">Parámetros del Departamento.</p>
+                </div>
+
+                <div class="hero-kpis" role="list">
+                    <article class="kpi-card" role="listitem">
+                        <div class="kpi-icon"><i data-lucide="users"></i></div>
+                        <div id="kpi-members" class="kpi-value tabular-nums" data-dynamic="false">32</div>
+                        <div class="kpi-label">Integrantes del equipo</div>
+                    </article>
+
+                    <article class="kpi-card" role="listitem">
+                        <div class="kpi-icon"><i data-lucide="layers"></i></div>
+                        <div id="kpi-committees" class="kpi-value tabular-nums">0</div>
+                        <div class="kpi-label">Comités especializados</div>
+                    </article>
+
+                    <article class="kpi-card" role="listitem">
+                        <div class="kpi-icon"><i data-lucide="folder-kanban"></i></div>
+                        <div id="kpi-projects" class="kpi-value tabular-nums">0</div>
+                        <div class="kpi-label">Proyectos en curso</div>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <!-- REFERENTES -->
+        <section class="section" id="referentes">
+            <div class="container">
+                <div class="section__header">
+                    <h2 class="section__title medium-title">Referentes</h2>
+                </div>
+
+                <div class="referentes__container dm-accordion">
+                    <details class="dm-accordion__item">
+                        <summary class="dm-accordion__summary dm-accordion__summary--ceo">Dirección del Departamento</summary>
+                        <div class="dm-accordion__content">
+                            <div class="referentes__row--top">
+                                <div class="referente__card referente-hero-card">
+                                    <div class="referente-hero">
+                                        <div class="referente-hero-photo">
+                                            <img src="assets/images/avatar-leila-final.png" alt="Dra. Leila Cura" width="1000"
+                                                height="1000" loading="lazy" decoding="async">
+                                        </div>
+                                        <div class="referente-hero-body">
+                                            <h3 class="referente-hero-name">Dra. Leila Cura</h3>
+                                            <p class="referente-hero-role">DIRECCIÓN DEL DEPARTAMENTO MÉDICO</p>
+                                            <p class="referente-hero-subrole">CEO de Brisa y Gerente de Salud de PAE</p>
+                                            <p class="referente-hero-desc">
+                                                Dirección general y visión estratégica de los servicios de salud<br>
+                                                corporativos, asegurando estándares de excelencia médica.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
+
+                    <details class="dm-accordion__item">
+                        <summary class="dm-accordion__summary dm-accordion__summary--leaders">Subdirección</summary>
+                        <div class="dm-accordion__content">
+                            <div class="referentes__row--bottom">
+                                <!-- Leader 1 -->
+                                <div class="referente__card leader-card">
+                                    <div class="referente__img-wrapper">
+                                        <img src="assets/images/avatar-silva-new.png" alt="Gustavo Silva"
+                                            class="referente__img" width="1000" height="1000" loading="lazy" decoding="async">
+                                    </div>
+                                    <div class="referente__content">
+                                        <div style="min-height: 170px; display: flex; flex-direction: column;">
+                                            <h3 class="referente__name">Gustavo Silva</h3>
+                                            <p class="referente__role"
+                                                style="margin-bottom: 0.5rem; font-size: 1.1rem; color: var(--first-color); font-weight: 700; letter-spacing: 1px;">
+                                                SUBDIRECCIÓN DEL DEPARTAMENTO</p>
+                                            <p class="referente__role referente__role--secondary">
+                                                LÍDER DE SALUD DE PAE<br>UPSTREAM</p>
+                                        </div>
+                                        <p class="referente__desc">Gestión integral del ecosistema Upstream. Liderazgo
+                                            estratégico en Exploración y Producción, asegurando la continuidad operativa y la
+                                            cobertura sanitaria en cada yacimiento.</p>
+                                    </div>
+                                </div>
+
+                                <!-- Leader 2 -->
+                                <div class="referente__card leader-card">
+                                    <div class="referente__img-wrapper">
+                                        <img src="assets/images/avatar-azcarate-new.png" alt="Juan Martín Azcárate"
+                                            class="referente__img" width="1000" height="1000" loading="lazy" decoding="async">
+                                    </div>
+                                    <div class="referente__content">
+                                        <div style="min-height: 170px; display: flex; flex-direction: column;">
+                                            <h3 class="referente__name">Juan Martín Azcárate</h3>
+                                            <p class="referente__role"
+                                                style="margin-bottom: 0.5rem; font-size: 1.1rem; color: var(--first-color); font-weight: 700; letter-spacing: 1px;">
+                                                SUBDIRECCIÓN DEL DEPARTAMENTO</p>
+                                            <p class="referente__role referente__role--secondary">
+                                                LÍDER DE SALUD DE PAE<br>DOWNSTREAM</p>
+                                        </div>
+                                        <p class="referente__desc">Conducción integral del ecosistema Downstream. Articulación
+                                            de la estrategia sanitaria en complejos de refinación y sedes corporativas,
+                                            unificando los estándares de salud industrial y administrativa.</p>
+                                    </div>
+                                </div>
+
+                                <!-- Leader 3 -->
+                                <div class="referente__card leader-card">
+                                    <div class="referente__img-wrapper">
+                                        <img src="assets/images/avatar-medina-new.png" alt="Leandro Medina" class="referente__img"
+                                            width="1000" height="1000" loading="lazy" decoding="async">
+                                    </div>
+                                    <div class="referente__content">
+                                        <div style="min-height: 170px; display: flex; flex-direction: column;">
+                                            <h3 class="referente__name">Leandro Medina</h3>
+                                            <div class="leader-role-spacer"></div>
+                                            <p class="referente__role referente__role--secondary">
+                                                LÍDER DE SALUD DE MPSA/FSE</p>
+                                        </div>
+                                        <p class="referente__desc">Liderazgo ejecutivo en salud ocupacional y respuesta a
+                                            emergencias para las operaciones de MPSA y FSE.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
+
+                    <details class="dm-accordion__item">
+                        <summary class="dm-accordion__summary dm-accordion__summary--coordinadores">Coordinadores</summary>
+                        <div class="dm-accordion__content">
+                            <div class="coordinadores__container">
+                                <!-- Coordinator 1: Juan Maurino -->
+                                <div class="coordinator__card coordinator-card-tier">
+                                    <div class="coordinator__img-wrapper">
+                                        <img src="assets/images/coord-maurino-new.png" alt="Juan Maurino" class="coordinator__img"
+                                            width="1000" height="1000" loading="lazy" decoding="async">
+                                    </div>
+                                    <h4 class="coordinator__name">Juan Maurino</h4>
+                                    <p class="coordinator__role">Neuquén</p>
+                                </div>
+
+                                <!-- Coordinator 2: Mario Bianchi -->
+                                <div class="coordinator__card coordinator-card-tier">
+                                    <div class="coordinator__img-wrapper">
+                                        <img src="assets/images/coord-bianchi-new.png" alt="Mario Bianchi" class="coordinator__img"
+                                            width="1000" height="1000" loading="lazy" decoding="async">
+                                    </div>
+                                    <h4 class="coordinator__name">Mario Bianchi</h4>
+                                    <p class="coordinator__role">Buenos Aires</p>
+                                </div>
+
+                                <!-- Coordinator 3: Sergio Aciar -->
+                                <div class="coordinator__card coordinator-card-tier">
+                                    <div class="coordinator__img-wrapper">
+                                        <img src="assets/images/coord-aciar-new.png" alt="Sergio Aciar" class="coordinator__img"
+                                            width="1000" height="1000" loading="lazy" decoding="async">
+                                    </div>
+                                    <h4 class="coordinator__name">Sergio Aciar</h4>
+                                    <p class="coordinator__role">Golfo San Jorge</p>
+                                </div>
+
+                                <!-- Coordinator 4: Hernán Rodríguez -->
+                                <div class="coordinator__card coordinator-card-tier">
+                                    <div class="coordinator__img-wrapper">
+                                        <img src="assets/images/coord-rodriguez-new.png" alt="Hernán Rodríguez"
+                                            class="coordinator__img" width="1000" height="1000" loading="lazy" decoding="async">
+                                    </div>
+                                    <h4 class="coordinator__name">Hernán Rodríguez</h4>
+                                    <p class="coordinator__role">Golfo San Jorge</p>
+                                </div>
+
+                                <!-- Coordinator 5: Roberto Sabha -->
+                                <div class="coordinator__card coordinator-card-tier">
+                                    <div class="coordinator__img-wrapper">
+                                        <img src="assets/images/coord-sabha-new.png" alt="Roberto Sabha" class="coordinator__img"
+                                            width="1000" height="1000" loading="lazy" decoding="async">
+                                    </div>
+                                    <h4 class="coordinator__name">Roberto Sabha</h4>
+                                    <p class="coordinator__role">Acambuco</p>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
+                </div>
+            </div>
+        </section>
+
+        <!-- ESTRUCTURA FUNCIONAL (New Segment) -->
+        <section class="section orgtree" id="estructura-funcional">
+            <div class="container">
+                <!-- Main Toggle Button Area -->
+                <div class="structure__toggle-container orgtree-header">
+                    <div class="dashboard-container">
+                        <button id="structure-main-toggle" class="dashboard-header structure__main-btn">
+                            <div class="dashboard-header-left">
+                                <div class="dashboard-icon-box">
+                                    <!-- Nuevo icono institucional (sitemap) -->
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <circle cx="6" cy="6" r="3" />
+                                        <circle cx="18" cy="6" r="3" />
+                                        <circle cx="12" cy="18" r="3" />
+                                        <path d="M8.5 8.5 10.5 15" />
+                                        <path d="M15.5 8.5 13.5 15" />
+                                    </svg>
+                                </div>
+                                <div class="dashboard-title-group">
+                                    <h2 class="dashboard-eyebrow">ORGANIZACIÓN</h2>
+                                    <span class="dashboard-divider" aria-hidden="true"></span>
+                                    <h1 class="dashboard-title">Estructura Funcional</h1>
+                                </div>
+                            </div>
+                            <div class="dashboard-header-right">
+                                <div class="header-info-wrapper" onclick="event.stopPropagation()">
+                                    <div class="header-info-icon">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
+                                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                            stroke-linecap="round" stroke-linejoin="round">
+                                            <circle cx="12" cy="12" r="10" />
+                                            <path d="M12 16v-4" />
+                                            <path d="M12 8h.01" />
+                                        </svg>
+                                    </div>
+                                    <div class="header-tooltip-content">
+                                        <div class="tooltip-arrow"></div>
+                                        <p>Haz click en la flecha para expandir o contraer la estructura funcional.</p>
+                                    </div>
+                                </div>
+                                <div class="dashboard-chevron structure__chevron">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <path d="m6 9 6 6 6-6" />
+                                    </svg>
+                                </div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Collapsible Content -->
+                <div id="structure-content-wrapper" class="structure__content-wrapper">
+                    <div class="structure__inner-container glass-panel orgtree-panel">
+
+                        <!-- Director Card -->
+                        <div class="structure__director-container">
+                            <div class="structure__director-card">
+                                <div class="structure__director-icon-wrapper">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" class="text-white">
+                                        <circle cx="12" cy="8" r="7" />
+                                        <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88" />
+                                    </svg>
+                                </div>
+                                <div class="structure__director-content">
+                                    <h2 class="structure__director-name">Dra. Leila Cura</h2>
+                                    <p class="structure__director-role">Directora del Departamento Médico</p>
+                                    <div class="structure__director-subroles">
+                                        <span>CEO de Brisa</span>
+                                        <span class="dot-separator"></span>
+                                        <span>Gerente de Salud de PAE</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="structure__connector-line"></div>
+                        </div>
+
+                        <!-- Groups Container (Rendered by JS) -->
+                        <div id="structure-groups-container" class="structure__groups-space">
+                            <!-- JS will inject content here -->
+                        </div>
+
+                        <!-- Footer -->
+                    </div>
+                </div>
+
+                
+            </div>
+        </section>
+
+        <!-- DOCUMENTACIÓN OFICIAL (New Section) -->
+        <section class="section" id="documentacion" style="padding-top: 1rem;"> <!-- Reduced top padding -->
+            <div class="container text-center">
+                <div class="section__header">
+                    <h2 class="section__title medium-title" style="margin-bottom: 3rem;">Documentación y Normativa
+                    </h2>
+                </div>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center max-w-3xl mx-auto mb-16 w-full px-4">
+                    <!-- Button 1: Documento Estructural -->
+                    <a href="https://panamericanenergy.sharepoint.com/:w:/t/DepartamentoMdico/IQCn9k1SWqvHQ7LwvVmqlXc7Ab3PcoOW1hEzfo1loMO35fk?e=ZOxDy9"
+                        target="_blank" rel="noopener noreferrer"
+                        class="flex-1 group relative flex items-center justify-center gap-3 px-6 py-5 bg-white border border-gray-200 rounded-xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] hover:shadow-[0_8px_30px_-4px_rgba(37,99,235,0.2)] hover:border-blue-200 hover:-translate-y-1 transition-all duration-300">
+                        <div
+                            class="p-2.5 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors duration-300">
+                            <i data-lucide="file-text" class="w-6 h-6"></i>
+                        </div>
+                        <div class="flex flex-col text-left">
+                            <span
+                                class="font-bold text-gray-800 group-hover:text-blue-700 text-base sm:text-lg leading-tight transition-colors">Documento
+                                Estructural</span>
+                            <span class="text-xs text-gray-400 group-hover:text-blue-400 transition-colors mt-0.5">Ver
+                                documentación oficial</span>
+                        </div>
+                    </a>
+
+                    <!-- Button 2: Documento de Conformación -->
+                    <a href="https://panamericanenergy.sharepoint.com/:w:/t/DepartamentoMdico/IQDGM2EdNEL1Tb8NrYRdkc_MATLevPm_etGV-klGCdtGrCI?e=luZdoc"
+                        target="_blank" rel="noopener noreferrer"
+                        class="flex-1 group relative flex items-center justify-center gap-3 px-6 py-5 bg-white border border-gray-200 rounded-xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] hover:shadow-[0_8px_30px_-4px_rgba(122,184,0,0.25)] hover:border-brisa hover:-translate-y-1 transition-all duration-300">
+                        <div
+                            class="p-2.5 bg-lime-50 text-brisa rounded-lg group-hover:bg-brisa group-hover:text-white transition-colors duration-300">
+                            <i data-lucide="users" class="w-6 h-6"></i>
+                        </div>
+                        <div class="flex flex-col text-left">
+                            <span
+                                class="font-bold text-gray-800 group-hover:text-brisa text-base sm:text-lg leading-tight transition-colors">Conformación
+                                de Comités</span>
+                            <span class="text-xs text-gray-400 group-hover:text-lime-500 transition-colors mt-0.5">Ver
+                                integrantes y roles</span>
+                        </div>
+                    </a>
+                </div>
+
+                <!-- DASHBOARD -->
+                <div id="custom-dashboard-root" class="w-full">
+                    <!-- Content will be rendered by JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Chart.js REMOVED -->
+
+        <!-- COMITES -->
+        <section class="section section--tight" id="comites">
+            <div class="container">
+                <div class="section__header section__header--compact">
+                    <h2 class="section__title medium-title">Comités de Trabajo</h2>
+                    <span class="section__subtitle section__subtitle--brisa">Equipos focalizados en el desarrollo de cada
+                        <strong>vertical</strong> del servicio médico.</span>
+                </div>
+
+                <div class="comites__grid">
+                    <!-- Comité 1 -->
+                    <article class="comite__card" data-committee-id="comite_ejecutivo_emergencias"
+                        data-link="pages/comites/comite-ejecutivo-emergencias.html">
+                        <div>
+                            <header class="comite__card-header">
+                                <div class="comite__kicker">
+                                    <span class="comite__icon-badge" aria-hidden="true"><i data-lucide="alert-triangle"></i></span>
+                                    <span class="comite__kicker-label">Comité</span>
+                                    <span class="comite__open-indicator" aria-hidden="true" title="Abrir comité"><i data-lucide="arrow-up-right"></i></span>
+                                </div>
+                                <h3 class="comite__title"><span class="comite__title-prefix">Comité </span>Ejecutivo de Emergencias</h3>
+                                <p class="comite__desc">Protocolos y gestión de respuesta ante emergencias médicas.</p>
+                            </header>
+                            <div class="committee-stats">
+                                <div class="committee-stat-item">
+                                    <span class="committee-stat-label">Integrantes</span>
+                                    <span class="committee-stat-value">...</span>
+                                </div>
+                                <div class="stats-divider"></div>
+                                <div class="committee-stat-item">
+                                    <span class="committee-stat-label">Proyectos</span>
+                                    <span class="committee-stat-value">...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <footer class="comite__card-footer">
+                            <div class="comite__actions">
+                                <button class="comite__join-btn comite__join-trigger"
+                                    data-committee-id="comite_ejecutivo_emergencias" type="button">
+                                    <span class="icon">+</span>
+                                    <span>Unirme</span>
+                                </button>
+                                <a href="pages/comites/comite-ejecutivo-emergencias.html"
+                                    class="comite__btn-secondary">Ingresar
+                                    al comité</a>
+                            </div>
+                        </footer>
+                    </article>
+
+                    <!-- Comité 2 -->
+                    <article class="comite__card" data-committee-id="comite_salud_ocupacional"
+                        data-link="pages/comites/salud-ocupacional.html">
+                        <div>
+                            <header class="comite__card-header">
+                                <div class="comite__kicker">
+                                    <span class="comite__icon-badge" aria-hidden="true"><i data-lucide="shield"></i></span>
+                                    <span class="comite__kicker-label">Comité</span>
+                                    <span class="comite__open-indicator" aria-hidden="true" title="Abrir comité"><i data-lucide="arrow-up-right"></i></span>
+                                </div>
+                                <h3 class="comite__title"><span class="comite__title-prefix">Comité de </span>Salud Ocupacional</h3>
+                                <p class="comite__desc">Seguridad, higiene y medicina del trabajo.</p>
+                            </header>
+                            <div class="committee-stats">
+                                <div class="committee-stat-item">
+                                    <span class="committee-stat-label">Integrantes</span>
+                                    <span class="committee-stat-value">...</span>
+                                </div>
+                                <div class="stats-divider"></div>
+                                <div class="committee-stat-item">
+                                    <span class="committee-stat-label">Proyectos</span>
+                                    <span class="committee-stat-value">...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <footer class="comite__card-footer">
+                            <div class="comite__actions">
+                                <button class="comite__join-btn comite__join-trigger"
+                                    data-committee-id="comite_salud_ocupacional" type="button">
+                                    <span class="icon">+</span>
+                                    <span>Unirme</span>
+                                </button>
+                                <a href="pages/comites/salud-ocupacional.html" class="comite__btn-secondary">Ingresar al
+                                    comité</a>
+                            </div>
+                        </footer>
+                    </article>
+
+                    <!-- Comité 3 -->
+                    <article class="comite__card" data-committee-id="comite_calidad_seguridad"
+                        data-link="pages/comites/comite-calidad-seguridad.html">
+                        <div>
+                            <header class="comite__card-header">
+                                <div class="comite__kicker">
+                                    <span class="comite__icon-badge" aria-hidden="true"><i data-lucide="check-circle"></i></span>
+                                    <span class="comite__kicker-label">Comité</span>
+                                    <span class="comite__open-indicator" aria-hidden="true" title="Abrir comité"><i data-lucide="arrow-up-right"></i></span>
+                                </div>
+                                <h3 class="comite__title"><span class="comite__title-prefix">Comité de </span>Calidad y Seguridad</h3>
+                                <p class="comite__desc">Estándares de calidad y seguridad del paciente.</p>
+                            </header>
+                            <div class="committee-stats">
+                                <div class="committee-stat-item">
+                                    <span class="committee-stat-label">Integrantes</span>
+                                    <span class="committee-stat-value">...</span>
+                                </div>
+                                <div class="stats-divider"></div>
+                                <div class="committee-stat-item">
+                                    <span class="committee-stat-label">Proyectos</span>
+                                    <span class="committee-stat-value">...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <footer class="comite__card-footer">
+                            <div class="comite__actions">
+                                <button class="comite__join-btn comite__join-trigger"
+                                    data-committee-id="comite_calidad_seguridad" type="button">
+                                    <span class="icon">+</span>
+                                    <span>Unirme</span>
+                                </button>
+                                <a href="pages/comites/comite-calidad-seguridad.html"
+                                    class="comite__btn-secondary">Ingresar
+                                    al comité</a>
+                            </div>
+                        </footer>
+                    </article>
+
+                    <!-- Comité 4 -->
+                    <article class="comite__card" data-committee-id="comite_salud_digital"
+                        data-link="pages/comites/comite-salud-digital.html">
+                        <div>
+                            <header class="comite__card-header">
+                                <div class="comite__kicker">
+                                    <span class="comite__icon-badge" aria-hidden="true"><i data-lucide="laptop"></i></span>
+                                    <span class="comite__kicker-label">Comité</span>
+                                    <span class="comite__open-indicator" aria-hidden="true" title="Abrir comité"><i data-lucide="arrow-up-right"></i></span>
+                                </div>
+                                <h3 class="comite__title"><span class="comite__title-prefix">Comité de </span>Salud Digital e Innovación</h3>
+                                <p class="comite__desc">Transformación e innovación digital en salud.</p>
+                            </header>
+                            <div class="committee-stats">
+                                <div class="committee-stat-item">
+                                    <span class="committee-stat-label">Integrantes</span>
+                                    <span class="committee-stat-value">...</span>
+                                </div>
+                                <div class="stats-divider"></div>
+                                <div class="committee-stat-item">
+                                    <span class="committee-stat-label">Proyectos</span>
+                                    <span class="committee-stat-value">...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <footer class="comite__card-footer">
+                            <div class="comite__actions">
+                                <button class="comite__join-btn comite__join-trigger"
+                                    data-committee-id="comite_salud_digital" type="button">
+                                    <span class="icon">+</span>
+                                    <span>Unirme</span>
+                                </button>
+                                <a href="pages/comites/comite-salud-digital.html" class="comite__btn-secondary">Ingresar
+                                    al
+                                    comité</a>
+                            </div>
+                        </footer>
+                    </article>
+
+                    <!-- Comité 5 -->
+                    <article class="comite__card" data-committee-id="comite_docencia_investigacion"
+                        data-link="pages/comites/comite-docencia-investigacion.html">
+                        <div>
+                            <header class="comite__card-header">
+                                <div class="comite__kicker">
+                                    <span class="comite__icon-badge" aria-hidden="true"><i data-lucide="graduation-cap"></i></span>
+                                    <span class="comite__kicker-label">Comité</span>
+                                    <span class="comite__open-indicator" aria-hidden="true" title="Abrir comité"><i data-lucide="arrow-up-right"></i></span>
+                                </div>
+                                <h3 class="comite__title"><span class="comite__title-prefix">Comité de </span>Docencia e Investigación</h3>
+                                <p class="comite__desc">Formación continua y desarrollo científico.</p>
+                            </header>
+                            <div class="committee-stats">
+                                <div class="committee-stat-item">
+                                    <span class="committee-stat-label">Integrantes</span>
+                                    <span class="committee-stat-value">...</span>
+                                </div>
+                                <div class="stats-divider"></div>
+                                <div class="committee-stat-item">
+                                    <span class="committee-stat-label">Proyectos</span>
+                                    <span class="committee-stat-value">...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <footer class="comite__card-footer">
+                            <div class="comite__actions">
+                                <button class="comite__join-btn comite__join-trigger"
+                                    data-committee-id="comite_docencia_investigacion" type="button">
+                                    <span class="icon">+</span>
+                                    <span>Unirme</span>
+                                </button>
+                                <a href="pages/comites/comite-docencia-investigacion.html"
+                                    class="comite__btn-secondary">Ingresar
+                                    al comité</a>
+                            </div>
+                        </footer>
+                    </article>
+
+                    <!-- Comité 6 -->
+                    <article class="comite__card" data-committee-id="comite_farmacia_terapeutica"
+                        data-link="pages/comites/comite-farmacia-terapeutica.html">
+                        <div>
+                            <header class="comite__card-header">
+                                <div class="comite__kicker">
+                                    <span class="comite__icon-badge" aria-hidden="true"><i data-lucide="pill"></i></span>
+                                    <span class="comite__kicker-label">Comité</span>
+                                    <span class="comite__open-indicator" aria-hidden="true" title="Abrir comité"><i data-lucide="arrow-up-right"></i></span>
+                                </div>
+                                <h3 class="comite__title"><span class="comite__title-prefix">Comité de </span>Farmacia y Terapéutica</h3>
+                                <p class="comite__desc">Gestión de medicamentos y tratamientos.</p>
+                            </header>
+                            <div class="committee-stats">
+                                <div class="committee-stat-item">
+                                    <span class="committee-stat-label">Integrantes</span>
+                                    <span class="committee-stat-value">...</span>
+                                </div>
+                                <div class="stats-divider"></div>
+                                <div class="committee-stat-item">
+                                    <span class="committee-stat-label">Proyectos</span>
+                                    <span class="committee-stat-value">...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <footer class="comite__card-footer">
+                            <div class="comite__actions">
+                                <button class="comite__join-btn comite__join-trigger"
+                                    data-committee-id="comite_farmacia_terapeutica" type="button">
+                                    <span class="icon">+</span>
+                                    <span>Unirme</span>
+                                </button>
+                                <a href="pages/comites/comite-farmacia-terapeutica.html"
+                                    class="comite__btn-secondary">Ingresar
+                                    al comité</a>
+                            </div>
+                        </footer>
+                    </article>
+
+                    <!-- Comité 7 -->
+                    <article class="comite__card" data-committee-id="comite_bioetica"
+                        data-link="pages/comites/comite-bioetica.html">
+                        <div>
+                            <header class="comite__card-header">
+                                <div class="comite__kicker">
+                                    <span class="comite__icon-badge" aria-hidden="true"><i data-lucide="scale"></i></span>
+                                    <span class="comite__kicker-label">Comité</span>
+                                    <span class="comite__open-indicator" aria-hidden="true" title="Abrir comité"><i data-lucide="arrow-up-right"></i></span>
+                                </div>
+                                <h3 class="comite__title"><span class="comite__title-prefix">Comité de </span>Bioética</h3>
+                                <p class="comite__desc">Análisis ético de la práctica médica.</p>
+                            </header>
+                            <div class="committee-stats">
+                                <div class="committee-stat-item">
+                                    <span class="committee-stat-label">Integrantes</span>
+                                    <span class="committee-stat-value">...</span>
+                                </div>
+                                <div class="stats-divider"></div>
+                                <div class="committee-stat-item">
+                                    <span class="committee-stat-label">Proyectos</span>
+                                    <span class="committee-stat-value">...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <footer class="comite__card-footer">
+                            <div class="comite__actions">
+                                <button class="comite__join-btn comite__join-trigger"
+                                    data-committee-id="comite_bioetica" type="button">
+                                    <span class="icon">+</span>
+                                    <span>Unirme</span>
+                                </button>
+                                <a href="pages/comites/comite-bioetica.html" class="comite__btn-secondary">Ingresar al
+                                    comité</a>
+                            </div>
+                        </footer>
+                    </article>
+                </div>
+
+
+            </div>
+        </section>
+
+        <!-- HERRAMIENTAS DE INVESTIGACIÓN -->
+        <section class="section" id="investigacion"
+            style="background-color: #f9fafb; padding-top: 2rem; padding-bottom: 6rem;">
+            <div class="container">
+                <div class="section__header">
+                    <h2 class="section__title medium-title dm-title">Motor de Evidencia Científica</h2>
+                    <span class="section__subtitle">Acceso directo a bases
+                        de datos biomédicas e inteligencia artificial clínica.</span>
+                </div>
+
+                <div class="research__grid">
+
+                    <!-- PubMed -->
+                    <div class="research__card">
+                        <div class="research__logo-wrapper">
+                            <img src="assets/images/logo-pubmed.png" alt="PubMed Logo" class="research__logo"
+                                width="377" height="134" loading="lazy" decoding="async">
+                        </div>
+
+                        <form action="https://pubmed.ncbi.nlm.nih.gov/" method="get" target="_blank"
+                            class="research__form" onsubmit="setTimeout(() => this.reset(), 1000)">
+                            <label class="research__label">Base de Datos NLM</label>
+                            <div class="research__input-wrapper">
+                                <input type="text" name="term" placeholder="Buscar papers, autores, PMID..."
+                                    class="research__input" required>
+                                <button type="submit" class="research__button research__button--blue">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="research__icon" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <p class="research__caption">Búsqueda directa en National Library of Medicine</p>
+                        </form>
+                    </div>
+
+                    <!-- Open Evidence -->
+                    <div class="research__card">
+                        <div class="research__logo-wrapper">
+                            <img src="assets/images/Open%20Evidence.png" alt="OpenEvidence Logo"
+                                class="research__logo--openevidence" width="1200" height="630" loading="lazy"
+                                decoding="async">
+                        </div>
+
+                        <form
+                            onsubmit="event.preventDefault(); const q = this.querySelector('input').value; const btn = this.querySelector('button'); const icon = btn.innerHTML; if(q) { navigator.clipboard.writeText(q).then(() => { btn.innerHTML = '<svg xmlns=\'http://www.w3.org/2000/svg\' class=\'research__icon\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'currentColor\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M5 13l4 4L19 7\' /></svg>'; setTimeout(() => { window.open('https://www.openevidence.com/', '_blank'); btn.innerHTML = icon; }, 500); }); this.reset(); }"
+                            class="research__form">
+                            <div class="research__label-row">
+                                <label class="research__label">Inteligencia Artificial Médica</label>
+                                <span class="dm-info-tip">
+                                    <button type="button" class="dm-info-btn" aria-label="Información">i</button>
+                                    <span class="dm-info-tooltip" role="tooltip">
+                                        OpenEvidence es una herramienta de IA clínica orientada a apoyar a profesionales de la salud.
+                                        Participó del programa Mayo Clinic Platform Accelerate y cuenta con acuerdos de contenido con NEJM Group.
+                                        En 2023 reportó un desempeño superior al 90% en el USMLE.
+                                    </span>
+                                </span>
+                            </div>
+                            <div class="research__input-wrapper">
+                                <input type="text" name="query"
+                                    placeholder="Escribe tu pregunta (se copiará al portapapeles)..."
+                                    class="research__input" required>
+                                <button type="submit" class="research__button research__button--black"
+                                    title="Buscar (copia al portapapeles)">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="research__icon" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <p class="research__caption">Tu pregunta se copiará automáticamente. Pega (Ctrl+V) en
+                                OpenEvidence.</p>
+                        </form>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+
+
+
+        <!-- Foro General del Departamento Médico -->
+        <!-- Galería Operativa -->
+        <section class="dm-carousel-section" id="carrete" aria-label="Centro de Recursos Visuales">
+            <div id="dm-muro-composer" class="dm-muro-composer" aria-label="Publicar novedad">
+                <div class="dm-muro-composer__inner">
+                    <div class="dm-muro-avatar" aria-hidden="true">
+                        <i data-lucide="user"></i>
+                    </div>
+                    <div class="dm-muro-field">
+                        <input id="dm-muro-input" type="text" placeholder="Cuadro de texto"
+                            aria-label="Cuadro de texto" name="dm-muro-text" autocomplete="off"
+                            autocorrect="off" autocapitalize="off" spellcheck="false" inputmode="text"
+                            data-1p-ignore="true" data-lpignore="true" data-bwignore="true"
+                            data-form-type="other" />
+                    </div>
+                    <div class="dm-muro-actions">
+                        <button id="dm-muro-photo" type="button" class="dm-muro-action" aria-label="Agregar foto">
+                            <i data-lucide="image"></i>
+                        </button>
+                    </div>
+                    <button id="dm-muro-send" type="button" class="dm-muro-send" aria-label="Publicar">
+                        <i data-lucide="send"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="dm-carousel-header">
+                <div class="dm-carousel-title">
+                    <h2 class="section__title medium-title dm-title dm-title-center">
+                        <span class="dm-title-line">Centro de Recursos Visuales</span>
+                    </h2>
+                </div>
+                <div class="dm-carousel-actions"></div>
+            </div>
+            <div class="dm-carousel-stage" id="galeria-operativa">
+                <div class="dm-carousel-left">
+                    <div class="dm-carousel-viewport">
+                        <div id="dm-carousel-track" class="dm-carousel-track">
+                            <div class="dm-carousel-empty">Cargando galería...</div>
+                        </div>
+                        <button id="dm-overlay-prev" class="dm-nav-btn dm-nav-btn--left" type="button" aria-label="Anterior">◀</button>
+                        <button id="dm-overlay-next" class="dm-nav-btn dm-nav-btn--right" type="button" aria-label="Siguiente">▶</button>
+                    </div>
+                    <div class="dm-carousel-info-panel" aria-live="polite">
+                        <div id="dm-carousel-reference" class="dm-carousel-reference">Referencia: -</div>
+                        <div id="dm-carousel-author" class="dm-carousel-meta">Autor: -</div>
+                    </div>
+                    <div id="dm-carousel-dots" class="dm-carousel-dots" aria-hidden="true"></div>
+                </div>
+                <aside class="dm-comments" aria-label="Comentarios de la imagen">
+                    <div class="dm-comments__header">
+                        <div class="dm-comments__title">Comentarios</div>
+                        <div class="dm-comments__count" id="dm-comments-count">0</div>
+                    </div>
+                    <div class="dm-comments__list" id="dm-comments-list">
+                        <div class="dm-comments__empty">Sin comentarios todavía.</div>
+                    </div>
+                    <div class="dm-comments__composer">
+                        <div class="dm-comment-inline">
+                            <textarea id="dm-comment-inline-input" rows="1" placeholder="Escribe un comentario..." aria-label="Comentar imagen"></textarea>
+                            <button type="button" class="emoji-btn emoji-trigger dm-comment-emoji" data-emoji-target="dm-comment-inline-input" aria-label="Insertar emoji">😊</button>
+                            <div class="emoji-panel" data-emoji-panel></div>
+                        </div>
+                        <button id="dm-comment-send" class="dm-comment-submit" type="button" aria-label="Enviar comentario">Enviar comentario</button>
+                    </div>
+                </aside>
+            </div>
+            <div class="dm-console">
+                <div class="dm-console-left">
+                    <button id="dm-fullscreen" class="dm-console-btn" type="button" aria-label="Pantalla completa" data-tip="Pantalla completa">⛶</button>
+                    <button id="dm-slower" class="dm-console-btn" type="button" aria-label="Reducir velocidad" data-tip="Mayor duración de la imagen">+</button>
+                    <div class="dm-speed-input-wrapper">
+                        <input id="dm-speed-input" class="dm-console-input" type="number" min="1" max="30" step="1"
+                            aria-label="Segundos por foto" />
+                        <span class="dm-speed-suffix">seg</span>
+                    </div>
+                    <button id="dm-faster" class="dm-console-btn" type="button" aria-label="Aumentar velocidad" data-tip="Menor duración de la imagen">−</button>
+                </div>
+                <div class="dm-console-center">
+                    <button id="dm-prev" class="dm-console-btn" type="button" aria-label="Anterior" data-tip="Imagen previa">◀</button>
+                    <button id="dm-playpause" class="dm-console-btn" type="button" aria-label="Pausar/Reproducir" data-tip="Pausa / Play">⏯</button>
+                    <button id="dm-next" class="dm-console-btn" type="button" aria-label="Siguiente" data-tip="Imagen siguiente">▶</button>
+                </div>
+                <div class="dm-console-right">
+                    <button id="dm-like" class="dm-console-btn" type="button" aria-label="Me gusta" data-tip="Me gusta">❤️ <span id="dm-like-count">0</span></button>
+                    <button id="dm-add-image" class="dm-console-btn dm-add-image-btn" type="button" aria-label="Agregar imagen">+ Agregar imagen</button>
+                    <button id="dm-delete" class="dm-console-btn dm-delete-admin" type="button" aria-label="Eliminar imagen" data-tip="Borrar imagen">🗑</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Modal carga de imágenes -->
+        <div id="dm-carousel-modal" class="dm-carousel-modal" aria-hidden="true">
+            <div class="dm-carousel-modal__dialog" role="dialog" aria-modal="true"
+                aria-labelledby="dm-carousel-modal-title">
+                <div class="dm-carousel-modal__header">
+                    <h3 id="dm-carousel-modal-title">Agregar imagen</h3>
+                    <button id="dm-carousel-modal-close" class="dm-carousel-close" type="button"
+                        aria-label="Cerrar modal">&times;</button>
+                </div>
+                <form id="dm-carousel-form" class="dm-carousel-form">
+                    <label class="dm-carousel-field">
+                        <span>Título</span>
+                        <div class="emoji-input-wrap">
+                            <input id="dm-carousel-title-input" type="text" required maxlength="120"
+                                placeholder="Ej: Simulación de Código Rojo" />
+                            <button type="button" class="emoji-btn emoji-trigger" data-emoji-target="dm-carousel-title-input" aria-label="Insertar emoji">😊</button>
+                            <div class="emoji-panel" data-emoji-panel></div>
+                        </div>
+                    </label>
+                    <label class="dm-carousel-field">
+                        <span>Imagen</span>
+                        <input id="dm-carousel-file-input" type="file" accept="image/*" required />
+                    </label>
+                    <label class="dm-carousel-field">
+                        <span>Unidad de negocio</span>
+                        <select id="dm-carousel-bu" required>
+                            <option value="">Seleccionar</option>
+                            <option value="Upstream">Upstream</option>
+                            <option value="Downstream">Downstream</option>
+                            <option value="Salud Ocupacional Brisa - MPSA/FSE">Salud Ocupacional Brisa - MPSA/FSE</option>
+                        </select>
+                    </label>
+                    <label class="dm-carousel-field">
+                        <span>Unidad de gestión</span>
+                        <select id="dm-carousel-mu" required>
+                            <option value="">Seleccionar</option>
+                        </select>
+                    </label>
+                    <div class="dm-carousel-modal__actions">
+                        <button type="button" id="dm-carousel-cancel" class="dm-carousel-secondary">Cancelar</button>
+                        <button type="submit" id="dm-carousel-save" class="dm-carousel-primary">Guardar</button>
+                    </div>
+                </form>
+                <div id="dm-carousel-error" class="dm-carousel-error" role="alert" style="display:none;"></div>
+            </div>
+        </div>
+
+
+        <div id="dm-loading" class="dm-loading dm-loading-hidden">
+            <div class="dm-spinner"></div>
+            <p>Subiendo imagen…</p>
+        </div>
+
+    
+
+        <div id="foro" class="mt-16 mb-8 max-w-5xl mx-auto w-full">
+            <div class="text-center mb-8">
+                <h2 class="section__title medium-title dm-title">
+                    <i data-lucide="message-square" class="w-8 h-8 text-brisa"></i>
+                    Foro General del Departamento Médico
+                </h2>
+                <p class="text-gray-500 font-medium">
+                    Espacio de colaboración y avisos para todo el Departamento Médico.
+                </p>
+            </div>
+
+            <div class="section-card bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col h-auto">
+                <!-- Header -->
+                <div class="bg-gray-50 p-4 border-b border-gray-200 flex items-center justify-between">
+                    <span class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                        <i data-lucide="message-circle" class="w-4 h-4 text-brisa"></i> Actividad Reciente
+                    </span>
+                    <span class="text-xs text-gray-400">Visible para todo el Departamento</span>
+                </div>
+
+                <!-- Messages List -->
+                <div id="forum-messages-general" class="h-96 max-h-96 overflow-y-auto p-6 space-y-4 bg-gray-50/30">
+                    <!-- Mensajes renderizados por JS -->
+                </div>
+
+                <!-- Input Area -->
+                <div class="px-4 py-3 bg-white border-t border-gray-200">
+                    <form id="form-send-msg-general" class="flex gap-3 items-end">
+                        <div class="flex-1">
+                            <div class="emoji-input-wrap">
+                                <textarea id="msg-text-general" placeholder="Escribe tu mensaje, novedad o consulta aquí..."
+                                    class="w-full px-4 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brisa focus:border-transparent transition-all resize-none forum-textarea"
+                                    rows="1"
+                                    onkeydown="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); this.form.dispatchEvent(new Event('submit', {cancelable: true, bubbles: true})); }"></textarea>
+                                <button type="button" class="emoji-btn emoji-trigger" data-emoji-target="msg-text-general" aria-label="Insertar emoji">😊</button>
+                                <div class="emoji-panel" data-emoji-panel></div>
+                            </div>
+                        </div>
+                        <button type="submit"
+                            class="h-[42px] px-6 bg-brisa text-white rounded-lg hover:bg-brisa-dark disabled:opacity-50 transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-medium flex-shrink-0">
+                            <i data-lucide="send" class="w-4 h-4"></i> <span class="hidden sm:inline">Enviar</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        
+
+        <!-- Calendario - Cronograma de Actividades -->
+        <section class="section section--tight calendario-section" id="calendario">
+            <div class="container">
+                <div class="max-w-5xl mx-auto w-full estructura-calendar">
+                                    <div class="calendar-header">
+                                        <h2 class="section__title medium-title dm-title">
+                                            <i data-lucide="calendar" class="w-8 h-8 text-brisa"></i>
+                                            Calendario – Cronograma de Actividades
+                                        </h2>
+                                    </div>
+                                    <div class="calendar-controls">
+                                        <div class="calendar-toggle-group" role="group" aria-label="Vista del calendario">
+                                            <button type="button" class="calendar-toggle is-active" data-calendar-mode="MONTH" aria-pressed="true">Mes</button>
+                                            <button type="button" class="calendar-toggle" data-calendar-mode="AGENDA" aria-pressed="false">Agenda</button>
+                                        </div>
+                                    </div>
+                                    <div class="calendar-container">
+                                        <a class="calendar-edit-btn calendar-edit-btn--floating"
+                                            href="https://calendar.google.com/calendar/u/0/r?cid=aca87c4282b359a629e92fa3a0fcf15d043c5647e3eb7a081f74f9d4365bd559@group.calendar.google.com"
+                                            target="_blank" rel="noreferrer">Editar Calendario</a>
+                                        <iframe id="calendar-iframe" loading="lazy"
+                                            title="Calendario de actividades"
+                                            src="https://calendar.google.com/calendar/embed?src=aca87c4282b359a629e92fa3a0fcf15d043c5647e3eb7a081f74f9d4365bd559%40group.calendar.google.com&ctz=America%2FArgentina%2FBuenos_Aires&mode=MONTH"
+                                            frameborder="0" scrolling="no" allowfullscreen>
+                                        </iframe>
+                                        <div class="visitas-wrap visitas-wrap--overlay">
+                                            <div class="visitas-pill">
+                                                <span class="visitas-label">Visitas a esta página</span>
+                                                <span id="contador-visitas" class="visitas-count">0</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+            </div>
+        </section>
+
+        
+
+    </main>
+
+
+
+    <!-- FOOTER -->
+    <footer class="footer">
+        <div class="container footer__container">
+            <div class="footer__logos">
+                <img src="assets/images/logo-brisa-transparent.png" alt="Brisa Salud y Bienestar"
+                    class="footer__logo-img" width="900" height="500" loading="lazy" decoding="async">
+            </div>
+            <p class="footer__copy">&copy; 2025 <span class="footer__brand">Brisa Salud y Bienestar</span>. Todos los
+                derechos reservados.</p>
+            <span class="footer__version">v1.4.00.2</span>
+        </div>
+    </footer>
+
+    <!-- SCROLL UP -->
+    <a href="#" class="scrollup" id="scroll-up">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+            class="scrollup__icon">
+            <path d="m18 15-6-6-6 6" />
+        </svg>
+    </a>
+
+    <button id="dmAssistantFab" type="button" aria-label="Asistente IA">
+        <img src="/asistente-ia/boti-brisa.jpg" alt="" aria-hidden="true">
+    </button>
+
+    <nav class="dm-bottom-nav" aria-label="Navegación principal">
+        <a class="dm-bottom-nav__item" href="#carrete" data-route="carrete">
+            <i data-lucide="image"></i>
+            <span>Muro</span>
+        </a>
+        <a class="dm-bottom-nav__item" href="#estructura" data-route="estructura">
+            <i data-lucide="git-branch"></i>
+            <span>Estructura</span>
+        </a>
+        <a class="dm-bottom-nav__item" href="#comites" data-route="comites">
+            <i data-lucide="users"></i>
+            <span>Comités</span>
+        </a>
+        <a class="dm-bottom-nav__item" href="#evidencia" data-route="evidencia">
+            <i data-lucide="search"></i>
+            <span>Evidencia</span>
+        </a>
+        <a class="dm-bottom-nav__item" href="#foro" data-route="foro">
+            <i data-lucide="message-square"></i>
+            <span>Foro</span>
+        </a>
+    </nav>
+
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="js/app.js"></script>
+
+    <!-- Lucide para iconos del foro general -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+    <script>
+        // Emoji picker ligero para foros, chat y campos de texto
+        (() => {
+            const EMOJIS = [
+                "😀","😁","😂","🤣","😃","😄","😅","😆","😉","😊","😋","😎","😍","😘","😗","😙","😚","☺️","🙂","🤗","🤔","😐","😑","😶","🙄","😏","😣","😥","😮","🤐","😯","😪","😫","😴","😌","🤓","😛","😜","😝","🤤","😒","😓","😔","😕","🙃","🤑","😲","☹️","🙁","😖","😞","😟","😤","😢","😭","😦","😧","😨","😩","😬","😰","😱","😳","😵","😡","😠","😇","🤠","🤡","🤥","🤒","🤕","🤢","🤧","🤮","🥳","🥺",
+                "👍","👎","👏","🙌","🙏","🤝","💪","🖐","✋","🤚","👋","🤲","👐","👌","✌️","🤞","🤟","🤘","🤏","👈","👉","👆","👇","☝️","✊","👊","🤜","🤛",
+                "❤️","🧡","💛","💚","💙","💜","🖤","🤍","🤎","💔","❣️","💕","💞","💓","💗","💖","💘","💝","💟",
+                "⚠️","✅","☑️","❌","❗","❕","❓","❔","ℹ️","💡","📌","📍","⭐","🌟","✨","🔥","💧","🌈","☀️","⛅","🌙","⭐️","🌟","☁️","⚡",
+                "🍎","🍋","🍇","🍉","🍓","🍑","🥝","🥑","🥕","🌽","🌶","🥔","🥦","🍞","🥐","🥖","🧀","🥚","🍳","🥞","🥓","🍗","🍖","🍔","🍟","🍕","🌭","🌮","🌯","🥗","🍝","🍜","🍣","🍤","🍦","🍰","🎂","🍫",
+                "⚽","🏀","🏈","⚾","🎾","🏐","🏉","🎱","🏓","🏸","🥅","🥊","🥋","🎽","🛹","⛳","🥇","🥈","🥉","🏆",
+                "🎉","🎊","🎈","🎂","🥂","🍾","🎁","📣","🎵","🎶","🎤","🎧","🎸","🎺","🎻","🥁",
+                "🚑","🏥","💊","💉","🩺","🩹",
+                "🚀","✈️","🚗","🚕","🚙","🚌","🚎","🏎","🚓","🚑","🚒","🚚","🚜","🛵","🚲","🛴",
+                "💻","🖥","📱","⌚","⌨️","🖱","💾","💿","🎥","📸","📹","🎞","🛰","📡",
+                "🧠","🫀","🫁","🦴","🦷","🧬","🧪","🧫","🧻","🧯","🧹","🧺","🧼","🪥",
+                "👩‍⚕️","🧑‍⚕️","🧑‍🔬","🩺","💉","💊","🩸","🦠","🩹","🫀","🫁","🧬","🏥","🧴","🧻","🩼"
+            ];
+
+            const ensurePanel = (panel) => {
+                if (panel.dataset.ready) return;
+                panel.dataset.ready = "1";
+                panel.innerHTML = EMOJIS.map((emo) => `<button type="button" class="emoji-option" data-emoji="${emo}">${emo}</button>`).join("");
+            };
+
+            const insertAtCaret = (input, emoji) => {
+                const start = input.selectionStart ?? input.value.length;
+                const end = input.selectionEnd ?? input.value.length;
+                const value = input.value || "";
+                input.value = value.slice(0, start) + emoji + value.slice(end);
+                const pos = start + emoji.length;
+                input.setSelectionRange(pos, pos);
+                input.dispatchEvent(new Event("input", { bubbles: true }));
+            };
+
+            const bindPicker = (trigger) => {
+                const targetId = trigger.dataset.emojiTarget;
+                const input = document.getElementById(targetId);
+                const panel = trigger.parentElement?.querySelector(".emoji-panel");
+                if (!input || !panel) return;
+
+                ensurePanel(panel);
+
+                trigger.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    panel.classList.toggle("open");
+                });
+
+                panel.addEventListener("click", (e) => {
+                    const btn = e.target?.closest(".emoji-option");
+                    if (!btn) return;
+                    insertAtCaret(input, btn.dataset.emoji || "");
+                    panel.classList.remove("open");
+                    input.focus();
+                });
+            };
+
+            const initPickers = () => {
+                document.querySelectorAll(".emoji-trigger").forEach((btn) => {
+                    if (btn.dataset.emojiBound) return;
+                    btn.dataset.emojiBound = "1";
+                    bindPicker(btn);
+                });
+            };
+
+            document.addEventListener("click", (e) => {
+                document.querySelectorAll(".emoji-panel.open").forEach((panel) => {
+                    const trigger = panel.parentElement?.querySelector(".emoji-trigger");
+                    if (!panel.contains(e.target) && !trigger?.contains(e.target)) {
+                        panel.classList.remove("open");
+                    }
+                });
+            });
+
+            document.addEventListener("DOMContentLoaded", () => {
+                initPickers();
+                // Re-scan when dynamic content (como chat flotante) aparece
+                const observer = new MutationObserver(() => initPickers());
+                observer.observe(document.body, { childList: true, subtree: true });
+            });
+        })();
+    </script>
+
+    <!-- LOGIN MODAL -->
+    <!-- LOGIN MODAL (Disabled temporarily) -->
+    <!--
+    <div id="login-modal" class="login-modal-overlay">
+        <div class="login-bg"></div>
+        <div class="login-overlay"></div>
+
+        <div class="login-card fade-in-up">
+            <div class="login-logo-wrapper">
+                <div class="login-logo-circle">
+                    <img src="assets/images/logo-dpto-medico-large.png" alt="Logo Departamento Médico"
+                        class="login-logo-img" width="1024" height="1024" loading="lazy" decoding="async">
+                </div>
+            </div>
+
+            <div class="login-header">
+                <h2 class="login-title">Departamento Médico</h2>
+                <p class="login-subtitle">Portal de Acceso Seguro</p>
+            </div>
+
+            <form id="loginForm" class="login-form" onsubmit="handleLogin(event)">
+                <div class="login-input-group">
+                    <label for="password" class="login-label">Contraseña</label>
+                    <div class="login-input-wrapper">
+                        <div class="login-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                                viewBox="0 0 16 16">
+                                <path
+                                    d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2zM5 8h6a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" />
+                            </svg>
+                        </div>
+                        <input type="text" id="password" name="password" class="login-input password-masked"
+                            placeholder="Ingrese código de acceso" autocomplete="off" style="padding-right: 2.5rem;"
+                            spellcheck="false" autocorrect="off" autocapitalize="off">
+
+                        <button type="button" class="password-toggle" onclick="togglePasswordVisibility()"
+                            title="Mostrar/Ocultar contraseña">
+                            <i class="fa-regular fa-eye" id="toggleIcon"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <button type="submit" class="login-btn">
+                    Iniciar Sesión
+                </button>
+
+                <div class="login-links">
+                    <a href="#" onclick="handleForgotPassword(event)" class="login-forgot">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor"
+                            viewBox="0 0 16 16" style="margin-right: 4px;">
+                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
+                            <path
+                                d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286zm1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94z" />
+                        </svg>
+                        ¿Olvidaste tu contraseña?
+                    </a>
+                </div>
+            </form>
+    </div>
+    </div>
+    -->
+    <script type="module">
+        import { getFirebase, getFirebaseConfig } from "/assets/js/common/firebaseClient.js";
+
+        const { app, auth, db, storage } = getFirebase();
+        window.__FIREBASE_CONFIG__ = getFirebaseConfig();
+        window.__FIREBASE_APP__ = app;
+        window.__FIREBASE_AUTH__ = auth;
+        window.__FIREBASE_DB__ = db;
+        window.__FIREBASE_STORAGE__ = storage;
+    </script>
+    <script type="module" src="assets/js/common/notifications.js"></script>
+    <script type="module">
+        import { EmailAuthProvider, onAuthStateChanged, reauthenticateWithCredential } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+        import {
+            collection,
+            addDoc,
+            deleteDoc,
+            doc,
+            updateDoc,
+            onSnapshot,
+            serverTimestamp,
+            query,
+            orderBy,
+            where,
+            getCountFromServer,
+            getDoc,
+            getDocs,
+            runTransaction
+        } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { getFirebase } from "/assets/js/common/firebaseClient.js";
+        import { hydrateAvatars, resolveUidForAuthor } from "/assets/js/common/user-profiles.js";
+        import { requireAuth, buildLoginRedirectUrl } from "/assets/js/shared/authGate.js";
+
+        (async () => {
+            const appId = "departamento-medico-brisa";
+            window.__APP_ID__ = appId;
+
+            let db = null;
+            let forumAuth = null;
+            try {
+                const firebase = getFirebase();
+                db = firebase?.db || null;
+                forumAuth = firebase?.auth || null;
+            } catch (e) {
+                console.error("Error obteniendo AuthApp en index:", e);
+            }
+            const authedUser = await requireAuth(forumAuth, { fallbackHash: "#estructura" });
+            if (!authedUser) return;
+            let isAdmin = false;
+
+            const resolveAdminStatus = async (user) => {
+                if (!user) return false;
+                try {
+                    const token = await user.getIdTokenResult();
+                    if (token?.claims?.admin === true) return true;
+                } catch (e) {
+                    console.warn("[Admin] No se pudo leer custom claims.", e);
+                }
+                if (!db) return false;
+                try {
+                    const snap = await getDoc(doc(db, "admin_whitelist", user.uid));
+                    return snap.exists();
+                } catch (e) {
+                    console.warn("[Admin] No se pudo leer whitelist.", e);
+                    return false;
+                }
+            };
+
+            const refreshAdminState = async (user) => {
+                isAdmin = await resolveAdminStatus(user);
+                return isAdmin;
+            };
+
+            const getForumMessageById = (id) => messages.find((msg) => msg.id === id);
+
+            const requirePasswordReauth = async (user, confirmLabel = "Confirmar") => {
+                const providerIds = (user.providerData || []).map((p) => p.providerId);
+                if (!providerIds.includes("password")) {
+                    Swal.fire({
+                        icon: "info",
+                        title: "No disponible",
+                        text: "Tu método de ingreso no usa contraseña. Reautenticá desde tu proveedor."
+                    });
+                    return false;
+                }
+                const result = await Swal.fire({
+                    title: "Confirmá tu contraseña",
+                    input: "password",
+                    inputPlaceholder: "Contraseña",
+                    showCancelButton: true,
+                    confirmButtonText: confirmLabel,
+                    cancelButtonText: "Cancelar"
+                });
+                if (!result.isConfirmed) return false;
+                const password = result.value;
+                if (!password) return false;
+                try {
+                    const cred = EmailAuthProvider.credential(user.email, password);
+                    await reauthenticateWithCredential(user, cred);
+                    return true;
+                } catch (err) {
+                    console.error("[Foro] Error al reautenticar", err);
+                    Swal.fire({
+                        icon: "error",
+                        title: "Error",
+                        text: "No se pudo verificar la contraseña. Intentá nuevamente."
+                    });
+                    return false;
+                }
+            };
+
+            window.editForumMessage = async (id) => {
+                if (!db) {
+                    console.warn("No hay conexión a Firestore para editar el mensaje.");
+                    return;
+                }
+                const user = forumAuth?.currentUser;
+                if (!user) {
+                    Swal.fire({
+                        icon: "warning",
+                        title: "Acceso restringido",
+                        text: "Iniciá sesión para continuar."
+                    });
+                    return;
+                }
+                const msg = getForumMessageById(id);
+                if (!msg || !canManageForumMessage(msg, user)) {
+                    Swal.fire({
+                        icon: "error",
+                        title: "Acceso restringido",
+                        text: "Solo podés editar tus propios mensajes o moderar como administrador."
+                    });
+                    return;
+                }
+                await claimForumMessageOwner(msg, user);
+                const result = await Swal.fire({
+                    title: "Editar mensaje",
+                    input: "textarea",
+                    inputValue: msg.text || "",
+                    inputPlaceholder: "Escribí tu mensaje",
+                    showCancelButton: true,
+                    confirmButtonText: "Guardar",
+                    cancelButtonText: "Cancelar",
+                    inputValidator: (value) => {
+                        if (!value || !value.trim()) return "Escribí un mensaje.";
+                        return null;
+                    }
+                });
+                if (!result.isConfirmed) return;
+                const nextText = (result.value || "").trim();
+                if (!nextText || nextText === (msg.text || "").trim()) return;
+                const reauthed = await requirePasswordReauth(user, "Guardar");
+                if (!reauthed) return;
+                try {
+                    await updateDoc(
+                        doc(db, "artifacts", appId, "public", "data", "committee_messages", id),
+                        { text: nextText }
+                    );
+                    Swal.fire({
+                        icon: "success",
+                        title: "Actualizado",
+                        text: "Tu mensaje fue editado.",
+                        timer: 1400,
+                        showConfirmButton: false
+                    });
+                } catch (e) {
+                    console.error("Error editando mensaje del foro:", e);
+                    Swal.fire({
+                        icon: "error",
+                        title: "Error",
+                        text: "No se pudo editar el mensaje."
+                    });
+                }
+            };
+
+            window.deleteForumMessage = async (id) => {
+                if (!db) {
+                    console.warn("No hay conexión a Firestore para borrar el mensaje.");
+                    return;
+                }
+                const user = forumAuth?.currentUser;
+                if (!user) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Acceso restringido',
+                        text: 'Iniciá sesión para continuar.',
+                        confirmButtonColor: '#d33'
+                    });
+                    return;
+                }
+                const msg = getForumMessageById(id);
+                if (!msg || !canManageForumMessage(msg, user)) {
+                    Swal.fire({
+                        icon: "error",
+                        title: "Acceso restringido",
+                        text: "Solo podés borrar tus propios mensajes o moderar como administrador."
+                    });
+                    return;
+                }
+                await claimForumMessageOwner(msg, user);
+                const confirm = await Swal.fire({
+                    title: 'Eliminar mensaje',
+                    text: 'Esta acción no se puede deshacer. ¿Continuar?',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#3085d6',
+                    confirmButtonText: 'Borrar',
+                    cancelButtonText: 'Cancelar'
+                });
+                if (!confirm.isConfirmed) return;
+                const reauthed = await requirePasswordReauth(user, "Eliminar");
+                if (!reauthed) return;
+
+                try {
+                    await deleteDoc(
+                        doc(db, "artifacts", appId, "public", "data", "committee_messages", id)
+                    );
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Eliminado',
+                        text: 'El mensaje ha sido borrado correctamente.',
+                        timer: 1400,
+                        showConfirmButton: false
+                    });
+                } catch (e) {
+                    console.error("Error eliminando mensaje del foro:", e);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: 'No se pudo eliminar el mensaje.'
+                    });
+                }
+            };
+
+            const forumMessages = document.getElementById("forum-messages-general");
+            const form = document.getElementById("form-send-msg-general");
+            const msgText = document.getElementById("msg-text-general");
+            const errorId = "forum-general-error";
+            let errorEl = document.getElementById(errorId);
+
+            const ensureErrorEl = () => {
+                if (errorEl || !form) return errorEl;
+                errorEl = document.createElement("div");
+                errorEl.id = errorId;
+                errorEl.className = "text-xs text-red-600 mt-2";
+                errorEl.hidden = true;
+                form.parentElement?.appendChild(errorEl);
+                return errorEl;
+            };
+
+            const setError = (message) => {
+                const el = ensureErrorEl();
+                if (!el) return;
+                el.textContent = message || "";
+                el.hidden = !message;
+            };
+
+            const clearError = () => setError("");
+
+            let messages = [];
+            const profileCache = new Map();
+            let initialPurged = false;
+
+            const resolveValue = (obj, keys, fallback = "") => {
+                for (const k of keys) {
+                    if (obj && obj[k]) return obj[k];
+                }
+                return fallback;
+            };
+
+            const getUserDisplayName = async (user) => {
+                if (!user) return "Usuario";
+                if (profileCache.has(user.uid)) return profileCache.get(user.uid);
+                let displayName = user.displayName || user.email || "Usuario";
+                if (db) {
+                    try {
+                        const perfilSnap = await getDoc(doc(db, "usuarios", user.uid));
+                        if (perfilSnap.exists()) {
+                            const perfil = perfilSnap.data() || {};
+                            displayName =
+                                resolveValue(perfil, ["displayName", "nombreCompleto", "apellidoNombre", "fullName", "name", "nombre"], "") ||
+                                `${resolveValue(perfil, ["apellido", "lastName"], "")} ${resolveValue(perfil, ["nombre"], "")}`.trim() ||
+                                displayName;
+                        }
+                    } catch (e) {
+                        console.warn("No se pudo leer perfil para likes.", e);
+                    }
+                }
+                profileCache.set(user.uid, displayName);
+                return displayName;
+            };
+
+            const normalizeAuthor = (value) => (value || "").trim().toLowerCase();
+
+            const isForumMessageOwner = (msg, user) => {
+                if (!msg || !user) return false;
+                if (msg.authorUid && msg.authorUid === user.uid) return true;
+                if (!msg.authorUid) {
+                    const authorName = normalizeAuthor(msg.author || msg.authorName);
+                    const aliases = [
+                        user.displayName,
+                        user.email,
+                        profileCache.get(user.uid)
+                    ]
+                        .filter(Boolean)
+                        .map(normalizeAuthor);
+                    return Boolean(authorName && aliases.includes(authorName));
+                }
+                return false;
+            };
+
+const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForumMessageOwner(msg, user));
+
+            const claimForumMessageOwner = async (msg, user) => {
+                if (!db || !msg || msg.authorUid || !user) return;
+                if (!isForumMessageOwner(msg, user)) return;
+                try {
+                    const displayName = await getUserDisplayName(user);
+                    await updateDoc(
+                        doc(db, "artifacts", appId, "public", "data", "committee_messages", msg.id),
+                        {
+                            authorUid: user.uid,
+                            authorName: displayName || msg.author || user.email || "Usuario"
+                        }
+                    );
+                } catch (e) {
+                    console.warn("No se pudo reclamar el mensaje del foro.", e);
+                }
+            };
+
+            let legacyForumCleanup = false;
+
+            const syncLegacyForumMessages = async () => {
+                if (legacyForumCleanup) return;
+                if (!db) return;
+                const user = forumAuth?.currentUser;
+                if (!user) return;
+                const admin = await refreshAdminState(user);
+                if (!admin) return;
+
+                const pending = messages.filter((msg) => !msg.authorUid && !msg.isInitial);
+                if (!pending.length) return;
+                legacyForumCleanup = true;
+
+                for (const msg of pending) {
+                    try {
+                        const resolvedUid = await resolveUidForAuthor({
+                            uid: msg.authorUid,
+                            authorName: msg.author || msg.authorName
+                        });
+                        if (resolvedUid) {
+                            await updateDoc(
+                                doc(db, "artifacts", appId, "public", "data", "committee_messages", msg.id),
+                                {
+                                    authorUid: resolvedUid,
+                                    authorName: msg.authorName || msg.author || ""
+                                }
+                            );
+                        } else {
+                            await deleteDoc(
+                                doc(db, "artifacts", appId, "public", "data", "committee_messages", msg.id)
+                            );
+                        }
+                    } catch (e) {
+                        console.warn("No se pudo sincronizar mensaje legado.", e);
+                    }
+                }
+            };
+
+
+            const closeAllLikePopovers = (exceptId) => {
+                if (!forumMessages) return;
+                const popovers = forumMessages.querySelectorAll("[data-like-popover]");
+                popovers.forEach((popover) => {
+                    if (exceptId && popover.dataset.likePopover === exceptId) return;
+                    popover.classList.add("hidden");
+                });
+            };
+
+            window.toggleForumLike = async (id) => {
+                if (!db) {
+                    console.warn("No hay conexión a Firestore para el like.");
+                    return;
+                }
+                const user = forumAuth?.currentUser;
+                if (!user) {
+                    Swal.fire({
+                        icon: "warning",
+                        title: "Iniciá sesión",
+                        text: "Debes iniciar sesión para dar like."
+                    });
+                    return;
+                }
+                try {
+                    const displayName = await getUserDisplayName(user);
+                    await runTransaction(db, async (trx) => {
+                        const msgRef = doc(db, "artifacts", appId, "public", "data", "committee_messages", id);
+                        const snap = await trx.get(msgRef);
+                        if (!snap.exists()) return;
+                        const data = snap.data() || {};
+                        const likedBy = data.likedBy && typeof data.likedBy === "object" ? { ...data.likedBy } : {};
+                        if (likedBy[user.uid]) {
+                            delete likedBy[user.uid];
+                        } else {
+                            likedBy[user.uid] = displayName || user.email || "Usuario";
+                        }
+                        trx.update(msgRef, { likedBy });
+                    });
+                } catch (e) {
+                    console.error("Error actualizando like del foro:", e);
+                    Swal.fire({
+                        icon: "error",
+                        title: "Error",
+                        text: "No se pudo actualizar el like."
+                    });
+                }
+            };
+
+            window.toggleForumLikePopover = (event, id) => {
+                if (event?.stopPropagation) event.stopPropagation();
+                if (!forumMessages) return;
+                const popover = forumMessages.querySelector(`[data-like-popover="${id}"]`);
+                if (!popover) return;
+                const isHidden = popover.classList.contains("hidden");
+                closeAllLikePopovers();
+                if (isHidden) popover.classList.remove("hidden");
+            };
+
+            let likePopoverBound = false;
+            const bindLikePopoverDismiss = () => {
+                if (likePopoverBound) return;
+                likePopoverBound = true;
+                document.addEventListener("click", (event) => {
+                    const target = event.target;
+                    if (target.closest("[data-like-eye]") || target.closest(".dm-like-popover")) return;
+                    closeAllLikePopovers();
+                });
+            };
+
+            function renderMessages() {
+                if (!forumMessages) return;
+                forumMessages.innerHTML = messages
+                    .map((msg) => {
+                        const date = msg.createdAt
+                            ? (msg.createdAt.seconds
+                                ? new Date(msg.createdAt.seconds * 1000)
+                                : new Date(msg.createdAt))
+                            : new Date();
+                        const dateStr = date.toLocaleString("es-AR", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit"
+                        });
+                        const initials = (msg.author || "")
+                            .split(" ")
+                            .filter(Boolean)
+                            .map((n) => n[0])
+                            .join("")
+                            .substring(0, 2)
+                            .toUpperCase();
+
+                        const currentUser = forumAuth?.currentUser;
+                        const canManage = currentUser && canManageForumMessage(msg, currentUser);
+                        const likedBy = msg.likedBy && typeof msg.likedBy === "object" ? msg.likedBy : {};
+                        const likeNames = Object.values(likedBy).filter(Boolean);
+                        const likeNamesSorted = [...likeNames].sort((a, b) => a.localeCompare(b, "es"));
+                        const likeCount = likeNames.length;
+                        const liked = currentUser && likedBy[currentUser.uid];
+                        const likeBtnClass = liked ? "text-brisa" : "text-gray-300 hover:text-brisa";
+                        const likeCountClass = liked ? "text-brisa" : "text-gray-400";
+                        const likePopoverContent = likeNamesSorted.length
+                            ? likeNamesSorted.map((name) => `<div class="dm-like-name">${name}</div>`).join("")
+                            : '<div class="dm-like-empty">Sin likes todavía.</div>';
+                        const likeControls = `
+                <div class="relative flex items-center gap-1" data-like-wrap="${msg.id}">
+                  <button
+                    type="button"
+                    onclick="window.toggleForumLike('${msg.id}')"
+                    class="${likeBtnClass} flex items-center gap-1 p-1 rounded-full transition-all"
+                    aria-label="Me gusta"
+                    aria-pressed="${liked ? "true" : "false"}">
+                    <i data-lucide="heart" class="w-4 h-4"></i>
+                    <span class="${likeCountClass} text-[11px]">${likeCount}</span>
+                  </button>
+                  <button
+                    type="button"
+                    data-like-eye="true"
+                    onclick="window.toggleForumLikePopover(event, '${msg.id}')"
+                    class="text-gray-300 hover:text-gray-500 p-1 rounded-full hover:bg-gray-100 transition-all"
+                    aria-label="Ver likes">
+                    <i data-lucide="eye" class="w-4 h-4"></i>
+                  </button>
+                  <div class="dm-like-popover hidden" data-like-popover="${msg.id}">
+                    <div class="dm-like-popover__title">Personas que dieron like</div>
+                    ${likePopoverContent}
+                  </div>
+                </div>
+              `;
+                        const editAttrs = canManage
+                            ? `onclick="window.editForumMessage('${msg.id}')" title="Editar mensaje"`
+                            : 'disabled aria-disabled="true" title="Solo el autor o admin puede editar"';
+                        const deleteAttrs = canManage
+                            ? `onclick="window.deleteForumMessage('${msg.id}')" title="Eliminar mensaje"`
+                            : 'disabled aria-disabled="true" title="Solo el autor o admin puede borrar"';
+                        const editClass = canManage
+                            ? "text-gray-300 hover:text-gray-600 hover:bg-gray-100"
+                            : "text-gray-300 opacity-50 cursor-not-allowed";
+                        const deleteClass = canManage
+                            ? "text-gray-300 hover:text-red-500 hover:bg-red-50"
+                            : "text-gray-300 opacity-50 cursor-not-allowed";
+                        const messageActions = `
+                <div class="flex items-center gap-1">
+                  <button
+                    type="button"
+                    ${editAttrs}
+                    class="${editClass} p-1 rounded-full transition-all"
+                    aria-label="Editar mensaje">
+                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                  </button>
+                  <button
+                    type="button"
+                    ${deleteAttrs}
+                    class="${deleteClass} p-1 rounded-full transition-all"
+                    aria-label="Eliminar mensaje">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                  </button>
+                </div>
+              `;
+                        return `
+        <div class="flex gap-4">
+          <div class="dm-avatar dm-foro-avatar"
+               data-dm-uid="${msg.authorUid || ""}"
+               data-dm-author="${msg.author || ""}">
+            <img class="dm-avatar__img" data-author-avatar src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="Avatar" hidden />
+            <span class="dm-initials" data-avatar-fallback="initials">${initials}</span>
+          </div>
+          <div class="flex-1 space-y-1">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex flex-col">
+                <span class="font-bold text-gray-900 text-sm">${msg.author || ""}</span>
+                <span class="text-xs text-gray-500">
+                  ${msg.businessUnit || ""}${msg.managementUnit ? " · " + msg.managementUnit : ""}
+                </span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-[11px] text-gray-400">${dateStr}</span>
+                ${likeControls}
+                ${messageActions}
+              </div>
+            </div>
+            <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm border border-gray-100 text-gray-700 text-sm leading-relaxed">
+              ${msg.text || ""}
+            </div>
+          </div>
+        </div>
+        `;
+                    })
+                    .join("");
+                hydrateAvatars(forumMessages);
+                if (window.lucide) window.lucide.createIcons();
+                forumMessages.scrollTop = forumMessages.scrollHeight;
+            }
+
+            if (forumAuth) {
+                onAuthStateChanged(forumAuth, async (user) => {
+                    if (!user) {
+                        window.location.replace(buildLoginRedirectUrl("#estructura"));
+                        return;
+                    }
+                    await refreshAdminState(user);
+                    await getUserDisplayName(user);
+                    syncLegacyForumMessages();
+                    renderMessages();
+                });
+            }
+
+            if (db) {
+                const msgsRef = query(
+                    collection(db, "artifacts", appId, "public", "data", "committee_messages"),
+                    orderBy("createdAt", "asc")
+                );
+
+                onSnapshot(
+                    msgsRef,
+                    (snap) => {
+                        const rawMessages = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+                        const initialMessage = rawMessages.find(
+                            (m) => m.isInitial === true && m.committeeId === "foro_general"
+                        );
+                        if (initialMessage && !initialPurged) {
+                            initialPurged = true;
+                            deleteDoc(
+                                doc(db, "artifacts", appId, "public", "data", "committee_messages", initialMessage.id)
+                            ).catch((err) => {
+                                console.warn("No se pudo borrar el mensaje inicial.", err);
+                            });
+                        }
+                        messages = rawMessages.filter(
+                            (m) => m.committeeId === "foro_general" && !m.isInitial
+                        );
+                        syncLegacyForumMessages();
+                        renderMessages();
+                    },
+                    (error) => {
+                        console.error("Error suscribiendo foro general:", error);
+                        if (error?.code === "permission-denied") {
+                            setError("No tenés permisos para ver el foro.");
+                        } else if (error?.code === "failed-precondition" && /index/i.test(error?.message || "")) {
+                            console.warn("Falta indice en Firestore para el foro general:", error);
+                        }
+                    }
+                );
+
+            }
+
+            if (form) {
+                form.addEventListener("submit", async (e) => {
+                    e.preventDefault();
+                    clearError();
+
+                    if (!db) {
+                        setError("No hay conexión con Firestore.");
+                        console.error("Foro general: no hay instancia de Firestore disponible.");
+                        return;
+                    }
+                    if (!msgText) return;
+                    const text = msgText.value.trim();
+                    if (!text) return;
+
+                    const user = forumAuth?.currentUser;
+                    if (!user) {
+                        Swal.fire({
+                            icon: "warning",
+                            title: "Iniciá sesión",
+                            text: "Debes iniciar sesión para enviar mensajes."
+                        });
+                        return;
+                    }
+
+                    const perfilRef = doc(db, "usuarios", user.uid);
+                    const perfilSnap = await getDoc(perfilRef);
+
+                    if (!perfilSnap.exists()) {
+                        Swal.fire({
+                            icon: "error",
+                            title: "Perfil incompleto",
+                            text: "No encontramos tu información. Volvé a iniciar sesión."
+                        });
+                        return;
+                    }
+
+                    const perfil = perfilSnap.data() || {};
+
+                    const author =
+                        resolveValue(perfil, ["displayName", "nombreCompleto", "apellidoNombre", "fullName", "name", "nombre"], "") ||
+                        `${resolveValue(perfil, ["apellido", "lastName"], "")} ${resolveValue(perfil, ["nombre"], "")}`.trim() ||
+                        user.displayName ||
+                        user.email ||
+                        "Médico";
+                    const businessUnit = resolveValue(perfil, ["businessUnit", "unidadNegocio", "bu", "business_unit"], "");
+                    const managementUnit = resolveValue(perfil, ["managementUnit", "unidadGestion", "mu", "management_unit"], "");
+
+                    try {
+                        await addDoc(
+                            collection(db, "artifacts", appId, "public", "data", "committee_messages"),
+                            {
+                                text,
+                                author,
+                                businessUnit,
+                                managementUnit,
+                                committeeId: "foro_general",
+                                authorUid: user.uid,
+                                authorName: author,
+                                createdAt: serverTimestamp()
+                            }
+                        );
+                        msgText.value = "";
+                        clearError();
+                    } catch (error) {
+                        console.error("Error escribiendo mensaje en Firestore (foro general):", error);
+                        if (error?.code === "permission-denied") {
+                            setError("No tenés permisos para publicar en el foro.");
+                            console.error("Permiso denegado al publicar en foro general.", error);
+                            return;
+                        }
+                        if (error?.code === "failed-precondition" && /index/i.test(error?.message || "")) {
+                            console.warn("Falta indice en Firestore para publicar en foro general:", error);
+                        }
+                        setError("No se pudo publicar el mensaje. Intentá nuevamente.");
+                    }
+                });
+
+            } else {
+                console.warn("Foro general: Firebase DB o elementos del DOM no disponibles.");
+            }
+
+            bindLikePopoverDismiss();
+
+        })();
+    </script>
+    <!-- Logout Overlay -->
+    <div id="logout-overlay" class="session-overlay">
+        <div class="session-spinner"></div>
+        <div class="session-text">Cerrando Sesión...</div>
+    </div>
+
+    <script type="module">
+        const userInfoTrigger = document.getElementById('user-info-trigger');
+        const pushInfoTrigger = document.getElementById('push-info-trigger');
+        const pushToggleHeader = document.getElementById('push-toggle-menu');
+        const pushToggleHint = document.getElementById('push-toggle-hint');
+        const pushBanner = document.getElementById('push-permission-banner');
+        const pushBannerAllow = document.getElementById('push-banner-allow');
+        const pushBannerLater = document.getElementById('push-banner-later');
+        const tooltipEl = document.createElement('div');
+        tooltipEl.className = 'ui-tooltip';
+        document.body.appendChild(tooltipEl);
+        let tooltipTarget = null;
+
+        const showTooltip = (el, text) => {
+            if (!tooltipEl || !el) return;
+            tooltipTarget = el;
+            tooltipEl.textContent = text;
+            tooltipEl.style.display = 'block';
+            const rect = el.getBoundingClientRect();
+            const tooltipWidth = tooltipEl.offsetWidth;
+            const viewportWidth = window.innerWidth;
+            let left = rect.left + window.scrollX - tooltipWidth + rect.width;
+            const minLeft = 8 + window.scrollX;
+            const maxLeft = window.scrollX + viewportWidth - tooltipWidth - 8;
+            if (left < minLeft) left = minLeft;
+            if (left > maxLeft) left = maxLeft;
+            tooltipEl.style.left = `${left}px`;
+            tooltipEl.style.top = `${rect.bottom + window.scrollY + 6}px`;
+        };
+
+        const hideTooltip = () => {
+            if (!tooltipEl) return;
+            tooltipEl.style.display = 'none';
+            tooltipTarget = null;
+        };
+
+        const attachTooltip = (el, getText) => {
+            if (!el) return;
+            const resolver = typeof getText === 'function' ? getText : () => getText;
+            const handleShow = (e) => {
+                e.stopPropagation();
+                showTooltip(el, resolver());
+            };
+            el.addEventListener('mouseenter', handleShow);
+            el.addEventListener('mouseleave', hideTooltip);
+            el.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (tooltipTarget === el) {
+                    hideTooltip();
+                } else {
+                    handleShow(e);
+                }
+            });
+        };
+
+        document.addEventListener('click', (e) => {
+            if (tooltipTarget && !tooltipEl.contains(e.target)) {
+                hideTooltip();
+            }
+        });
+
+        const headerInfoText = "Hacé click en tu nombre para abrir el menú de usuario.\nDesde ahí podés gestionar notificaciones y cerrar sesión.";
+        const pushInfoText = () => {
+            const perm = typeof Notification !== 'undefined' ? Notification.permission : 'unsupported';
+            const blocked = perm === 'denied' ? ' (bloqueadas en el navegador)' : '';
+            return "Las notificaciones te avisan cuando recibís mensajes nuevos, incluso si no estás viendo el chat.\nPodés activarlas o desactivarlas cuando quieras.\nEl permiso del navegador se gestiona desde el candado 🔒." + blocked;
+        };
+
+        attachTooltip(userInfoTrigger, headerInfoText);
+        attachTooltip(pushInfoTrigger, pushInfoText);
+
+        const getStoredPushEnabled = () => {
+            try {
+                const stored = localStorage.getItem('pushEnabled');
+                if (stored === null) return true; // default ON
+                return stored === 'true';
+            } catch (e) {
+                return true;
+            }
+        };
+
+        const setStoredPushEnabled = (value) => {
+            try {
+                localStorage.setItem('pushEnabled', value ? 'true' : 'false');
+            } catch (e) {
+                // ignore
+            }
+        };
+
+        const getPromptDismissed = () => {
+            try {
+                return localStorage.getItem('pushPromptDismissed') === 'true';
+            } catch (e) {
+                return false;
+            }
+        };
+
+        const setPromptDismissed = (value) => {
+            try {
+                localStorage.setItem('pushPromptDismissed', value ? 'true' : 'false');
+            } catch (e) {
+                // ignore
+            }
+        };
+
+        const getPromptGranted = () => {
+            try {
+                return localStorage.getItem('pushPromptGranted') === 'true';
+            } catch (e) {
+                return false;
+            }
+        };
+
+        const setPromptGranted = (value) => {
+            try {
+                localStorage.setItem('pushPromptGranted', value ? 'true' : 'false');
+            } catch (e) {
+                // ignore
+            }
+        };
+
+        const getNotificationsPreference = () => {
+            try {
+                return localStorage.getItem('notificationsPreference') || 'unknown';
+            } catch (e) {
+                return 'unknown';
+            }
+        };
+
+        const setNotificationsPreference = (value) => {
+            try {
+                localStorage.setItem('notificationsPreference', value);
+            } catch (e) {
+                // ignore
+            }
+        };
+
+        const showOrHideBanner = (enabled, { triggeredByUser = false } = {}) => {
+            if (!pushBanner) return;
+            const perm = typeof Notification !== 'undefined' ? Notification.permission : 'unsupported';
+            console.log("[UI] Permission actual:", perm);
+            if (perm === 'granted') {
+                setPromptGranted(true);
+                setNotificationsPreference('granted');
+                setPromptDismissed(false);
+                pushBanner.classList.add('hidden');
+                return;
+            }
+            if (perm === 'denied') {
+                pushBanner.classList.add('hidden');
+                if (pushToggleHint && enabled) {
+                    pushToggleHint.textContent = 'Notificaciones bloqueadas en el navegador (candado 🔒).';
+                }
+                setNotificationsPreference('denied');
+                return;
+            }
+            const dismissed = getPromptDismissed();
+            const granted = getPromptGranted();
+            const pref = getNotificationsPreference();
+            if (!enabled || granted) {
+                pushBanner.classList.add('hidden');
+                return;
+            }
+            if (pref === 'granted') {
+                pushBanner.classList.add('hidden');
+                return;
+            }
+            if (pref === 'denied') {
+                pushBanner.classList.add('hidden');
+                return;
+            }
+            if (dismissed && !triggeredByUser) {
+                pushBanner.classList.add('hidden');
+                return;
+            }
+            if (pref === 'later' && !triggeredByUser) {
+                pushBanner.classList.add('hidden');
+                return;
+            }
+            pushBanner.classList.remove('hidden');
+        };
+        // Mostrar banner en carga si corresponde
+        (function bootstrapPushBanner() {
+            const enabled = getStoredPushEnabled();
+            const perm = typeof Notification !== 'undefined' ? Notification.permission : 'unsupported';
+            const dismissed = getPromptDismissed();
+            const granted = getPromptGranted();
+            const pref = getNotificationsPreference();
+            if (!enabled) return;
+            if (perm === 'granted') {
+                setPromptGranted(true);
+                setNotificationsPreference('granted');
+                return;
+            }
+            if (perm === 'denied') {
+                setNotificationsPreference('denied');
+                if (pushToggleHint) pushToggleHint.textContent = 'Notificaciones bloqueadas en el navegador (candado 🔒).';
+                return;
+            }
+            if (perm === 'default' && !granted && pref !== 'granted' && pref !== 'denied' && (!dismissed || pref === 'later')) {
+                showOrHideBanner(true, { triggeredByUser: true });
+            }
+        })();
+
+        const applyPushToggleUI = (enabled) => {
+            if (pushToggleHeader) {
+                pushToggleHeader.checked = enabled;
+            }
+            if (pushToggleHint) {
+                const perm = typeof Notification !== 'undefined' ? Notification.permission : 'unsupported';
+                if (perm === 'granted') {
+                    setPromptGranted(true);
+                }
+                if (!enabled) {
+                    pushToggleHint.textContent = 'Para revocar permisos del navegador usá el candado 🔒 del sitio';
+                } else if (perm === 'denied') {
+                    pushToggleHint.textContent = 'Notificaciones bloqueadas en el navegador (candado 🔒).';
+                } else {
+                    pushToggleHint.textContent = '';
+                }
+            }
+            console.log("[UI] Toggle notificaciones:", enabled);
+            showOrHideBanner(enabled);
+        };
+
+        if (pushToggleHeader) {
+            const initial = getStoredPushEnabled();
+            applyPushToggleUI(initial);
+            pushToggleHeader.addEventListener('change', () => {
+                const enabled = pushToggleHeader.checked;
+                setStoredPushEnabled(enabled);
+                if (enabled) {
+                    setPromptDismissed(false);
+                    const perm = typeof Notification !== 'undefined' ? Notification.permission : 'unsupported';
+                    console.log("[UI] Permission actual:", perm);
+                    if (perm === 'granted') {
+                        setPromptGranted(true);
+                        setNotificationsPreference('granted');
+                        window.enablePushNotifications('HRodriguez');
+                        if (pushBanner) pushBanner.classList.add('hidden');
+                    } else {
+                        showOrHideBanner(true, { triggeredByUser: true });
+                    }
+                } else {
+                    console.log('[PUSH] Desactivadas a nivel preferencia local. Para revocar permisos, usar ajustes del navegador.');
+                    if (pushBanner) pushBanner.classList.add('hidden');
+                    setNotificationsPreference('later');
+                }
+                applyPushToggleUI(enabled);
+            });
+        }
+        if (pushBannerAllow) {
+            pushBannerAllow.addEventListener('click', () => {
+                const perm = typeof Notification !== 'undefined' ? Notification.permission : 'unsupported';
+                console.log("[PUSH] permission state", perm);
+                window.enablePushNotifications('HRodriguez');
+                setPromptDismissed(false);
+                setPromptGranted(perm === 'granted');
+                setNotificationsPreference(perm === 'granted' ? 'granted' : 'unknown');
+                setTimeout(() => {
+                    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+                        setPromptGranted(true);
+                        setNotificationsPreference('granted');
+                        try { localStorage.setItem('notificationsAccepted', 'granted'); } catch (e) {}
+                    }
+                }, 300);
+                if (perm === 'granted') {
+                    try { localStorage.setItem('notificationsAccepted', 'granted'); } catch (e) {}
+                }
+                if (pushBanner) pushBanner.classList.add('hidden');
+            });
+        }
+
+        if (pushBannerLater) {
+            pushBannerLater.addEventListener('click', () => {
+                setPromptDismissed(true);
+                setNotificationsPreference('later');
+                try { localStorage.setItem('notificationsAccepted', 'denied'); } catch (e) {}
+                if (pushBanner) pushBanner.classList.add('hidden');
+            });
+        }
+
+        const isBannerVisible = () => pushBanner && !pushBanner.classList.contains('hidden');
+
+        document.addEventListener('keydown', (e) => {
+            if (!isBannerVisible()) return;
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                pushBannerAllow?.click();
+            }
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                setPromptDismissed(true);
+                pushBanner.classList.add('hidden');
+            }
+        });
+
+    </script>
+
+    <script type="module">
+        (() => {
+            let chatLoaded = false;
+            let chatLoading = null;
+            const loadChat = () => {
+                if (chatLoaded) return Promise.resolve();
+                if (chatLoading) return chatLoading;
+                chatLoading = import('/js/chat.js')
+                    .then(() => {
+                        chatLoaded = true;
+                    })
+                    .catch(() => {
+                        chatLoading = null;
+                    });
+                return chatLoading;
+            };
+            window.__ensureChatLoaded = loadChat;
+
+            const triggerLoad = () => loadChat();
+            const onFirstInput = () => triggerLoad();
+
+            window.addEventListener('pointerdown', onFirstInput, { once: true });
+            window.addEventListener(
+                'keydown',
+                (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        onFirstInput();
+                    }
+                },
+                { once: true }
+            );
+            window.addEventListener('hashchange', () => {
+                if (window.location.hash.includes('chat')) {
+                    loadChat();
+                }
+            });
+            if (window.location.hash.includes('chat')) {
+                loadChat();
+            }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', loadChat, { once: true });
+            } else {
+                loadChat();
+            }
+        })();
+    </script>
+    <script type="module" src="assets/js/pages/index.js"></script>
+    <script type="module">
+        import { getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
+        import { doc, setDoc, serverTimestamp, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { getFirebase, ensureMessaging } from "/assets/js/common/firebaseClient.js";
+
+        const { db: pushDb } = getFirebase();
+        let messaging = null;
+
+        const messagingReady = (async () => {
+            try {
+                messaging = await ensureMessaging();
+                console.log("[PUSH] messaging instance:", messaging);
+                if (messaging) {
+                    onMessage(messaging, (payload) => {
+                        console.debug("[PUSH] Mensaje en foreground", payload);
+                    });
+                }
+            } catch (e) {
+                console.log("[PUSH] error: verificando soporte de messaging", e?.code, e?.message);
+            }
+        })();
+
+        async function enablePushNotifications(uid) {
+            console.log("[PUSH] start enablePushNotifications");
+            const permission = await Notification.requestPermission();
+            console.log("[PUSH] permission:", permission);
+            if (permission !== "granted") {
+                console.log("[PUSH] Permiso denegado");
+                return;
+            }
+            await messagingReady;
+            if (!messaging) {
+                console.log("[PUSH] Messaging no disponible (browser/soporte)");
+                return;
+            }
+            let swReg = null;
+            try {
+                swReg = await navigator.serviceWorker.getRegistration("/service-worker.js");
+                if (!swReg) {
+                    swReg = await navigator.serviceWorker.ready;
+                }
+            } catch (e) {
+                console.log("[PUSH] error: No se pudo obtener el SW de messaging", e?.code, e?.message);
+            }
+            try {
+                const token = await getToken(messaging, {
+                    vapidKey: "BN8lEc8DXuY2NsRBPSY0vEBhsVFYO4qI65w40YlURUaNy7pQIDjCZ4k7hdMGg-L0nTzElN1BYGC7mwfSnLh6fmY",
+                    serviceWorkerRegistration: swReg || undefined
+                });
+                if (!token) {
+                    console.log("[PUSH] No se pudo obtener token");
+                    return;
+                }
+                console.log("[PUSH] token obtenido:", token);
+                await setDoc(
+                    doc(pushDb, "pushTokens", uid),
+                    {
+                        tokens: arrayUnion(token),
+                        updatedAt: serverTimestamp(),
+                        userAgent: navigator.userAgent
+                    },
+                    { merge: true }
+                );
+            } catch (e) {
+                console.log("[PUSH] error: obteniendo token", e?.code, e?.message);
+            }
+        }
+
+        window.enablePushNotifications = (uid = 'HRodriguez') => enablePushNotifications(uid);
+        window.__resetPushPrompt = () => {
+            try {
+                localStorage.removeItem('pushPromptGranted');
+                localStorage.removeItem('pushPromptDismissed');
+                localStorage.removeItem('notificationsPreference');
+            } catch (e) {}
+        };
+        // Activar modo claridad si viene por query (?clarity=1) o storage
+        (() => {
+            let clarity = false;
+            try {
+                const qp = new URLSearchParams(location.search).get('clarity');
+                const stored = localStorage.getItem('uiClarity');
+                clarity = qp === '1' || stored === 'true';
+                if (qp === '1') localStorage.setItem('uiClarity', 'true');
+            } catch (e) {
+                clarity = false;
+            }
+            if (clarity) document.body.classList.add('ui-clarity');
+        })();
+        const syncOrgAria = () => {
+            try {
+                const mainToggle = document.getElementById('structure-main-toggle');
+                const contentWrapper = document.getElementById('structure-content-wrapper');
+                if (mainToggle && contentWrapper) {
+                    const expanded = contentWrapper.classList.contains('expanded');
+                    mainToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+                }
+                document.querySelectorAll('.group-card').forEach(card => {
+                    const header = card.querySelector('.group-header-btn');
+                    const content = card.querySelector('.group-content');
+                    const open = content?.classList.contains('open');
+                    if (header && typeof open === 'boolean') {
+                        header.setAttribute('aria-expanded', open ? 'true' : 'false');
+                        card.setAttribute('aria-expanded', open ? 'true' : 'false');
+                    }
+                });
+                document.querySelectorAll('.region-accordion').forEach(region => {
+                    const btn = region.querySelector('.region-btn');
+                    const content = region.querySelector('.group-content');
+                    const open = content?.classList.contains('open');
+                    if (btn && typeof open === 'boolean') {
+                        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+                    }
+                });
+            } catch (e) {}
+        };
+        document.addEventListener('DOMContentLoaded', () => setTimeout(syncOrgAria, 150));
+        // Autoscroll suave al abrir secciones de organigrama
+        document.addEventListener('click', (e) => {
+            const header = e.target.closest('.group-header-btn, .region-btn, #structure-main-toggle');
+            if (!header) return;
+            setTimeout(() => {
+                if (header.getAttribute('aria-expanded') === 'true') {
+                    const rect = header.getBoundingClientRect();
+                    if (rect.top < 0 || rect.bottom > window.innerHeight) {
+                        header.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                    header.classList.add('org-highlight');
+                    setTimeout(() => header.classList.remove('org-highlight'), 250);
+                }
+                syncOrgAria();
+            }, 50);
+        }, true);
+        window.__resetPushPrompt = () => {
+            try {
+                localStorage.removeItem('pushPromptGranted');
+                localStorage.removeItem('pushPromptDismissed');
+                localStorage.removeItem('notificationsPreference');
+            } catch (e) {}
+        };
+    </script>
+    <div id="push-permission-banner" class="push-banner hidden">
+        <div style="font-weight:700; color:#111827; font-size:15px; text-align:center;">Notificaciones del Departamento Médico</div>
+        <div style="color:#4b5563; font-size:13px; text-align:center;">Las notificaciones te permiten recibir avisos importantes cuando llega un mensaje nuevo, incluso si no estás en la plataforma.</div>
+        <div style="color:#6b7280; font-size:12px; text-align:center;">Podés cambiarlo cuando quieras desde el menú de usuario o el candado 🔒 del navegador.</div>
+        <div class="push-banner-actions">
+            <button id="push-banner-later" class="push-banner-later" type="button">Ahora no</button>
+            <button id="push-banner-allow" class="push-banner-allow" type="button">Permitir</button>
+        </div>
+    </div>
+</body>
+
+</html>

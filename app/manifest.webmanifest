@@ -1,0 +1,50 @@
+{
+  "name": "Departamento Médico",
+  "short_name": "Depto Médico",
+  "start_url": "/app/index.html#muro",
+  "scope": "/app/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "background_color": "#7AB800",
+  "theme_color": "#7AB800",
+  "icons": [
+    { "src": "/assets/icons/icon-72.png", "sizes": "72x72", "type": "image/png" },
+    { "src": "/assets/icons/icon-96.png", "sizes": "96x96", "type": "image/png" },
+    { "src": "/assets/icons/icon-128.png", "sizes": "128x128", "type": "image/png" },
+    { "src": "/assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/assets/icons/icon-256.png", "sizes": "256x256", "type": "image/png" },
+    { "src": "/assets/icons/icon-384.png", "sizes": "384x384", "type": "image/png" },
+    { "src": "/assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/assets/icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Muro",
+      "short_name": "Muro",
+      "description": "Novedades del departamento",
+      "url": "/app/index.html#muro",
+      "icons": [{ "src": "/assets/icons/icon-96.png", "sizes": "96x96", "type": "image/png" }]
+    },
+    {
+      "name": "Estructura",
+      "short_name": "Estructura",
+      "description": "Estructura funcional",
+      "url": "/app/index.html#estructura",
+      "icons": [{ "src": "/assets/icons/icon-96.png", "sizes": "96x96", "type": "image/png" }]
+    },
+    {
+      "name": "Comites",
+      "short_name": "Comites",
+      "description": "Acceso a comites",
+      "url": "/app/index.html#comites",
+      "icons": [{ "src": "/assets/icons/icon-96.png", "sizes": "96x96", "type": "image/png" }]
+    },
+    {
+      "name": "Foro",
+      "short_name": "Foro",
+      "description": "Foro del equipo medico",
+      "url": "/app/index.html#foro",
+      "icons": [{ "src": "/assets/icons/icon-96.png", "sizes": "96x96", "type": "image/png" }]
+    }
+  ]
+}

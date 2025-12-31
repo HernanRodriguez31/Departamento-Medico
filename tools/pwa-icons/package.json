@@ -1,0 +1,12 @@
+{
+  "name": "pwa-icons",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Generate PWA icons for Departamento Medico",
+  "scripts": {
+    "generate": "node generate-icons.js"
+  },
+  "dependencies": {
+    "sharp": "^0.33.2"
+  }
+}

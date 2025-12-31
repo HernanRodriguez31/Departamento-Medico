@@ -1,0 +1,1322 @@
+:root {
+  --border-soft: #E5E7EB;
+  --border-mid: #D1D5DB;
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-mid: 0 6px 16px rgba(0, 0, 0, 0.10);
+  --shadow-hard: 0 10px 28px rgba(0, 0, 0, 0.14);
+  /* OrgTree tokens (premium organigrama) */
+  --org-bg: #FFFFFF;
+  --org-surface: #FFFFFF;
+  --org-border: rgba(17, 24, 39, 0.10);
+  --org-border-soft: rgba(17, 24, 39, 0.07);
+  --org-text: #0F172A;
+  --org-muted: #667085;
+  --org-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --org-shadow-2: 0 12px 28px rgba(0, 0, 0, 0.10);
+  --org-radius-lg: 18px;
+  --org-radius-md: 14px;
+  --org-radius-sm: 12px;
+  --org-accent: #2EAD50;
+  --org-accent-rail: rgba(46, 173, 80, 0.65);
+  --org-accent-soft: rgba(46, 173, 80, 0.06);
+  --org-focus: rgba(46, 173, 80, 0.35);
+  --org-subtle: rgba(0, 0, 0, 0.04);
+}
+
+/* Cards / contenedores principales */
+.card,
+.section-card,
+.glass-panel,
+.referente__card,
+.coordinator__card,
+.leader-card,
+.dashboard-container,
+.research__card,
+.referente-hero-card {
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-soft), var(--shadow-mid);
+  background: #fff;
+  border-radius: 16px;
+}
+
+/* Dropdowns / popovers / tooltips / banners */
+.user-panel-dropdown,
+.ui-tooltip,
+.push-banner,
+.emoji-panel {
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-soft), var(--shadow-hard);
+  background: #fff;
+  border-radius: 12px;
+}
+
+/* Sección headers / separadores */
+.section__header,
+.user-menu__row--primary,
+.user-menu__row--subtle {
+  border-bottom: 1px solid var(--border-soft);
+}
+
+/* Hover y focus accesible */
+.card:hover,
+.section-card:hover,
+.referente__card:hover,
+.coordinator__card:hover,
+.leader-card:hover,
+.dashboard-container:hover {
+  border-color: var(--border-mid);
+  box-shadow: var(--shadow-soft), var(--shadow-mid);
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid rgba(34, 197, 94, 0.35);
+  outline-offset: 2px;
+}
+
+/* Modo claridad */
+body.ui-clarity .card,
+body.ui-clarity .section-card,
+body.ui-clarity .glass-panel,
+body.ui-clarity .referente__card,
+body.ui-clarity .coordinator__card,
+body.ui-clarity .leader-card,
+body.ui-clarity .dashboard-container,
+body.ui-clarity .research__card,
+body.ui-clarity .referente-hero-card {
+  border-color: var(--border-mid);
+  box-shadow: var(--shadow-soft), var(--shadow-hard);
+}
+
+body.ui-clarity .user-panel-dropdown,
+body.ui-clarity .ui-tooltip,
+body.ui-clarity .push-banner,
+body.ui-clarity .emoji-panel {
+  border-color: var(--border-mid);
+  box-shadow: var(--shadow-mid), var(--shadow-hard);
+}
+
+/* --- ORGANIGRAMA (Estructura Funcional) --- */
+.group-card {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+  border-radius: 16px;
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+.group-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--first-color, #7AB800);
+}
+.group-card:hover {
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.10);
+  transform: translateY(-1px);
+  border-color: rgba(0, 0, 0, 0.10);
+}
+.group-card[aria-expanded="true"],
+.group-card.expanded {
+  background: #F6FBF7;
+  border-left: 4px solid var(--first-color, #7AB800);
+  padding-bottom: 4px;
+}
+
+.group-header-btn,
+.region-btn {
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.group-header-btn:hover,
+.region-btn:hover,
+.group-header-btn:focus-visible,
+.region-btn:focus-visible {
+  background: rgba(46, 173, 80, 0.06);
+  box-shadow: inset 3px 0 0 var(--first-color, #7AB800);
+  outline: 2px solid rgba(34, 197, 94, 0.35);
+  outline-offset: 2px;
+}
+
+.group-header-btn .structure__chevron svg,
+.group-header-btn .dashboard-chevron svg,
+.region-btn .structure__chevron svg,
+.region-btn .dashboard-chevron svg,
+.structure__chevron svg {
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+.group-header-btn[aria-expanded="true"] .structure__chevron svg,
+.group-header-btn[aria-expanded="true"] .dashboard-chevron svg,
+.region-btn[aria-expanded="true"] .structure__chevron svg,
+.region-btn[aria-expanded="true"] .dashboard-chevron svg,
+.structure__main-btn[aria-expanded="true"] .structure__chevron svg {
+  transform: rotate(180deg);
+  color: var(--first-color, #7AB800);
+}
+
+.group-content {
+  position: relative;
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-4px);
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: max-height 0.22s ease, opacity 0.22s ease, transform 0.22s ease,
+    grid-template-rows 0.22s ease;
+  will-change: max-height, opacity, transform;
+}
+.group-content.open::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  top: 8px;
+  bottom: 8px;
+  border-left: 1px solid rgba(0, 0, 0, 0.06);
+}
+.group-content.open {
+  max-height: 1200px;
+  opacity: 1;
+  transform: translateY(0);
+  grid-template-rows: 1fr;
+  pointer-events: auto;
+}
+
+.region-accordion {
+  background: #fff;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+  margin-bottom: 14px;
+}
+.region-accordion:last-child {
+  margin-bottom: 0;
+}
+.region-accordion .region-btn {
+  position: sticky;
+  top: 0;
+  background: inherit;
+  z-index: 2;
+  padding: 1.5rem 1.5rem;
+}
+.region-btn {
+  border-radius: 12px 12px 0 0;
+  cursor: pointer;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.region-btn[aria-expanded="true"] {
+  background: rgba(46, 173, 80, 0.06);
+  border-left: 4px solid var(--first-color, #7AB800);
+  box-shadow: inset 0 2px 0 rgba(46, 173, 80, 0.14);
+}
+.region-btn:hover,
+.region-btn:focus-visible {
+  box-shadow: inset 0 2px 0 rgba(46, 173, 80, 0.14), 0 2px 8px rgba(0,0,0,0.06);
+  transform: translateY(-0.5px);
+}
+
+.staff-badge {
+  border: 1px solid #E5E7EB;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+.staff-badge:hover {
+  background: #F8FAFC;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+.staff-badge.coordinator {
+  border-color: rgba(46, 173, 80, 0.28);
+  background: #F6FBF7;
+}
+.staff-badge.coordinator::after {
+  content: none;
+  display: none;
+}
+.staff-role {
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  margin-top: 0.125rem;
+}
+
+/* Micro divisores y zebra en listas */
+.group-content .region-accordion + .region-accordion {
+  border-top: 1px solid rgba(0,0,0,0.06);
+}
+.staff-grid .staff-badge:nth-child(2n) {
+  background: rgba(0,0,0,0.015);
+}
+.staff-grid .staff-badge:nth-child(2n).coordinator {
+  background: rgba(46,173,80,0.03);
+}
+
+/* Estado activo más claro */
+.group-card[aria-expanded="true"],
+.group-card.expanded {
+  box-shadow: inset 0 3px 0 rgba(46, 173, 80, 0.16), 0 10px 24px rgba(0, 0, 0, 0.10);
+}
+.group-header-btn[aria-expanded="true"],
+.region-btn[aria-expanded="true"] {
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+.group-card[aria-expanded="true"] .group-header-btn,
+.group-card.expanded .group-header-btn {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: inherit;
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.06);
+}
+
+/* Divisores internos y zebra adicional para listas largas */
+.group-content.open .sector-item + .sector-item {
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  padding-top: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+body.ui-clarity .group-card {
+  border-color: var(--border-mid);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.10);
+}
+body.ui-clarity .region-accordion {
+  border-color: var(--border-mid);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+/* --- ORGTREE PREMIUM SCOPE ---
+   Selectores usados (reales):
+   .structure__main-btn, .structure__content-wrapper, .group-card, .group-header-btn,
+   .group-content, .group-content.open, .region-accordion, .region-btn, .staff-badge, .orgtree
+*/
+.orgtree {
+  --org-bg: #FFFFFF;
+  --org-surface: #FFFFFF;
+  --org-border: rgba(17, 24, 39, 0.16);
+  --org-border-soft: rgba(17, 24, 39, 0.12);
+  --org-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --org-shadow-2: 0 12px 28px rgba(0, 0, 0, 0.10);
+  --org-radius-lg: 20px;
+  --org-radius-md: 14px;
+  --org-radius-sm: 12px;
+  --org-accent: var(--first-color);
+  --org-accent-rail: var(--first-color);
+  --org-accent-soft: rgba(106, 191, 75, 0.06);
+  --org-focus: rgba(106, 191, 75, 0.35);
+  color: #0F172A;
+}
+.orgtree .orgtree-panel {
+  position: relative;
+  background: var(--org-bg);
+  border: 1px solid var(--org-border-soft);
+  box-shadow: var(--org-shadow-1), var(--org-shadow-2);
+  border-radius: var(--org-radius-lg);
+  padding: 1.5rem;
+}
+.orgtree .orgtree-panel::before {
+  display: none;
+}
+.orgtree .structure__toggle-container {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--org-border-soft);
+  box-shadow: var(--org-shadow-1), var(--org-shadow-2);
+  border-radius: var(--org-radius-lg);
+  padding: 0.25rem;
+}
+.orgtree .dashboard-container {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+.orgtree .structure__main-btn {
+  width: 100%;
+  --dashboard-pad-x: 1.25rem;
+  --dashboard-pad-y: 1rem;
+  --dashboard-accent-h: 2px;
+  padding: var(--dashboard-pad-y) var(--dashboard-pad-x);
+  border: none;
+  border-radius: var(--org-radius-lg);
+  box-shadow: none;
+  background: transparent;
+}
+.orgtree .structure__main-btn .dashboard-icon-box {
+  padding: 10px;
+  margin-left: -36px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff, #f2f6f4);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+.orgtree .structure__main-btn .dashboard-chevron svg {
+  transition: transform 0.18s ease, color 0.18s ease;
+}
+.orgtree .dashboard-header-left h2.dashboard-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--first-color, #7AB800);
+  text-transform: uppercase;
+  margin: 0;
+}
+.orgtree .dashboard-header-left h1.dashboard-title {
+  font-size: 30px;
+  font-weight: 600;
+  color: #1F2933;
+  margin: 2px 0 0;
+  line-height: 1.15;
+}
+.orgtree .dashboard-divider {
+  display: none;
+}
+.orgtree .structure__main-btn:hover {
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+}
+.orgtree .structure__main-btn:focus-visible {
+  outline: 2px solid var(--org-focus);
+  outline-offset: 4px;
+}
+.orgtree .structure__main-btn.expanded .structure__chevron svg {
+  transform: rotate(180deg);
+  color: var(--org-accent);
+}
+
+@media (min-width: 1024px) {
+  .orgtree {
+    --orgtree-frame-max: calc(100% - 9.5rem);
+    --orgtree-inner-gutter: 0.75rem;
+  }
+
+  .orgtree .structure__toggle-container {
+    padding: 0;
+  }
+
+  .orgtree .structure__main-btn {
+    --dashboard-pad-x: var(--orgtree-inner-gutter);
+    --dashboard-pad-y: 1.5rem;
+    --dashboard-accent-h: 5px;
+  }
+
+  .orgtree .structure__main-btn .dashboard-icon-box {
+    margin-left: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .orgtree .structure__main-btn .dashboard-icon-box svg {
+    width: 30px;
+    height: 30px;
+  }
+
+  .orgtree .dashboard-header-left {
+    gap: 0.6rem;
+  }
+
+  .orgtree .dashboard-title-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .orgtree .dashboard-header-left h2.dashboard-eyebrow {
+    font-size: 1.55rem;
+    letter-spacing: 0.11em;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  .orgtree .dashboard-header-left h1.dashboard-title {
+    font-size: 2.5rem;
+    font-weight: 800;
+    letter-spacing: -1.5px;
+    margin: 0;
+  }
+
+  .orgtree .dashboard-divider {
+    display: inline-block;
+    width: 1px;
+    height: 1.35em;
+    background: #d1d5db;
+  }
+
+  .orgtree .structure__main-btn::before {
+    background: var(--first-color, #7AB800);
+    opacity: 1;
+    left: 0.35rem;
+    right: 0.35rem;
+    clip-path: polygon(0 50%, 18px 0, calc(100% - 18px) 0, 100% 50%, calc(100% - 18px) 100%, 18px 100%);
+  }
+
+  .orgtree .structure__toggle-container,
+  .orgtree .structure__content-wrapper {
+    width: 100%;
+    max-width: var(--orgtree-frame-max);
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .orgtree .structure__content-wrapper {
+    padding-left: var(--orgtree-inner-gutter);
+    padding-right: var(--orgtree-inner-gutter);
+  }
+
+  .orgtree .orgtree-panel {
+    padding: 1.5rem 0.75rem;
+  }
+}
+
+/* OrgTree: group/region toggles as +/- */
+.orgtree .group-chevron,
+.orgtree .region-chevron {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid rgba(122, 184, 0, 0.24);
+  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.92), rgba(122, 184, 0, 0.15) 70%);
+  color: var(--first-color, #7ab800);
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(122, 184, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px) saturate(170%);
+  -webkit-backdrop-filter: blur(10px) saturate(170%);
+  flex-shrink: 0;
+}
+
+.orgtree .group-chevron {
+  margin-left: 0;
+  align-self: center;
+}
+
+.orgtree .region-chevron {
+  margin-left: auto;
+}
+
+.orgtree .group-chevron svg,
+.orgtree .region-chevron svg {
+  display: none !important;
+}
+
+.orgtree .group-chevron::before,
+.orgtree .region-chevron::before {
+  content: "+";
+}
+
+.orgtree .group-card.active-group .group-chevron::before,
+.orgtree .group-card[aria-expanded="true"] .group-chevron::before,
+.orgtree .region-btn.open .region-chevron::before,
+.orgtree .region-accordion.open .region-chevron::before {
+  content: "-";
+}
+
+
+.orgtree .group-card {
+  position: relative;
+  border: 2px solid var(--org-border-soft);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+  border-radius: var(--org-radius-md);
+  overflow: hidden;
+  background: var(--org-surface);
+  transition: box-shadow 0.2s ease, transform 0.18s ease, border-color 0.2s ease;
+  isolation: isolate; /* evita que sombras internas salgan del contenedor */
+}
+.orgtree .group-card::before,
+.orgtree .group-card::after {
+  display: none;
+}
+.orgtree .group-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--org-accent);
+  display: block;
+}
+.orgtree .group-card:hover {
+  transform: translateY(-0.5px);
+  border-color: var(--org-accent-rail);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.10);
+}
+.orgtree .group-card.active-group,
+.orgtree .group-card[aria-expanded="true"] {
+  border-color: var(--org-accent-rail);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.10);
+}
+.orgtree .group-card.active-group::after,
+.orgtree .group-card[aria-expanded="true"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--org-accent-rail);
+}
+.orgtree .group-header-btn {
+  width: 100%;
+  padding: 1.5rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: block;
+  transition: background-color 0.2s ease, transform 0.18s ease, border-color 0.18s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+}
+.orgtree .group-header-btn:hover {
+  background: var(--org-accent-soft);
+  transform: translateY(-0.5px);
+}
+.orgtree .group-header-btn:focus-visible {
+  outline: 2px solid var(--org-focus);
+  outline-offset: 3px;
+}
+.orgtree .group-card.active-group .group-header-btn,
+.orgtree .group-card[aria-expanded="true"] .group-header-btn {
+  background: #f9fafb;
+}
+.orgtree .group-header-btn .group-chevron svg,
+.orgtree .group-header-btn .structure__chevron svg {
+  transition: transform 0.18s ease, color 0.18s ease;
+}
+.orgtree .group-card.active-group .group-header-btn .group-chevron svg,
+.orgtree .group-card[aria-expanded="true"] .group-header-btn .group-chevron svg {
+  transform: rotate(180deg);
+  color: var(--org-accent);
+}
+.orgtree .group-card > .group-content {
+  padding: 0;
+  background: var(--org-surface);
+  border-top: 0;
+  margin-top: 0;
+}
+.orgtree .group-card > .group-content > .group-content-inner {
+  padding: 0 1.25rem 1.25rem;
+}
+.orgtree .group-card > .group-content.open::before {
+  left: 18px;
+  border-left-color: rgba(0, 0, 0, 0.06);
+}
+
+.orgtree .region-accordion {
+  position: relative;
+  border: 1px solid var(--org-border-soft);
+  border-radius: var(--org-radius-md);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  background: var(--org-surface);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.orgtree .region-accordion::before {
+  display: none;
+}
+.orgtree .region-btn {
+  padding: 1.1rem 1.25rem;
+  width: 100%;
+  background: transparent;
+  border: none;
+  transition: background-color 0.2s ease, transform 0.16s ease, border-color 0.2s ease;
+}
+.orgtree .region-btn:hover {
+  background: rgba(0, 0, 0, 0.02);
+  transform: translateY(-1px);
+}
+.orgtree .region-btn.open {
+  background: var(--org-accent-soft);
+}
+.orgtree .region-btn:focus-visible {
+  outline: 2px solid var(--org-focus);
+  outline-offset: 3px;
+}
+.orgtree .region-btn .region-chevron svg {
+  transition: transform 0.18s ease, color 0.18s ease;
+}
+.orgtree .region-btn.open .region-chevron svg {
+  transform: rotate(180deg);
+  color: var(--org-accent);
+}
+.orgtree .region-btn .region-icon-box {
+  background: #f6f7f5;
+  border: 1px solid var(--org-border-soft);
+}
+.orgtree .region-btn.open .region-icon-box {
+  background: #fff;
+  color: var(--org-accent);
+}
+.orgtree .region-accordion .group-content.open {
+  padding-left: 1.25rem;
+}
+
+.orgtree .staff-badge {
+  border: 1px solid var(--org-border-soft);
+  border-radius: var(--org-radius-sm);
+  padding: 0.75rem 0.85rem;
+  min-height: 60px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  transition: box-shadow 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
+}
+.orgtree .staff-badge:hover {
+  border-color: rgba(46, 173, 80, 0.2);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.10);
+  background: #f8fafb;
+}
+.orgtree .staff-badge.coordinator {
+  background: #f6fbf7;
+  border-color: rgba(46, 173, 80, 0.25);
+  position: relative;
+}
+.orgtree .staff-badge.coordinator::after {
+  content: none;
+  display: none;
+}
+.orgtree .staff-grid .staff-badge:nth-child(2n) {
+  background: rgba(0, 0, 0, 0.015);
+}
+
+.orgtree .group-content,
+.orgtree .group-content.open {
+  transition: max-height 0.2s ease, opacity 0.2s ease, transform 0.2s ease, grid-template-rows 0.2s ease;
+}
+.orgtree .group-content.open {
+  opacity: 1;
+}
+.orgtree .org-highlight {
+  box-shadow: 0 0 0 1px rgba(46, 173, 80, 0.14), 0 6px 16px rgba(0, 0, 0, 0.10);
+  transition: box-shadow 0.2s ease;
+}
+
+/* ORGTREE: Director block */
+.orgtree .structure__director-card {
+  background: #fff;
+  border: 1px solid var(--org-border);
+  border-radius: var(--org-radius-lg);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
+  max-width: 48rem;
+}
+.orgtree .structure__director-icon-wrapper {
+  background: var(--org-accent);
+  border: 1px solid var(--org-accent);
+  color: #fff;
+}
+.orgtree .structure__director-name {
+  font-size: 26px;
+  font-weight: 600;
+  color: #0F172A;
+}
+.orgtree .structure__director-role {
+  color: var(--org-accent);
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+.orgtree .structure__director-subroles span {
+  color: #6b7280;
+}
+.orgtree .structure__connector-line {
+  background: var(--org-border-soft);
+}
+
+/* ORGTREE: Leader card (reinforced) */
+.orgtree .group-leader-badge {
+  background: #fff;
+  border: 1px solid var(--org-border-soft);
+  border-radius: 14px;
+  padding: 10px 12px;
+  min-width: 220px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  gap: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+.orgtree .group-leader-badge:hover {
+  border-color: var(--org-border);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.10);
+  transform: translateY(-1px);
+}
+.orgtree .group-leader-badge:focus-visible {
+  outline: 2px solid var(--org-focus);
+  outline-offset: 3px;
+}
+.orgtree .group-header-btn {
+  align-items: center;
+}
+.orgtree .group-header-btn .group-leader-badge {
+  align-self: center;
+}
+.orgtree .group-title-wrapper {
+  justify-content: center;
+  text-align: center;
+}
+.orgtree .group-title-text h2,
+.orgtree .group-subtitle {
+  text-align: center;
+}
+.orgtree .group-leader-badge {
+  margin-top: 4px;
+}
+.orgtree .leader-icon-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: rgba(46, 173, 80, 0.10);
+  color: var(--org-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
+}
+.orgtree .leader-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #667085;
+  font-weight: 700;
+}
+.orgtree .leader-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #0F172A;
+}
+
+/* ORGTREE: Level 1 header hierarchy */
+.orgtree .group-title-wrapper {
+  align-items: center;
+  gap: 12px;
+}
+.orgtree .group-title-text h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0;
+  line-height: 1.2;
+}
+.orgtree .group-subtitle {
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  color: #667085;
+  margin-top: 2px;
+}
+.orgtree .group-icon-circle {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #f6f8f7;
+  border: 1px solid var(--org-border-soft);
+  color: var(--org-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.orgtree .group-card.active-group .group-header-btn,
+.orgtree .group-card[aria-expanded="true"] .group-header-btn {
+  background: #f9fafb;
+}
+
+/* ORGTREE: Level 2 header hierarchy */
+.orgtree .region-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-radius: var(--org-radius-md);
+}
+.orgtree .region-btn .region-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.orgtree .region-btn .region-icon-box {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #f4f5f6;
+  border: 1px solid var(--org-border-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #4b5563;
+}
+.orgtree .region-btn .region-name {
+  font-size: 16px;
+  font-weight: 650;
+  color: #0F172A;
+}
+.orgtree .region-btn.open .region-icon-box {
+  background: #eef7f0;
+  color: var(--org-accent);
+  border-color: var(--org-border-soft);
+}
+.orgtree .region-btn .region-chevron svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ORGTREE: Leader card */
+.orgtree .group-leader-badge {
+  background: #fff;
+  border: 1px solid var(--org-border-soft);
+  border-radius: 14px;
+  padding: 10px 12px;
+  min-width: 210px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  gap: 10px;
+  display: inline-flex;
+  align-items: center;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+.orgtree .group-leader-badge:hover {
+  border-color: var(--org-border);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.10);
+  transform: translateY(-1px);
+}
+.orgtree .group-leader-badge:focus-visible {
+  outline: 2px solid var(--org-focus);
+  outline-offset: 3px;
+}
+.orgtree .leader-icon-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: rgba(46, 173, 80, 0.10);
+  color: var(--org-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
+}
+.orgtree .leader-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #667085;
+  font-weight: 700;
+}
+.orgtree .leader-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0F172A;
+}
+
+/* ORGTREE: Level 1 header */
+.orgtree .group-header-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 1.25rem 1.5rem;
+}
+@media (min-width: 768px) {
+  .orgtree .group-header-btn {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    align-items: center;
+    justify-content: initial;
+  }
+
+  .orgtree .group-title-wrapper {
+    justify-content: flex-start;
+    text-align: left;
+  }
+
+  .orgtree .group-title-text h2,
+  .orgtree .group-subtitle {
+    text-align: left;
+  }
+
+  .orgtree .group-leader-badge {
+    justify-self: center;
+  }
+
+  .orgtree .group-chevron {
+    justify-self: end;
+  }
+}
+.orgtree .group-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.orgtree .group-icon-circle {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #f6f8f7;
+  border: 1px solid var(--org-border-soft);
+  color: var(--org-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.orgtree .group-title-text h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0;
+  line-height: 1.2;
+}
+.orgtree .group-subtitle {
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  color: #667085;
+  margin-top: 2px;
+}
+.orgtree .group-card.active-group .group-header-btn,
+.orgtree .group-card[aria-expanded="true"] .group-header-btn {
+  background: var(--org-accent-soft);
+}
+.orgtree .group-card.active-group::after,
+.orgtree .group-card[aria-expanded="true"]::after {
+  width: 3px;
+}
+
+/* ORGTREE: Level 2 header */
+.orgtree .region-accordion {
+  border-radius: var(--org-radius-md);
+  border: 1px solid var(--org-border-soft);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  background: #fff;
+}
+.orgtree .regions-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: transparent;
+}
+.orgtree .region-accordion.open {
+  border-color: var(--org-accent-rail);
+  box-shadow: 0 0 0 1px rgba(106, 191, 75, 0.18), 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+.orgtree .region-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-radius: var(--org-radius-md);
+}
+.orgtree .region-btn .region-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.orgtree .region-btn .region-icon-box {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #f4f5f6;
+  border: 1px solid var(--org-border-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #4b5563;
+}
+.orgtree .region-btn .region-name {
+  font-size: 16px;
+  font-weight: 650;
+  color: #0F172A;
+}
+.orgtree .region-btn:hover {
+  border-color: var(--org-border);
+  background: rgba(0, 0, 0, 0.015);
+}
+.orgtree .region-btn.open {
+  background: var(--org-accent-soft);
+  border-left: 3px solid var(--org-accent-rail);
+}
+.orgtree .region-btn.open .region-icon-box {
+  background: #eef7f0;
+  color: var(--org-accent);
+  border-color: var(--org-border-soft);
+}
+.orgtree .region-btn .region-chevron svg {
+  width: 18px;
+  height: 18px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .orgtree .structure__main-btn,
+  .orgtree .group-header-btn,
+  .orgtree .region-btn,
+  .orgtree .group-content {
+    transition: none !important;
+  }
+}
+
+/* =========================================================
+   ORGTREE FINAL – Corporate Premium
+   ========================================================= */
+.orgtree {
+  --org-divider: rgba(17, 24, 39, 0.09);
+  --org-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --org-shadow-2: 0 10px 26px rgba(0, 0, 0, 0.12);
+}
+
+/* Contenedor principal */
+.orgtree .group-card {
+  border: 2px solid var(--org-border-soft);
+  border-radius: var(--org-radius-md);
+  background: var(--org-surface);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.orgtree .group-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--org-border);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+}
+.orgtree .group-card.active-group,
+.orgtree .group-card[aria-expanded="true"] {
+  border-color: var(--org-accent-rail);
+  box-shadow: inset 3px 0 0 var(--org-accent), 0 12px 28px rgba(0, 0, 0, 0.12);
+}
+.orgtree .group-accent-bar {
+  height: 3px;
+  background: var(--org-accent);
+}
+
+/* Header nivel 1 */
+.orgtree .group-header-btn {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  padding: 1.25rem 1.5rem;
+  transition: background-color 0.18s ease;
+}
+.orgtree .group-card.active-group .group-header-btn,
+.orgtree .group-card[aria-expanded="true"] .group-header-btn {
+  background: rgba(17, 24, 39, 0.02);
+  border-bottom-color: var(--org-divider);
+}
+.orgtree .group-header-btn:focus-visible,
+.orgtree .region-btn:focus-visible {
+  outline: 2px solid var(--org-focus);
+  outline-offset: 4px;
+}
+.orgtree .group-chevron svg {
+  transition: transform 0.18s ease, color 0.18s ease;
+  color: rgba(17, 24, 39, 0.35);
+}
+.orgtree .group-card[aria-expanded="true"] .group-chevron svg {
+  transform: rotate(180deg);
+  color: var(--org-accent);
+}
+
+/* Wrapper colapsable sin padding; padding solo en el inner de nivel 1 */
+.orgtree .group-card > .group-content {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.orgtree .group-card > .group-content > .group-content-inner {
+  padding: 0 1.25rem 1.25rem;
+}
+
+/* Stack de regiones (sin divide-y Tailwind) */
+.orgtree .regions-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: transparent;
+}
+
+/* Región nivel 2 */
+.orgtree .region-accordion {
+  border: 1px solid var(--org-border-soft);
+  border-radius: var(--org-radius-md);
+  background: var(--org-surface);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+.orgtree .region-accordion:hover {
+  border-color: var(--org-border);
+}
+.orgtree .region-accordion.open {
+  border-color: var(--org-accent-rail);
+  box-shadow: 0 0 0 1px rgba(106, 191, 75, 0.14), 0 10px 24px rgba(0, 0, 0, 0.10);
+}
+.orgtree .region-btn {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0.95rem 1.1rem;
+  transition: background-color 0.18s ease;
+}
+.orgtree .region-accordion.open .region-btn {
+  background: var(--org-accent-soft);
+}
+.orgtree .region-chevron svg {
+  transition: transform 0.18s ease, color 0.18s ease;
+  color: rgba(17, 24, 39, 0.3);
+}
+.orgtree .region-accordion.open .region-chevron svg {
+  transform: rotate(90deg);
+  color: var(--org-accent);
+}
+
+/* Staff cards */
+.orgtree .staff-badge {
+  border: 1px solid var(--org-border-soft);
+  border-radius: var(--org-radius-sm);
+  background: #fff;
+  box-shadow: var(--org-shadow-1);
+}
+.orgtree .staff-badge:hover {
+  border-color: rgba(106, 191, 75, 0.25);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orgtree .group-card,
+  .orgtree .group-header-btn,
+  .orgtree .region-btn,
+  .orgtree .group-chevron svg,
+  .orgtree .region-chevron svg {
+    transition: none !important;
+  }
+}
+
+/* =========================================================
+   ORGTREE FINAL FIX (borde 100% coincidente + sin zócalo)
+   ========================================================= */
+.orgtree{
+  /* + contraste en bordes grises */
+  --org-border: rgba(15,23,42,.14);
+  --org-border-soft: rgba(15,23,42,.08);
+  --org-divider: rgba(15,23,42,.08);
+
+  /* realce */
+  --org-accent-rail: var(--first-color);
+}
+
+/* 1) Grupo nivel 1: mismo grosor siempre (gris/verde) */
+.orgtree .group-card{
+  border-width: 1px !important;
+  border-style: solid !important;
+  border-color: var(--org-border) !important;
+  box-sizing: border-box;
+  box-shadow: 0 6px 16px rgba(0,0,0,.06) !important;
+  transition: border-color .18s ease, box-shadow .18s ease !important;
+}
+
+/* Realce: SOLO color */
+.orgtree .group-card:hover,
+.orgtree .group-card.active-group{
+  border-color: var(--org-accent-rail) !important;
+  box-shadow: 0 12px 28px rgba(0,0,0,.12) !important;
+}
+
+/* 2) IMPORTANTÍSIMO: colapsar padding cuando está cerrado */
+.orgtree .group-card > .group-content{
+  padding: 0 !important;
+  border-top: 0 !important;
+}
+
+/* padding real SOLO abierto */
+.orgtree .group-card > .group-content.open{
+  padding: 0 1.25rem 1.25rem !important;
+  border-top: 1px solid var(--org-divider) !important;
+}
+
+/* 3) Regiones: el realce debe envolver TODO el accordion */
+.orgtree .region-accordion{
+  border-width: 1px !important;
+  border-style: solid !important;
+  border-color: var(--org-border-soft) !important;
+  position: relative;
+  box-sizing: border-box;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06) !important;
+}
+
+/* wrapper open */
+.orgtree .region-accordion.open{
+  border-color: var(--org-accent-rail) !important;
+  box-shadow: 0 10px 20px rgba(0,0,0,.06);
+}
+
+/* rail vertical completo (solo open) */
+.orgtree .region-accordion::after{
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--org-accent-rail);
+  opacity: 0;
+  transition: opacity .18s ease;
+  pointer-events: none;
+}
+.orgtree .region-accordion.open::after{ opacity: 1; }
+
+/* eliminar rail parcial del header (si existe) */
+.orgtree .region-btn.open{ border-left: 0 !important; }
+
+/* colapsar padding en contenido de región */
+.orgtree .region-accordion > .group-content{
+  padding: 0 !important;
+  border-top: 0 !important;
+}
+.orgtree .region-accordion > .group-content.open{
+  padding: 0 1rem 1rem !important;
+  border-top: 1px solid var(--org-divider) !important;
+}
+
+.orgtree .group-header-btn:hover,
+.orgtree .region-btn:hover {
+  box-shadow: none !important;
+  outline: none !important;
+}
+.orgtree .group-header-btn:focus-visible,
+.orgtree .region-btn:focus-visible {
+  box-shadow: none !important;
+}
+
+@media (max-width: 768px) {
+  .orgtree .group-content.open {
+    max-height: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .orgtree .group-header-btn {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+
+  .orgtree .group-title-wrapper {
+    grid-column: 1;
+  }
+
+  .orgtree .group-leader-badge {
+    grid-column: 2;
+    justify-self: center;
+  }
+
+  .orgtree .group-chevron {
+    grid-column: 3;
+    justify-self: end;
+  }
+}

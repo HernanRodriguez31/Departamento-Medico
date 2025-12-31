@@ -1,0 +1,50 @@
+{
+  "name": "Dto Médico",
+  "short_name": "Dto Médico",
+  "start_url": "/app.html#carrete",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "background_color": "#7AB800",
+  "theme_color": "#7AB800",
+  "icons": [
+    { "src": "/assets/icons/icon-72.png", "sizes": "72x72", "type": "image/png" },
+    { "src": "/assets/icons/icon-96.png", "sizes": "96x96", "type": "image/png" },
+    { "src": "/assets/icons/icon-128.png", "sizes": "128x128", "type": "image/png" },
+    { "src": "/assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/assets/icons/icon-256.png", "sizes": "256x256", "type": "image/png" },
+    { "src": "/assets/icons/icon-384.png", "sizes": "384x384", "type": "image/png" },
+    { "src": "/assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/assets/icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Feed",
+      "short_name": "Feed",
+      "description": "Novedades del departamento",
+      "url": "/app/#feed",
+      "icons": [{ "src": "/assets/icons/icon-96.png", "sizes": "96x96", "type": "image/png" }]
+    },
+    {
+      "name": "Comites",
+      "short_name": "Comites",
+      "description": "Acceso a comites",
+      "url": "/app/#comites",
+      "icons": [{ "src": "/assets/icons/icon-96.png", "sizes": "96x96", "type": "image/png" }]
+    },
+    {
+      "name": "Mensajes",
+      "short_name": "Mensajes",
+      "description": "Chat del equipo medico",
+      "url": "/app/#chat",
+      "icons": [{ "src": "/assets/icons/icon-96.png", "sizes": "96x96", "type": "image/png" }]
+    },
+    {
+      "name": "Notificaciones",
+      "short_name": "Notif",
+      "description": "Panel de notificaciones",
+      "url": "/app/#notificaciones",
+      "icons": [{ "src": "/assets/icons/icon-96.png", "sizes": "96x96", "type": "image/png" }]
+    }
+  ]
+}
