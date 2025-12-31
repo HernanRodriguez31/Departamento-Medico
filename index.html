@@ -2811,8 +2811,7 @@
             </div>
 
             <div class="login-header">
-                <h2 class="login-title">Departamento Médico</h2>
-                <p class="login-subtitle">Portal de Acceso Seguro</p>
+                <h2 class="login-subtitle">Bienvenido</h2>
             </div>
 
             <form id="loginForm" class="login-form" onsubmit="handleLogin(event)">
@@ -2840,6 +2839,13 @@
                 <button type="submit" class="login-btn">
                     Iniciar Sesión
                 </button>
+
+                <div class="login-biometrics">
+                    <button type="button" class="login-biometrics-btn">
+                        <i class="fa-solid fa-fingerprint" aria-hidden="true"></i>
+                        <span>Usar Face ID / Huella</span>
+                    </button>
+                </div>
 
                 <div class="login-links">
                     <a href="#" onclick="handleForgotPassword(event)" class="login-forgot">

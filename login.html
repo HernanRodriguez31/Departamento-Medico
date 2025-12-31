@@ -13,131 +13,174 @@
 
     <style>
         :root {
-            --primary-color: #2E6B46;
-            /* Deep Medical Green */
-            --primary-dark: #1e4a2e;
+            --primary-color: #7AB800;
+            --primary-dark: #689f00;
             --text-color: #1f2937;
-            --text-light: #6b7280;
-            --bg-gradient-start: #f0f9ff;
-            --bg-gradient-end: #f0fdf4;
+            --text-soft: #374151;
+            --text-light: #64748b;
+            --bg-gradient-start: #f5fff0;
+            --bg-gradient-mid: #eef8ff;
+            --bg-gradient-end: #ffffff;
+            --card-shadow: 0 32px 80px rgba(15, 23, 42, 0.12), 0 12px 30px rgba(15, 23, 42, 0.08);
+            --card-border: rgba(148, 163, 184, 0.2);
+            --card-glow: radial-gradient(120% 60% at 50% 0%, rgba(122, 184, 0, 0.12) 0%, rgba(56, 189, 248, 0.08) 45%, transparent 75%);
+        }
+
+        html,
+        body {
+            height: 100%;
+            height: 100dvh;
+            overflow: hidden;
         }
 
         body {
             font-family: 'Manrope', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            box-sizing: border-box;
             margin: 0;
+            position: relative;
+            padding: clamp(16px, 3vw, 40px);
             /* Professional gradient background */
-            background: linear-gradient(135deg, #e0f2fe 0%, #f0fdf4 100%);
+            background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-mid) 45%, var(--bg-gradient-end) 100%);
             color: var(--text-color);
         }
 
         /* Ambient background shapes for extra polish */
         body::before {
             content: '';
-            position: absolute;
-            top: -10%;
+            position: fixed;
+            top: -20%;
             left: -10%;
-            width: 50%;
-            height: 50%;
-            background: radial-gradient(circle, rgba(46, 107, 70, 0.08) 0%, transparent 70%);
-            z-index: -1;
+            width: 60%;
+            height: 60%;
+            background: radial-gradient(circle, rgba(122, 184, 0, 0.18) 0%, transparent 65%);
+            z-index: 0;
+            pointer-events: none;
         }
 
         body::after {
             content: '';
-            position: absolute;
-            bottom: -10%;
+            position: fixed;
+            bottom: -20%;
             right: -10%;
-            width: 50%;
-            height: 50%;
-            background: radial-gradient(circle, rgba(37, 99, 235, 0.05) 0%, transparent 70%);
-            z-index: -1;
+            width: 55%;
+            height: 55%;
+            background: radial-gradient(circle, rgba(56, 189, 248, 0.16) 0%, transparent 65%);
+            z-index: 0;
+            pointer-events: none;
         }
 
         .login-card {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            padding: 2rem 2.5rem;
-            /* Reduced padding */
-            border-radius: 24px;
-            box-shadow:
-                0 20px 25px -5px rgba(0, 0, 0, 0.1),
-                0 8px 10px -6px rgba(0, 0, 0, 0.05),
-                inset 0 0 0 1px rgba(255, 255, 255, 0.5);
-            /* Subtle white border */
+            background: #ffffff;
+            padding: clamp(2rem, 4vh, 3.25rem) clamp(1.75rem, 4vw, 3.25rem);
+            border-radius: clamp(24px, 3vw, 30px);
+            box-shadow: var(--card-shadow);
             width: 100%;
-            max-width: 420px;
+            max-width: clamp(360px, 40vw, 520px);
             text-align: center;
             position: relative;
             overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.8);
+            border: 1px solid var(--card-border);
+            transition: box-shadow 0.3s ease;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .login-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 16%;
+            right: 16%;
+            height: 6px;
+            border-radius: 999px;
+            background: linear-gradient(90deg, rgba(122, 184, 0, 0.7), rgba(56, 189, 248, 0.45), rgba(122, 184, 0, 0.7));
+            opacity: 0.75;
+        }
+
+        .login-card::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: var(--card-glow);
+            opacity: 0.9;
+            pointer-events: none;
+        }
+
+        .login-card > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .login-main,
+        .login-footer {
+            width: 100%;
+        }
+
+        .login-main {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .login-footer {
+            margin-top: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .login-footer .login-btn,
+        .login-footer .error {
+            width: 100%;
         }
 
         .logo-container {
-            margin-bottom: 0.5rem;
-            /* Reduced margin */
+            margin-bottom: 0.75rem;
             display: flex;
             justify-content: center;
         }
 
         .logo-img {
-            max-width: 320px;
-            /* Large, prominent logo */
+            width: clamp(210px, 32vh, 400px);
+            max-width: 70vw;
             height: auto;
             display: block;
-        }
-
-        h1 {
-            color: #111827;
-            font-size: 1.25rem;
-            font-weight: 800;
-            letter-spacing: -0.025em;
-            margin: 0;
-            text-transform: uppercase;
-            line-height: 1.2;
+            filter: drop-shadow(0 16px 24px rgba(15, 23, 42, 0.12));
         }
 
         .subtitle {
-            color: var(--primary-color);
-            font-size: 0.75rem;
+            color: var(--text-soft);
+            font-size: clamp(1.05rem, 2.2vh, 1.4rem);
             font-weight: 700;
-            letter-spacing: 0.15em;
-            text-transform: uppercase;
-            margin-top: 0.5rem;
-            margin-bottom: 1.2rem;
-            /* Reduced margin */
-            display: block;
+            letter-spacing: -0.01em;
+            margin: 0.25rem 0 clamp(1rem, 2.6vh, 1.75rem);
         }
 
         .divider {
             height: 1px;
-            background: linear-gradient(to right, transparent, #e5e7eb, transparent);
-            margin: 1rem 0;
-            /* Reduced margin */
+            background: linear-gradient(to right, transparent, rgba(148, 163, 184, 0.4), transparent);
+            margin: clamp(1rem, 2.2vh, 1.5rem) 0 clamp(1rem, 2.4vh, 1.5rem);
             width: 100%;
         }
 
         .form-group {
             text-align: left;
-            margin-bottom: 1rem;
-            /* Reduced margin */
+            margin-bottom: clamp(0.9rem, 1.8vh, 1.1rem);
         }
 
         input {
             width: 100%;
-            padding: 12px 14px;
-            /* Reduced padding */
+            padding: clamp(12px, 1.7vh, 16px) clamp(14px, 2.4vw, 18px);
             margin: 0;
-            border: 1px solid #e5e7eb;
-            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
             box-sizing: border-box;
-            font-size: 0.95rem;
+            font-size: clamp(0.92rem, 1.7vh, 1rem);
             font-family: inherit;
             transition: all 0.2s ease;
-            background-color: #f9fafb;
+            background-color: #f8fafc;
             color: #1f2937;
         }
 
@@ -145,38 +188,38 @@
             outline: none;
             border-color: var(--primary-color);
             background-color: #fff;
-            box-shadow: 0 0 0 4px rgba(46, 107, 70, 0.1);
+            box-shadow: 0 0 0 4px rgba(122, 184, 0, 0.18);
         }
 
         input::placeholder {
             color: #9ca3af;
         }
 
-        button {
+        .login-btn {
             width: 100%;
-            padding: 12px;
-            /* Reduced padding */
+            padding: clamp(12px, 1.9vh, 16px) clamp(16px, 3vw, 20px);
             background-color: var(--primary-color);
             color: white;
             border: none;
             border-radius: 50px;
             /* Fully rounded */
             cursor: pointer;
-            font-size: 1rem;
+            font-size: clamp(0.95rem, 1.8vh, 1.05rem);
             font-weight: 700;
-            margin-top: 1.5rem;
-            transition: all 0.2s ease;
-            box-shadow: 0 4px 6px rgba(46, 107, 70, 0.2);
-            letter-spacing: 0.025em;
+            margin-top: clamp(1rem, 2.6vh, 1.5rem);
+            transition: all 0.25s ease;
+            box-shadow: 0 18px 30px rgba(122, 184, 0, 0.22);
+            letter-spacing: 0.02em;
+            text-transform: none;
         }
 
-        button:hover {
+        .login-btn:hover {
             background-color: var(--primary-dark);
             transform: translateY(-1px);
-            box-shadow: 0 6px 12px rgba(46, 107, 70, 0.3);
+            box-shadow: 0 22px 36px rgba(122, 184, 0, 0.28);
         }
 
-        button:active {
+        .login-btn:active {
             transform: translateY(0);
         }
 
@@ -190,6 +233,40 @@
         }
 
         .forgot-password:hover {
+            color: var(--primary-color);
+        }
+
+        .biometric-option {
+            margin-top: clamp(0.7rem, 1.6vh, 0.9rem);
+            display: flex;
+            justify-content: center;
+        }
+
+        .biometric-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.55rem;
+            padding: 0.6rem 1.2rem;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.45);
+            background: #ffffff;
+            color: var(--text-light);
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .biometric-btn:hover {
+            border-color: rgba(122, 184, 0, 0.6);
+            color: var(--text-color);
+            box-shadow: 0 12px 22px rgba(15, 23, 42, 0.08);
+            transform: translateY(-1px);
+        }
+
+        .biometric-icon {
+            width: 18px;
+            height: 18px;
             color: var(--primary-color);
         }
 
@@ -242,7 +319,8 @@
             width: 90%;
             max-width: 400px;
             text-align: center;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            box-shadow: var(--card-shadow);
+            border: 1px solid var(--card-border);
             transform: translateY(20px);
             transition: transform 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
         }
@@ -343,7 +421,7 @@
         }
 
         /* Button Loading State */
-        button.loading {
+        .login-btn.loading {
             background-color: white !important;
             color: var(--primary-color) !important;
             border: 2px solid var(--primary-color) !important;
@@ -405,42 +483,263 @@
                 transform: rotate(360deg);
             }
         }
+
+        @media (max-width: 520px) {
+            body {
+                padding: 16px;
+            }
+
+            .login-card {
+                padding: 2.25rem 1.75rem;
+                border-radius: 24px;
+            }
+
+            .logo-img {
+                width: min(300px, 78vw);
+            }
+
+            .subtitle {
+                font-size: 1.1rem;
+            }
+        }
+
+        @media (min-width: 900px) {
+            body {
+                padding: clamp(24px, 4vw, 56px);
+            }
+
+            .login-card {
+                max-width: clamp(420px, 36vw, 560px);
+                padding: 2.1rem 2.6rem;
+                min-height: clamp(560px, 74dvh, 700px);
+            }
+
+            .logo-container {
+                margin-bottom: 0.35rem;
+            }
+
+            .logo-img {
+                width: clamp(320px, 46vh, 480px);
+                max-width: 100%;
+            }
+
+            .subtitle {
+                font-size: 1.1rem;
+                margin-bottom: 0.8rem;
+            }
+
+            .divider {
+                margin: 0.6rem 0 0.8rem;
+            }
+
+            .form-group {
+                margin-bottom: 0.6rem;
+            }
+
+            input {
+                padding: 11px 14px;
+                font-size: 0.93rem;
+            }
+
+            .login-btn {
+                margin-top: 0.6rem;
+                padding: 11px 16px;
+                font-size: 0.95rem;
+            }
+
+            .biometric-option {
+                margin-top: 0.4rem;
+            }
+
+            .biometric-btn {
+                font-size: 0.85rem;
+                padding: 0.45rem 0.9rem;
+            }
+
+            .forgot-password {
+                margin-top: 0.6rem;
+                font-size: 0.78rem;
+            }
+        }
+
+        @media (min-width: 900px) and (max-height: 900px) {
+            .login-card {
+                padding: 1.95rem 2.35rem;
+                max-width: clamp(420px, 34vw, 520px);
+                min-height: clamp(520px, 70dvh, 660px);
+            }
+
+            .logo-img {
+                width: clamp(300px, 44vh, 450px);
+            }
+
+            .subtitle {
+                font-size: 1.05rem;
+                margin-bottom: 0.75rem;
+            }
+
+            .divider {
+                margin: 0.55rem 0 0.75rem;
+            }
+
+            .form-group {
+                margin-bottom: 0.55rem;
+            }
+
+            input {
+                padding: 10px 13px;
+            }
+
+            .login-btn {
+                margin-top: 0.5rem;
+                padding: 10px 14px;
+            }
+
+            .biometric-option {
+                margin-top: 0.35rem;
+            }
+
+            .forgot-password {
+                margin-top: 0.55rem;
+                font-size: 0.76rem;
+            }
+        }
+
+        @media (min-width: 900px) and (max-height: 820px) {
+            .login-card {
+                padding: 1.8rem 2.15rem;
+                max-width: clamp(400px, 34vw, 520px);
+                min-height: clamp(500px, 68dvh, 620px);
+            }
+
+            .logo-img {
+                width: clamp(280px, 40vh, 410px);
+            }
+
+            .subtitle {
+                font-size: 1rem;
+                margin-bottom: 0.7rem;
+            }
+
+            .divider {
+                margin: 0.5rem 0 0.7rem;
+            }
+
+            .form-group {
+                margin-bottom: 0.5rem;
+            }
+
+            input {
+                padding: 10px 12px;
+                font-size: 0.9rem;
+            }
+
+            .login-btn {
+                margin-top: 0.45rem;
+                padding: 10px 14px;
+            }
+
+            .biometric-option {
+                margin-top: 0.3rem;
+            }
+
+            .forgot-password {
+                margin-top: 0.5rem;
+                font-size: 0.74rem;
+            }
+        }
+
+        @media (min-width: 900px) and (max-height: 760px) {
+            .login-card {
+                padding: 1.6rem 1.9rem;
+                border-radius: 22px;
+                max-width: clamp(360px, 32vw, 480px);
+                min-height: clamp(480px, 66dvh, 580px);
+            }
+
+            .logo-img {
+                width: clamp(260px, 38vh, 380px);
+            }
+
+            .subtitle {
+                font-size: 0.98rem;
+                margin-bottom: 0.6rem;
+            }
+
+            input {
+                padding: 9px 12px;
+                font-size: 0.88rem;
+            }
+
+            .login-btn {
+                padding: 9px 13px;
+                font-size: 0.9rem;
+            }
+
+            .biometric-btn {
+                font-size: 0.78rem;
+                padding: 0.4rem 0.85rem;
+            }
+
+            .forgot-password {
+                margin-top: 0.45rem;
+                font-size: 0.72rem;
+            }
+        }
     </style>
 </head>
 
 <body>
 
     <div class="login-card">
-        <div class="logo-container">
-            <img src="./assets/images/logo-dpto-medico-large.png" alt="Logo Departamento Médico" class="logo-img">
-        </div>
+        <div class="login-main">
+            <div class="logo-container">
+                <img src="./assets/images/logo-dpto-medico-large.png" alt="Logo Departamento Médico" class="logo-img">
+            </div>
 
-        <h1>Departamento Médico</h1>
-        <span class="subtitle">Portal de Acceso Seguro</span>
+            <h2 class="subtitle">Inicia sesión en tu cuenta</h2>
 
-        <div class="divider"></div>
+            <div class="divider"></div>
 
-        <div class="form-group">
-            <input type="email" id="email" placeholder="Usuario" autocomplete="email">
-        </div>
-        <div class="form-group password-wrapper">
-            <input type="password" id="password" placeholder="Contraseña" autocomplete="current-password">
-            <div class="toggle-password" onclick="togglePassword()">
-                <!-- Eye Open Icon (Default Hidden) -->
-                <svg id="eye-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                    <circle cx="12" cy="12" r="3"></circle>
-                </svg>
-                <!-- Eye Closed Icon (Initially hidden or handled via JS props, simpler to just swap path or stick to simple toggle class) -->
+            <div class="form-group">
+                <input type="email" id="email" placeholder="Usuario" autocomplete="email">
+            </div>
+            <div class="form-group password-wrapper">
+                <input type="password" id="password" placeholder="Contraseña" autocomplete="current-password">
+                <div class="toggle-password" onclick="togglePassword()">
+                    <!-- Eye Open Icon (Default Hidden) -->
+                    <svg id="eye-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                    <!-- Eye Closed Icon (Initially hidden or handled via JS props, simpler to just swap path or stick to simple toggle class) -->
+                </div>
             </div>
         </div>
 
-        <button id="btn-ingresar" onclick="login()">INICIAR SESIÓN</button>
+        <div class="login-footer">
+            <button id="btn-ingresar" class="login-btn" onclick="login()">Ingresar</button>
 
-        <a href="#" class="forgot-password" onclick="openModal(event)">¿Olvidaste tu contraseña?</a>
+            <div class="biometric-option">
+                <button type="button" class="biometric-btn" aria-label="Usar Face ID o huella">
+                    <svg class="biometric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M12 3a7 7 0 0 1 7 7v1"></path>
+                        <path d="M5 11v-1a7 7 0 0 1 14 0v1"></path>
+                        <path d="M8 11v2a4 4 0 0 0 8 0v-2"></path>
+                        <path d="M9 17a3 3 0 0 0 6 0v-1"></path>
+                        <path d="M7 19a5 5 0 0 0 10 0v-2"></path>
+                    </svg>
+                    <span>Usar Face ID / Huella</span>
+                </button>
+            </div>
 
-        <p id="error-msg" class="error"></p>
+            <a href="#" class="forgot-password" onclick="openModal(event)">¿Olvidaste tu contraseña?</a>
+
+            <p id="error-msg" class="error"></p>
+        </div>
     </div>
 
     <!-- Forgot Password Modal -->
@@ -542,11 +841,6 @@
         };
 
         let loginInProgress = false;
-        onAuthStateChanged(auth, (user) => {
-            if (!user || loginInProgress) return;
-            // Avoid leaving authenticated users on the login screen.
-            window.location.replace(getRedirectTarget());
-        });
 
         // Password Toggle Logic
         window.togglePassword = () => {
@@ -668,7 +962,7 @@
 
         function resetBtn() {
             const btn = document.getElementById('btn-ingresar');
-            btn.innerHTML = 'INICIAR SESIÓN';
+            btn.innerHTML = 'Ingresar';
             btn.classList.remove("loading");
         }
 
