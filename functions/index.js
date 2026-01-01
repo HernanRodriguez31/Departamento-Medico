@@ -849,36 +849,34 @@ exports.aiChat = functions
 exports.webauthnRegisterStart = functions
   .region('us-central1')
   .https.onRequest(async (req, res) => {
+    const origin = resolveWebOrigin(req);
+    setCorsHeaders(res, origin);
+    if (req.method === 'OPTIONS') return res.status(204).send('');
     try {
-      const origin = resolveWebOrigin(req);
-      setCorsHeaders(res, origin);
-      if (req.method === 'OPTIONS') return res.status(204).send('');
+      if (!db) throw new Error("La base de datos 'db' no está inicializada.");
+      if (!isoBase64URL) throw new Error("La librería 'isoBase64URL' no está importada.");
+      if (!generateRegistrationOptions) {
+        throw new Error("La función 'generateRegistrationOptions' no está disponible.");
+      }
+
       if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'method_not_allowed' });
-      if (!origin) return res.status(403).json({ ok: false, error: 'origin_not_allowed' });
 
       const authHeader = req.get('Authorization') || '';
       const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i);
       if (!tokenMatch) return res.status(401).json({ ok: false, error: 'auth_required' });
 
-      let decoded = null;
-      try {
-        decoded = await admin.auth().verifyIdToken(tokenMatch[1]);
-      } catch (error) {
-        return res.status(401).json({ ok: false, error: 'auth_invalid' });
-      }
-
-      const uid = decoded?.uid || null;
+      const decoded = await admin.auth().verifyIdToken(tokenMatch[1]);
+      const uid = decoded?.uid;
       if (!uid) return res.status(401).json({ ok: false, error: 'auth_invalid' });
-      const rpID = resolveRpID(origin);
-      if (!rpID) return res.status(400).json({ ok: false, error: 'invalid_origin' });
+      const email = decoded?.email || '';
 
-      const userRecord = await admin.auth().getUser(uid).catch(() => null);
-      const email = decoded?.email || userRecord?.email || '';
-      const displayName = userRecord?.displayName || email || uid;
+      const rpID = resolveRpID(origin);
+      console.log(`🔍 Debug Registro: UID=${uid}, RPID=${rpID}, Origin=${origin}`);
 
       const userRef = db.collection(WEBAUTHN_USERS_COLLECTION).doc(uid);
       const userSnap = await userRef.get();
-      const storedCreds = Array.isArray(userSnap.data()?.credentials) ? userSnap.data().credentials : [];
+      const storedCreds =
+        userSnap.exists && Array.isArray(userSnap.data()?.credentials) ? userSnap.data().credentials : [];
 
       if (storedCreds.length) {
         return res.status(200).json({ ok: true, alreadyRegistered: true });
@@ -891,7 +889,7 @@ exports.webauthnRegisterStart = functions
             return {
               id: isoBase64URL.toBuffer(cred.id),
               type: 'public-key',
-              transports: Array.isArray(cred.transports) ? cred.transports : []
+              transports: cred.transports || []
             };
           } catch (e) {
             return null;
@@ -904,8 +902,7 @@ exports.webauthnRegisterStart = functions
         rpID,
         userID: uid,
         userName: email || uid,
-        userDisplayName: displayName,
-        timeout: 60_000,
+        timeout: 60000,
         attestationType: 'none',
         excludeCredentials,
         authenticatorSelection: {
@@ -916,7 +913,7 @@ exports.webauthnRegisterStart = functions
 
       if (!options || !options.challenge) {
         console.error('🔥 Error: generateOptions devolvió undefined', options);
-        return res.status(500).json({ ok: false, error: 'challenge_generation_failed' });
+        throw new Error('Failed to generate challenge');
       }
 
       const challengeId = await createWebauthnChallenge({
@@ -927,13 +924,11 @@ exports.webauthnRegisterStart = functions
         origin
       });
 
+      console.log('✅ Opciones de registro generadas con éxito');
       return res.status(200).json({ ok: true, options, challengeId });
     } catch (error) {
-      const origin = resolveWebOrigin(req);
-      setCorsHeaders(res, origin);
-      console.error('🔥 CRITICAL ERROR in RegisterStart:', error);
-      if (res.headersSent) return;
-      return res.status(500).json({ error: error.message });
+      console.error('🔥 ERROR FATAL EN REGISTRO:', error);
+      return res.status(500).json({ ok: false, error: error.message, stack: error.stack });
     }
   });
 
