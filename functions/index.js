@@ -938,109 +938,70 @@ exports.webauthnRegisterFinish = functions
     const origin = resolveWebOrigin(req);
     setCorsHeaders(res, origin);
     if (req.method === 'OPTIONS') return res.status(204).send('');
-    if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'method_not_allowed' });
-    if (!origin) return res.status(403).json({ ok: false, error: 'origin_not_allowed' });
-
-    const authHeader = req.get('Authorization') || '';
-    const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i);
-    if (!tokenMatch) return res.status(401).json({ ok: false, error: 'auth_required' });
-
-    let decoded = null;
     try {
-      decoded = await admin.auth().verifyIdToken(tokenMatch[1]);
-    } catch (error) {
-      return res.status(401).json({ ok: false, error: 'auth_invalid' });
-    }
+      const { body } = req;
 
-    const uid = decoded?.uid || null;
-    if (!uid) return res.status(401).json({ ok: false, error: 'auth_invalid' });
-
-    const body = parseRequestBody(req);
-    const credential = body?.credential;
-    const challengeId = body?.challengeId;
-    if (!credential || !challengeId) {
-      return res.status(400).json({ ok: false, error: 'missing_payload' });
-    }
-
-    const challengeDoc = await loadWebauthnChallenge(challengeId);
-    if (!challengeDoc || challengeDoc.data?.type !== 'registration') {
-      return res.status(400).json({ ok: false, error: 'invalid_challenge' });
-    }
-
-    if (challengeDoc.data?.uid !== uid) {
-      return res.status(403).json({ ok: false, error: 'challenge_mismatch' });
-    }
-
-    if (isChallengeExpired(challengeDoc.data?.createdAt)) {
-      await challengeDoc.ref.delete().catch(() => {});
-      return res.status(400).json({ ok: false, error: 'challenge_expired' });
-    }
-
-    try {
-      const expectedOrigin = challengeDoc.data?.origin || DEFAULT_WEBAUTHN_ORIGIN;
-      const expectedRPID = challengeDoc.data?.rpID || DEFAULT_WEBAUTHN_RPID;
-      const verification = await verifyRegistrationResponse({
-        response: credential,
-        expectedChallenge: challengeDoc.data.challenge,
-        expectedOrigin,
-        expectedRPID
-      });
-
-      const { verified, registrationInfo } = verification;
-      if (!verified || !registrationInfo) {
-        return res.status(400).json({ ok: false, error: 'registration_failed' });
+      // 1. Validar Usuario (Token)
+      const authHeader = req.get('Authorization') || '';
+      const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i);
+      if (!tokenMatch) return res.status(401).json({ error: 'auth_required' });
+      const decoded = await admin.auth().verifyIdToken(tokenMatch[1]);
+      const uid = decoded.uid;
+      // 2. Validar Challenge
+      const challengeId = req.query.challengeId || body.challengeId;
+      const challengeRef = db.collection(WEBAUTHN_CHALLENGES_COLLECTION).doc(challengeId);
+      const challengeSnap = await challengeRef.get();
+      if (!challengeSnap.exists) {
+        throw new Error('Challenge not found (Register)');
       }
+      const challengeData = challengeSnap.data();
+      await challengeRef.delete();
 
-      const credentialId = isoBase64URL.fromBuffer(registrationInfo.credentialID);
-      const publicKey = isoBase64URL.fromBuffer(registrationInfo.credentialPublicKey);
-      const transports = Array.isArray(credential?.transports)
-        ? credential.transports
-        : Array.isArray(credential?.response?.transports)
-          ? credential.response.transports
-          : [];
+      // 3. Verificar Registro
+      const verification = await verifyRegistrationResponse({
+        response: body,
+        expectedChallenge: challengeData.challenge,
+        expectedOrigin: challengeData.origin,
+        expectedRPID: challengeData.rpID,
+        requireUserVerification: true
+      });
+      if (verification.verified) {
+        const { credential } = verification.registrationInfo;
 
-      const userRecord = await admin.auth().getUser(uid).catch(() => null);
-      const email = decoded?.email || userRecord?.email || '';
-      const displayName = userRecord?.displayName || email || uid;
+        // 4. GUARDAR EN EL LUGAR CORRECTO ('webauthn_users')
+        const newCredential = {
+          id: isoBase64URL.fromBuffer(credential.id),
+          publicKey: isoBase64URL.fromBuffer(credential.publicKey),
+          counter: credential.counter,
+          transports: body.response.transports || [],
+          deviceType: credential.credentialDeviceType,
+          backedUp: credential.credentialBackedUp,
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        };
+        const userRef = db.collection('webauthn_users').doc(uid);
+        const userDoc = await userRef.get();
 
-      await db
-        .collection(WEBAUTHN_CREDENTIALS_COLLECTION)
-        .doc(credentialId)
-        .set(
+        let credentials = [];
+        if (userDoc.exists) {
+          credentials = userDoc.data().credentials || [];
+        }
+
+        credentials.push(newCredential);
+
+        await userRef.set(
           {
-            uid,
-            email,
-            displayName,
-            publicKey,
-            counter: registrationInfo.counter,
-            transports,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            email: decoded.email,
+            credentials
           },
           { merge: true }
         );
-
-      await db
-        .collection(WEBAUTHN_USERS_COLLECTION)
-        .doc(uid)
-        .set(
-          {
-            email,
-            displayName,
-            credentials: admin.firestore.FieldValue.arrayUnion({
-              id: credentialId,
-              transports
-            }),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            createdAt: admin.firestore.FieldValue.serverTimestamp()
-          },
-          { merge: true }
-        );
-
-      await challengeDoc.ref.delete().catch(() => {});
-      return res.status(200).json({ ok: true });
+        console.log(`✅ Credencial guardada correctamente para usuario ${uid}`);
+        return res.status(200).json({ ok: true, verified: true });
+      }
+      throw new Error('Verification failed');
     } catch (error) {
-      return res.status(400).json({ ok: false, error: 'registration_failed' });
+      console.error('🔥 RegisterFinish Error:', error);
+      return res.status(500).json({ error: error.message });
     }
   });
 
