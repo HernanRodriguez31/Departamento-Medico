@@ -1072,23 +1072,44 @@
             }
         };
 
-        const maybeRegisterPasskey = async (user, email) => {
-            if (!supportsBiometric || !functionsBaseUrl || !user) return;
+        const registerBiometricPasskey = async (user, email) => {
+            console.log('🚀 Iniciando registro biométrico...');
+            if (!supportsBiometric || !functionsBaseUrl || !user) {
+                console.log('✅ Registro biométrico exitoso');
+                return;
+            }
             try {
                 const idToken = await user.getIdToken();
                 const startData = await postJson('webauthnRegisterStart', { email }, idToken);
-                if (startData?.alreadyRegistered || !startData?.options || !startData?.challengeId) return;
+                if (startData?.alreadyRegistered) {
+                    try {
+                        localStorage.removeItem('passkey_registration_failed');
+                    } catch (error) {}
+                    console.log('✅ Registro biométrico exitoso');
+                    return;
+                }
+                if (!startData?.options || !startData?.challengeId) {
+                    throw new Error('webauthn_start_failed');
+                }
                 const publicKey = preformatCreateOptions(startData.options);
                 const credential = await navigator.credentials.create({ publicKey });
-                if (!credential) return;
+                if (!credential) {
+                    throw new Error('webauthn_create_cancelled');
+                }
                 const credentialJson = publicKeyCredentialToJSON(credential);
                 await postJson('webauthnRegisterFinish', {
                     credential: credentialJson,
                     challengeId: startData.challengeId
                 }, idToken);
+                try {
+                    localStorage.removeItem('passkey_registration_failed');
+                } catch (error) {}
+                console.log('✅ Registro biométrico exitoso');
             } catch (error) {
-                // Best-effort enrollment: do not block login.
-                console.info('Passkey enrollment skipped.', error);
+                console.error('❌ Error en registro biométrico:', error);
+                try {
+                    localStorage.setItem('passkey_registration_failed', 'true');
+                } catch (storageError) {}
             }
         };
 
@@ -1150,10 +1171,6 @@
                 } catch (error) {
                     console.info('No se pudo guardar credenciales.', error);
                 }
-            }
-
-            if (options.enrollPasskey) {
-                await maybeRegisterPasskey(user, email);
             }
 
             return displayName;
@@ -1389,8 +1406,19 @@
 
                 await finalizeLogin(user, email, {
                     storePassword: true,
-                    enrollPasskey: true
+                    enrollPasskey: false
                 });
+
+                if (supportsBiometric) {
+                    showToast('Configurando Face ID...', { anchor: biometricBtn, duration: 2200 });
+                    await registerBiometricPasskey(user, email);
+                } else {
+                    try {
+                        localStorage.setItem('passkey_registration_failed', 'unsupported');
+                    } catch (error) {
+                        // no-op
+                    }
+                }
 
                 // Overlay is already active; keep it brief before redirecting
                 setTimeout(() => {
