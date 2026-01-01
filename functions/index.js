@@ -932,78 +932,86 @@ exports.webauthnRegisterStart = functions
     }
   });
 
-exports.webauthnRegisterFinish = functions
-  .region('us-central1')
-  .https.onRequest(async (req, res) => {
-    const origin = resolveWebOrigin(req);
-    setCorsHeaders(res, origin);
-    if (req.method === 'OPTIONS') return res.status(204).send('');
-    try {
-      const { body } = req;
+exports.webauthnRegisterFinish = functions.region('us-central1').https.onRequest(async (req, res) => {
+  const origin = resolveWebOrigin(req);
+  setCorsHeaders(res, origin);
+  if (req.method === 'OPTIONS') return res.status(204).send('');
+  try {
+    const body = req.body;
 
-      // 1. Validar Usuario (Token)
-      const authHeader = req.get('Authorization') || '';
-      const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i);
-      if (!tokenMatch) return res.status(401).json({ error: 'auth_required' });
-      const decoded = await admin.auth().verifyIdToken(tokenMatch[1]);
-      const uid = decoded.uid;
-      // 2. Validar Challenge
-      const challengeId = req.query.challengeId || body.challengeId;
-      const challengeRef = db.collection(WEBAUTHN_CHALLENGES_COLLECTION).doc(challengeId);
-      const challengeSnap = await challengeRef.get();
-      if (!challengeSnap.exists) {
-        throw new Error('Challenge not found (Register)');
-      }
-      const challengeData = challengeSnap.data();
-      await challengeRef.delete();
+    // 1. Validar Token de Usuario
+    const authHeader = req.get('Authorization') || '';
+    const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i);
+    if (!tokenMatch) return res.status(401).json({ error: 'auth_required' });
+    const decoded = await admin.auth().verifyIdToken(tokenMatch[1]);
+    const uid = decoded.uid;
+    const email = decoded.email || '';
 
-      // 3. Verificar Registro
-      const verification = await verifyRegistrationResponse({
-        response: body,
-        expectedChallenge: challengeData.challenge,
-        expectedOrigin: challengeData.origin,
-        expectedRPID: challengeData.rpID,
-        requireUserVerification: true
-      });
-      if (verification.verified) {
-        const { credential } = verification.registrationInfo;
-
-        // 4. GUARDAR EN EL LUGAR CORRECTO ('webauthn_users')
-        const newCredential = {
-          id: isoBase64URL.fromBuffer(credential.id),
-          publicKey: isoBase64URL.fromBuffer(credential.publicKey),
-          counter: credential.counter,
-          transports: body.response.transports || [],
-          deviceType: credential.credentialDeviceType,
-          backedUp: credential.credentialBackedUp,
-          createdAt: admin.firestore.FieldValue.serverTimestamp()
-        };
-        const userRef = db.collection('webauthn_users').doc(uid);
-        const userDoc = await userRef.get();
-
-        let credentials = [];
-        if (userDoc.exists) {
-          credentials = userDoc.data().credentials || [];
-        }
-
-        credentials.push(newCredential);
-
-        await userRef.set(
-          {
-            email: decoded.email,
-            credentials
-          },
-          { merge: true }
-        );
-        console.log(`✅ Credencial guardada correctamente para usuario ${uid}`);
-        return res.status(200).json({ ok: true, verified: true });
-      }
-      throw new Error('Verification failed');
-    } catch (error) {
-      console.error('🔥 RegisterFinish Error:', error);
-      return res.status(500).json({ error: error.message });
+    // 2. Validar Challenge
+    const challengeId = req.query.challengeId || body.challengeId;
+    const challengeRef = db.collection(WEBAUTHN_CHALLENGES_COLLECTION).doc(challengeId);
+    const challengeSnap = await challengeRef.get();
+    if (!challengeSnap.exists) {
+      throw new Error('Challenge not found (Register)');
     }
-  });
+    const challengeData = challengeSnap.data();
+    await challengeRef.delete();
+
+    // 3. Verificar Registro
+    const verification = await verifyRegistrationResponse({
+      response: body,
+      expectedChallenge: challengeData.challenge,
+      expectedOrigin: challengeData.origin,
+      expectedRPID: challengeData.rpID,
+      requireUserVerification: true
+    });
+    if (verification.verified) {
+      const { credential } = verification.registrationInfo;
+
+      // 4. PREPARAR DATOS PARA GUARDAR (Conversión a String es CRÍTICA)
+      const newCredential = {
+        id: isoBase64URL.fromBuffer(credential.id),
+        publicKey: isoBase64URL.fromBuffer(credential.publicKey),
+        counter: credential.counter,
+        transports: body.response.transports || [],
+        deviceType: credential.credentialDeviceType || 'unknown',
+        backedUp: credential.credentialBackedUp || false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+      console.log(`💾 Guardando credencial para usuario ${uid} en DB...`);
+
+      // 5. GUARDAR EN DB (Crear si no existe)
+      const userRef = db.collection(WEBAUTHN_USERS_COLLECTION).doc(uid);
+      const userDoc = await userRef.get();
+
+      let credentials = [];
+      if (userDoc.exists) {
+        credentials = userDoc.data().credentials || [];
+      }
+
+      const existingIndex = credentials.findIndex((c) => c.id === newCredential.id);
+      if (existingIndex >= 0) {
+        credentials[existingIndex] = newCredential;
+      } else {
+        credentials.push(newCredential);
+      }
+
+      await userRef.set(
+        {
+          email,
+          credentials
+        },
+        { merge: true }
+      );
+      console.log('✅ Credencial guardada EXITOSAMENTE.');
+      return res.status(200).json({ ok: true, verified: true });
+    }
+    throw new Error('Verification failed');
+  } catch (error) {
+    console.error('🔥 RegisterFinish Error:', error);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
 
 exports.webauthnLoginStart = functions
   .region('us-central1')
