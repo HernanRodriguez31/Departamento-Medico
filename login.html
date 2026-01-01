@@ -299,14 +299,15 @@
         .login-toast {
             position: fixed;
             left: 50%;
-            bottom: 24px;
-            transform: translateX(-50%) translateY(8px);
-            background: rgba(15, 23, 42, 0.92);
-            color: #ffffff;
+            top: calc(16px + env(safe-area-inset-top, 0px));
+            transform: translateX(-50%) translateY(-8px);
+            background: #ffffff;
+            color: #1f2937;
             padding: 10px 16px;
-            border-radius: 999px;
+            border-radius: 16px;
             font-size: 0.9rem;
-            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.25);
+            border: 2px solid #7AB800;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.2s ease, transform 0.2s ease;
@@ -830,6 +831,13 @@
             }, 3000);
         };
 
+        const clearLoginInputs = () => {
+            const emailInput = document.getElementById('email');
+            const passwordInput = document.getElementById('password');
+            if (emailInput) emailInput.value = '';
+            if (passwordInput) passwordInput.value = '';
+        };
+
         const setBiometricLoading = (isLoading) => {
             if (!biometricBtn) return;
             biometricBtn.disabled = isLoading;
@@ -838,6 +846,12 @@
                 biometricLabel.textContent = isLoading ? 'Verificando...' : biometricDefaultText;
             }
         };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', clearLoginInputs, { once: true });
+        } else {
+            clearLoginInputs();
+        }
 
         if (!supportsBiometric && biometricOption) {
             biometricOption.style.display = 'none';
@@ -859,7 +873,7 @@
                         mediation: 'required'
                     });
                     if (!credential) {
-                        showToast('No se detectó Face ID o la validación falló. Intente manualmente.');
+                        showToast('Primera vez: Por favor ingrese manualmente para vincular su seguridad.');
                         return;
                     }
                     const emailInput = document.getElementById('email');
@@ -869,10 +883,10 @@
                     if (credential.id && credential.password) {
                         window.login();
                     } else {
-                        showToast('No se detectó Face ID o la validación falló. Intente manualmente.');
+                        showToast('Primera vez: Por favor ingrese manualmente para vincular su seguridad.');
                     }
                 } catch (error) {
-                    showToast('No se detectó Face ID o la validación falló. Intente manualmente.');
+                    showToast('Primera vez: Por favor ingrese manualmente para vincular su seguridad.');
                 } finally {
                     setBiometricLoading(false);
                 }
