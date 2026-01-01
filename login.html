@@ -321,6 +321,55 @@
             transform: translateX(-50%) translateY(0);
         }
 
+        .login-toast--biometric {
+            text-align: left;
+            padding: 14px 18px;
+        }
+
+        .login-toast__content {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .login-toast__icon {
+            width: 24px;
+            height: 24px;
+            color: var(--primary-color);
+            flex-shrink: 0;
+        }
+
+        .login-toast__icon .lock-shackle {
+            transition: transform 0.3s ease;
+            transform-origin: 16px 7px;
+        }
+
+        .login-toast__text {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+        }
+
+        .login-toast__line {
+            color: #111827;
+            font-size: 0.92rem;
+            line-height: 1.3;
+        }
+
+        .login-toast__email {
+            color: var(--primary-color);
+            font-weight: 700;
+            font-size: 0.95rem;
+        }
+
+        .login-toast--success .login-toast__icon {
+            color: var(--primary-dark);
+        }
+
+        .login-toast--success .login-toast__icon .lock-shackle {
+            transform: rotate(-22deg) translate(-1px, -2px);
+        }
+
         .loading {
             opacity: 0.7;
             pointer-events: none;
@@ -813,15 +862,17 @@
         const supportsCredentialStore = Boolean(window.PasswordCredential && navigator.credentials);
         const supportsBiometric = Boolean(window.PublicKeyCredential && navigator.credentials);
 
-        const showToast = (message, options = {}) => {
-            if (!message) return;
+        const getToastElement = () => {
             let toast = document.querySelector('.login-toast');
             if (!toast) {
                 toast = document.createElement('div');
                 toast.className = 'login-toast';
                 document.body.appendChild(toast);
             }
-            toast.textContent = message;
+            return toast;
+        };
+
+        const positionToast = (toast, options = {}) => {
             toast.style.left = "";
             toast.style.top = "";
             toast.style.bottom = "";
@@ -839,13 +890,62 @@
                 }
                 toast.style.top = `${Math.round(top)}px`;
             }
-            toast.classList.add('login-toast--show');
+        };
+
+        const scheduleToastHide = (toast, duration) => {
             if (toast._timerId) {
                 clearTimeout(toast._timerId);
             }
+            const safeDuration = Number.isFinite(duration) ? duration : 3000;
+            if (safeDuration <= 0) return;
             toast._timerId = setTimeout(() => {
                 toast.classList.remove('login-toast--show');
-            }, 3000);
+            }, safeDuration);
+        };
+
+        const showToast = (message, options = {}) => {
+            if (!message) return;
+            const toast = getToastElement();
+            toast.classList.remove('login-toast--biometric', 'login-toast--success');
+            toast.textContent = message;
+            positionToast(toast, options);
+            toast.classList.add('login-toast--show');
+            scheduleToastHide(toast, options.duration);
+        };
+
+        const showBiometricToast = (options = {}) => {
+            const toast = getToastElement();
+            const state = options.state || 'prompt';
+            const email = (options.email || '').trim() || 'tu usuario';
+            const statusLine = state === 'success'
+                ? 'Acceso verificado. Ingresando...'
+                : 'Confirma el método de seguridad del dispositivo.';
+
+            toast.classList.add('login-toast--biometric');
+            toast.classList.toggle('login-toast--success', state === 'success');
+            toast.innerHTML = `
+                <div class="login-toast__content">
+                    <svg class="login-toast__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path class="lock-shackle" d="M8 11V7a4 4 0 0 1 8 0v4"></path>
+                        <rect x="5" y="11" width="14" height="9" rx="2"></rect>
+                        <path d="M12 15v2"></path>
+                    </svg>
+                    <div class="login-toast__text">
+                        <span class="login-toast__line">Para iniciar sesión con</span>
+                        <span class="login-toast__email"></span>
+                        <span class="login-toast__line login-toast__method"></span>
+                    </div>
+                </div>
+            `;
+            const emailEl = toast.querySelector('.login-toast__email');
+            if (emailEl) emailEl.textContent = email;
+            const methodEl = toast.querySelector('.login-toast__method');
+            if (methodEl) methodEl.textContent = statusLine;
+
+            positionToast(toast, { anchor: options.anchor });
+            toast.classList.add('login-toast--show');
+            scheduleToastHide(toast, options.duration ?? 2600);
         };
 
         const restoreSavedEmail = () => {
@@ -891,8 +991,21 @@
             biometricBtn.addEventListener('click', async () => {
                 const emailInput = document.getElementById('email');
                 const passwordInput = document.getElementById('password');
+                let savedEmail = '';
+                try {
+                    savedEmail = localStorage.getItem('saved_email') || '';
+                } catch (error) {
+                    savedEmail = '';
+                }
+                const displayEmail = (emailInput?.value || savedEmail).trim();
                 setBiometricLoading(true);
                 try {
+                    showBiometricToast({
+                        email: displayEmail,
+                        state: 'prompt',
+                        anchor: biometricBtn,
+                        duration: 2800
+                    });
                     if (navigator.credentials?.preventSilentAccess) {
                         try {
                             await navigator.credentials.preventSilentAccess();
@@ -916,7 +1029,15 @@
                     } catch (error) {
                         // no-op
                     }
-                    window.login();
+                    showBiometricToast({
+                        email: credentialId,
+                        state: 'success',
+                        anchor: biometricBtn,
+                        duration: 1400
+                    });
+                    setTimeout(() => {
+                        window.login();
+                    }, 120);
                 } catch (error) {
                     showToast('Para activar Face ID, inicie sesión con Usuario y Contraseña manualmente por primera vez.', { anchor: biometricBtn });
                 } finally {
