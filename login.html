@@ -1411,7 +1411,7 @@
 
                 if (supportsBiometric) {
                     showToast('Configurando Face ID...', { anchor: biometricBtn, duration: 2200 });
-                    await registerBiometricPasskey(user, email);
+                    registerBiometricPasskey(user, email).catch(() => {});
                 } else {
                     try {
                         localStorage.setItem('passkey_registration_failed', 'unsupported');

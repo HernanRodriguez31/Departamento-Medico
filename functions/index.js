@@ -883,84 +883,92 @@ exports.aiChat = functions
 exports.webauthnRegisterStart = functions
   .region('us-central1')
   .https.onRequest(async (req, res) => {
-    const origin = resolveWebOrigin(req);
-    setCorsHeaders(res, origin);
-    if (req.method === 'OPTIONS') return res.status(204).send('');
-    if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'method_not_allowed' });
-    if (!origin) return res.status(403).json({ ok: false, error: 'origin_not_allowed' });
-
-    const authHeader = req.get('Authorization') || '';
-    const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i);
-    if (!tokenMatch) return res.status(401).json({ ok: false, error: 'auth_required' });
-
-    let decoded = null;
     try {
-      decoded = await admin.auth().verifyIdToken(tokenMatch[1]);
-    } catch (error) {
-      return res.status(401).json({ ok: false, error: 'auth_invalid' });
-    }
+      const origin = resolveWebOrigin(req);
+      setCorsHeaders(res, origin);
+      if (req.method === 'OPTIONS') return res.status(204).send('');
+      if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'method_not_allowed' });
+      if (!origin) return res.status(403).json({ ok: false, error: 'origin_not_allowed' });
 
-    const uid = decoded?.uid || null;
-    if (!uid) return res.status(401).json({ ok: false, error: 'auth_invalid' });
-    const rpID = resolveRpID(origin);
-    if (!rpID) return res.status(400).json({ ok: false, error: 'invalid_origin' });
+      const authHeader = req.get('Authorization') || '';
+      const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i);
+      if (!tokenMatch) return res.status(401).json({ ok: false, error: 'auth_required' });
 
-    const userRecord = await admin.auth().getUser(uid).catch(() => null);
-    const email = decoded?.email || userRecord?.email || '';
-    const displayName = userRecord?.displayName || email || uid;
-
-    const userRef = db.collection(WEBAUTHN_USERS_COLLECTION).doc(uid);
-    const userSnap = await userRef.get();
-    const storedCreds = Array.isArray(userSnap.data()?.credentials) ? userSnap.data().credentials : [];
-
-    if (storedCreds.length) {
-      return res.status(200).json({ ok: true, alreadyRegistered: true });
-    }
-
-    const excludeCredentials = storedCreds
-      .map((cred) => {
-        if (!cred?.id) return null;
-        try {
-          return {
-            id: isoBase64URL.toBuffer(cred.id),
-            type: 'public-key',
-            transports: Array.isArray(cred.transports) ? cred.transports : []
-          };
-        } catch (e) {
-          return null;
-        }
-      })
-      .filter(Boolean);
-
-    const options = await generateRegistrationOptions({
-      rpName: WEBAUTHN_RP_NAME,
-      rpID,
-      userID: uid,
-      userName: email || uid,
-      userDisplayName: displayName,
-      timeout: 60_000,
-      attestationType: 'none',
-      excludeCredentials,
-      authenticatorSelection: {
-        residentKey: 'required',
-        userVerification: 'required'
+      let decoded = null;
+      try {
+        decoded = await admin.auth().verifyIdToken(tokenMatch[1]);
+      } catch (error) {
+        return res.status(401).json({ ok: false, error: 'auth_invalid' });
       }
-    });
 
-    if (!options || !options.challenge) {
-      console.error('🔥 Error: generateOptions devolvió undefined', options);
-      return res.status(500).json({ ok: false, error: 'challenge_generation_failed' });
+      const uid = decoded?.uid || null;
+      if (!uid) return res.status(401).json({ ok: false, error: 'auth_invalid' });
+      const rpID = resolveRpID(origin);
+      if (!rpID) return res.status(400).json({ ok: false, error: 'invalid_origin' });
+
+      const userRecord = await admin.auth().getUser(uid).catch(() => null);
+      const email = decoded?.email || userRecord?.email || '';
+      const displayName = userRecord?.displayName || email || uid;
+
+      const userRef = db.collection(WEBAUTHN_USERS_COLLECTION).doc(uid);
+      const userSnap = await userRef.get();
+      const storedCreds = Array.isArray(userSnap.data()?.credentials) ? userSnap.data().credentials : [];
+
+      if (storedCreds.length) {
+        return res.status(200).json({ ok: true, alreadyRegistered: true });
+      }
+
+      const excludeCredentials = storedCreds
+        .map((cred) => {
+          if (!cred?.id) return null;
+          try {
+            return {
+              id: isoBase64URL.toBuffer(cred.id),
+              type: 'public-key',
+              transports: Array.isArray(cred.transports) ? cred.transports : []
+            };
+          } catch (e) {
+            return null;
+          }
+        })
+        .filter(Boolean);
+
+      const options = await generateRegistrationOptions({
+        rpName: WEBAUTHN_RP_NAME,
+        rpID,
+        userID: uid,
+        userName: email || uid,
+        userDisplayName: displayName,
+        timeout: 60_000,
+        attestationType: 'none',
+        excludeCredentials,
+        authenticatorSelection: {
+          residentKey: 'required',
+          userVerification: 'required'
+        }
+      });
+
+      if (!options || !options.challenge) {
+        console.error('🔥 Error: generateOptions devolvió undefined', options);
+        return res.status(500).json({ ok: false, error: 'challenge_generation_failed' });
+      }
+
+      const challengeId = await createWebauthnChallenge({
+        type: 'registration',
+        uid,
+        challenge: options.challenge,
+        rpID,
+        origin
+      });
+
+      return res.status(200).json({ ok: true, options, challengeId });
+    } catch (error) {
+      const origin = resolveWebOrigin(req);
+      setCorsHeaders(res, origin);
+      console.error('🔥 CRITICAL ERROR in RegisterStart:', error);
+      if (res.headersSent) return;
+      return res.status(500).json({ error: error.message });
     }
-
-    const challengeId = await createWebauthnChallenge({
-      type: 'registration',
-      uid,
-      challenge: options.challenge,
-      rpID,
-      origin
-    });
-
-    return res.status(200).json({ ok: true, options, challengeId });
   });
 
 exports.webauthnRegisterFinish = functions
