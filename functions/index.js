@@ -1,6 +1,13 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const cors = require('cors');
+const {
+  generateRegistrationOptions,
+  verifyRegistrationResponse,
+  generateAuthenticationOptions,
+  verifyAuthenticationResponse
+} = require('@simplewebauthn/server');
+const { isoBase64URL } = require('@simplewebauthn/server/helpers');
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -23,6 +30,11 @@ const NOTIF_BODY_LIMIT = 140;
 const AI_RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const AI_RATE_LIMIT_MAX = 20;
 const aiRateLimitByUid = new Map();
+const WEBAUTHN_RP_NAME = 'Departamento Medico Brisa';
+const WEBAUTHN_USERS_COLLECTION = 'webauthn_users';
+const WEBAUTHN_CREDENTIALS_COLLECTION = 'webauthn_credentials';
+const WEBAUTHN_CHALLENGES_COLLECTION = '_webauthn_challenges';
+const WEBAUTHN_CHALLENGE_TTL_MS = 5 * 60 * 1000;
 const PROD_ORIGINS = new Set([
   'https://departamento-medico-brisa.web.app',
   'https://departamento-medico-brisa.firebaseapp.com'
@@ -30,6 +42,54 @@ const PROD_ORIGINS = new Set([
 
 function isLocalOrigin(origin = '') {
   return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+}
+
+function isAllowedWebOrigin(origin = '') {
+  if (!origin) return false;
+  return (
+    /^https:\/\/departamento-medico-brisa\.(web\.app|firebaseapp\.com)$/i.test(origin) ||
+    /^https:\/\/([a-z0-9-]+\.)*brisasaludybienestar\.com$/i.test(origin) ||
+    isLocalOrigin(origin)
+  );
+}
+
+function setCorsHeaders(res, origin) {
+  if (origin && isAllowedWebOrigin(origin)) {
+    res.set('Access-Control-Allow-Origin', origin);
+    res.set('Vary', 'Origin');
+  }
+  res.set('Access-Control-Allow-Methods', 'POST,OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+}
+
+function getRpIDFromOrigin(origin = '') {
+  if (!origin) return null;
+  try {
+    const hostname = new URL(origin).hostname;
+    if (hostname === '127.0.0.1') return 'localhost';
+    return hostname;
+  } catch (e) {
+    return null;
+  }
+}
+
+function parseRequestBody(req) {
+  if (req.body && typeof req.body === 'object') return req.body;
+  if (typeof req.body === 'string') {
+    try {
+      return JSON.parse(req.body);
+    } catch (e) {
+      return {};
+    }
+  }
+  return {};
+}
+
+function isChallengeExpired(createdAt) {
+  if (!createdAt) return true;
+  const createdMs = typeof createdAt.toMillis === 'function' ? createdAt.toMillis() : 0;
+  if (!createdMs) return true;
+  return Date.now() - createdMs > WEBAUTHN_CHALLENGE_TTL_MS;
 }
 
 const corsHandler = cors({
@@ -142,6 +202,23 @@ const snippet = (value, max = NOTIF_BODY_LIMIT) => {
   if (!text) return '';
   if (text.length <= max) return text;
   return `${text.slice(0, Math.max(0, max - 3))}...`;
+};
+
+const createWebauthnChallenge = async (payload = {}) => {
+  const ref = db.collection(WEBAUTHN_CHALLENGES_COLLECTION).doc();
+  await ref.set({
+    ...payload,
+    createdAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+  return ref.id;
+};
+
+const loadWebauthnChallenge = async (challengeId = '') => {
+  if (!challengeId) return null;
+  const ref = db.collection(WEBAUTHN_CHALLENGES_COLLECTION).doc(challengeId);
+  const snap = await ref.get();
+  if (!snap.exists) return null;
+  return { ref, data: snap.data() || {} };
 };
 
 const resolveUserName = async (uid) => {
@@ -771,4 +848,312 @@ exports.aiChat = functions
 
     logAi(502, { error: lastError });
     return res.status(502).json({ ok: false, error: lastError });
+  });
+
+exports.webauthnRegisterStart = functions
+  .region('us-central1')
+  .https.onRequest(async (req, res) => {
+    const origin = req.get('origin') || '';
+    setCorsHeaders(res, origin);
+    if (req.method === 'OPTIONS') return res.status(204).send('');
+    if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'method_not_allowed' });
+    if (!isAllowedWebOrigin(origin)) return res.status(403).json({ ok: false, error: 'origin_not_allowed' });
+
+    const authHeader = req.get('Authorization') || '';
+    const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i);
+    if (!tokenMatch) return res.status(401).json({ ok: false, error: 'auth_required' });
+
+    let decoded = null;
+    try {
+      decoded = await admin.auth().verifyIdToken(tokenMatch[1]);
+    } catch (error) {
+      return res.status(401).json({ ok: false, error: 'auth_invalid' });
+    }
+
+    const uid = decoded?.uid || null;
+    if (!uid) return res.status(401).json({ ok: false, error: 'auth_invalid' });
+    const rpID = getRpIDFromOrigin(origin);
+    if (!rpID) return res.status(400).json({ ok: false, error: 'invalid_origin' });
+
+    const userRecord = await admin.auth().getUser(uid).catch(() => null);
+    const email = decoded?.email || userRecord?.email || '';
+    const displayName = userRecord?.displayName || email || uid;
+
+    const userRef = db.collection(WEBAUTHN_USERS_COLLECTION).doc(uid);
+    const userSnap = await userRef.get();
+    const storedCreds = Array.isArray(userSnap.data()?.credentials) ? userSnap.data().credentials : [];
+
+    if (storedCreds.length) {
+      return res.status(200).json({ ok: true, alreadyRegistered: true });
+    }
+
+    const excludeCredentials = storedCreds
+      .map((cred) => {
+        if (!cred?.id) return null;
+        try {
+          return {
+            id: isoBase64URL.toBuffer(cred.id),
+            type: 'public-key',
+            transports: Array.isArray(cred.transports) ? cred.transports : []
+          };
+        } catch (e) {
+          return null;
+        }
+      })
+      .filter(Boolean);
+
+    const options = generateRegistrationOptions({
+      rpName: WEBAUTHN_RP_NAME,
+      rpID,
+      userID: uid,
+      userName: email || uid,
+      userDisplayName: displayName,
+      timeout: 60_000,
+      attestationType: 'none',
+      excludeCredentials,
+      authenticatorSelection: {
+        residentKey: 'required',
+        userVerification: 'required'
+      }
+    });
+
+    const challengeId = await createWebauthnChallenge({
+      type: 'registration',
+      uid,
+      challenge: options.challenge,
+      rpID,
+      origin
+    });
+
+    return res.status(200).json({ ok: true, options, challengeId });
+  });
+
+exports.webauthnRegisterFinish = functions
+  .region('us-central1')
+  .https.onRequest(async (req, res) => {
+    const origin = req.get('origin') || '';
+    setCorsHeaders(res, origin);
+    if (req.method === 'OPTIONS') return res.status(204).send('');
+    if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'method_not_allowed' });
+    if (!isAllowedWebOrigin(origin)) return res.status(403).json({ ok: false, error: 'origin_not_allowed' });
+
+    const authHeader = req.get('Authorization') || '';
+    const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i);
+    if (!tokenMatch) return res.status(401).json({ ok: false, error: 'auth_required' });
+
+    let decoded = null;
+    try {
+      decoded = await admin.auth().verifyIdToken(tokenMatch[1]);
+    } catch (error) {
+      return res.status(401).json({ ok: false, error: 'auth_invalid' });
+    }
+
+    const uid = decoded?.uid || null;
+    if (!uid) return res.status(401).json({ ok: false, error: 'auth_invalid' });
+
+    const body = parseRequestBody(req);
+    const credential = body?.credential;
+    const challengeId = body?.challengeId;
+    if (!credential || !challengeId) {
+      return res.status(400).json({ ok: false, error: 'missing_payload' });
+    }
+
+    const challengeDoc = await loadWebauthnChallenge(challengeId);
+    if (!challengeDoc || challengeDoc.data?.type !== 'registration') {
+      return res.status(400).json({ ok: false, error: 'invalid_challenge' });
+    }
+
+    if (challengeDoc.data?.uid !== uid) {
+      return res.status(403).json({ ok: false, error: 'challenge_mismatch' });
+    }
+
+    if (isChallengeExpired(challengeDoc.data?.createdAt)) {
+      await challengeDoc.ref.delete().catch(() => {});
+      return res.status(400).json({ ok: false, error: 'challenge_expired' });
+    }
+
+    try {
+      const verification = await verifyRegistrationResponse({
+        response: credential,
+        expectedChallenge: challengeDoc.data.challenge,
+        expectedOrigin: challengeDoc.data.origin,
+        expectedRPID: challengeDoc.data.rpID
+      });
+
+      const { verified, registrationInfo } = verification;
+      if (!verified || !registrationInfo) {
+        return res.status(400).json({ ok: false, error: 'registration_failed' });
+      }
+
+      const credentialId = isoBase64URL.fromBuffer(registrationInfo.credentialID);
+      const publicKey = isoBase64URL.fromBuffer(registrationInfo.credentialPublicKey);
+      const transports = Array.isArray(credential?.transports)
+        ? credential.transports
+        : Array.isArray(credential?.response?.transports)
+          ? credential.response.transports
+          : [];
+
+      const userRecord = await admin.auth().getUser(uid).catch(() => null);
+      const email = decoded?.email || userRecord?.email || '';
+      const displayName = userRecord?.displayName || email || uid;
+
+      await db
+        .collection(WEBAUTHN_CREDENTIALS_COLLECTION)
+        .doc(credentialId)
+        .set(
+          {
+            uid,
+            email,
+            displayName,
+            publicKey,
+            counter: registrationInfo.counter,
+            transports,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          },
+          { merge: true }
+        );
+
+      await db
+        .collection(WEBAUTHN_USERS_COLLECTION)
+        .doc(uid)
+        .set(
+          {
+            email,
+            displayName,
+            credentials: admin.firestore.FieldValue.arrayUnion({
+              id: credentialId,
+              transports
+            }),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+          },
+          { merge: true }
+        );
+
+      await challengeDoc.ref.delete().catch(() => {});
+      return res.status(200).json({ ok: true });
+    } catch (error) {
+      return res.status(400).json({ ok: false, error: 'registration_failed' });
+    }
+  });
+
+exports.webauthnLoginStart = functions
+  .region('us-central1')
+  .https.onRequest(async (req, res) => {
+    const origin = req.get('origin') || '';
+    setCorsHeaders(res, origin);
+    if (req.method === 'OPTIONS') return res.status(204).send('');
+    if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'method_not_allowed' });
+    if (!isAllowedWebOrigin(origin)) return res.status(403).json({ ok: false, error: 'origin_not_allowed' });
+
+    const rpID = getRpIDFromOrigin(origin);
+    if (!rpID) return res.status(400).json({ ok: false, error: 'invalid_origin' });
+
+    const options = generateAuthenticationOptions({
+      rpID,
+      timeout: 60_000,
+      userVerification: 'required'
+    });
+
+    const challengeId = await createWebauthnChallenge({
+      type: 'authentication',
+      challenge: options.challenge,
+      rpID,
+      origin
+    });
+
+    return res.status(200).json({ ok: true, options, challengeId });
+  });
+
+exports.webauthnLoginFinish = functions
+  .region('us-central1')
+  .https.onRequest(async (req, res) => {
+    const origin = req.get('origin') || '';
+    setCorsHeaders(res, origin);
+    if (req.method === 'OPTIONS') return res.status(204).send('');
+    if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'method_not_allowed' });
+    if (!isAllowedWebOrigin(origin)) return res.status(403).json({ ok: false, error: 'origin_not_allowed' });
+
+    const body = parseRequestBody(req);
+    const credential = body?.credential;
+    const challengeId = body?.challengeId;
+    if (!credential || !challengeId) {
+      return res.status(400).json({ ok: false, error: 'missing_payload' });
+    }
+
+    const challengeDoc = await loadWebauthnChallenge(challengeId);
+    if (!challengeDoc || challengeDoc.data?.type !== 'authentication') {
+      return res.status(400).json({ ok: false, error: 'invalid_challenge' });
+    }
+
+    if (isChallengeExpired(challengeDoc.data?.createdAt)) {
+      await challengeDoc.ref.delete().catch(() => {});
+      return res.status(400).json({ ok: false, error: 'challenge_expired' });
+    }
+
+    const credentialId = credential?.id;
+    if (!credentialId) {
+      return res.status(400).json({ ok: false, error: 'missing_credential_id' });
+    }
+
+    const credSnap = await db.collection(WEBAUTHN_CREDENTIALS_COLLECTION).doc(credentialId).get();
+    if (!credSnap.exists) {
+      return res.status(404).json({ ok: false, error: 'credential_not_found' });
+    }
+
+    const stored = credSnap.data() || {};
+    const rpID = challengeDoc.data?.rpID;
+    if (!rpID) {
+      return res.status(400).json({ ok: false, error: 'invalid_origin' });
+    }
+
+    try {
+      const verification = await verifyAuthenticationResponse({
+        response: credential,
+        expectedChallenge: challengeDoc.data.challenge,
+        expectedOrigin: challengeDoc.data.origin,
+        expectedRPID: rpID,
+        authenticator: {
+          credentialID: isoBase64URL.toBuffer(credentialId),
+          credentialPublicKey: isoBase64URL.toBuffer(stored.publicKey),
+          counter: stored.counter || 0,
+          transports: Array.isArray(stored.transports) ? stored.transports : []
+        }
+      });
+
+      const { verified, authenticationInfo } = verification;
+      if (!verified || !authenticationInfo) {
+        return res.status(401).json({ ok: false, error: 'authentication_failed' });
+      }
+
+      await db
+        .collection(WEBAUTHN_CREDENTIALS_COLLECTION)
+        .doc(credentialId)
+        .set(
+          {
+            counter: authenticationInfo.newCounter,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            lastUsedAt: admin.firestore.FieldValue.serverTimestamp()
+          },
+          { merge: true }
+        );
+
+      const uid = stored.uid;
+      if (!uid) {
+        return res.status(401).json({ ok: false, error: 'authentication_failed' });
+      }
+
+      const customToken = await admin.auth().createCustomToken(uid);
+      await challengeDoc.ref.delete().catch(() => {});
+
+      return res.status(200).json({
+        ok: true,
+        uid,
+        email: stored.email || '',
+        customToken
+      });
+    } catch (error) {
+      return res.status(401).json({ ok: false, error: 'authentication_failed' });
+    }
   });

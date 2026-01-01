@@ -849,11 +849,11 @@
 
     <!-- FIREBASE AND AUTH LOGIC DO NOT TOUCH -->
     <script type="module">
-        import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+        import { signInWithEmailAndPassword, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
         import { doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
         import { getFirebase } from "/assets/js/common/firebaseClient.js";
 
-        const { auth, db } = getFirebase();
+        const { auth, db, app } = getFirebase();
         const loginForm = document.getElementById('login-form');
         const biometricOption = document.querySelector('.biometric-option');
         const biometricBtn = document.getElementById('biometric-btn');
@@ -861,6 +861,16 @@
         const biometricDefaultText = biometricLabel?.textContent?.trim() || 'Usar Face ID / Huella';
         const supportsCredentialStore = Boolean(window.PasswordCredential && navigator.credentials);
         const supportsBiometric = Boolean(window.PublicKeyCredential && navigator.credentials);
+        let loginInProgress = false;
+        const functionsBaseUrl = (() => {
+            const projectId = app?.options?.projectId;
+            if (!projectId) return '';
+            const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+            if (isLocal) {
+                return `http://localhost:5001/${projectId}/us-central1`;
+            }
+            return `https://us-central1-${projectId}.cloudfunctions.net`;
+        })();
 
         const getToastElement = () => {
             let toast = document.querySelector('.login-toast');
@@ -948,6 +958,98 @@
             scheduleToastHide(toast, options.duration ?? 2600);
         };
 
+        const bufferToBase64Url = (buffer) => {
+            const bytes = new Uint8Array(buffer);
+            let str = '';
+            for (let i = 0; i < bytes.length; i += 1) {
+                str += String.fromCharCode(bytes[i]);
+            }
+            return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+        };
+
+        const base64UrlToBuffer = (base64Url) => {
+            const padding = '='.repeat((4 - (base64Url.length % 4)) % 4);
+            const base64 = (base64Url + padding).replace(/-/g, '+').replace(/_/g, '/');
+            const raw = atob(base64);
+            const buffer = new ArrayBuffer(raw.length);
+            const bytes = new Uint8Array(buffer);
+            for (let i = 0; i < raw.length; i += 1) {
+                bytes[i] = raw.charCodeAt(i);
+            }
+            return buffer;
+        };
+
+        const publicKeyCredentialToJSON = (cred) => {
+            if (!cred) return cred;
+            if (Array.isArray(cred)) {
+                return cred.map((item) => publicKeyCredentialToJSON(item));
+            }
+            if (cred instanceof ArrayBuffer) {
+                return bufferToBase64Url(cred);
+            }
+            if (cred instanceof Uint8Array) {
+                return bufferToBase64Url(cred.buffer);
+            }
+            if (typeof cred === 'object') {
+                const obj = {};
+                Object.keys(cred).forEach((key) => {
+                    obj[key] = publicKeyCredentialToJSON(cred[key]);
+                });
+                return obj;
+            }
+            return cred;
+        };
+
+        const preformatCreateOptions = (options) => {
+            return {
+                ...options,
+                challenge: base64UrlToBuffer(options.challenge),
+                user: {
+                    ...options.user,
+                    id: base64UrlToBuffer(options.user.id)
+                },
+                excludeCredentials: Array.isArray(options.excludeCredentials)
+                    ? options.excludeCredentials.map((cred) => ({
+                        ...cred,
+                        id: base64UrlToBuffer(cred.id)
+                    }))
+                    : []
+            };
+        };
+
+        const preformatGetOptions = (options) => {
+            return {
+                ...options,
+                challenge: base64UrlToBuffer(options.challenge),
+                allowCredentials: Array.isArray(options.allowCredentials)
+                    ? options.allowCredentials.map((cred) => ({
+                        ...cred,
+                        id: base64UrlToBuffer(cred.id)
+                    }))
+                    : []
+            };
+        };
+
+        const postJson = async (path, body = {}, idToken = '') => {
+            if (!functionsBaseUrl) {
+                throw new Error('functions_base_missing');
+            }
+            const headers = { 'Content-Type': 'application/json' };
+            if (idToken) headers.Authorization = `Bearer ${idToken}`;
+            const response = await fetch(`${functionsBaseUrl}/${path}`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(body)
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data?.ok === false) {
+                const error = new Error(data?.error || 'request_failed');
+                error.data = data;
+                throw error;
+            }
+            return data;
+        };
+
         const restoreSavedEmail = () => {
             const emailInput = document.getElementById('email');
             const passwordInput = document.getElementById('password');
@@ -968,6 +1070,93 @@
             if (biometricLabel) {
                 biometricLabel.textContent = isLoading ? 'Verificando...' : biometricDefaultText;
             }
+        };
+
+        const maybeRegisterPasskey = async (user, email) => {
+            if (!supportsBiometric || !functionsBaseUrl || !user) return;
+            try {
+                const idToken = await user.getIdToken();
+                const startData = await postJson('webauthnRegisterStart', { email }, idToken);
+                if (startData?.alreadyRegistered || !startData?.options || !startData?.challengeId) return;
+                const publicKey = preformatCreateOptions(startData.options);
+                const credential = await navigator.credentials.create({ publicKey });
+                if (!credential) return;
+                const credentialJson = publicKeyCredentialToJSON(credential);
+                await postJson('webauthnRegisterFinish', {
+                    credential: credentialJson,
+                    challengeId: startData.challengeId
+                }, idToken);
+            } catch (error) {
+                // Best-effort enrollment: do not block login.
+                console.info('Passkey enrollment skipped.', error);
+            }
+        };
+
+        const ensureUserProfile = async (user, email) => {
+            const docRef = doc(db, "usuarios", user.uid);
+            let docSnap = null;
+            try {
+                docSnap = await getDoc(docRef);
+            } catch (e) {
+                const err = new Error('profile_read_failed');
+                err.code = 'profile_read_failed';
+                throw err;
+            }
+
+            let displayName = formatDisplayName(user.email || email);
+            if (user.displayName) {
+                displayName = user.displayName;
+            }
+
+            if (!docSnap.exists()) {
+                try {
+                    await setDoc(
+                        docRef,
+                        {
+                            nombre: displayName,
+                            email: user.email || email,
+                            createdAt: serverTimestamp(),
+                            updatedAt: serverTimestamp()
+                        },
+                        { merge: true }
+                    );
+                } catch (e) {
+                    const err = new Error('profile_create_failed');
+                    err.code = 'profile_create_failed';
+                    throw err;
+                }
+            } else {
+                const savedName = docSnap.data()?.nombre;
+                if (savedName) displayName = savedName;
+            }
+
+            return displayName;
+        };
+
+        const finalizeLogin = async (user, email, options = {}) => {
+            const displayName = await ensureUserProfile(user, email);
+            sessionStorage.setItem('isLoggedIn', 'true');
+            localStorage.setItem('user_nombre', displayName);
+            try {
+                if (email) localStorage.setItem('saved_email', email.trim());
+            } catch (error) {
+                // no-op
+            }
+
+            if (options.storePassword && supportsCredentialStore && loginForm && window.PasswordCredential) {
+                try {
+                    const creds = new PasswordCredential(loginForm);
+                    await navigator.credentials.store(creds);
+                } catch (error) {
+                    console.info('No se pudo guardar credenciales.', error);
+                }
+            }
+
+            if (options.enrollPasskey) {
+                await maybeRegisterPasskey(user, email);
+            }
+
+            return displayName;
         };
 
         if (document.readyState === 'loading') {
@@ -998,6 +1187,7 @@
                     savedEmail = '';
                 }
                 const displayEmail = (emailInput?.value || savedEmail).trim();
+                if (loginInProgress) return;
                 setBiometricLoading(true);
                 try {
                     showBiometricToast({
@@ -1006,41 +1196,66 @@
                         anchor: biometricBtn,
                         duration: 2800
                     });
-                    if (navigator.credentials?.preventSilentAccess) {
-                        try {
-                            await navigator.credentials.preventSilentAccess();
-                        } catch (error) {
-                            // Best-effort to disable silent access; ignore failures.
-                        }
+
+                    const startData = await postJson('webauthnLoginStart', { email: displayEmail });
+                    if (!startData?.options || !startData?.challengeId) {
+                        throw new Error('webauthn_start_failed');
                     }
-                    const credential = await navigator.credentials.get({
-                        password: true,
-                        mediation: 'required'
+
+                    const assertion = await navigator.credentials.get({
+                        publicKey: preformatGetOptions(startData.options)
                     });
-                    if (!credential || !credential.id || !credential.password) {
-                        showToast('Para activar Face ID, inicie sesión con Usuario y Contraseña manualmente por primera vez.', { anchor: biometricBtn });
-                        return;
+
+                    if (!assertion) {
+                        throw new Error('webauthn_assertion_missing');
                     }
-                    const credentialId = credential.id.trim();
-                    if (emailInput) emailInput.value = credentialId;
-                    if (passwordInput) passwordInput.value = credential.password;
+
+                    const credential = publicKeyCredentialToJSON(assertion);
+                    const finishData = await postJson('webauthnLoginFinish', {
+                        credential,
+                        challengeId: startData.challengeId
+                    });
+
+                    if (!finishData?.customToken) {
+                        throw new Error('webauthn_finish_failed');
+                    }
+
+                    const resolvedEmail = (finishData.email || displayEmail || '').trim();
+                    if (emailInput && resolvedEmail) emailInput.value = resolvedEmail;
+                    if (passwordInput) passwordInput.value = '';
                     try {
-                        localStorage.setItem('saved_email', credentialId);
+                        if (resolvedEmail) localStorage.setItem('saved_email', resolvedEmail);
                     } catch (error) {
                         // no-op
                     }
+
                     showBiometricToast({
-                        email: credentialId,
+                        email: resolvedEmail || displayEmail,
                         state: 'success',
                         anchor: biometricBtn,
                         duration: 1400
                     });
+
+                    const overlay = document.getElementById('login-overlay');
+                    if (overlay) overlay.classList.add('active');
+                    loginInProgress = true;
+
+                    const userCredential = await signInWithCustomToken(auth, finishData.customToken);
+                    const user = userCredential.user;
+                    await finalizeLogin(user, resolvedEmail || user.email || displayEmail, {
+                        storePassword: false,
+                        enrollPasskey: false
+                    });
+
                     setTimeout(() => {
-                        window.login();
-                    }, 120);
+                        window.location.replace(getRedirectTarget());
+                    }, 900);
                 } catch (error) {
                     showToast('Para activar Face ID, inicie sesión con Usuario y Contraseña manualmente por primera vez.', { anchor: biometricBtn });
                 } finally {
+                    const overlay = document.getElementById('login-overlay');
+                    if (overlay) overlay.classList.remove('active');
+                    loginInProgress = false;
                     setBiometricLoading(false);
                 }
             });
@@ -1120,8 +1335,6 @@
                 .join(" ");
         };
 
-        let loginInProgress = false;
-
         // Password Toggle Logic
         window.togglePassword = () => {
             const passwordInput = document.getElementById('password');
@@ -1174,57 +1387,10 @@
                 const userCredential = await signInWithEmailAndPassword(auth, email, password);
                 const user = userCredential.user;
 
-                const docRef = doc(db, "usuarios", user.uid);
-                let docSnap = null;
-                try {
-                    docSnap = await getDoc(docRef);
-                } catch (e) {
-                    mostrarError("No se pudo leer el perfil del usuario. Intenta nuevamente.");
-                    return;
-                }
-
-                let displayName = formatDisplayName(user.email || email);
-                if (user.displayName) {
-                    displayName = user.displayName;
-                }
-
-                if (!docSnap.exists()) {
-                    try {
-                        await setDoc(
-                            docRef,
-                            {
-                                nombre: displayName,
-                                email: user.email || email,
-                                createdAt: serverTimestamp(),
-                                updatedAt: serverTimestamp()
-                            },
-                            { merge: true }
-                        );
-                    } catch (e) {
-                        mostrarError("No se pudo crear el perfil del usuario. Intenta nuevamente.");
-                        return;
-                    }
-                } else {
-                    const savedName = docSnap.data()?.nombre;
-                    if (savedName) displayName = savedName;
-                }
-
-                sessionStorage.setItem('isLoggedIn', 'true');
-                localStorage.setItem('user_nombre', displayName);
-                try {
-                    localStorage.setItem('saved_email', email.trim());
-                } catch (error) {
-                    // no-op
-                }
-
-                if (supportsCredentialStore && loginForm && window.PasswordCredential) {
-                    try {
-                        const creds = new PasswordCredential(loginForm);
-                        await navigator.credentials.store(creds);
-                    } catch (error) {
-                        console.info('No se pudo guardar credenciales.', error);
-                    }
-                }
+                await finalizeLogin(user, email, {
+                    storePassword: true,
+                    enrollPasskey: true
+                });
 
                 // Overlay is already active; keep it brief before redirecting
                 setTimeout(() => {
@@ -1235,7 +1401,11 @@
                 console.error("Login error:", error);
 
                 let msg = "Error al iniciar sesión.";
-                if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+                if (error.code === 'profile_read_failed') {
+                    msg = "No se pudo leer el perfil del usuario. Intenta nuevamente.";
+                } else if (error.code === 'profile_create_failed') {
+                    msg = "No se pudo crear el perfil del usuario. Intenta nuevamente.";
+                } else if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
                     msg = "Usuario o contraseña incorrectos.";
                 } else if (error.code === 'auth/too-many-requests') {
                     msg = "Demasiados intentos. Intenta más tarde.";
