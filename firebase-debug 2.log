@@ -1,0 +1,27 @@
+[debug] [2025-12-31T23:16:19.213Z] ----------------------------------------------------------------------
+[debug] [2025-12-31T23:16:19.221Z] Command:       /opt/homebrew/Cellar/node@20/20.19.6/bin/node /opt/homebrew/bin/firebase deploy
+[debug] [2025-12-31T23:16:19.221Z] CLI Version:   15.0.0
+[debug] [2025-12-31T23:16:19.221Z] Platform:      darwin
+[debug] [2025-12-31T23:16:19.221Z] Node Version:  v20.19.6
+[debug] [2025-12-31T23:16:19.221Z] Time:          Wed Dec 31 2025 20:16:19 GMT-0300 (Argentina Standard Time)
+[debug] [2025-12-31T23:16:19.221Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-12-31T23:16:20.097Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-12-31T23:16:20.098Z] > authorizing via signed-in user (hernangabrielrodriguez@gmail.com)
+[debug] [2025-12-31T23:16:20.098Z] [iam] checking project departamento-medico-brisa for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get","firebasehosting.sites.update","firebaserules.releases.create","firebaserules.releases.update","firebaserules.rulesets.create"]
+[debug] [2025-12-31T23:16:20.098Z] Checked if tokens are valid: false, expires at: 1767213656654
+[debug] [2025-12-31T23:16:20.098Z] Checked if tokens are valid: false, expires at: 1767213656654
+[debug] [2025-12-31T23:16:20.098Z] > refreshing access token with scopes: []
+[debug] [2025-12-31T23:16:20.099Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-12-31T23:16:20.099Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-12-31T23:16:20.322Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-12-31T23:16:20.322Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-12-31T23:16:20.337Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/departamento-medico-brisa:testIamPermissions [none]
+[debug] [2025-12-31T23:16:20.337Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/departamento-medico-brisa:testIamPermissions x-goog-quota-user=projects/departamento-medico-brisa
+[debug] [2025-12-31T23:16:20.337Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/departamento-medico-brisa:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get","firebasehosting.sites.update","firebaserules.releases.create","firebaserules.releases.update","firebaserules.rulesets.create"]}
+[debug] [2025-12-31T23:16:21.408Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/departamento-medico-brisa:testIamPermissions 200
+[debug] [2025-12-31T23:16:21.408Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/departamento-medico-brisa:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get","firebasehosting.sites.update","firebaserules.releases.create","firebaserules.releases.update","firebaserules.rulesets.create"]}
+[debug] [2025-12-31T23:16:21.409Z] Checked if tokens are valid: true, expires at: 1767226579322
+[debug] [2025-12-31T23:16:21.409Z] Checked if tokens are valid: true, expires at: 1767226579322
+[debug] [2025-12-31T23:16:21.409Z] >>> [apiv2][query] POST https://iam.googleapis.com/v1/projects/departamento-medico-brisa/serviceAccounts/departamento-medico-brisa@appspot.gserviceaccount.com:testIamPermissions [none]
+[debug] [2025-12-31T23:16:21.409Z] >>> [apiv2][body] POST https://iam.googleapis.com/v1/projects/departamento-medico-brisa/serviceAccounts/departamento-medico-brisa@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
