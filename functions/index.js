@@ -900,7 +900,7 @@ exports.webauthnRegisterStart = functions
       const options = await generateRegistrationOptions({
         rpName: WEBAUTHN_RP_NAME,
         rpID,
-        userID: uid,
+        userID: new Uint8Array(Buffer.from(uid)),
         userName: email || uid,
         timeout: 60000,
         attestationType: 'none',
