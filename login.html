@@ -265,6 +265,11 @@
             transition: all 0.2s ease;
         }
 
+        .biometric-btn.is-loading {
+            opacity: 0.7;
+            cursor: wait;
+        }
+
         .biometric-btn:hover {
             border-color: rgba(122, 184, 0, 0.6);
             color: var(--text-color);
@@ -289,6 +294,30 @@
             border: 1px solid #fecaca;
             text-align: left;
             line-height: 1.4;
+        }
+
+        .login-toast {
+            position: fixed;
+            left: 50%;
+            bottom: 24px;
+            transform: translateX(-50%) translateY(8px);
+            background: rgba(15, 23, 42, 0.92);
+            color: #ffffff;
+            padding: 10px 16px;
+            border-radius: 999px;
+            font-size: 0.9rem;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.25);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            z-index: 9999;
+            max-width: min(520px, 90vw);
+            text-align: center;
+        }
+
+        .login-toast--show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
         }
 
         .loading {
@@ -778,9 +807,39 @@
         const loginForm = document.getElementById('login-form');
         const biometricOption = document.querySelector('.biometric-option');
         const biometricBtn = document.getElementById('biometric-btn');
-        const supportsCredentials = Boolean(window.PasswordCredential && navigator.credentials);
+        const biometricLabel = biometricBtn?.querySelector('span') || null;
+        const biometricDefaultText = biometricLabel?.textContent?.trim() || 'Usar Face ID / Huella';
+        const supportsCredentialStore = Boolean(window.PasswordCredential && navigator.credentials);
+        const supportsBiometric = Boolean(window.PublicKeyCredential && navigator.credentials);
 
-        if (!supportsCredentials && biometricOption) {
+        const showToast = (message) => {
+            if (!message) return;
+            let toast = document.querySelector('.login-toast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.className = 'login-toast';
+                document.body.appendChild(toast);
+            }
+            toast.textContent = message;
+            toast.classList.add('login-toast--show');
+            if (toast._timerId) {
+                clearTimeout(toast._timerId);
+            }
+            toast._timerId = setTimeout(() => {
+                toast.classList.remove('login-toast--show');
+            }, 3000);
+        };
+
+        const setBiometricLoading = (isLoading) => {
+            if (!biometricBtn) return;
+            biometricBtn.disabled = isLoading;
+            biometricBtn.classList.toggle('is-loading', isLoading);
+            if (biometricLabel) {
+                biometricLabel.textContent = isLoading ? 'Verificando...' : biometricDefaultText;
+            }
+        };
+
+        if (!supportsBiometric && biometricOption) {
             biometricOption.style.display = 'none';
         }
 
@@ -791,23 +850,31 @@
             });
         }
 
-        if (supportsCredentials && biometricBtn) {
+        if (supportsBiometric && biometricBtn) {
             biometricBtn.addEventListener('click', async () => {
+                setBiometricLoading(true);
                 try {
                     const credential = await navigator.credentials.get({
                         password: true,
-                        mediation: 'optional'
+                        mediation: 'required'
                     });
-                    if (!credential) return;
+                    if (!credential) {
+                        showToast('No se detectó Face ID o la validación falló. Intente manualmente.');
+                        return;
+                    }
                     const emailInput = document.getElementById('email');
                     const passwordInput = document.getElementById('password');
                     if (emailInput && credential.id) emailInput.value = credential.id;
                     if (passwordInput && credential.password) passwordInput.value = credential.password;
                     if (credential.id && credential.password) {
                         window.login();
+                    } else {
+                        showToast('No se detectó Face ID o la validación falló. Intente manualmente.');
                     }
                 } catch (error) {
-                    console.info('Credenciales no disponibles o acción cancelada.', error);
+                    showToast('No se detectó Face ID o la validación falló. Intente manualmente.');
+                } finally {
+                    setBiometricLoading(false);
                 }
             });
         }
@@ -978,7 +1045,7 @@
                 sessionStorage.setItem('isLoggedIn', 'true');
                 localStorage.setItem('user_nombre', displayName);
 
-                if (supportsCredentials && loginForm && window.PasswordCredential) {
+                if (supportsCredentialStore && loginForm && window.PasswordCredential) {
                     try {
                         const creds = new PasswordCredential(loginForm);
                         await navigator.credentials.store(creds);
