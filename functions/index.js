@@ -932,7 +932,7 @@ exports.webauthnRegisterStart = functions
       })
       .filter(Boolean);
 
-    const options = generateRegistrationOptions({
+    const options = await generateRegistrationOptions({
       rpName: WEBAUTHN_RP_NAME,
       rpID,
       userID: uid,
@@ -946,6 +946,11 @@ exports.webauthnRegisterStart = functions
         userVerification: 'required'
       }
     });
+
+    if (!options || !options.challenge) {
+      console.error('🔥 Error: generateOptions devolvió undefined', options);
+      return res.status(500).json({ ok: false, error: 'challenge_generation_failed' });
+    }
 
     const challengeId = await createWebauthnChallenge({
       type: 'registration',
@@ -1082,11 +1087,16 @@ exports.webauthnLoginStart = functions
     const rpID = resolveRpID(origin);
     if (!rpID) return res.status(400).json({ ok: false, error: 'invalid_origin' });
 
-    const options = generateAuthenticationOptions({
+    const options = await generateAuthenticationOptions({
       rpID,
       timeout: 60_000,
       userVerification: 'required'
     });
+
+    if (!options || !options.challenge) {
+      console.error('🔥 Error: generateOptions devolvió undefined', options);
+      return res.status(500).json({ ok: false, error: 'challenge_generation_failed' });
+    }
 
     const challengeId = await createWebauthnChallenge({
       type: 'authentication',
