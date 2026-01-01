@@ -1050,31 +1050,34 @@ exports.webauthnLoginStart = functions
     const origin = resolveWebOrigin(req);
     setCorsHeaders(res, origin);
     if (req.method === 'OPTIONS') return res.status(204).send('');
-    if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'method_not_allowed' });
-    if (!origin) return res.status(403).json({ ok: false, error: 'origin_not_allowed' });
+    try {
+      const rpID = resolveRpID(origin);
+      console.log('🔍 LoginStart:', { origin, rpID });
 
-    const rpID = resolveRpID(origin);
-    if (!rpID) return res.status(400).json({ ok: false, error: 'invalid_origin' });
+      const options = await generateAuthenticationOptions({
+        rpID,
+        timeout: 60000,
+        userVerification: 'required'
+      });
 
-    const options = await generateAuthenticationOptions({
-      rpID,
-      timeout: 60_000,
-      userVerification: 'required'
-    });
+      if (!options || !options.challenge) {
+        console.error('🔥 Error: generateOptions devolvió undefined', options);
+        throw new Error('Failed to generate challenge');
+      }
 
-    if (!options || !options.challenge) {
-      console.error('🔥 Error: generateOptions devolvió undefined', options);
-      return res.status(500).json({ ok: false, error: 'challenge_generation_failed' });
+      const challengeId = await createWebauthnChallenge({
+        type: 'authentication',
+        challenge: options.challenge,
+        rpID,
+        origin
+      });
+
+      console.log('✅ LoginStart OK:', challengeId);
+      return res.status(200).json({ ok: true, options, challengeId });
+    } catch (error) {
+      console.error('🔥 LoginStart Error:', error);
+      return res.status(500).json({ ok: false, error: error.message });
     }
-
-    const challengeId = await createWebauthnChallenge({
-      type: 'authentication',
-      challenge: options.challenge,
-      rpID,
-      origin
-    });
-
-    return res.status(200).json({ ok: true, options, challengeId });
   });
 
 exports.webauthnLoginFinish = functions
@@ -1083,90 +1086,84 @@ exports.webauthnLoginFinish = functions
     const origin = resolveWebOrigin(req);
     setCorsHeaders(res, origin);
     if (req.method === 'OPTIONS') return res.status(204).send('');
-    if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'method_not_allowed' });
-    if (!origin) return res.status(403).json({ ok: false, error: 'origin_not_allowed' });
-
-    const body = parseRequestBody(req);
-    const credential = body?.credential;
-    const challengeId = body?.challengeId;
-    if (!credential || !challengeId) {
-      return res.status(400).json({ ok: false, error: 'missing_payload' });
-    }
-
-    const challengeDoc = await loadWebauthnChallenge(challengeId);
-    if (!challengeDoc || challengeDoc.data?.type !== 'authentication') {
-      return res.status(400).json({ ok: false, error: 'invalid_challenge' });
-    }
-
-    if (isChallengeExpired(challengeDoc.data?.createdAt)) {
-      await challengeDoc.ref.delete().catch(() => {});
-      return res.status(400).json({ ok: false, error: 'challenge_expired' });
-    }
-
-    const credentialId = credential?.id;
-    if (!credentialId) {
-      return res.status(400).json({ ok: false, error: 'missing_credential_id' });
-    }
-
-    const credSnap = await db.collection(WEBAUTHN_CREDENTIALS_COLLECTION).doc(credentialId).get();
-    if (!credSnap.exists) {
-      return res.status(404).json({ ok: false, error: 'credential_not_found' });
-    }
-
-    const stored = credSnap.data() || {};
-    const rpID = challengeDoc.data?.rpID || DEFAULT_WEBAUTHN_RPID;
-    const expectedOrigin = challengeDoc.data?.origin || DEFAULT_WEBAUTHN_ORIGIN;
-    if (!rpID) {
-      return res.status(400).json({ ok: false, error: 'invalid_origin' });
-    }
-
     try {
+      // Usamos req.body directamente por seguridad
+      const body = req.body;
+      const credential = body.credential || body;
+      const response = credential.response || body.response;
+      const challengeId = req.query.challengeId || body.challengeId;
+      console.log('🔍 Iniciando LoginFinish para challengeId:', challengeId);
+      // 1. Validar Challenge
+      if (!challengeId) return res.status(400).json({ ok: false, error: 'missing_challenge' });
+      const challengeRef = db.collection(WEBAUTHN_CHALLENGES_COLLECTION).doc(challengeId);
+      const challengeSnap = await challengeRef.get();
+      if (!challengeSnap.exists) {
+        console.error('❌ Challenge no encontrado o expirado');
+        return res.status(400).json({ ok: false, error: 'challenge_not_found' });
+      }
+      const challengeData = challengeSnap.data();
+      await challengeRef.delete().catch(() => {}); // Borrar para evitar reuso
+      // 2. Identificar al Usuario (Decodificación robusta)
+      let uid = null;
+      const userHandle = response?.userHandle;
+      if (userHandle) {
+        try {
+          // Intenta decodificar desde base64url (lo estándar)
+          uid = isoBase64URL.toBuffer(userHandle).toString('utf-8');
+        } catch (e) {
+          try {
+            // Intenta decodificar desde base64 estándar (fallback)
+            uid = Buffer.from(userHandle, 'base64').toString('utf-8');
+          } catch (err) {
+            console.error('Error decodificando userHandle:', err);
+            uid = null;
+          }
+        }
+      }
+      if (!uid) {
+        console.error('⚠️ No se pudo recuperar el UID del userHandle.');
+        throw new Error('User identification failed');
+      }
+      console.log('👤 Usuario identificado:', uid);
+      // 3. Obtener credenciales del USUARIO (Directamente del perfil)
+      const userRef = db.collection(WEBAUTHN_USERS_COLLECTION).doc(uid);
+      const userSnap = await userRef.get();
+      if (!userSnap.exists) throw new Error('User not found in DB');
+      const userCreds = Array.isArray(userSnap.data()?.credentials) ? userSnap.data().credentials : [];
+      const credentialId = credential.id;
+      // Buscamos la credencial en el array del usuario
+      const currentCred = userCreds.find((c) => c.id === credentialId);
+      if (!currentCred) {
+        console.error('❌ Credencial no encontrada en el perfil del usuario');
+        throw new Error('Credential not found');
+      }
+      // 4. Verificar Firma
       const verification = await verifyAuthenticationResponse({
         response: credential,
-        expectedChallenge: challengeDoc.data.challenge,
-        expectedOrigin,
-        expectedRPID: rpID,
+        expectedChallenge: challengeData.challenge,
+        expectedOrigin: challengeData.origin,
+        expectedRPID: challengeData.rpID,
         authenticator: {
-          credentialID: isoBase64URL.toBuffer(credentialId),
-          credentialPublicKey: isoBase64URL.toBuffer(stored.publicKey),
-          counter: stored.counter || 0,
-          transports: Array.isArray(stored.transports) ? stored.transports : []
+          credentialID: isoBase64URL.toBuffer(currentCred.id),
+          credentialPublicKey: isoBase64URL.toBuffer(currentCred.publicKey),
+          counter: currentCred.counter || 0,
+          transports: currentCred.transports || []
         }
       });
-
-      const { verified, authenticationInfo } = verification;
-      if (!verified || !authenticationInfo) {
-        return res.status(401).json({ ok: false, error: 'authentication_failed' });
+      if (verification.verified) {
+        console.log('✅ Verificación exitosa. Generando token...');
+        // Actualizar contador en la base de datos
+        currentCred.counter = verification.authenticationInfo.newCounter;
+        await userRef.update({ credentials: userCreds });
+        // Generar la llave maestra de Firebase
+        const token = await admin.auth().createCustomToken(uid);
+        return res.status(200).json({ ok: true, verified: true, token, customToken: token });
+      } else {
+        throw new Error('Verification failed');
       }
-
-      await db
-        .collection(WEBAUTHN_CREDENTIALS_COLLECTION)
-        .doc(credentialId)
-        .set(
-          {
-            counter: authenticationInfo.newCounter,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            lastUsedAt: admin.firestore.FieldValue.serverTimestamp()
-          },
-          { merge: true }
-        );
-
-      const uid = stored.uid;
-      if (!uid) {
-        return res.status(401).json({ ok: false, error: 'authentication_failed' });
-      }
-
-      const customToken = await admin.auth().createCustomToken(uid);
-      await challengeDoc.ref.delete().catch(() => {});
-
-      return res.status(200).json({
-        ok: true,
-        uid,
-        email: stored.email || '',
-        customToken
-      });
     } catch (error) {
-      return res.status(401).json({ ok: false, error: 'authentication_failed' });
+      console.error('🔥 LoginFinish Critical Error:', error);
+      return res.status(500).json({ ok: false, error: error.message });
     }
   });
 
