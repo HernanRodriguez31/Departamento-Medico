@@ -1410,8 +1410,14 @@
                 });
 
                 if (supportsBiometric) {
-                    showToast('Configurando Face ID...', { anchor: biometricBtn, duration: 2200 });
-                    registerBiometricPasskey(user, email).catch(() => {});
+                    showToast('Vinculando con Face ID...', { anchor: biometricBtn, duration: 4000 });
+                    try {
+                        await registerBiometricPasskey(user, email);
+                        showToast('✅ Face ID Activado correctamente', { anchor: biometricBtn, duration: 2000 });
+                        await new Promise((resolve) => setTimeout(resolve, 1000));
+                    } catch (error) {
+                        console.warn('No se pudo activar Face ID (pero entramos igual):', error);
+                    }
                 } else {
                     try {
                         localStorage.setItem('passkey_registration_failed', 'unsupported');
@@ -1423,7 +1429,7 @@
                 // Overlay is already active; keep it brief before redirecting
                 setTimeout(() => {
                     window.location.replace(getRedirectTarget());
-                }, 900);
+                }, 500);
 
             } catch (error) {
                 console.error("Login error:", error);
