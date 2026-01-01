@@ -979,6 +979,10 @@
             return buffer;
         };
 
+        const base64URLToBuffer = (base64URL) => base64UrlToBuffer(base64URL);
+
+        const arrayBufferToBase64URL = (buffer) => bufferToBase64Url(buffer);
+
         const publicKeyCredentialToJSON = (cred) => {
             if (!cred) return cred;
             if (Array.isArray(cred)) {
@@ -1176,6 +1180,104 @@
             return displayName;
         };
 
+        window.loginWithPasskey = async () => {
+            if (loginInProgress) return;
+            if (!functionsBaseUrl) {
+                showToast('No se pudo iniciar Face ID. Intenta de nuevo.', { duration: 4000 });
+                return;
+            }
+
+            const emailInput = document.getElementById('email');
+            const displayEmail = (emailInput?.value || '').trim();
+            const overlay = document.getElementById('login-overlay');
+
+            loginInProgress = true;
+            setBiometricLoading(true);
+            if (biometricLabel) biometricLabel.textContent = '🔄 Conectando...';
+
+            try {
+                showBiometricToast({
+                    email: displayEmail,
+                    state: 'prompt',
+                    anchor: biometricBtn,
+                    duration: 2800
+                });
+
+                const startResp = await fetch(`${functionsBaseUrl}/webauthnLoginStart`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (!startResp.ok) throw new Error('Error iniciando login biométrico');
+                const startData = await startResp.json();
+                const options = startData.options;
+                if (!options) throw new Error('Opciones inválidas de login biométrico');
+
+                options.challenge = base64URLToBuffer(options.challenge);
+                if (options.allowCredentials) {
+                    options.allowCredentials.forEach((cred) => {
+                        cred.id = base64URLToBuffer(cred.id);
+                    });
+                }
+
+                console.log('Solicitando credencial al navegador...');
+                const credential = await navigator.credentials.get({ publicKey: options });
+
+                const credentialData = {
+                    id: credential.id,
+                    rawId: arrayBufferToBase64URL(credential.rawId),
+                    type: credential.type,
+                    response: {
+                        authenticatorData: arrayBufferToBase64URL(credential.response.authenticatorData),
+                        clientDataJSON: arrayBufferToBase64URL(credential.response.clientDataJSON),
+                        signature: arrayBufferToBase64URL(credential.response.signature),
+                        userHandle: credential.response.userHandle
+                            ? arrayBufferToBase64URL(credential.response.userHandle)
+                            : null
+                    },
+                    challengeId: startData.challengeId
+                };
+
+                if (biometricLabel) biometricLabel.textContent = '🔐 Verificando...';
+
+                const finishResp = await fetch(`${functionsBaseUrl}/webauthnLoginFinish`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(credentialData)
+                });
+                const finishData = await finishResp.json();
+
+                if (finishData.ok && (finishData.token || finishData.customToken)) {
+                    const token = finishData.token || finishData.customToken;
+                    if (overlay) overlay.classList.add('active');
+                    const userCredential = await signInWithCustomToken(auth, token);
+                    const user = userCredential.user;
+                    const resolvedEmail = user.email || displayEmail || '';
+                    if (emailInput && resolvedEmail) emailInput.value = resolvedEmail;
+                    await finalizeLogin(user, resolvedEmail, {
+                        storePassword: false,
+                        enrollPasskey: false
+                    });
+                    if (biometricLabel) biometricLabel.textContent = '✅ ¡Éxito!';
+                    setTimeout(() => {
+                        window.location.replace(getRedirectTarget());
+                    }, 500);
+                } else {
+                    throw new Error('Validación fallida en servidor');
+                }
+            } catch (error) {
+                console.error('Error en login biométrico:', error);
+                if (biometricLabel) biometricLabel.textContent = biometricDefaultText;
+                if (error.name !== 'NotAllowedError') {
+                    showToast('Para activar Face ID, inicie sesión manualmente primero.', { duration: 4000 });
+                }
+            } finally {
+                if (overlay) overlay.classList.remove('active');
+                loginInProgress = false;
+                setBiometricLoading(false);
+                if (biometricLabel) biometricLabel.textContent = biometricDefaultText;
+            }
+        };
+
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', restoreSavedEmail, { once: true });
         } else {
@@ -1195,86 +1297,7 @@
 
         if (supportsBiometric && biometricBtn) {
             biometricBtn.addEventListener('click', async () => {
-                const emailInput = document.getElementById('email');
-                const passwordInput = document.getElementById('password');
-                let savedEmail = '';
-                try {
-                    savedEmail = localStorage.getItem('saved_email') || '';
-                } catch (error) {
-                    savedEmail = '';
-                }
-                const displayEmail = (emailInput?.value || savedEmail).trim();
-                if (loginInProgress) return;
-                setBiometricLoading(true);
-                try {
-                    showBiometricToast({
-                        email: displayEmail,
-                        state: 'prompt',
-                        anchor: biometricBtn,
-                        duration: 2800
-                    });
-
-                    const startData = await postJson('webauthnLoginStart', { email: displayEmail });
-                    if (!startData?.options || !startData?.challengeId) {
-                        throw new Error('webauthn_start_failed');
-                    }
-
-                    const assertion = await navigator.credentials.get({
-                        publicKey: preformatGetOptions(startData.options)
-                    });
-
-                    if (!assertion) {
-                        throw new Error('webauthn_assertion_missing');
-                    }
-
-                    const credential = publicKeyCredentialToJSON(assertion);
-                    const finishData = await postJson('webauthnLoginFinish', {
-                        credential,
-                        challengeId: startData.challengeId
-                    });
-
-                    if (!finishData?.customToken) {
-                        throw new Error('webauthn_finish_failed');
-                    }
-
-                    const resolvedEmail = (finishData.email || displayEmail || '').trim();
-                    if (emailInput && resolvedEmail) emailInput.value = resolvedEmail;
-                    if (passwordInput) passwordInput.value = '';
-                    try {
-                        if (resolvedEmail) localStorage.setItem('saved_email', resolvedEmail);
-                    } catch (error) {
-                        // no-op
-                    }
-
-                    showBiometricToast({
-                        email: resolvedEmail || displayEmail,
-                        state: 'success',
-                        anchor: biometricBtn,
-                        duration: 1400
-                    });
-
-                    const overlay = document.getElementById('login-overlay');
-                    if (overlay) overlay.classList.add('active');
-                    loginInProgress = true;
-
-                    const userCredential = await signInWithCustomToken(auth, finishData.customToken);
-                    const user = userCredential.user;
-                    await finalizeLogin(user, resolvedEmail || user.email || displayEmail, {
-                        storePassword: false,
-                        enrollPasskey: false
-                    });
-
-                    setTimeout(() => {
-                        window.location.replace(getRedirectTarget());
-                    }, 900);
-                } catch (error) {
-                    showToast('Para activar Face ID, inicie sesión con Usuario y Contraseña manualmente por primera vez.', { anchor: biometricBtn });
-                } finally {
-                    const overlay = document.getElementById('login-overlay');
-                    if (overlay) overlay.classList.remove('active');
-                    loginInProgress = false;
-                    setBiometricLoading(false);
-                }
+                await window.loginWithPasskey();
             });
         }
 
