@@ -1,6 +1,11 @@
+/**
+ * HEADER MAESTRO - DEPARTAMENTO MEDICO BRISA
+ * Incluye importaciones, inicialización y helpers críticos.
+ */
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
-const cors = require('cors');
+const cors = require('cors')({ origin: true });
+// Importaciones de SimpleWebAuthn (CRITICAS)
 const {
   generateRegistrationOptions,
   verifyRegistrationResponse,
@@ -9,11 +14,63 @@ const {
 } = require('@simplewebauthn/server');
 const { isoBase64URL } = require('@simplewebauthn/server/helpers');
 
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
-
+// Inicializacion
+admin.initializeApp();
 const db = admin.firestore();
+
+// Constantes de Base de Datos
+const WEBAUTHN_RP_NAME = 'Departamento Medico Brisa';
+const WEBAUTHN_USERS_COLLECTION = 'webauthn_users';
+const WEBAUTHN_CHALLENGES_COLLECTION = '_webauthn_challenges';
+
+// --- HELPERS GLOBALES (Para evitar errores de undefined) ---
+const resolveWebOrigin = (req) => {
+  const origin = req.headers?.origin;
+  if (origin) return origin;
+  const referer = req.headers?.referer;
+  if (referer) {
+    try {
+      const url = new URL(referer);
+      return `${url.protocol}//${url.host}`;
+    } catch (e) {}
+  }
+  return 'https://dm.brisasaludybienestar.com';
+};
+
+const resolveRpID = (origin) => {
+  try {
+    // Si viene con protocolo, extraemos el hostname
+    if (origin && origin.startsWith('http')) {
+      return new URL(origin).hostname;
+    }
+    return origin || 'dm.brisasaludybienestar.com';
+  } catch (e) {
+    console.error('Error parseando RP ID:', origin);
+    return 'dm.brisasaludybienestar.com'; // Fallback seguro
+  }
+};
+
+const setCorsHeaders = (res, origin) => {
+  res.set('Access-Control-Allow-Origin', origin);
+  res.set('Access-Control-Allow-Credentials', 'true');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+};
+
+const createWebauthnChallenge = async ({ type, uid, challenge, rpID, origin }) => {
+  const docRef = db.collection(WEBAUTHN_CHALLENGES_COLLECTION).doc();
+  await docRef.set({
+    challenge,
+    type,
+    uid: uid || null,
+    rpID,
+    origin,
+    createdAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+  return docRef.id;
+};
+
+// A PARTIR DE AQUI VAN LOS EXPORTS (No tocar los exports existentes)
 const messaging = admin.messaging();
 const TIMEZONE = 'America/Argentina/Buenos_Aires';
 const ALLOWED_START = 8;
@@ -30,78 +87,11 @@ const NOTIF_BODY_LIMIT = 140;
 const AI_RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const AI_RATE_LIMIT_MAX = 20;
 const aiRateLimitByUid = new Map();
-const WEBAUTHN_RP_NAME = 'Departamento Medico Brisa';
-const WEBAUTHN_USERS_COLLECTION = 'webauthn_users';
 const WEBAUTHN_CREDENTIALS_COLLECTION = 'webauthn_credentials';
-const WEBAUTHN_CHALLENGES_COLLECTION = '_webauthn_challenges';
 const WEBAUTHN_CHALLENGE_TTL_MS = 5 * 60 * 1000;
-const IS_EMULATOR =
-  process.env.FUNCTIONS_EMULATOR === 'true' || Boolean(process.env.FIREBASE_EMULATOR_HUB);
-const DEFAULT_WEBAUTHN_RPID =
-  process.env.WEBAUTHN_RPID || (IS_EMULATOR ? 'localhost' : 'dm.brisasaludybienestar.com');
+const DEFAULT_WEBAUTHN_RPID = process.env.WEBAUTHN_RPID || 'dm.brisasaludybienestar.com';
 const DEFAULT_WEBAUTHN_ORIGIN =
-  process.env.WEBAUTHN_ORIGIN ||
-  (IS_EMULATOR ? 'http://localhost:5502' : 'https://dm.brisasaludybienestar.com');
-const PROD_ORIGINS = new Set([
-  'https://departamento-medico-brisa.web.app',
-  'https://departamento-medico-brisa.firebaseapp.com'
-]);
-
-function isLocalOrigin(origin = '') {
-  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
-}
-
-function isAllowedWebOrigin(origin = '') {
-  if (!origin) return false;
-  return (
-    /^https:\/\/departamento-medico-brisa\.(web\.app|firebaseapp\.com)$/i.test(origin) ||
-    /^https:\/\/([a-z0-9-]+\.)*brisasaludybienestar\.com$/i.test(origin) ||
-    origin === DEFAULT_WEBAUTHN_ORIGIN ||
-    isLocalOrigin(origin)
-  );
-}
-
-function setCorsHeaders(res, origin) {
-  if (origin && isAllowedWebOrigin(origin)) {
-    res.set('Access-Control-Allow-Origin', origin);
-    res.set('Vary', 'Origin');
-  }
-  res.set('Access-Control-Allow-Methods', 'POST,OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type,Authorization');
-}
-
-function getRpIDFromOrigin(origin = '') {
-  if (!origin) return null;
-  try {
-    const hostname = new URL(origin).hostname;
-    if (hostname === '127.0.0.1') return 'localhost';
-    return hostname;
-  } catch (e) {
-    return null;
-  }
-}
-
-function resolveWebOrigin(req) {
-  const originHeader = req.get('origin') || '';
-  if (isAllowedWebOrigin(originHeader)) return originHeader;
-
-  const referer = req.get('referer') || '';
-  if (referer) {
-    try {
-      const url = new URL(referer);
-      const derived = `${url.protocol}//${url.host}`;
-      if (isAllowedWebOrigin(derived)) return derived;
-    } catch (e) {}
-  }
-
-  if (isAllowedWebOrigin(DEFAULT_WEBAUTHN_ORIGIN)) return DEFAULT_WEBAUTHN_ORIGIN;
-  return '';
-}
-
-function resolveRpID(origin = '') {
-  const rpID = getRpIDFromOrigin(origin);
-  return rpID || DEFAULT_WEBAUTHN_RPID;
-}
+  process.env.WEBAUTHN_ORIGIN || 'https://dm.brisasaludybienestar.com';
 
 function parseRequestBody(req) {
   if (req.body && typeof req.body === 'object') return req.body;
@@ -121,21 +111,6 @@ function isChallengeExpired(createdAt) {
   if (!createdMs) return true;
   return Date.now() - createdMs > WEBAUTHN_CHALLENGE_TTL_MS;
 }
-
-const corsHandler = cors({
-  origin: (origin, cb) => {
-    // Permitir requests server-to-server o sin Origin (curl, etc.)
-    if (!origin) return cb(null, true);
-
-    if (PROD_ORIGINS.has(origin) || isLocalOrigin(origin)) return cb(null, true);
-
-    return cb(null, false);
-  },
-  credentials: true,
-  methods: ['POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  maxAge: 86400
-});
 
 function extractTextFromContent(content) {
   if (!content) return '';
@@ -232,15 +207,6 @@ const snippet = (value, max = NOTIF_BODY_LIMIT) => {
   if (!text) return '';
   if (text.length <= max) return text;
   return `${text.slice(0, Math.max(0, max - 3))}...`;
-};
-
-const createWebauthnChallenge = async (payload = {}) => {
-  const ref = db.collection(WEBAUTHN_CHALLENGES_COLLECTION).doc();
-  await ref.set({
-    ...payload,
-    createdAt: admin.firestore.FieldValue.serverTimestamp()
-  });
-  return ref.id;
 };
 
 const loadWebauthnChallenge = async (challengeId = '') => {
