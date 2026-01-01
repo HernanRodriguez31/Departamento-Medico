@@ -1075,46 +1075,89 @@
             }
         };
 
-        const registerBiometricPasskey = async (user, email) => {
-            console.log('🚀 Iniciando registro biométrico...');
-            if (!supportsBiometric || !functionsBaseUrl || !user) {
+        async function registerBiometricPasskey(user, email) {
+            console.log('🛠 Iniciando Registro Biométrico...');
+
+            if (!supportsBiometric || !user) {
                 console.log('✅ Registro biométrico exitoso');
                 return;
             }
-            try {
-                const idToken = await user.getIdToken();
-                const startData = await postJson('webauthnRegisterStart', { email }, idToken);
-                if (startData?.alreadyRegistered) {
-                    try {
-                        localStorage.removeItem('passkey_registration_failed');
-                    } catch (error) {}
-                    console.log('✅ Registro biométrico exitoso');
-                    return;
+
+            const registerStartUrl = functionsBaseUrl
+                ? `${functionsBaseUrl}/webauthnRegisterStart`
+                : 'https://us-central1-departamento-medico-brisa.cloudfunctions.net/webauthnRegisterStart';
+            const registerFinishUrl = functionsBaseUrl
+                ? `${functionsBaseUrl}/webauthnRegisterFinish`
+                : 'https://us-central1-departamento-medico-brisa.cloudfunctions.net/webauthnRegisterFinish';
+
+            // 1. Obtener Opciones de Registro del Backend
+            const idToken = await user.getIdToken();
+            const startResp = await fetch(registerStartUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}`
                 }
-                if (!startData?.options || !startData?.challengeId) {
-                    throw new Error('webauthn_start_failed');
-                }
-                const publicKey = preformatCreateOptions(startData.options);
-                const credential = await navigator.credentials.create({ publicKey });
-                if (!credential) {
-                    throw new Error('webauthn_create_cancelled');
-                }
-                const credentialJson = publicKeyCredentialToJSON(credential);
-                await postJson('webauthnRegisterFinish', {
-                    credential: credentialJson,
-                    challengeId: startData.challengeId
-                }, idToken);
+            });
+            if (!startResp.ok) throw new Error('Falló inicio de registro en servidor');
+            const startData = await startResp.json();
+            if (startData?.alreadyRegistered) {
                 try {
                     localStorage.removeItem('passkey_registration_failed');
                 } catch (error) {}
                 console.log('✅ Registro biométrico exitoso');
-            } catch (error) {
-                console.error('❌ Error en registro biométrico:', error);
-                try {
-                    localStorage.setItem('passkey_registration_failed', 'true');
-                } catch (storageError) {}
+                return;
             }
-        };
+
+            const options = startData.options;
+
+            // 2. CONVERSIÓN (Texto -> Binario) para el Navegador
+            options.user.id = base64URLToBuffer(options.user.id);
+            options.challenge = base64URLToBuffer(options.challenge);
+            if (options.excludeCredentials) {
+                options.excludeCredentials.forEach((cred) => {
+                    cred.id = base64URLToBuffer(cred.id);
+                });
+            }
+
+            // 3. Crear Credencial (El navegador pide FaceID/TouchID aquí)
+            console.log('👤 Solicitando creación de llave al usuario...');
+            const credential = await navigator.credentials.create({ publicKey: options });
+            console.log('✅ Llave creada en dispositivo.');
+
+            // 4. CONVERSIÓN (Binario -> Texto) para el Servidor
+            const credentialData = {
+                id: credential.id,
+                rawId: bufferToBase64URL(credential.rawId),
+                type: credential.type,
+                response: {
+                    attestationObject: bufferToBase64URL(credential.response.attestationObject),
+                    clientDataJSON: bufferToBase64URL(credential.response.clientDataJSON),
+                    transports: credential.response.getTransports ? credential.response.getTransports() : []
+                },
+                challengeId: startData.challengeId
+            };
+
+            // 5. Finalizar Registro en Backend
+            console.log('📡 Enviando credencial nueva al servidor...');
+            const finishResp = await fetch(registerFinishUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}`
+                },
+                body: JSON.stringify(credentialData)
+            });
+            if (!finishResp.ok) {
+                const errData = await finishResp.json();
+                console.error('❌ Error guardando en DB:', errData);
+                throw new Error(errData.error || 'Error al guardar credencial');
+            }
+            try {
+                localStorage.removeItem('passkey_registration_failed');
+            } catch (error) {}
+            console.log('🎉 ¡Registro Biométrico Exitoso y Guardado!');
+        }
 
         const ensureUserProfile = async (user, email) => {
             const docRef = doc(db, "usuarios", user.uid);
