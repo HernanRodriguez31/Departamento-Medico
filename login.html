@@ -958,30 +958,29 @@
             scheduleToastHide(toast, options.duration ?? 2600);
         };
 
-        const bufferToBase64Url = (buffer) => {
+        // --- HELPERS DE CONVERSION ROBUSTOS ---
+        function bufferToBase64URL(buffer) {
             const bytes = new Uint8Array(buffer);
-            let str = '';
-            for (let i = 0; i < bytes.length; i += 1) {
-                str += String.fromCharCode(bytes[i]);
+            let binary = '';
+            for (let i = 0; i < bytes.byteLength; i += 1) {
+                binary += String.fromCharCode(bytes[i]);
             }
-            return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-        };
+            return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        }
 
-        const base64UrlToBuffer = (base64Url) => {
-            const padding = '='.repeat((4 - (base64Url.length % 4)) % 4);
-            const base64 = (base64Url + padding).replace(/-/g, '+').replace(/_/g, '/');
-            const raw = atob(base64);
-            const buffer = new ArrayBuffer(raw.length);
-            const bytes = new Uint8Array(buffer);
-            for (let i = 0; i < raw.length; i += 1) {
-                bytes[i] = raw.charCodeAt(i);
+        function base64URLToBuffer(base64URL) {
+            const base64 = base64URL.replace(/-/g, '+').replace(/_/g, '/');
+            const pad = base64.length % 4;
+            const padded = pad ? base64 + '='.repeat(4 - pad) : base64;
+            const binary = atob(padded);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i += 1) {
+                bytes[i] = binary.charCodeAt(i);
             }
-            return buffer;
-        };
+            return bytes.buffer;
+        }
 
-        const base64URLToBuffer = (base64URL) => base64UrlToBuffer(base64URL);
-
-        const arrayBufferToBase64URL = (buffer) => bufferToBase64Url(buffer);
+        const arrayBufferToBase64URL = (buffer) => bufferToBase64URL(buffer);
 
         const publicKeyCredentialToJSON = (cred) => {
             if (!cred) return cred;
@@ -989,10 +988,10 @@
                 return cred.map((item) => publicKeyCredentialToJSON(item));
             }
             if (cred instanceof ArrayBuffer) {
-                return bufferToBase64Url(cred);
+                return bufferToBase64URL(cred);
             }
             if (cred instanceof Uint8Array) {
-                return bufferToBase64Url(cred.buffer);
+                return bufferToBase64URL(cred.buffer);
             }
             if (typeof cred === 'object') {
                 const obj = {};
@@ -1007,15 +1006,15 @@
         const preformatCreateOptions = (options) => {
             return {
                 ...options,
-                challenge: base64UrlToBuffer(options.challenge),
+                challenge: base64URLToBuffer(options.challenge),
                 user: {
                     ...options.user,
-                    id: base64UrlToBuffer(options.user.id)
+                    id: base64URLToBuffer(options.user.id)
                 },
                 excludeCredentials: Array.isArray(options.excludeCredentials)
                     ? options.excludeCredentials.map((cred) => ({
                         ...cred,
-                        id: base64UrlToBuffer(cred.id)
+                        id: base64URLToBuffer(cred.id)
                     }))
                     : []
             };
@@ -1024,11 +1023,11 @@
         const preformatGetOptions = (options) => {
             return {
                 ...options,
-                challenge: base64UrlToBuffer(options.challenge),
+                challenge: base64URLToBuffer(options.challenge),
                 allowCredentials: Array.isArray(options.allowCredentials)
                     ? options.allowCredentials.map((cred) => ({
                         ...cred,
-                        id: base64UrlToBuffer(cred.id)
+                        id: base64URLToBuffer(cred.id)
                     }))
                     : []
             };
@@ -1182,36 +1181,43 @@
 
         window.loginWithPasskey = async () => {
             if (loginInProgress) return;
-            if (!functionsBaseUrl) {
-                showToast('No se pudo iniciar Face ID. Intenta de nuevo.', { duration: 4000 });
-                return;
-            }
+            const btn = document.getElementById('btn-biometric') || biometricBtn;
+            const btnLabel = btn?.querySelector('span') || null;
+            const setBtnText = (text) => {
+                if (btnLabel) {
+                    btnLabel.textContent = text;
+                } else if (btn) {
+                    btn.textContent = text;
+                }
+            };
+
+            setBtnText('🔄 Iniciando...');
+            console.log('🚀 Iniciando Login con Passkey...');
 
             const emailInput = document.getElementById('email');
             const displayEmail = (emailInput?.value || '').trim();
             const overlay = document.getElementById('login-overlay');
+            const loginStartUrl = functionsBaseUrl
+                ? `${functionsBaseUrl}/webauthnLoginStart`
+                : 'https://us-central1-departamento-medico-brisa.cloudfunctions.net/webauthnLoginStart';
+            const loginFinishUrl = functionsBaseUrl
+                ? `${functionsBaseUrl}/webauthnLoginFinish`
+                : 'https://us-central1-departamento-medico-brisa.cloudfunctions.net/webauthnLoginFinish';
 
             loginInProgress = true;
             setBiometricLoading(true);
-            if (biometricLabel) biometricLabel.textContent = '🔄 Conectando...';
 
             try {
-                showBiometricToast({
-                    email: displayEmail,
-                    state: 'prompt',
-                    anchor: biometricBtn,
-                    duration: 2800
-                });
-
-                const startResp = await fetch(`${functionsBaseUrl}/webauthnLoginStart`, {
+                // 1. Obtener Challenge del Servidor
+                const startResp = await fetch(loginStartUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' }
                 });
-                if (!startResp.ok) throw new Error('Error iniciando login biométrico');
+                if (!startResp.ok) throw new Error('Error conectando con servidor (Start)');
                 const startData = await startResp.json();
                 const options = startData.options;
-                if (!options) throw new Error('Opciones inválidas de login biométrico');
 
+                // 2. Convertir Challenge a Binario
                 options.challenge = base64URLToBuffer(options.challenge);
                 if (options.allowCredentials) {
                     options.allowCredentials.forEach((cred) => {
@@ -1219,27 +1225,32 @@
                     });
                 }
 
-                console.log('Solicitando credencial al navegador...');
+                // 3. Pedir Huella/Cara al Navegador
+                console.log('👤 Solicitando biometría al usuario...');
                 const credential = await navigator.credentials.get({ publicKey: options });
+                console.log('✅ Biometría obtenida. Procesando...');
 
+                // 4. Empaquetar respuesta
                 const credentialData = {
                     id: credential.id,
-                    rawId: arrayBufferToBase64URL(credential.rawId),
+                    rawId: bufferToBase64URL(credential.rawId),
                     type: credential.type,
                     response: {
-                        authenticatorData: arrayBufferToBase64URL(credential.response.authenticatorData),
-                        clientDataJSON: arrayBufferToBase64URL(credential.response.clientDataJSON),
-                        signature: arrayBufferToBase64URL(credential.response.signature),
+                        authenticatorData: bufferToBase64URL(credential.response.authenticatorData),
+                        clientDataJSON: bufferToBase64URL(credential.response.clientDataJSON),
+                        signature: bufferToBase64URL(credential.response.signature),
                         userHandle: credential.response.userHandle
-                            ? arrayBufferToBase64URL(credential.response.userHandle)
+                            ? bufferToBase64URL(credential.response.userHandle)
                             : null
                     },
                     challengeId: startData.challengeId
                 };
 
-                if (biometricLabel) biometricLabel.textContent = '🔐 Verificando...';
+                // 5. Enviar al Servidor
+                setBtnText('🔐 Verificando...');
+                console.log('📡 Enviando datos a LoginFinish...');
 
-                const finishResp = await fetch(`${functionsBaseUrl}/webauthnLoginFinish`, {
+                const finishResp = await fetch(loginFinishUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(credentialData)
@@ -1247,6 +1258,7 @@
                 const finishData = await finishResp.json();
 
                 if (finishData.ok && (finishData.token || finishData.customToken)) {
+                    console.log('🎉 Login Exitoso. Entrando...');
                     const token = finishData.token || finishData.customToken;
                     if (overlay) overlay.classList.add('active');
                     const userCredential = await signInWithCustomToken(auth, token);
@@ -1257,24 +1269,23 @@
                         storePassword: false,
                         enrollPasskey: false
                     });
-                    if (biometricLabel) biometricLabel.textContent = '✅ ¡Éxito!';
-                    setTimeout(() => {
-                        window.location.replace(getRedirectTarget());
-                    }, 500);
+                    setBtnText('✅ ¡Éxito!');
+                    setTimeout(() => window.location.replace(getRedirectTarget()), 500);
                 } else {
-                    throw new Error('Validación fallida en servidor');
+                    console.error('❌ El servidor rechazó la credencial:', finishData);
+                    throw new Error(finishData.error || 'Rechazado por servidor');
                 }
             } catch (error) {
-                console.error('Error en login biométrico:', error);
-                if (biometricLabel) biometricLabel.textContent = biometricDefaultText;
+                console.error('🔥 Error Fatal en Passkey:', error);
+                setBtnText('💡 Usar Face ID / Huella');
                 if (error.name !== 'NotAllowedError') {
-                    showToast('Para activar Face ID, inicie sesión manualmente primero.', { duration: 4000 });
+                    showToast(`Error: ${error.message}`);
                 }
             } finally {
                 if (overlay) overlay.classList.remove('active');
                 loginInProgress = false;
                 setBiometricLoading(false);
-                if (biometricLabel) biometricLabel.textContent = biometricDefaultText;
+                setBtnText(biometricDefaultText);
             }
         };
 
