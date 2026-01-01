@@ -35,6 +35,13 @@ const WEBAUTHN_USERS_COLLECTION = 'webauthn_users';
 const WEBAUTHN_CREDENTIALS_COLLECTION = 'webauthn_credentials';
 const WEBAUTHN_CHALLENGES_COLLECTION = '_webauthn_challenges';
 const WEBAUTHN_CHALLENGE_TTL_MS = 5 * 60 * 1000;
+const IS_EMULATOR =
+  process.env.FUNCTIONS_EMULATOR === 'true' || Boolean(process.env.FIREBASE_EMULATOR_HUB);
+const DEFAULT_WEBAUTHN_RPID =
+  process.env.WEBAUTHN_RPID || (IS_EMULATOR ? 'localhost' : 'dm.brisasaludybienestar.com');
+const DEFAULT_WEBAUTHN_ORIGIN =
+  process.env.WEBAUTHN_ORIGIN ||
+  (IS_EMULATOR ? 'http://localhost:5502' : 'https://dm.brisasaludybienestar.com');
 const PROD_ORIGINS = new Set([
   'https://departamento-medico-brisa.web.app',
   'https://departamento-medico-brisa.firebaseapp.com'
@@ -49,6 +56,7 @@ function isAllowedWebOrigin(origin = '') {
   return (
     /^https:\/\/departamento-medico-brisa\.(web\.app|firebaseapp\.com)$/i.test(origin) ||
     /^https:\/\/([a-z0-9-]+\.)*brisasaludybienestar\.com$/i.test(origin) ||
+    origin === DEFAULT_WEBAUTHN_ORIGIN ||
     isLocalOrigin(origin)
   );
 }
@@ -71,6 +79,28 @@ function getRpIDFromOrigin(origin = '') {
   } catch (e) {
     return null;
   }
+}
+
+function resolveWebOrigin(req) {
+  const originHeader = req.get('origin') || '';
+  if (isAllowedWebOrigin(originHeader)) return originHeader;
+
+  const referer = req.get('referer') || '';
+  if (referer) {
+    try {
+      const url = new URL(referer);
+      const derived = `${url.protocol}//${url.host}`;
+      if (isAllowedWebOrigin(derived)) return derived;
+    } catch (e) {}
+  }
+
+  if (isAllowedWebOrigin(DEFAULT_WEBAUTHN_ORIGIN)) return DEFAULT_WEBAUTHN_ORIGIN;
+  return '';
+}
+
+function resolveRpID(origin = '') {
+  const rpID = getRpIDFromOrigin(origin);
+  return rpID || DEFAULT_WEBAUTHN_RPID;
 }
 
 function parseRequestBody(req) {
@@ -853,11 +883,11 @@ exports.aiChat = functions
 exports.webauthnRegisterStart = functions
   .region('us-central1')
   .https.onRequest(async (req, res) => {
-    const origin = req.get('origin') || '';
+    const origin = resolveWebOrigin(req);
     setCorsHeaders(res, origin);
     if (req.method === 'OPTIONS') return res.status(204).send('');
     if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'method_not_allowed' });
-    if (!isAllowedWebOrigin(origin)) return res.status(403).json({ ok: false, error: 'origin_not_allowed' });
+    if (!origin) return res.status(403).json({ ok: false, error: 'origin_not_allowed' });
 
     const authHeader = req.get('Authorization') || '';
     const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i);
@@ -872,7 +902,7 @@ exports.webauthnRegisterStart = functions
 
     const uid = decoded?.uid || null;
     if (!uid) return res.status(401).json({ ok: false, error: 'auth_invalid' });
-    const rpID = getRpIDFromOrigin(origin);
+    const rpID = resolveRpID(origin);
     if (!rpID) return res.status(400).json({ ok: false, error: 'invalid_origin' });
 
     const userRecord = await admin.auth().getUser(uid).catch(() => null);
@@ -931,11 +961,11 @@ exports.webauthnRegisterStart = functions
 exports.webauthnRegisterFinish = functions
   .region('us-central1')
   .https.onRequest(async (req, res) => {
-    const origin = req.get('origin') || '';
+    const origin = resolveWebOrigin(req);
     setCorsHeaders(res, origin);
     if (req.method === 'OPTIONS') return res.status(204).send('');
     if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'method_not_allowed' });
-    if (!isAllowedWebOrigin(origin)) return res.status(403).json({ ok: false, error: 'origin_not_allowed' });
+    if (!origin) return res.status(403).json({ ok: false, error: 'origin_not_allowed' });
 
     const authHeader = req.get('Authorization') || '';
     const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i);
@@ -973,11 +1003,13 @@ exports.webauthnRegisterFinish = functions
     }
 
     try {
+      const expectedOrigin = challengeDoc.data?.origin || DEFAULT_WEBAUTHN_ORIGIN;
+      const expectedRPID = challengeDoc.data?.rpID || DEFAULT_WEBAUTHN_RPID;
       const verification = await verifyRegistrationResponse({
         response: credential,
         expectedChallenge: challengeDoc.data.challenge,
-        expectedOrigin: challengeDoc.data.origin,
-        expectedRPID: challengeDoc.data.rpID
+        expectedOrigin,
+        expectedRPID
       });
 
       const { verified, registrationInfo } = verification;
@@ -1041,13 +1073,13 @@ exports.webauthnRegisterFinish = functions
 exports.webauthnLoginStart = functions
   .region('us-central1')
   .https.onRequest(async (req, res) => {
-    const origin = req.get('origin') || '';
+    const origin = resolveWebOrigin(req);
     setCorsHeaders(res, origin);
     if (req.method === 'OPTIONS') return res.status(204).send('');
     if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'method_not_allowed' });
-    if (!isAllowedWebOrigin(origin)) return res.status(403).json({ ok: false, error: 'origin_not_allowed' });
+    if (!origin) return res.status(403).json({ ok: false, error: 'origin_not_allowed' });
 
-    const rpID = getRpIDFromOrigin(origin);
+    const rpID = resolveRpID(origin);
     if (!rpID) return res.status(400).json({ ok: false, error: 'invalid_origin' });
 
     const options = generateAuthenticationOptions({
@@ -1069,11 +1101,11 @@ exports.webauthnLoginStart = functions
 exports.webauthnLoginFinish = functions
   .region('us-central1')
   .https.onRequest(async (req, res) => {
-    const origin = req.get('origin') || '';
+    const origin = resolveWebOrigin(req);
     setCorsHeaders(res, origin);
     if (req.method === 'OPTIONS') return res.status(204).send('');
     if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'method_not_allowed' });
-    if (!isAllowedWebOrigin(origin)) return res.status(403).json({ ok: false, error: 'origin_not_allowed' });
+    if (!origin) return res.status(403).json({ ok: false, error: 'origin_not_allowed' });
 
     const body = parseRequestBody(req);
     const credential = body?.credential;
@@ -1103,7 +1135,8 @@ exports.webauthnLoginFinish = functions
     }
 
     const stored = credSnap.data() || {};
-    const rpID = challengeDoc.data?.rpID;
+    const rpID = challengeDoc.data?.rpID || DEFAULT_WEBAUTHN_RPID;
+    const expectedOrigin = challengeDoc.data?.origin || DEFAULT_WEBAUTHN_ORIGIN;
     if (!rpID) {
       return res.status(400).json({ ok: false, error: 'invalid_origin' });
     }
@@ -1112,7 +1145,7 @@ exports.webauthnLoginFinish = functions
       const verification = await verifyAuthenticationResponse({
         response: credential,
         expectedChallenge: challengeDoc.data.challenge,
-        expectedOrigin: challengeDoc.data.origin,
+        expectedOrigin,
         expectedRPID: rpID,
         authenticator: {
           credentialID: isoBase64URL.toBuffer(credentialId),
@@ -1157,3 +1190,5 @@ exports.webauthnLoginFinish = functions
       return res.status(401).json({ ok: false, error: 'authentication_failed' });
     }
   });
+
+// Actualizacion forzada
