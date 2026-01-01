@@ -891,37 +891,34 @@
             biometricBtn.addEventListener('click', async () => {
                 const emailInput = document.getElementById('email');
                 const passwordInput = document.getElementById('password');
-                const currentEmail = emailInput?.value?.trim() || '';
-                if (!currentEmail) {
-                    showToast('Por favor, ingrese su usuario la primera vez para configurarlo.', { anchor: biometricBtn });
-                    return;
-                }
                 setBiometricLoading(true);
                 try {
+                    if (navigator.credentials?.preventSilentAccess) {
+                        try {
+                            await navigator.credentials.preventSilentAccess();
+                        } catch (error) {
+                            // Best-effort to disable silent access; ignore failures.
+                        }
+                    }
                     const credential = await navigator.credentials.get({
                         password: true,
                         mediation: 'required'
                     });
-                    if (!credential) {
-                        showToast('Primera vez: Por favor ingrese manualmente para vincular su seguridad.', { anchor: biometricBtn });
+                    if (!credential || !credential.id || !credential.password) {
+                        showToast('Para activar Face ID, inicie sesión con Usuario y Contraseña manualmente por primera vez.', { anchor: biometricBtn });
                         return;
                     }
-                    const credentialId = (credential.id || '').trim();
-                    const normalizedEmail = currentEmail.toLowerCase();
-                    const normalizedCredentialId = credentialId.toLowerCase();
-                    if (credentialId && normalizedEmail && normalizedCredentialId !== normalizedEmail) {
-                        showToast('El usuario no coincide con la credencial guardada.', { anchor: biometricBtn });
-                        return;
+                    const credentialId = credential.id.trim();
+                    if (emailInput) emailInput.value = credentialId;
+                    if (passwordInput) passwordInput.value = credential.password;
+                    try {
+                        localStorage.setItem('saved_email', credentialId);
+                    } catch (error) {
+                        // no-op
                     }
-                    if (emailInput && credentialId) emailInput.value = credentialId;
-                    if (passwordInput && credential.password) passwordInput.value = credential.password;
-                    if (credential.id && credential.password) {
-                        window.login();
-                    } else {
-                        showToast('Primera vez: Por favor ingrese manualmente para vincular su seguridad.', { anchor: biometricBtn });
-                    }
+                    window.login();
                 } catch (error) {
-                    showToast('Primera vez: Por favor ingrese manualmente para vincular su seguridad.', { anchor: biometricBtn });
+                    showToast('Para activar Face ID, inicie sesión con Usuario y Contraseña manualmente por primera vez.', { anchor: biometricBtn });
                 } finally {
                     setBiometricLoading(false);
                 }
