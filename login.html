@@ -813,7 +813,7 @@
         const supportsCredentialStore = Boolean(window.PasswordCredential && navigator.credentials);
         const supportsBiometric = Boolean(window.PublicKeyCredential && navigator.credentials);
 
-        const showToast = (message) => {
+        const showToast = (message, options = {}) => {
             if (!message) return;
             let toast = document.querySelector('.login-toast');
             if (!toast) {
@@ -822,6 +822,23 @@
                 document.body.appendChild(toast);
             }
             toast.textContent = message;
+            toast.style.left = "";
+            toast.style.top = "";
+            toast.style.bottom = "";
+            toast.style.transform = "translateX(-50%) translateY(-8px)";
+            const anchor = options.anchor || null;
+            if (anchor && typeof anchor.getBoundingClientRect === "function") {
+                const rect = anchor.getBoundingClientRect();
+                toast.style.left = `${rect.left + rect.width / 2}px`;
+                toast.style.top = "0px";
+                const toastHeight = toast.offsetHeight || 0;
+                const gap = 10;
+                let top = rect.top - toastHeight - gap;
+                if (top < 8) {
+                    top = rect.bottom + gap;
+                }
+                toast.style.top = `${Math.round(top)}px`;
+            }
             toast.classList.add('login-toast--show');
             if (toast._timerId) {
                 clearTimeout(toast._timerId);
@@ -831,10 +848,16 @@
             }, 3000);
         };
 
-        const clearLoginInputs = () => {
+        const restoreSavedEmail = () => {
             const emailInput = document.getElementById('email');
             const passwordInput = document.getElementById('password');
-            if (emailInput) emailInput.value = '';
+            let savedEmail = '';
+            try {
+                savedEmail = localStorage.getItem('saved_email') || '';
+            } catch (error) {
+                savedEmail = '';
+            }
+            if (emailInput) emailInput.value = savedEmail.trim();
             if (passwordInput) passwordInput.value = '';
         };
 
@@ -848,9 +871,9 @@
         };
 
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', clearLoginInputs, { once: true });
+            document.addEventListener('DOMContentLoaded', restoreSavedEmail, { once: true });
         } else {
-            clearLoginInputs();
+            restoreSavedEmail();
         }
 
         if (!supportsBiometric && biometricOption) {
@@ -866,6 +889,13 @@
 
         if (supportsBiometric && biometricBtn) {
             biometricBtn.addEventListener('click', async () => {
+                const emailInput = document.getElementById('email');
+                const passwordInput = document.getElementById('password');
+                const currentEmail = emailInput?.value?.trim() || '';
+                if (!currentEmail) {
+                    showToast('Por favor, ingrese su usuario la primera vez para configurarlo.', { anchor: biometricBtn });
+                    return;
+                }
                 setBiometricLoading(true);
                 try {
                     const credential = await navigator.credentials.get({
@@ -873,20 +903,25 @@
                         mediation: 'required'
                     });
                     if (!credential) {
-                        showToast('Primera vez: Por favor ingrese manualmente para vincular su seguridad.');
+                        showToast('Primera vez: Por favor ingrese manualmente para vincular su seguridad.', { anchor: biometricBtn });
                         return;
                     }
-                    const emailInput = document.getElementById('email');
-                    const passwordInput = document.getElementById('password');
-                    if (emailInput && credential.id) emailInput.value = credential.id;
+                    const credentialId = (credential.id || '').trim();
+                    const normalizedEmail = currentEmail.toLowerCase();
+                    const normalizedCredentialId = credentialId.toLowerCase();
+                    if (credentialId && normalizedEmail && normalizedCredentialId !== normalizedEmail) {
+                        showToast('El usuario no coincide con la credencial guardada.', { anchor: biometricBtn });
+                        return;
+                    }
+                    if (emailInput && credentialId) emailInput.value = credentialId;
                     if (passwordInput && credential.password) passwordInput.value = credential.password;
                     if (credential.id && credential.password) {
                         window.login();
                     } else {
-                        showToast('Primera vez: Por favor ingrese manualmente para vincular su seguridad.');
+                        showToast('Primera vez: Por favor ingrese manualmente para vincular su seguridad.', { anchor: biometricBtn });
                     }
                 } catch (error) {
-                    showToast('Primera vez: Por favor ingrese manualmente para vincular su seguridad.');
+                    showToast('Primera vez: Por favor ingrese manualmente para vincular su seguridad.', { anchor: biometricBtn });
                 } finally {
                     setBiometricLoading(false);
                 }
@@ -1058,6 +1093,11 @@
 
                 sessionStorage.setItem('isLoggedIn', 'true');
                 localStorage.setItem('user_nombre', displayName);
+                try {
+                    localStorage.setItem('saved_email', email.trim());
+                } catch (error) {
+                    // no-op
+                }
 
                 if (supportsCredentialStore && loginForm && window.PasswordCredential) {
                     try {
