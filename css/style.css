@@ -4224,7 +4224,7 @@ img {
         width: 22px;
         height: 22px;
         border-radius: 999px;
-        border: 1.5px solid var(--brisa);
+        border: 1px solid var(--brisa);
         color: var(--brisa);
         align-items: center;
         justify-content: center;

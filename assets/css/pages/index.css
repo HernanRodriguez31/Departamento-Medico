@@ -2940,7 +2940,7 @@ html {
     width: 38px !important;
     height: 38px !important;
     border-radius: 999px;
-    border: 2px solid var(--first-color, #7ab800);
+    border: 1px solid var(--first-color, #7ab800);
     background: rgba(122, 184, 0, 0.1);
     overflow: hidden;
   }
