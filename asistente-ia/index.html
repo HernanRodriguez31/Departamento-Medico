@@ -411,7 +411,7 @@
                 );
             const isDebugAi = getAllParams().get("debugAi") === "1";
             const PROD_AI_ENDPOINT = "https://us-central1-departamento-medico-brisa.cloudfunctions.net/aiChat";
-            const EMU_AI_ENDPOINT = "http://127.0.0.1:5001/departamento-medico-brisa/us-central1/aiChat";
+            const EMU_AI_ENDPOINT = "https://us-central1-departamento-medico-brisa.cloudfunctions.net/aiChat";
             const resolveAiEndpoint = () => {
                 const params = getAllParams();
                 const forcedEndpoint = params.get("aiEndpoint");
