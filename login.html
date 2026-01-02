@@ -244,45 +244,6 @@
             color: var(--primary-color);
         }
 
-        .biometric-option {
-            margin-top: clamp(0.7rem, 1.6vh, 0.9rem);
-            display: flex;
-            justify-content: center;
-        }
-
-        .biometric-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.55rem;
-            padding: 0.6rem 1.2rem;
-            border-radius: 999px;
-            border: 1px solid rgba(148, 163, 184, 0.45);
-            background: #ffffff;
-            color: var(--text-light);
-            font-size: 0.9rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .biometric-btn.is-loading {
-            opacity: 0.7;
-            cursor: wait;
-        }
-
-        .biometric-btn:hover {
-            border-color: rgba(122, 184, 0, 0.6);
-            color: var(--text-color);
-            box-shadow: 0 12px 22px rgba(15, 23, 42, 0.08);
-            transform: translateY(-1px);
-        }
-
-        .biometric-icon {
-            width: 18px;
-            height: 18px;
-            color: var(--primary-color);
-        }
-
         .error {
             color: #b91c1c;
             font-size: 0.875rem;
@@ -294,80 +255,6 @@
             border: 1px solid #fecaca;
             text-align: left;
             line-height: 1.4;
-        }
-
-        .login-toast {
-            position: fixed;
-            left: 50%;
-            top: calc(16px + env(safe-area-inset-top, 0px));
-            transform: translateX(-50%) translateY(-8px);
-            background: #ffffff;
-            color: #1f2937;
-            padding: 10px 16px;
-            border-radius: 16px;
-            font-size: 0.9rem;
-            border: 2px solid #7AB800;
-            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.2s ease, transform 0.2s ease;
-            z-index: 9999;
-            max-width: min(520px, 90vw);
-            text-align: center;
-        }
-
-        .login-toast--show {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
-        }
-
-        .login-toast--biometric {
-            text-align: left;
-            padding: 14px 18px;
-        }
-
-        .login-toast__content {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .login-toast__icon {
-            width: 24px;
-            height: 24px;
-            color: var(--primary-color);
-            flex-shrink: 0;
-        }
-
-        .login-toast__icon .lock-shackle {
-            transition: transform 0.3s ease;
-            transform-origin: 16px 7px;
-        }
-
-        .login-toast__text {
-            display: flex;
-            flex-direction: column;
-            gap: 0.2rem;
-        }
-
-        .login-toast__line {
-            color: #111827;
-            font-size: 0.92rem;
-            line-height: 1.3;
-        }
-
-        .login-toast__email {
-            color: var(--primary-color);
-            font-weight: 700;
-            font-size: 0.95rem;
-        }
-
-        .login-toast--success .login-toast__icon {
-            color: var(--primary-dark);
-        }
-
-        .login-toast--success .login-toast__icon .lock-shackle {
-            transform: rotate(-22deg) translate(-1px, -2px);
         }
 
         .loading {
@@ -634,15 +521,6 @@
                 font-size: 0.95rem;
             }
 
-            .biometric-option {
-                margin-top: 0.4rem;
-            }
-
-            .biometric-btn {
-                font-size: 0.85rem;
-                padding: 0.45rem 0.9rem;
-            }
-
             .forgot-password {
                 margin-top: 0.6rem;
                 font-size: 0.78rem;
@@ -680,10 +558,6 @@
             .login-btn {
                 margin-top: 0.5rem;
                 padding: 10px 14px;
-            }
-
-            .biometric-option {
-                margin-top: 0.35rem;
             }
 
             .forgot-password {
@@ -726,10 +600,6 @@
                 padding: 10px 14px;
             }
 
-            .biometric-option {
-                margin-top: 0.3rem;
-            }
-
             .forgot-password {
                 margin-top: 0.5rem;
                 font-size: 0.74rem;
@@ -761,11 +631,6 @@
             .login-btn {
                 padding: 9px 13px;
                 font-size: 0.9rem;
-            }
-
-            .biometric-btn {
-                font-size: 0.78rem;
-                padding: 0.4rem 0.85rem;
             }
 
             .forgot-password {
@@ -810,20 +675,6 @@
             <div class="login-footer">
                 <button id="btn-ingresar" class="login-btn" type="submit">Ingresar</button>
 
-                <div class="biometric-option">
-                    <button type="button" class="biometric-btn" id="biometric-btn" aria-label="Usar Face ID o huella">
-                        <svg class="biometric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M12 3a7 7 0 0 1 7 7v1"></path>
-                            <path d="M5 11v-1a7 7 0 0 1 14 0v1"></path>
-                            <path d="M8 11v2a4 4 0 0 0 8 0v-2"></path>
-                            <path d="M9 17a3 3 0 0 0 6 0v-1"></path>
-                            <path d="M7 19a5 5 0 0 0 10 0v-2"></path>
-                        </svg>
-                        <span>Usar Face ID / Huella</span>
-                    </button>
-                </div>
-
                 <a href="#" class="forgot-password" onclick="openModal(event)">¿Olvidaste tu contraseña?</a>
 
                 <p id="error-msg" class="error"></p>
@@ -849,209 +700,13 @@
 
     <!-- FIREBASE AND AUTH LOGIC DO NOT TOUCH -->
     <script type="module">
-        import { signInWithEmailAndPassword, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+        import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
         import { doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
         import { getFirebase } from "/assets/js/common/firebaseClient.js";
 
-        const { auth, db, app } = getFirebase();
+        const { auth, db } = getFirebase();
         const loginForm = document.getElementById('login-form');
-        const biometricOption = document.querySelector('.biometric-option');
-        const biometricBtn = document.getElementById('biometric-btn');
-        const biometricLabel = biometricBtn?.querySelector('span') || null;
-        const biometricDefaultText = biometricLabel?.textContent?.trim() || 'Usar Face ID / Huella';
-        const supportsCredentialStore = Boolean(window.PasswordCredential && navigator.credentials);
-        const supportsBiometric = Boolean(window.PublicKeyCredential && navigator.credentials);
         let loginInProgress = false;
-        const functionsBaseUrl = (() => {
-            const projectId = app?.options?.projectId;
-            if (!projectId) return '';
-            const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
-            if (isLocal) {
-                return `http://localhost:5001/${projectId}/us-central1`;
-            }
-            return `https://us-central1-${projectId}.cloudfunctions.net`;
-        })();
-
-        const getToastElement = () => {
-            let toast = document.querySelector('.login-toast');
-            if (!toast) {
-                toast = document.createElement('div');
-                toast.className = 'login-toast';
-                document.body.appendChild(toast);
-            }
-            return toast;
-        };
-
-        const positionToast = (toast, options = {}) => {
-            toast.style.left = "";
-            toast.style.top = "";
-            toast.style.bottom = "";
-            toast.style.transform = "translateX(-50%) translateY(-8px)";
-            const anchor = options.anchor || null;
-            if (anchor && typeof anchor.getBoundingClientRect === "function") {
-                const rect = anchor.getBoundingClientRect();
-                toast.style.left = `${rect.left + rect.width / 2}px`;
-                toast.style.top = "0px";
-                const toastHeight = toast.offsetHeight || 0;
-                const gap = 10;
-                let top = rect.top - toastHeight - gap;
-                if (top < 8) {
-                    top = rect.bottom + gap;
-                }
-                toast.style.top = `${Math.round(top)}px`;
-            }
-        };
-
-        const scheduleToastHide = (toast, duration) => {
-            if (toast._timerId) {
-                clearTimeout(toast._timerId);
-            }
-            const safeDuration = Number.isFinite(duration) ? duration : 3000;
-            if (safeDuration <= 0) return;
-            toast._timerId = setTimeout(() => {
-                toast.classList.remove('login-toast--show');
-            }, safeDuration);
-        };
-
-        const showToast = (message, options = {}) => {
-            if (!message) return;
-            const toast = getToastElement();
-            toast.classList.remove('login-toast--biometric', 'login-toast--success');
-            toast.textContent = message;
-            positionToast(toast, options);
-            toast.classList.add('login-toast--show');
-            scheduleToastHide(toast, options.duration);
-        };
-
-        const showBiometricToast = (options = {}) => {
-            const toast = getToastElement();
-            const state = options.state || 'prompt';
-            const email = (options.email || '').trim() || 'tu usuario';
-            const statusLine = state === 'success'
-                ? 'Acceso verificado. Ingresando...'
-                : 'Confirma el método de seguridad del dispositivo.';
-
-            toast.classList.add('login-toast--biometric');
-            toast.classList.toggle('login-toast--success', state === 'success');
-            toast.innerHTML = `
-                <div class="login-toast__content">
-                    <svg class="login-toast__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path class="lock-shackle" d="M8 11V7a4 4 0 0 1 8 0v4"></path>
-                        <rect x="5" y="11" width="14" height="9" rx="2"></rect>
-                        <path d="M12 15v2"></path>
-                    </svg>
-                    <div class="login-toast__text">
-                        <span class="login-toast__line">Para iniciar sesión con</span>
-                        <span class="login-toast__email"></span>
-                        <span class="login-toast__line login-toast__method"></span>
-                    </div>
-                </div>
-            `;
-            const emailEl = toast.querySelector('.login-toast__email');
-            if (emailEl) emailEl.textContent = email;
-            const methodEl = toast.querySelector('.login-toast__method');
-            if (methodEl) methodEl.textContent = statusLine;
-
-            positionToast(toast, { anchor: options.anchor });
-            toast.classList.add('login-toast--show');
-            scheduleToastHide(toast, options.duration ?? 2600);
-        };
-
-        // --- HELPERS DE CONVERSION ROBUSTOS ---
-        function bufferToBase64URL(buffer) {
-            const bytes = new Uint8Array(buffer);
-            let binary = '';
-            for (let i = 0; i < bytes.byteLength; i += 1) {
-                binary += String.fromCharCode(bytes[i]);
-            }
-            return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-        }
-
-        function base64URLToBuffer(base64URL) {
-            const base64 = base64URL.replace(/-/g, '+').replace(/_/g, '/');
-            const pad = base64.length % 4;
-            const padded = pad ? base64 + '='.repeat(4 - pad) : base64;
-            const binary = atob(padded);
-            const bytes = new Uint8Array(binary.length);
-            for (let i = 0; i < binary.length; i += 1) {
-                bytes[i] = binary.charCodeAt(i);
-            }
-            return bytes.buffer;
-        }
-
-        const arrayBufferToBase64URL = (buffer) => bufferToBase64URL(buffer);
-
-        const publicKeyCredentialToJSON = (cred) => {
-            if (!cred) return cred;
-            if (Array.isArray(cred)) {
-                return cred.map((item) => publicKeyCredentialToJSON(item));
-            }
-            if (cred instanceof ArrayBuffer) {
-                return bufferToBase64URL(cred);
-            }
-            if (cred instanceof Uint8Array) {
-                return bufferToBase64URL(cred.buffer);
-            }
-            if (typeof cred === 'object') {
-                const obj = {};
-                Object.keys(cred).forEach((key) => {
-                    obj[key] = publicKeyCredentialToJSON(cred[key]);
-                });
-                return obj;
-            }
-            return cred;
-        };
-
-        const preformatCreateOptions = (options) => {
-            return {
-                ...options,
-                challenge: base64URLToBuffer(options.challenge),
-                user: {
-                    ...options.user,
-                    id: base64URLToBuffer(options.user.id)
-                },
-                excludeCredentials: Array.isArray(options.excludeCredentials)
-                    ? options.excludeCredentials.map((cred) => ({
-                        ...cred,
-                        id: base64URLToBuffer(cred.id)
-                    }))
-                    : []
-            };
-        };
-
-        const preformatGetOptions = (options) => {
-            return {
-                ...options,
-                challenge: base64URLToBuffer(options.challenge),
-                allowCredentials: Array.isArray(options.allowCredentials)
-                    ? options.allowCredentials.map((cred) => ({
-                        ...cred,
-                        id: base64URLToBuffer(cred.id)
-                    }))
-                    : []
-            };
-        };
-
-        const postJson = async (path, body = {}, idToken = '') => {
-            if (!functionsBaseUrl) {
-                throw new Error('functions_base_missing');
-            }
-            const headers = { 'Content-Type': 'application/json' };
-            if (idToken) headers.Authorization = `Bearer ${idToken}`;
-            const response = await fetch(`${functionsBaseUrl}/${path}`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify(body)
-            });
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok || data?.ok === false) {
-                const error = new Error(data?.error || 'request_failed');
-                error.data = data;
-                throw error;
-            }
-            return data;
-        };
 
         const restoreSavedEmail = () => {
             const emailInput = document.getElementById('email');
@@ -1065,99 +720,6 @@
             if (emailInput) emailInput.value = savedEmail.trim();
             if (passwordInput) passwordInput.value = '';
         };
-
-        const setBiometricLoading = (isLoading) => {
-            if (!biometricBtn) return;
-            biometricBtn.disabled = isLoading;
-            biometricBtn.classList.toggle('is-loading', isLoading);
-            if (biometricLabel) {
-                biometricLabel.textContent = isLoading ? 'Verificando...' : biometricDefaultText;
-            }
-        };
-
-        async function registerBiometricPasskey(user, email) {
-            console.log('🛠 Iniciando Registro Biométrico...');
-
-            if (!supportsBiometric || !user) {
-                console.log('✅ Registro biométrico exitoso');
-                return;
-            }
-
-            const registerStartUrl = functionsBaseUrl
-                ? `${functionsBaseUrl}/webauthnRegisterStart`
-                : 'https://us-central1-departamento-medico-brisa.cloudfunctions.net/webauthnRegisterStart';
-            const registerFinishUrl = functionsBaseUrl
-                ? `${functionsBaseUrl}/webauthnRegisterFinish`
-                : 'https://us-central1-departamento-medico-brisa.cloudfunctions.net/webauthnRegisterFinish';
-
-            // 1. Obtener Opciones de Registro del Backend
-            const idToken = await user.getIdToken();
-            const startResp = await fetch(registerStartUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${idToken}`
-                }
-            });
-            if (!startResp.ok) throw new Error('Falló inicio de registro en servidor');
-            const startData = await startResp.json();
-            if (startData?.alreadyRegistered) {
-                try {
-                    localStorage.removeItem('passkey_registration_failed');
-                } catch (error) {}
-                console.log('✅ Registro biométrico exitoso');
-                return;
-            }
-
-            const options = startData.options;
-
-            // 2. CONVERSIÓN (Texto -> Binario) para el Navegador
-            options.user.id = base64URLToBuffer(options.user.id);
-            options.challenge = base64URLToBuffer(options.challenge);
-            if (options.excludeCredentials) {
-                options.excludeCredentials.forEach((cred) => {
-                    cred.id = base64URLToBuffer(cred.id);
-                });
-            }
-
-            // 3. Crear Credencial (El navegador pide FaceID/TouchID aquí)
-            console.log('👤 Solicitando creación de llave al usuario...');
-            const credential = await navigator.credentials.create({ publicKey: options });
-            console.log('✅ Llave creada en dispositivo.');
-
-            // 4. CONVERSIÓN (Binario -> Texto) para el Servidor
-            const credentialData = {
-                id: credential.id,
-                rawId: bufferToBase64URL(credential.rawId),
-                type: credential.type,
-                response: {
-                    attestationObject: bufferToBase64URL(credential.response.attestationObject),
-                    clientDataJSON: bufferToBase64URL(credential.response.clientDataJSON),
-                    transports: credential.response.getTransports ? credential.response.getTransports() : []
-                },
-                challengeId: startData.challengeId
-            };
-
-            // 5. Finalizar Registro en Backend
-            console.log('📡 Enviando credencial nueva al servidor...');
-            const finishResp = await fetch(registerFinishUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${idToken}`
-                },
-                body: JSON.stringify(credentialData)
-            });
-            if (!finishResp.ok) {
-                const errData = await finishResp.json();
-                console.error('❌ Error guardando en DB:', errData);
-                throw new Error(errData.error || 'Error al guardar credencial');
-            }
-            try {
-                localStorage.removeItem('passkey_registration_failed');
-            } catch (error) {}
-            console.log('🎉 ¡Registro Biométrico Exitoso y Guardado!');
-        }
 
         const ensureUserProfile = async (user, email) => {
             const docRef = doc(db, "usuarios", user.uid);
@@ -1200,7 +762,7 @@
             return displayName;
         };
 
-        const finalizeLogin = async (user, email, options = {}) => {
+        const finalizeLogin = async (user, email) => {
             const displayName = await ensureUserProfile(user, email);
             sessionStorage.setItem('isLoggedIn', 'true');
             localStorage.setItem('user_nombre', displayName);
@@ -1210,136 +772,13 @@
                 // no-op
             }
 
-            if (options.storePassword && supportsCredentialStore && loginForm && window.PasswordCredential) {
-                try {
-                    const creds = new PasswordCredential(loginForm);
-                    await navigator.credentials.store(creds);
-                } catch (error) {
-                    console.info('No se pudo guardar credenciales.', error);
-                }
-            }
-
             return displayName;
-        };
-
-        window.loginWithPasskey = async () => {
-            if (loginInProgress) return;
-            const btn = document.getElementById('btn-biometric') || biometricBtn;
-            const btnLabel = btn?.querySelector('span') || null;
-            const setBtnText = (text) => {
-                if (btnLabel) {
-                    btnLabel.textContent = text;
-                } else if (btn) {
-                    btn.textContent = text;
-                }
-            };
-
-            setBtnText('🔄 Iniciando...');
-            console.log('🚀 Iniciando Login con Passkey...');
-
-            const emailInput = document.getElementById('email');
-            const displayEmail = (emailInput?.value || '').trim();
-            const overlay = document.getElementById('login-overlay');
-            const loginStartUrl = functionsBaseUrl
-                ? `${functionsBaseUrl}/webauthnLoginStart`
-                : 'https://us-central1-departamento-medico-brisa.cloudfunctions.net/webauthnLoginStart';
-            const loginFinishUrl = functionsBaseUrl
-                ? `${functionsBaseUrl}/webauthnLoginFinish`
-                : 'https://us-central1-departamento-medico-brisa.cloudfunctions.net/webauthnLoginFinish';
-
-            loginInProgress = true;
-            setBiometricLoading(true);
-
-            try {
-                // 1. Obtener Challenge del Servidor
-                const startResp = await fetch(loginStartUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                if (!startResp.ok) throw new Error('Error conectando con servidor (Start)');
-                const startData = await startResp.json();
-                const options = startData.options;
-
-                // 2. Convertir Challenge a Binario
-                options.challenge = base64URLToBuffer(options.challenge);
-                if (options.allowCredentials) {
-                    options.allowCredentials.forEach((cred) => {
-                        cred.id = base64URLToBuffer(cred.id);
-                    });
-                }
-
-                // 3. Pedir Huella/Cara al Navegador
-                console.log('👤 Solicitando biometría al usuario...');
-                const credential = await navigator.credentials.get({ publicKey: options });
-                console.log('✅ Biometría obtenida. Procesando...');
-
-                // 4. Empaquetar respuesta
-                const credentialData = {
-                    id: credential.id,
-                    rawId: bufferToBase64URL(credential.rawId),
-                    type: credential.type,
-                    response: {
-                        authenticatorData: bufferToBase64URL(credential.response.authenticatorData),
-                        clientDataJSON: bufferToBase64URL(credential.response.clientDataJSON),
-                        signature: bufferToBase64URL(credential.response.signature),
-                        userHandle: credential.response.userHandle
-                            ? bufferToBase64URL(credential.response.userHandle)
-                            : null
-                    },
-                    challengeId: startData.challengeId
-                };
-
-                // 5. Enviar al Servidor
-                setBtnText('🔐 Verificando...');
-                console.log('📡 Enviando datos a LoginFinish...');
-
-                const finishResp = await fetch(loginFinishUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(credentialData)
-                });
-                const finishData = await finishResp.json();
-
-                if (finishData.ok && (finishData.token || finishData.customToken)) {
-                    console.log('🎉 Login Exitoso. Entrando...');
-                    const token = finishData.token || finishData.customToken;
-                    if (overlay) overlay.classList.add('active');
-                    const userCredential = await signInWithCustomToken(auth, token);
-                    const user = userCredential.user;
-                    const resolvedEmail = user.email || displayEmail || '';
-                    if (emailInput && resolvedEmail) emailInput.value = resolvedEmail;
-                    await finalizeLogin(user, resolvedEmail, {
-                        storePassword: false,
-                        enrollPasskey: false
-                    });
-                    setBtnText('✅ ¡Éxito!');
-                    setTimeout(() => window.location.replace(getRedirectTarget()), 500);
-                } else {
-                    console.error('❌ El servidor rechazó la credencial:', finishData);
-                    throw new Error(finishData.error || 'Rechazado por servidor');
-                }
-            } catch (error) {
-                console.error('🔥 Error Fatal en Passkey:', error);
-                setBtnText('💡 Usar Face ID / Huella');
-                if (error.name !== 'NotAllowedError') {
-                    showToast(`Error: ${error.message}`);
-                }
-            } finally {
-                if (overlay) overlay.classList.remove('active');
-                loginInProgress = false;
-                setBiometricLoading(false);
-                setBtnText(biometricDefaultText);
-            }
         };
 
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', restoreSavedEmail, { once: true });
         } else {
             restoreSavedEmail();
-        }
-
-        if (!supportsBiometric && biometricOption) {
-            biometricOption.style.display = 'none';
         }
 
         if (loginForm) {
@@ -1349,11 +788,6 @@
             });
         }
 
-        if (supportsBiometric && biometricBtn) {
-            biometricBtn.addEventListener('click', async () => {
-                await window.loginWithPasskey();
-            });
-        }
 
         // One-shot cleanup for legacy root SW + caches.
         const cleanupRootServiceWorker = async () => {
@@ -1461,7 +895,6 @@
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value.trim();
             const errorMsg = document.getElementById('error-msg');
-            const btn = document.getElementById('btn-ingresar');
 
             errorMsg.style.display = 'none';
 
@@ -1481,27 +914,7 @@
                 const userCredential = await signInWithEmailAndPassword(auth, email, password);
                 const user = userCredential.user;
 
-                await finalizeLogin(user, email, {
-                    storePassword: true,
-                    enrollPasskey: false
-                });
-
-                if (supportsBiometric) {
-                    showToast('Vinculando con Face ID...', { anchor: biometricBtn, duration: 4000 });
-                    try {
-                        await registerBiometricPasskey(user, email);
-                        showToast('✅ Face ID Activado correctamente', { anchor: biometricBtn, duration: 2000 });
-                        await new Promise((resolve) => setTimeout(resolve, 1000));
-                    } catch (error) {
-                        console.warn('No se pudo activar Face ID (pero entramos igual):', error);
-                    }
-                } else {
-                    try {
-                        localStorage.setItem('passkey_registration_failed', 'unsupported');
-                    } catch (error) {
-                        // no-op
-                    }
-                }
+                await finalizeLogin(user, email);
 
                 // Overlay is already active; keep it brief before redirecting
                 setTimeout(() => {
