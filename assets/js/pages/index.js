@@ -528,6 +528,7 @@ async function initCarouselModule() {
   let isComposingComment = false;
   const PAGE_SIZE = 10;
   const FEED_SKELETON_COUNT = 6;
+  const CAROUSEL_SKELETON_COUNT = 3;
   let lastPostDoc = null;
   let hasMorePosts = true;
   let isLoadingPosts = false;
@@ -553,6 +554,20 @@ async function initCarouselModule() {
         <div class="dm-skeleton-block"></div>
         <div class="dm-skeleton-line dm-skeleton-line--lg"></div>
       </article>
+    `
+      )
+      .join("");
+
+  const buildCarouselSkeleton = () =>
+    Array.from({ length: CAROUSEL_SKELETON_COUNT })
+      .map(
+        () => `
+      <div class="dm-carousel-slide dm-carousel-slide--skeleton" aria-hidden="true">
+        <div class="dm-carousel-media is-loading">
+          <img class="dm-carousel-img" src="${TRANSPARENT_PIXEL}" alt="" aria-hidden="true" width="1200" height="900" />
+          <span class="dm-img-skeleton" aria-hidden="true"></span>
+        </div>
+      </div>
     `
       )
       .join("");
@@ -587,6 +602,17 @@ async function initCarouselModule() {
 
   const renderFeedSkeleton = () => {
     if (!track) return;
+    track.classList.remove("is-loading");
+    if (!feedMode) {
+      track.classList.add("is-loading");
+      track.innerHTML = buildCarouselSkeleton();
+      dots.innerHTML = "";
+      track.style.transition = "none";
+      track.style.transform = "none";
+      updateSlideWidth();
+      setupResizeObserver();
+      return;
+    }
     track.innerHTML = buildFeedSkeleton();
     track.appendChild(ensureFeedSentinel());
     updateFeedSentinel({ loading: true, hasMore: true, errorMessage: "" });
@@ -1500,6 +1526,7 @@ async function initCarouselModule() {
   const renderSlides = () => {
     teardownFeedObserver();
     clearFeedCommentSubscriptions();
+    if (track) track.classList.remove("is-loading");
     const activePosts = feedMode ? feedPosts : slides;
     if (!activePosts.length) {
       track.innerHTML = `<div class="dm-carousel-empty">${feedMode ? "Aún no hay publicaciones." : "Aún no hay imágenes cargadas."}</div>`;
@@ -1706,11 +1733,12 @@ async function initCarouselModule() {
         const fullUrl = s.imageUrl || "";
         const thumbUrl = s.thumbUrl || "";
         const displaySrc = thumbUrl || fullUrl || "";
+        const fetchPriority = idx === 0 ? 'fetchpriority="high"' : "";
         return `
         <div class="dm-carousel-slide" data-idx="${idx}">
           <div class="dm-carousel-media is-loading">
             <img class="dm-carousel-img is-blur" src="${displaySrc}" data-full="${fullUrl}" data-thumb="${thumbUrl}"
-              alt="${s.title || "Imagen de la galería"}" loading="${idx === 0 ? "eager" : "lazy"}"
+              alt="${s.title || "Imagen de la galería"}" loading="${idx === 0 ? "eager" : "lazy"}" ${fetchPriority}
               decoding="async" width="1200" height="900" />
             <span class="dm-img-skeleton" aria-hidden="true"></span>
             <button class="dm-slide-nav dm-slide-nav--left" type="button" data-slide-nav="prev" aria-label="Anterior">◀</button>

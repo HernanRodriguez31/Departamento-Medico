@@ -51,6 +51,27 @@ html {
   padding-top: 2rem;
 }
 
+#carrete:not(.is-feed-mode) .dm-carousel-viewport {
+  min-height: 400px;
+}
+
+#carrete:not(.is-feed-mode) .dm-carousel-track.is-loading {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  min-height: 100%;
+}
+
+#carrete:not(.is-feed-mode) .dm-carousel-track.is-loading .dm-carousel-slide--skeleton {
+  flex: 0 0 100%;
+  width: 100%;
+}
+
+#carrete:not(.is-feed-mode) .dm-carousel-track.is-loading .dm-carousel-slide--skeleton .dm-carousel-img {
+  opacity: 0;
+}
+
 #carrete .dm-carousel-header {
   margin-bottom: 0;
 }
