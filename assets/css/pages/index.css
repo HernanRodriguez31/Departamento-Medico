@@ -61,7 +61,7 @@ html {
   margin: 80px auto 40px auto;
   padding: 50px;
   width: 100%;
-  overflow: hidden;
+  overflow: visible;
 }
 
 #foro > .text-center {
@@ -94,7 +94,7 @@ html {
   margin: 40px auto 0;
   padding: 50px 50px 30px !important;
   width: 100%;
-  overflow: hidden;
+  overflow: visible;
 }
 
 #calendario .estructura-calendar {
@@ -2845,6 +2845,13 @@ html {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--sp-4);
   align-items: stretch;
+  padding-bottom: 60px !important;
+  overflow: visible !important;
+}
+
+#mision .mision__container {
+  padding-bottom: 70px !important;
+  overflow: visible !important;
 }
 
 .kpi-card {
@@ -4011,6 +4018,7 @@ body.dm-modal-open .brisa-chat-panel {
   transition: opacity 1.2s cubic-bezier(0.23, 1, 0.32, 1),
     transform 1.2s cubic-bezier(0.23, 1, 0.32, 1);
   will-change: opacity, transform;
+  contain: content;
 }
 
 .reveal-on-scroll.is-visible {
@@ -4028,6 +4036,24 @@ body.dm-modal-open .brisa-chat-panel {
 
 .delay-300 {
   transition-delay: 300ms;
+}
+
+h2::after,
+.section-title::after,
+.section-header::after,
+.titulo-seccion::after {
+  content: none !important;
+  display: none !important;
+  height: 0 !important;
+  border: none !important;
+  background: transparent !important;
+}
+
+.section__header,
+.section-header,
+.header-wrapper {
+  border: none !important;
+  border-bottom: none !important;
 }
 
 .dm-reveal {
