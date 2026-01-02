@@ -3104,10 +3104,7 @@ body.dm-modal-open .brisa-chat-panel {
     display: flex;
     justify-content: center;
     text-align: center;
-    font-size: 3rem;
-    font-weight: 700;
-    margin: 2.5rem 0 1.5rem;
-    letter-spacing: 0.4px;
+    margin: 0;
   }
 }
 
@@ -3699,6 +3696,38 @@ body.dm-modal-open .brisa-chat-panel {
   --dm-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --dm-ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
   --dm-reveal-shift: 16px;
+}
+
+.section-title--unified {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1e293b;
+  text-align: center;
+  margin-bottom: 16px;
+  letter-spacing: -0.02em;
+}
+
+@media (min-width: 1024px) {
+  .section-title--unified {
+    font-size: 36px;
+  }
+}
+
+.section-subtitle--compact {
+  font-size: 18px;
+  line-height: 1.4;
+  margin-top: 6px;
+  margin-bottom: 0;
+}
+
+#estructura-funcional {
+  margin-top: 80px;
+  margin-bottom: 60px;
+}
+
+.dm-accordion__summary.section-title--unified {
+  justify-content: center;
+  text-align: center;
 }
 
 .reveal-on-scroll {

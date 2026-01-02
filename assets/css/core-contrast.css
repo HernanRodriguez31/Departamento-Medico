@@ -344,14 +344,30 @@ body.ui-clarity .region-accordion {
 }
 .orgtree .structure__main-btn {
   width: 100%;
-  --dashboard-pad-x: 1.25rem;
-  --dashboard-pad-y: 1rem;
+  --dashboard-pad-x: 2.5rem;
+  --dashboard-pad-y: 1.75rem;
   --dashboard-accent-h: 2px;
   padding: var(--dashboard-pad-y) var(--dashboard-pad-x);
   border: none;
+  border-top: 3px solid var(--first-color, #7AB800);
   border-radius: var(--org-radius-lg);
   box-shadow: none;
   background: transparent;
+}
+
+.orgtree .structure__main-btn::before {
+  content: none;
+  display: none;
+}
+
+.orgtree .dashboard-header-left {
+  gap: 1.25rem;
+}
+
+.orgtree .dashboard-title-group {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
 }
 .orgtree .structure__main-btn .dashboard-icon-box {
   padding: 10px;
@@ -361,27 +377,41 @@ body.ui-clarity .region-accordion {
   background: linear-gradient(180deg, #ffffff, #f2f6f4);
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
+
+.orgtree .structure__main-btn .dashboard-icon-box svg {
+  width: 28px;
+  height: 28px;
+}
 .orgtree .structure__main-btn .dashboard-chevron svg {
   transition: transform 0.18s ease, color 0.18s ease;
 }
 .orgtree .dashboard-header-left h2.dashboard-eyebrow {
-  font-size: 11px;
-  letter-spacing: 0.12em;
+  font-size: 26px;
+  letter-spacing: 3px;
   color: var(--first-color, #7AB800);
   text-transform: uppercase;
+  font-weight: 700;
   margin: 0;
+  line-height: 1;
 }
 .orgtree .dashboard-header-left h1.dashboard-title {
-  font-size: 30px;
-  font-weight: 600;
-  color: #1F2933;
-  margin: 2px 0 0;
-  line-height: 1.15;
+  font-size: 36px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
 }
 .orgtree .dashboard-divider {
   display: none;
+  width: 1px;
+  height: 24px;
+  margin: 0 24px;
+  background: #cbd5e1;
+  align-self: center;
 }
 .orgtree .structure__main-btn:hover {
+  background: #f8fafc;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
 }
 .orgtree .structure__main-btn:focus-visible {
@@ -391,6 +421,14 @@ body.ui-clarity .region-accordion {
 .orgtree .structure__main-btn.expanded .structure__chevron svg {
   transform: rotate(180deg);
   color: var(--org-accent);
+}
+
+.orgtree .structure__main-btn:hover .structure__chevron svg {
+  transform: translateY(3px);
+}
+
+.orgtree .structure__main-btn.expanded:hover .structure__chevron svg {
+  transform: translateY(3px) rotate(180deg);
 }
 
 @media (min-width: 1024px) {
@@ -404,8 +442,8 @@ body.ui-clarity .region-accordion {
   }
 
   .orgtree .structure__main-btn {
-    --dashboard-pad-x: var(--orgtree-inner-gutter);
-    --dashboard-pad-y: 1.5rem;
+    --dashboard-pad-x: 2.5rem;
+    --dashboard-pad-y: 1.75rem;
     --dashboard-accent-h: 5px;
   }
 
@@ -423,34 +461,37 @@ body.ui-clarity .region-accordion {
   }
 
   .orgtree .dashboard-header-left {
-    gap: 0.6rem;
+    gap: 1.4rem;
   }
 
   .orgtree .dashboard-title-group {
     display: flex;
-    align-items: center;
-    gap: 0.75rem;
+    align-items: baseline;
+    gap: 0;
   }
 
   .orgtree .dashboard-header-left h2.dashboard-eyebrow {
-    font-size: 1.55rem;
-    letter-spacing: 0.11em;
+    font-size: 26px;
+    letter-spacing: 3px;
     font-weight: 700;
     margin: 0;
+    line-height: 1;
   }
 
   .orgtree .dashboard-header-left h1.dashboard-title {
-    font-size: 2.5rem;
-    font-weight: 800;
-    letter-spacing: -1.5px;
+    font-size: 36px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
     margin: 0;
+    line-height: 1.1;
   }
 
   .orgtree .dashboard-divider {
     display: inline-block;
     width: 1px;
-    height: 1.35em;
-    background: #d1d5db;
+    height: 24px;
+    margin: 0 24px;
+    background: #cbd5e1;
   }
 
   .orgtree .structure__main-btn::before {
