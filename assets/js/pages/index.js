@@ -2485,20 +2485,14 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
 }
 
 const initRevealAnimations = () => {
-  const targets = Array.from(document.querySelectorAll("main > section"));
+  const targets = Array.from(document.querySelectorAll(".reveal-on-scroll"));
   if (!targets.length) return;
 
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   if (!("IntersectionObserver" in window) || reduceMotion) {
-    targets.forEach((el) => el.classList.add("dm-reveal", "is-visible"));
+    targets.forEach((el) => el.classList.add("is-visible"));
     return;
   }
-
-  document.documentElement.classList.add("has-reveal");
-  targets.forEach((el, index) => {
-    el.classList.add("dm-reveal");
-    el.style.setProperty("--reveal-delay", `${Math.min(index * 70, 210)}ms`);
-  });
 
   const observer = new IntersectionObserver(
     (entries, obs) => {
@@ -2508,7 +2502,7 @@ const initRevealAnimations = () => {
         obs.unobserve(entry.target);
       });
     },
-    { threshold: 0.2, rootMargin: "0px 0px -10% 0px" }
+    { threshold: 0.15, rootMargin: "0px 0px -50px 0px" }
   );
 
   targets.forEach((el) => observer.observe(el));

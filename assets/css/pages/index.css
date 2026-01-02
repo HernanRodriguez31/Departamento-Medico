@@ -3701,6 +3701,76 @@ body.dm-modal-open .brisa-chat-panel {
   --dm-reveal-shift: 16px;
 }
 
+.reveal-on-scroll {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  transition-delay: var(--reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+
+.reveal-on-scroll.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.hero-kpis .kpi-card.reveal-on-scroll {
+  --reveal-delay: 0ms;
+}
+
+.hero-kpis .kpi-card.reveal-on-scroll:nth-child(2) {
+  --reveal-delay: 90ms;
+}
+
+.hero-kpis .kpi-card.reveal-on-scroll:nth-child(3) {
+  --reveal-delay: 180ms;
+}
+
+.mision__container .mision__item.reveal-on-scroll {
+  --reveal-delay: 0ms;
+}
+
+.mision__container .mision__item.reveal-on-scroll:nth-child(2) {
+  --reveal-delay: 90ms;
+}
+
+.mision__container .mision__item.reveal-on-scroll:nth-child(3) {
+  --reveal-delay: 180ms;
+}
+
+.referentes__row--bottom .referente__card.reveal-on-scroll {
+  --reveal-delay: 0ms;
+}
+
+.referentes__row--bottom .referente__card.reveal-on-scroll:nth-child(2) {
+  --reveal-delay: 90ms;
+}
+
+.referentes__row--bottom .referente__card.reveal-on-scroll:nth-child(3) {
+  --reveal-delay: 180ms;
+}
+
+.coordinadores__container .coordinator-card-tier.reveal-on-scroll {
+  --reveal-delay: 0ms;
+}
+
+.coordinadores__container .coordinator-card-tier.reveal-on-scroll:nth-child(2) {
+  --reveal-delay: 70ms;
+}
+
+.coordinadores__container .coordinator-card-tier.reveal-on-scroll:nth-child(3) {
+  --reveal-delay: 140ms;
+}
+
+.coordinadores__container .coordinator-card-tier.reveal-on-scroll:nth-child(4) {
+  --reveal-delay: 210ms;
+}
+
+.coordinadores__container .coordinator-card-tier.reveal-on-scroll:nth-child(5) {
+  --reveal-delay: 280ms;
+}
+
 .dm-reveal {
   transition: opacity var(--dm-motion-slow) var(--dm-ease-smooth),
     transform var(--dm-motion-slow) var(--dm-ease-smooth);
@@ -3801,6 +3871,7 @@ html.has-reveal .dm-reveal.is-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .reveal-on-scroll,
   .dm-reveal,
   .dm-progressive-img,
   .calendar-container .dm-calendar-frame,
@@ -3810,6 +3881,10 @@ html.has-reveal .dm-reveal.is-visible {
     transition: none !important;
     transform: none !important;
     filter: none !important;
+  }
+
+  .reveal-on-scroll {
+    opacity: 1 !important;
   }
 
   html.has-reveal .dm-reveal {
