@@ -57,8 +57,8 @@ html {
   border-radius: 24px;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.08);
   box-sizing: border-box;
-  max-width: 1000px;
-  margin: 40px auto;
+  max-width: 1200px;
+  margin: 80px auto 40px auto;
   padding: 50px;
   width: 100%;
   overflow: hidden;
@@ -82,6 +82,116 @@ html {
 #foro .section-card:hover {
   transform: none;
   box-shadow: none;
+}
+
+#calendario .container {
+  background-color: #ffffff;
+  border-top: 5px solid var(--first-color, #7ab800);
+  border-radius: 24px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.08);
+  box-sizing: border-box;
+  max-width: 1200px;
+  margin: 40px auto 0;
+  padding: 50px 50px 30px !important;
+  width: 100%;
+  overflow: hidden;
+}
+
+#calendario .estructura-calendar {
+  max-width: none;
+  margin: 0;
+  width: 100%;
+}
+
+#calendario .calendar-container {
+  background-color: #ffffff;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: -20px;
+}
+
+#calendario .calendar-container::after {
+  content: "";
+  position: absolute;
+  bottom: -20px;
+  left: -2%;
+  width: 104%;
+  height: 90px;
+  background-color: #ffffff;
+  border-top: none;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.visitas-wrap--standalone {
+  display: flex;
+  justify-content: center;
+  text-align: center;
+  margin: 12px auto 30px;
+  color: #64748b;
+}
+
+.visitas-wrap--standalone .visitas-pill {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+.visitas-wrap--standalone .visitas-label,
+.visitas-wrap--standalone .visitas-count {
+  color: #64748b;
+}
+
+.visitas-wrap--standalone .visitas-count {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+#calendario .calendar-header {
+  margin-bottom: 0;
+  text-align: center;
+}
+
+#calendario .calendar-header .section__title {
+  color: #1e293b;
+  letter-spacing: -0.03em;
+  margin-bottom: 24px;
+}
+
+#calendario .calendar-edit-btn {
+  background-color: transparent;
+  border: 2px solid var(--first-color, #7ab800);
+  color: var(--first-color, #7ab800);
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 8px 20px;
+  text-decoration: none;
+  transition: transform 0.2s ease, background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  white-space: nowrap;
+}
+
+#calendario .calendar-edit-btn:hover {
+  background-color: var(--first-color, #7ab800);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(122, 184, 0, 0.3);
+  transform: scale(1.05);
+}
+
+#calendario .calendar-edit-btn--floating {
+  box-shadow: none;
+}
+
+#calendario .calendar-edit-btn--floating:hover {
+  transform: translateX(-10%) scale(1.05);
+}
+
+@media (max-width: 768px) {
+  #calendario .calendar-edit-btn:hover,
+  #calendario .calendar-edit-btn--floating:hover {
+    transform: none;
+  }
 }
 
 .forum-send-btn {
@@ -2921,32 +3031,30 @@ html {
 .calendar-toggle-group {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  gap: 0;
+  padding: 4px;
+  background-color: #f1f5f9;
   border-radius: 999px;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
 }
 
 .calendar-toggle {
-  border: none;
   background: transparent;
-  padding: 0.4rem 1.1rem;
+  border: none;
   border-radius: 999px;
-  font-weight: 700;
-  font-size: 0.95rem;
-  color: #0f172a;
+  padding: 8px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #64748b;
   cursor: pointer;
-  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .calendar-toggle.is-active {
-  background: rgba(122, 184, 0, 0.14);
-  color: var(--first-color-ink);
-  box-shadow: inset 0 0 0 1px rgba(122, 184, 0, 0.35);
+  background-color: #ffffff;
+  color: var(--first-color, #7ab800);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transform: scale(1.02);
 }
 
 .calendar-toggle:focus-visible {

@@ -51,10 +51,49 @@
 }
 
 /* Sección headers / separadores */
-.section__header,
 .user-menu__row--primary,
 .user-menu__row--subtle {
   border-bottom: 1px solid var(--border-soft);
+}
+
+main h2,
+.section__header,
+.section-header,
+.section__title,
+.section-title,
+.section-title--unified {
+  border: none !important;
+  border-bottom: none !important;
+}
+
+main h2::before,
+main h2::after,
+.section__header::before,
+.section__header::after,
+.section-header::before,
+.section-header::after,
+.section__title::before,
+.section__title::after,
+.section-title::before,
+.section-title::after,
+.section-title--unified::before,
+.section-title--unified::after {
+  content: none !important;
+  display: none !important;
+}
+
+.section__header hr,
+.section-header hr,
+.section__header .divider,
+.section-header .divider,
+.section__header .separator,
+.section-header .separator,
+.section__header .section-divider,
+.section-header .section-divider,
+.section__header .title-divider,
+.section-header .title-divider,
+.section__header .line {
+  display: none !important;
 }
 
 /* Hover y focus accesible */
