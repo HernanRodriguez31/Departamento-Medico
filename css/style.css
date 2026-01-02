@@ -144,28 +144,30 @@ img {
 }
 .dm-notif-btn{
     position: relative;
-    width: 38px;
-    height: 38px;
-    border-radius: 12px;
-    border: 1px solid rgba(0,0,0,0.08);
-    background: #fff;
+    width: auto;
+    height: auto;
+    padding: 6px 16px;
+    border-radius: 9999px;
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    background: #ffffff;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     color: var(--first-color, #7AB800);
     cursor: pointer;
-    transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease, color .12s ease;
+    transition: background .12s ease, box-shadow .12s ease, border-color .12s ease, color .12s ease;
 }
 .dm-notif-btn svg,
 .dm-notif-btn i{
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
     display: block;
 }
 .dm-notif-btn:hover{
-    box-shadow: 0 10px 24px rgba(0,0,0,0.08);
-    transform: translateY(-1px);
-    border-color: rgba(0,0,0,0.12);
+    background: #f8fafc;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.06);
+    border-color: rgba(0, 0, 0, 0.04);
 }
 .dm-notif-btn.has-unread{
     animation: dm-notif-pulse 1.4s ease-in-out infinite;
@@ -597,7 +599,7 @@ img {
 .header__actions {
     display: inline-flex;
     align-items: center;
-    gap: var(--sp-3, 16px);
+    gap: 16px;
     flex-wrap: nowrap;
     min-width: 0;
 }
@@ -607,15 +609,19 @@ img {
 }
 
 .user-panel-trigger {
-    max-width: 220px;
+    width: fit-content;
+    max-width: none;
+    flex-shrink: 0;
 }
 
 .user-panel-trigger .user-name {
-    max-width: 140px;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    width: auto;
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
     white-space: nowrap;
     display: inline-block;
+    flex-shrink: 0;
 }
 
 .logo {
@@ -3471,16 +3477,18 @@ img {
     }
 
     .header__actions {
-        gap: var(--sp-2, 12px);
+        gap: 16px;
     }
 
     .user-panel-trigger {
-        max-width: 160px;
+        width: fit-content;
+        max-width: none;
         padding: 0.35rem 0.6rem;
     }
 
     .user-panel-trigger .user-name {
-        max-width: 96px;
+        width: auto;
+        max-width: none;
     }
 
     /* Adjust logo sizes for mobile if needed */
@@ -4205,17 +4213,19 @@ img {
     }
 
     .header .user-panel-trigger {
-        width: 100%;
-        max-width: 100%;
+        width: fit-content;
+        max-width: none;
         justify-content: center;
         text-align: center;
         padding: 0.25rem 0.5rem;
         line-height: 1.05;
         gap: 6px;
+        flex-shrink: 0;
     }
 
     .header .user-panel-trigger .user-name {
-        max-width: 100%;
+        width: auto;
+        max-width: none;
         text-align: center;
     }
 
