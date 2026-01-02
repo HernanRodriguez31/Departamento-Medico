@@ -46,6 +46,50 @@ html {
   max-width: 1200px;
 }
 
+#carrete.dm-carousel-section {
+  border-top: 3px solid var(--first-color, #7ab800);
+  padding-top: 2rem;
+}
+
+#carrete .dm-carousel-header {
+  margin-bottom: 0;
+}
+
+#carrete .dm-carousel-title {
+  margin-bottom: 0;
+}
+
+#carrete .dm-carousel-title h2 {
+  margin-bottom: 24px;
+}
+
+@media (min-width: 1024px) {
+  #carrete.dm-carousel-section {
+    padding-bottom: 2rem;
+  }
+
+  #carrete .dm-carousel-left {
+    gap: 0;
+  }
+
+  #carrete .dm-carousel-info-panel {
+    margin: 1rem auto 0;
+  }
+
+  #carrete .dm-carousel-dots {
+    margin-top: 0.6rem;
+  }
+
+  #carrete .dm-carousel-stage {
+    margin-bottom: 8px;
+  }
+
+  #carrete .dm-console {
+    margin-top: 8px;
+    margin-bottom: 8px;
+  }
+}
+
 .dm-carousel-header {
   display: flex;
   align-items: center;
@@ -1045,12 +1089,23 @@ html {
 }
 
 .dm-delete-admin {
-  border-color: #cbd5e1;
-  color: #6b7280;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+  font-size: 16px;
+  margin-bottom: 0;
+  transition: color 0.3s ease, background 0.3s ease, border-color 0.3s ease;
 }
 .dm-delete-admin:hover {
-  background: #e2e8f0;
-  color: #374151;
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #64748b;
+}
+
+.dm-delete-admin .dm-delete-icon,
+.dm-delete-admin svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.6;
 }
 
 .dm-carousel-delete-btn {
