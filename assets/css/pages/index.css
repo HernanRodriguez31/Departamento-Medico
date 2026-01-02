@@ -3702,73 +3702,28 @@ body.dm-modal-open .brisa-chat-panel {
 }
 
 .reveal-on-scroll {
-  opacity: 0;
-  transform: translateY(30px);
-  transition: opacity 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-    transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  transition-delay: var(--reveal-delay, 0ms);
+  opacity: 0 !important;
+  transform: translateY(50px);
+  transition: opacity 1.2s cubic-bezier(0.23, 1, 0.32, 1),
+    transform 1.2s cubic-bezier(0.23, 1, 0.32, 1);
   will-change: opacity, transform;
 }
 
 .reveal-on-scroll.is-visible {
-  opacity: 1;
+  opacity: 1 !important;
   transform: translateY(0);
 }
 
-.hero-kpis .kpi-card.reveal-on-scroll {
-  --reveal-delay: 0ms;
+.delay-100 {
+  transition-delay: 100ms;
 }
 
-.hero-kpis .kpi-card.reveal-on-scroll:nth-child(2) {
-  --reveal-delay: 90ms;
+.delay-200 {
+  transition-delay: 200ms;
 }
 
-.hero-kpis .kpi-card.reveal-on-scroll:nth-child(3) {
-  --reveal-delay: 180ms;
-}
-
-.mision__container .mision__item.reveal-on-scroll {
-  --reveal-delay: 0ms;
-}
-
-.mision__container .mision__item.reveal-on-scroll:nth-child(2) {
-  --reveal-delay: 90ms;
-}
-
-.mision__container .mision__item.reveal-on-scroll:nth-child(3) {
-  --reveal-delay: 180ms;
-}
-
-.referentes__row--bottom .referente__card.reveal-on-scroll {
-  --reveal-delay: 0ms;
-}
-
-.referentes__row--bottom .referente__card.reveal-on-scroll:nth-child(2) {
-  --reveal-delay: 90ms;
-}
-
-.referentes__row--bottom .referente__card.reveal-on-scroll:nth-child(3) {
-  --reveal-delay: 180ms;
-}
-
-.coordinadores__container .coordinator-card-tier.reveal-on-scroll {
-  --reveal-delay: 0ms;
-}
-
-.coordinadores__container .coordinator-card-tier.reveal-on-scroll:nth-child(2) {
-  --reveal-delay: 70ms;
-}
-
-.coordinadores__container .coordinator-card-tier.reveal-on-scroll:nth-child(3) {
-  --reveal-delay: 140ms;
-}
-
-.coordinadores__container .coordinator-card-tier.reveal-on-scroll:nth-child(4) {
-  --reveal-delay: 210ms;
-}
-
-.coordinadores__container .coordinator-card-tier.reveal-on-scroll:nth-child(5) {
-  --reveal-delay: 280ms;
+.delay-300 {
+  transition-delay: 300ms;
 }
 
 .dm-reveal {
