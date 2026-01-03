@@ -286,46 +286,14 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
   };
 
   const lockScroll = () => {
-    if (state.scrollLocked) return;
-    state.scrollLocked = true;
-    state.scrollY = window.scrollY || document.documentElement.scrollTop || 0;
-    state.bodyStyles = {
-      position: document.body.style.position,
-      top: document.body.style.top,
-      left: document.body.style.left,
-      right: document.body.style.right,
-      width: document.body.style.width
-    };
-
-    document.documentElement.classList.add("dm-scroll-locked");
-    document.body.classList.add("dm-scroll-locked");
-
-    document.body.style.position = "fixed";
-    document.body.style.top = `-${state.scrollY}px`;
-    document.body.style.left = "0";
-    document.body.style.right = "0";
-    document.body.style.width = "100%";
+    // Keep background scrollable to avoid layout shift when opening the assistant.
+    state.scrollLocked = false;
   };
 
   const unlockScroll = () => {
-    if (!state.scrollLocked && document.body.style.position !== "fixed") return;
     state.scrollLocked = false;
-
     document.documentElement.classList.remove("dm-scroll-locked");
     document.body.classList.remove("dm-scroll-locked");
-
-    const styles = state.bodyStyles || {};
-    const top = document.body.style.top;
-    const restoreY = top ? Math.abs(parseInt(top, 10)) : state.scrollY;
-
-    document.body.style.position = styles.position || "";
-    document.body.style.top = styles.top || "";
-    document.body.style.left = styles.left || "";
-    document.body.style.right = styles.right || "";
-    document.body.style.width = styles.width || "";
-
-    window.scrollTo(0, Number.isFinite(restoreY) ? restoreY : 0);
-    state.scrollY = 0;
   };
 
   const openPanel = async () => {

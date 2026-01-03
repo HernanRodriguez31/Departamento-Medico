@@ -2345,6 +2345,10 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
   const header = document.getElementById("header");
   const botSlot = document.getElementById("dmDesktopSidebarBotSlot");
   const fab = document.getElementById("dmAssistantFab");
+  const portalWrapper = document.getElementById("portal-wrapper");
+  const portalButton = document.getElementById("btn-portal");
+  const portalBubble = document.getElementById("portal-bubble");
+  const portalAction = document.getElementById("portal-action");
 
   // Keep original placement so we can restore when leaving desktop
   const originalParent = fab?.parentElement || null;
@@ -2390,6 +2394,7 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
   let navCubes = [];
   let activeCubeIndex = 0;
   let keyboardNavActive = false;
+  let suppressAiFocusOpen = false;
 
   const refreshNavCubes = () => {
     navCubes = Array.from(sidebar.querySelectorAll(".dm-cube"));
@@ -2399,8 +2404,66 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
   };
 
   const isAssistantCube = (btn) => btn && btn.id === "dmAssistantFab";
+  const isPortalCube = (btn) => btn && btn.id === "btn-portal";
+  const getAssistantShell = () => assistantShell || window.__dmAssistantShell;
+  const isAssistantMenuOpen = () => Boolean(getAssistantShell()?.state?.pickerOpen);
+  const showPortalBubble = () => {
+    if (!portalBubble) return;
+    portalBubble.style.display = "block";
+    portalBubble.setAttribute("aria-hidden", "false");
+  };
+  const hidePortalBubble = () => {
+    if (!portalBubble) return;
+    portalBubble.style.display = "none";
+    portalBubble.setAttribute("aria-hidden", "true");
+  };
+  const openPortalMenu = () => {
+    closeAiMenu();
+    showPortalBubble();
+    portalButton?.classList.add("active");
+  };
+  const closePortalMenu = () => {
+    hidePortalBubble();
+    portalButton?.classList.remove("active");
+  };
+  const openAiMenu = () => {
+    const shell = getAssistantShell();
+    if (!shell) return;
+    closePortalMenu();
+    shell.openPicker?.();
+    fab?.classList.add("active");
+    requestAnimationFrame(() => focusAiModel("gemini"));
+  };
+  const closeAiMenu = () => {
+    const shell = getAssistantShell();
+    if (!shell) return;
+    shell.closePicker?.();
+    fab?.classList.remove("active");
+  };
+  const closeAllMenus = () => {
+    closePortalMenu();
+    closeAiMenu();
+  };
+  const togglePortalMenu = () => {
+    const isOpen = portalBubble?.style.display === "block";
+    closeAllMenus();
+    if (!isOpen) openPortalMenu();
+  };
+  const toggleAiMenu = () => {
+    const isOpen = isAssistantMenuOpen();
+    closeAllMenus();
+    if (!isOpen) openAiMenu();
+  };
+  const isExternalCube = (btn) => {
+    if (!btn) return false;
+    if (btn.dataset.external === "true") return true;
+    if (btn.getAttribute("target") === "_blank") return true;
+    const href = btn.getAttribute("href");
+    return href ? /^https?:/i.test(href) : false;
+  };
 
   const scrollToCubeTarget = (btn) => {
+    if (isExternalCube(btn)) return;
     const targetSel = btn.getAttribute("data-target") || "";
     if (!targetSel || targetSel === "#top") {
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -2419,9 +2482,7 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
   const clearCubeSelection = ({ closePicker = false } = {}) => {
     if (!navCubes.length) return;
     navCubes.forEach((btn) => btn.classList.remove("is-selected"));
-    if (closePicker) {
-      (assistantShell || window.__dmAssistantShell)?.closePicker?.();
-    }
+    if (closePicker) closeAllMenus();
     const activeEl = document.activeElement;
     if (activeEl && navCubes.includes(activeEl)) {
       activeEl.blur();
@@ -2439,9 +2500,54 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
     if (focus) nextBtn.focus({ preventScroll: true });
     if (scroll && !isAssistantCube(nextBtn)) scrollToCubeTarget(nextBtn);
     if (isAssistantCube(nextBtn)) {
-      (assistantShell || window.__dmAssistantShell)?.openPicker?.();
-    } else {
+      openAiMenu();
+      return;
+    }
+    if (isPortalCube(nextBtn)) {
+      openPortalMenu();
+      return;
+    }
+    closeAllMenus();
+  };
+
+  const getAiSelector = () => document.querySelector(".dm-ai-selector");
+  const getAiButtons = () => {
+    const selector = getAiSelector();
+    if (!selector) return [];
+    return Array.from(selector.querySelectorAll("[data-dm-ai-model]"));
+  };
+  const focusAiModel = (model) => {
+    const selector = getAiSelector();
+    if (!selector) return;
+    const btn = selector.querySelector(`[data-dm-ai-model="${model}"]`);
+    if (btn) btn.focus({ preventScroll: true });
+  };
+  const handleAiSelectorKeydown = (event) => {
+    const selector = getAiSelector();
+    if (!selector || !selector.contains(event.target)) return;
+    const buttons = getAiButtons();
+    if (!buttons.length) return;
+    const activeIndex = buttons.indexOf(document.activeElement);
+    if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+      event.preventDefault();
+      const delta = event.key === "ArrowDown" ? 1 : -1;
+      const nextIndex = (activeIndex + delta + buttons.length) % buttons.length;
+      buttons[nextIndex].focus({ preventScroll: true });
+      return;
+    }
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
       (assistantShell || window.__dmAssistantShell)?.closePicker?.();
+      fab?.focus({ preventScroll: true });
+      return;
+    }
+    if (event.key === "ArrowRight" || event.key === "Enter") {
+      event.preventDefault();
+      const btn = document.activeElement;
+      const model = btn?.dataset?.dmAiModel;
+      if (model) {
+        (assistantShell || window.__dmAssistantShell)?.openChat?.(model);
+      }
     }
   };
 
@@ -2450,12 +2556,29 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
     navCubes.forEach((btn) => {
       btn.addEventListener(
         "click",
-        () => {
+        (event) => {
+          if (isPortalCube(btn)) {
+            event.preventDefault();
+            event.stopPropagation();
+            togglePortalMenu();
+            if (portalBubble?.style.display === "block") {
+              portalAction?.focus({ preventScroll: true });
+            }
+            return;
+          }
+          if (isAssistantCube(btn)) {
+            event.stopPropagation();
+            btn.classList.add("is-pressed");
+            window.setTimeout(() => btn.classList.remove("is-pressed"), 150);
+            toggleAiMenu();
+            return;
+          }
+          if (isExternalCube(btn)) return;
           btn.classList.add("is-pressed");
           window.setTimeout(() => btn.classList.remove("is-pressed"), 150);
           setActiveCube(navCubes.indexOf(btn), { scroll: true });
         },
-        { passive: true }
+        { passive: false }
       );
     });
   };
@@ -2492,11 +2615,97 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
 
   bindCubeHandlers();
 
+  if (fab) {
+    fab.addEventListener("click", (event) => {
+      if (!mq.matches) return;
+      event.preventDefault();
+      event.stopPropagation();
+      suppressAiFocusOpen = false;
+      toggleAiMenu();
+    });
+  }
+
+  if (portalWrapper && portalButton && portalBubble) {
+    portalWrapper.addEventListener("focusin", openPortalMenu);
+    portalWrapper.addEventListener("focusout", () => {
+      window.setTimeout(() => {
+        if (!portalWrapper.contains(document.activeElement)) closePortalMenu();
+      }, 0);
+    });
+    portalButton.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowRight" || event.key === "Enter") {
+        event.preventDefault();
+        closeAllMenus();
+        openPortalMenu();
+        portalAction?.focus({ preventScroll: true });
+      }
+    });
+  }
+
+  if (portalAction && portalButton) {
+    portalAction.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        portalButton.focus({ preventScroll: true });
+        return;
+      }
+      if (event.key === "Enter") return;
+    });
+    portalAction.addEventListener("click", (event) => {
+      event.stopPropagation();
+    });
+  }
+
+  if (fab) {
+    const markAiMouseIntent = () => {
+      if (!mq.matches) return;
+      suppressAiFocusOpen = true;
+    };
+    fab.addEventListener("pointerdown", markAiMouseIntent);
+    fab.addEventListener("mousedown", markAiMouseIntent);
+    fab.addEventListener("focus", () => {
+      if (!mq.matches) return;
+      if (suppressAiFocusOpen) {
+        suppressAiFocusOpen = false;
+        return;
+      }
+      closePortalMenu();
+      openAiMenu();
+    });
+  }
+
+  const aiSelector = getAiSelector();
+  if (aiSelector) {
+    aiSelector.addEventListener("keydown", handleAiSelectorKeydown);
+    aiSelector.addEventListener("click", (event) => event.stopPropagation());
+  }
+
+  document.addEventListener("click", (event) => {
+    if (!mq.matches) return;
+    const target = event.target;
+    if (target.closest(".nav-item-wrapper")) return;
+    if (target.closest("#dmAssistantFab")) return;
+    if (target.closest(".dm-ai-selector")) return;
+    closeAllMenus();
+  });
+
   syncDesktopState();
   updateHeaderHeightVar();
 
   window.addEventListener("resize", updateHeaderHeightVar, { passive: true });
   document.addEventListener("keydown", handleCubeKeyNav);
+  document.addEventListener("keydown", (event) => {
+    if (!mq.matches) return;
+    if (event.key !== "ArrowLeft") return;
+    const shell = getAssistantShell();
+    if (!shell?.state?.panelOpen) return;
+    if (isTextInput(event.target)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    shell.closeChat?.();
+    suppressAiFocusOpen = true;
+    fab?.focus({ preventScroll: true });
+  });
   window.addEventListener("wheel", handleWheelNav, { passive: true });
 
   refreshNavCubes();
@@ -2602,7 +2811,13 @@ const boot = () => {
   initDesktopQuickSidebar({ assistantShell });
   const assistantFab = document.getElementById("dmAssistantFab");
   if (assistantFab && assistantShell) {
-    assistantFab.addEventListener("click", () => assistantShell.togglePicker());
+    assistantFab.addEventListener("click", (event) => {
+      if (assistantFab.classList.contains("dm-cube")) {
+        event.stopPropagation();
+        return;
+      }
+      assistantShell.togglePicker();
+    });
   }
   initCarouselModule().catch((err) => console.error("[Muro] Error inicializando", err));
 };

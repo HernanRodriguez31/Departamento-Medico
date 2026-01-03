@@ -3602,7 +3602,7 @@ body.dm-modal-open .brisa-chat-panel {
 .dm-desktop-sidebar {
   position: fixed;
   left: 16px;
-  top: calc(var(--dm-header-h, 80px) + 12px);
+  top: calc(var(--dm-header-h, 80px) + 4px);
   z-index: 20500;
   display: none; /* enabled via media query */
   pointer-events: none; /* allow clicks only on inner content */
@@ -3618,22 +3618,22 @@ body.dm-modal-open .brisa-chat-panel {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 18px;
+  gap: 12px;
   pointer-events: auto;
 }
 
 .dm-cubes {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 12px;
   align-items: center;
 }
 
 /* Cube button (3D + glass edge) */
 .dm-cube {
-  width: 80px;
-  height: 80px;
-  border-radius: 18px;
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
   background: #26D07C; /* structureGreen */
   color: #ffffff;
   border: 1px solid rgba(0, 60, 40, 0.12); /* delicate border */
@@ -3658,7 +3658,7 @@ body.dm-modal-open .brisa-chat-panel {
   content: "";
   position: absolute;
   inset: 0;
-  border-radius: 17px; /* 1px less so it sits inside the border */
+  border-radius: 15px; /* 1px less so it sits inside the border */
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0) 40%);
   pointer-events: none;
 }
@@ -3679,7 +3679,7 @@ body.dm-modal-open .brisa-chat-panel {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 4px;
   transition: transform 0.1s ease, opacity 0.1s ease;
 }
 
@@ -3693,33 +3693,122 @@ body.dm-modal-open .brisa-chat-panel {
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 20px;
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.12));
 }
 
 /* lucide replaces <i> with <svg>, so target svg in both cases */
 .dm-cube__icon svg {
-  width: 28px;
-  height: 28px;
+  width: 20px;
+  height: 20px;
   stroke-width: 2.5;
 }
 
 .dm-cube__label {
-  font-size: 9px;
-  font-weight: 800;
+  font-size: 8px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.18em;
-  line-height: 1;
+  letter-spacing: 0.5px;
+  line-height: 1.1;
   text-align: center;
   max-width: 90%;
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.10));
+}
+
+.nav-item {
+  display: flex;
+  text-align: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.nav-label {
+  font-size: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.nav-icon {
+  font-size: 20px;
+}
+
+.nav-item-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.portal-submenu {
+  position: absolute;
+  left: 85px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
+  z-index: 5;
+}
+
+/* CÍRCULO PERFECTO PARA EL PORTAL */
+#portal-action {
+  width: 50px !important;
+  height: 50px !important;
+  border-radius: 50% !important;
+  aspect-ratio: 1 / 1;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  padding: 0 !important;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #7AB800;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  transition: all 0.2s ease;
+  text-decoration: none;
+  outline: none;
+  box-sizing: border-box;
+}
+
+#portal-action:hover,
+#portal-action:focus {
+  border-color: #7AB800 !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  transform: translateY(-2px);
+  outline: none;
+}
+
+#portal-action i {
+  font-size: 24px !important;
+  color: #7AB800;
+}
+
+#btn-portal:focus,
+#btn-portal:focus-visible,
+#btn-portal.active {
+  border: 2px solid #7AB800 !important;
+  outline: none;
+  color: #7AB800;
+  background-color: #f7fcf0;
+}
+
+#btn-portal:focus .nav-icon,
+#btn-portal.active .nav-icon {
+  color: #7AB800 !important;
 }
 
 @media (min-width: 1024px) {
   .dm-desktop-sidebar{
     --dm-brisa: var(--brisa-green, #7ab800);
 
-    --dm-cube-size: 76px;
-    --dm-cube-radius: 18px;
+    --dm-cube-size: 72px;
+    --dm-cube-radius: 16px;
 
     --dm-cube-bg: #ffffff;
     --dm-cube-border: rgba(0, 0, 0, 0.12);
@@ -3780,6 +3869,8 @@ body.dm-modal-open .brisa-chat-panel {
   }
 
   .dm-cube__icon svg {
+    width: 20px;
+    height: 20px;
     stroke: currentColor;
     stroke-width: 1.7 !important;
     stroke-linecap: round;
@@ -3790,7 +3881,7 @@ body.dm-modal-open .brisa-chat-panel {
   .dm-cube__label{
     color: var(--dm-brisa);
     font-size: 8px;
-    letter-spacing: 0.22em;
+    letter-spacing: 0.5px;
     text-shadow: none;
   }
 
@@ -3814,7 +3905,7 @@ body.dm-modal-open .brisa-chat-panel {
   /* Labels largos: 7px */
   .dm-cube[data-target="#referentes"] .dm-cube__label,
   .dm-cube[data-target="#carrete"] .dm-cube__label{
-    font-size: 7px;
+    font-size: 8px;
   }
 
   /* BOT tile dockeado: mismo cubo */
