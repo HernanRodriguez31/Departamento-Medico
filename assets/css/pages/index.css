@@ -3752,6 +3752,13 @@ body.dm-modal-open .brisa-chat-panel {
   border-radius: 0;
   box-shadow: none;
   z-index: 5;
+  display: none;
+}
+
+.nav-item-wrapper.is-open .portal-submenu,
+.nav-item-wrapper:focus-within .portal-submenu,
+.nav-item-wrapper:hover .portal-submenu {
+  display: block;
 }
 
 /* CÍRCULO PERFECTO PARA EL PORTAL */

@@ -2408,14 +2408,16 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
   const getAssistantShell = () => assistantShell || window.__dmAssistantShell;
   const isAssistantMenuOpen = () => Boolean(getAssistantShell()?.state?.pickerOpen);
   const showPortalBubble = () => {
-    if (!portalBubble) return;
-    portalBubble.style.display = "block";
+    if (!portalWrapper || !portalBubble) return;
+    portalWrapper.classList.add("is-open");
     portalBubble.setAttribute("aria-hidden", "false");
+    portalButton?.setAttribute("aria-expanded", "true");
   };
   const hidePortalBubble = () => {
-    if (!portalBubble) return;
-    portalBubble.style.display = "none";
+    if (!portalWrapper || !portalBubble) return;
+    portalWrapper.classList.remove("is-open");
     portalBubble.setAttribute("aria-hidden", "true");
+    portalButton?.setAttribute("aria-expanded", "false");
   };
   const openPortalMenu = () => {
     closeAiMenu();
@@ -2445,7 +2447,7 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
     closeAiMenu();
   };
   const togglePortalMenu = () => {
-    const isOpen = portalBubble?.style.display === "block";
+    const isOpen = portalWrapper?.classList.contains("is-open");
     closeAllMenus();
     if (!isOpen) openPortalMenu();
   };
@@ -2561,7 +2563,7 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
             event.preventDefault();
             event.stopPropagation();
             togglePortalMenu();
-            if (portalBubble?.style.display === "block") {
+            if (portalWrapper?.classList.contains("is-open")) {
               portalAction?.focus({ preventScroll: true });
             }
             return;
