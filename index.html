@@ -2,34 +2,38 @@
 <html lang="es">
 
 <head>
+    <style id="anti-flicker">
+        #splash-screen { visibility: visible; }
+    </style>
     <script>
-        // 1. Detección Ultrarrápida
         (function() {
+            // 1. Detectar Móvil
             var isMobile = window.matchMedia('(max-width: 1024px)').matches;
-            var urlParams = new URLSearchParams(window.location.search);
-            var isDesktopForced = urlParams.has('desktop');
+            var isDesktopForced = window.location.search.indexOf('desktop=1') > -1;
+            // 2. Si es Móvil...
             if (isMobile && !isDesktopForced) {
-                // 2. DETENER EL PARSER (Stop)
-                if (window.stop) {
-                    window.stop();
-                }
-                // 3. LA OPCIÓN NUCLEAR (Borrado de DOM)
-                document.documentElement.innerHTML = '';
-                // 4. Redirección
-                window.location.replace('/app/index.html');
-                // 5. Bloqueo final de Script
-                throw new Error("Redirección Móvil Forzada - Deteniendo ejecución.");
+                // ¡NO revelamos la página! Sigue invisible (display: none).
+                // Redirigimos inmediatamente.
+                window.location.replace('/app/index.html' + window.location.hash);
+            } else {
+                // 3. Si es Desktop...
+                window.addEventListener('load', function() {
+                    setTimeout(function() {
+                        var styleNode = document.getElementById('anti-flicker');
+                        if (styleNode) {
+                            styleNode.remove();
+                        }
+                        var splash = document.getElementById('splash-screen');
+                        if (splash) {
+                            splash.style.opacity = '0';
+                            setTimeout(function() { splash.remove(); }, 600);
+                        }
+                    }, 1000);
+                });
             }
         })();
     </script>
     <meta charset="UTF-8">
-    <style>
-        /* Mantén este estilo solo para suavizar la entrada en DESKTOP */
-        html {
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-    </style>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
     <title>Dto Médico</title>
     <meta name="description" content="Espacio de trabajo colaborativo para el crecimiento colectivo.">
@@ -1513,6 +1517,49 @@
 </head>
 
 <body>
+    <div id="splash-screen"
+        style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #ffffff; z-index: 9999999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.6s ease-out;">
+        <img src="assets/images/logo-dpto-medico-large.png" class="splash-logo" alt="Departamento Médico">
+        <div
+            style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #4ade80; border-radius: 50%; animation: spin 0.8s linear infinite; margin-top: 20px;">
+        </div>
+        <style>
+            @keyframes spin {
+                0% {
+                    transform: rotate(0deg);
+                }
+                100% {
+                    transform: rotate(360deg);
+                }
+            }
+
+            @keyframes pulse {
+                0% {
+                    transform: scale(1);
+                }
+                50% {
+                    transform: scale(1.03);
+                }
+                100% {
+                    transform: scale(1);
+                }
+            }
+
+            .splash-logo {
+                width: 280px;
+                height: auto;
+                animation: pulse 2s infinite;
+            }
+
+            @media (min-width: 1024px) {
+                .splash-logo {
+                    width: 450px;
+                }
+            }
+        </style>
+    </div>
+
+    <div id="app">
 
     <header class="header reveal-on-scroll" id="header">
         <div class="container header__container">
@@ -4099,6 +4146,7 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
             <button id="push-banner-allow" class="push-banner-allow" type="button">Permitir</button>
         </div>
     </div>
+</div>
 </body>
 
 </html>

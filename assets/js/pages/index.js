@@ -38,15 +38,6 @@ import { initAssistantShell } from "../shared/assistant-shell.js";
 import { initUserMenu } from "../common/user-menu.js";
 import { hydrateAvatars } from "../common/user-profiles.js";
 
-const revealDesktop = () => {
-  document.documentElement.style.opacity = "1";
-};
-
-document.addEventListener("DOMContentLoaded", revealDesktop);
-if (document.readyState !== "loading") {
-  revealDesktop();
-}
-
 function ensureFirebase() {
   return getFirebase();
 }
