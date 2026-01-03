@@ -51,6 +51,10 @@ html {
   padding-top: 2rem;
 }
 
+#estructura-hero .section__title {
+  margin-top: 80px;
+}
+
 #foro {
   background-color: #ffffff;
   border-top: 5px solid var(--first-color, #7ab800);
