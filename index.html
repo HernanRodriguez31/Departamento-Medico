@@ -2,23 +2,40 @@
 <html lang="es">
 
 <head>
+    <script>
+        // 1. Detección Ultrarrápida
+        (function() {
+            var isMobile = window.matchMedia('(max-width: 1024px)').matches;
+            var urlParams = new URLSearchParams(window.location.search);
+            var isDesktopForced = urlParams.has('desktop');
+            if (isMobile && !isDesktopForced) {
+                // 2. DETENER EL PARSER (Stop)
+                if (window.stop) {
+                    window.stop();
+                }
+                // 3. LA OPCIÓN NUCLEAR (Borrado de DOM)
+                document.documentElement.innerHTML = '';
+                // 4. Redirección
+                window.location.replace('/app/index.html');
+                // 5. Bloqueo final de Script
+                throw new Error("Redirección Móvil Forzada - Deteniendo ejecución.");
+            }
+        })();
+    </script>
     <meta charset="UTF-8">
+    <style>
+        /* Mantén este estilo solo para suavizar la entrada en DESKTOP */
+        html {
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+    </style>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
     <title>Dto Médico</title>
     <meta name="description" content="Espacio de trabajo colaborativo para el crecimiento colectivo.">
     <meta name="application-name" content="Dto Médico">
     <meta name="apple-mobile-web-app-title" content="Dto Médico">
     <meta name="theme-color" content="#7AB800">
-    <script>
-        // Mobile guard: send small screens to the app shell unless ?desktop=1 is present.
-        (() => {
-            const isMobile = window.matchMedia('(max-width: 1024px)').matches;
-            if (!isMobile) return;
-            const params = new URLSearchParams(window.location.search);
-            if (params.get('desktop') === '1') return;
-            window.location.replace(`/app/index.html${window.location.hash || ''}`);
-        })();
-    </script>
 
     <!-- Favicon -->
     <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32.png">
