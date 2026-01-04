@@ -3893,18 +3893,18 @@ body.dm-modal-open .brisa-chat-panel {
   }
 
   .dm-cube.is-selected{
-    border-color: rgba(122, 184, 0, 0.35);
+    border: 2px solid #7AB800;
+    background-color: #f7fcf0;
     box-shadow:
-      0 0 0 1px rgba(122, 184, 0, 0.18),
       0 10px 24px var(--dm-cube-drop),
       0 2px 0 var(--dm-cube-ledge);
   }
 
   .dm-cube:focus-visible{
-    outline: 2px solid rgba(122, 184, 0, 0.6);
-    outline-offset: 3px;
+    outline: none;
+    border: 2px solid #7AB800;
+    background-color: #f7fcf0;
     box-shadow:
-      0 0 0 2px rgba(122, 184, 0, 0.16),
       0 10px 24px var(--dm-cube-drop),
       0 2px 0 var(--dm-cube-ledge);
   }
@@ -3941,6 +3941,12 @@ body.dm-modal-open .brisa-chat-panel {
     justify-content: center;
     overflow: hidden;
     padding: 0;
+  }
+
+  body.dm-assistant-docked #dmAssistantFab.is-selected,
+  body.dm-assistant-docked #dmAssistantFab:focus-visible{
+    border: 2px solid #7AB800;
+    background-color: #f7fcf0;
   }
 
   body.dm-assistant-docked #dmAssistantFab:hover{
@@ -4121,6 +4127,16 @@ body.dm-modal-open .brisa-chat-panel {
     transform 1.2s cubic-bezier(0.23, 1, 0.32, 1);
   will-change: opacity, transform;
   contain: content;
+}
+
+.header.reveal-on-scroll {
+  contain: none;
+  overflow: visible;
+}
+
+.header.reveal-on-scroll .header__container,
+.header.reveal-on-scroll .header__actions {
+  overflow: visible;
 }
 
 .reveal-on-scroll.is-visible {
