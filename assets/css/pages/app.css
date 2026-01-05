@@ -12,6 +12,23 @@ html {
   scroll-behavior: smooth;
 }
 
+.disable-hover * {
+  pointer-events: none !important;
+}
+
+.disable-hover .main {
+  pointer-events: auto !important;
+}
+
+.disable-hover .header {
+  backdrop-filter: none;
+}
+
+.disable-hover .dm-carousel-section.is-feed-mode,
+.disable-hover .dm-carousel-section.is-feed-mode .dm-carousel-slide {
+  box-shadow: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -101,6 +118,7 @@ html {
   gap: 16px;
   padding: 6px 0 12px;
   flex-direction: column;
+  will-change: auto;
 }
 
 .dm-carousel-section.is-feed-mode .dm-carousel-slide {
@@ -109,6 +127,16 @@ html {
   flex-direction: column;
   border: 1px solid #e5e7eb;
   box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+}
+
+.dm-carousel-section.is-feed-mode .dm-carousel-slide,
+.dm-carousel-section.is-feed-mode .dm-post__media {
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+.dm-carousel-section.is-feed-mode .dm-post__media {
+  background: transparent;
 }
 
 .dm-carousel-section.is-feed-mode .dm-carousel-slide img {
@@ -322,6 +350,16 @@ html {
   transition: filter 0.25s ease, transform 0.25s ease, opacity 0.25s ease;
 }
 
+.img-fade-in {
+  opacity: 0;
+  transition: opacity 0.4s ease-out, filter 0.25s ease, transform 0.25s ease;
+  will-change: opacity;
+}
+
+.img-fade-in.is-loaded {
+  opacity: 1;
+}
+
 .dm-post.vertical .dm-post__media {
   aspect-ratio: 3 / 4;
 }
@@ -351,6 +389,10 @@ html {
   transition: opacity 0.2s ease;
   animation: dm-shimmer 1.2s ease-in-out infinite;
   pointer-events: none;
+}
+
+.dm-carousel-section.is-feed-mode .img-fade-in ~ .dm-img-skeleton {
+  opacity: 0 !important;
 }
 
 .dm-post__media.is-loading .dm-img-skeleton,

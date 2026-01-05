@@ -25,15 +25,28 @@ document.addEventListener('DOMContentLoaded', () => {
             document.addEventListener(type, preventGesture, { passive: false })
         })
 
-        document.addEventListener(
-            'touchmove',
-            (event) => {
-                if (event.touches && event.touches.length > 1) {
-                    event.preventDefault()
-                }
-            },
-            { passive: false }
-        )
+        let pinchActive = false
+        const preventPinchMove = (event) => {
+            if (event.touches && event.touches.length > 1 && event.cancelable) {
+                event.preventDefault()
+            }
+        }
+        const handlePinchStart = (event) => {
+            if (!event.touches || event.touches.length < 2 || pinchActive) return
+            pinchActive = true
+            document.addEventListener('touchmove', preventPinchMove, { passive: false })
+        }
+        const handlePinchEnd = (event) => {
+            const touches = event.touches ? event.touches.length : 0
+            if (pinchActive && touches < 2) {
+                pinchActive = false
+                document.removeEventListener('touchmove', preventPinchMove)
+            }
+        }
+
+        document.addEventListener('touchstart', handlePinchStart, { passive: true })
+        document.addEventListener('touchend', handlePinchEnd, { passive: true })
+        document.addEventListener('touchcancel', handlePinchEnd, { passive: true })
 
         let lastTouchEnd = 0
         document.addEventListener(
@@ -275,6 +288,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const mainScroller = document.querySelector("main.main");
+    const hoverClass = "disable-hover";
+    let hoverTimer = 0;
+    let hoverActive = false;
+    let scrollUiTicking = false;
+    let scrollUpVisible = null;
+
+    const handleDisableHover = () => {
+        if (!document.body) return;
+        if (!hoverActive) {
+            document.body.classList.add(hoverClass);
+            hoverActive = true;
+        }
+        if (hoverTimer) clearTimeout(hoverTimer);
+        hoverTimer = window.setTimeout(() => {
+            document.body.classList.remove(hoverClass);
+            hoverActive = false;
+        }, 150);
+    };
 
     const getScrollTop = () => {
         if (document.body.dataset.view && mainScroller) return mainScroller.scrollTop;
@@ -282,12 +313,13 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     /*==================== SHOW SCROLL UP ====================*/
-    function scrollUp() {
+    function scrollUp(y = getScrollTop()) {
         const btn = document.getElementById("scroll-up");
         if (!btn) return;
-        const y = getScrollTop();
-        if (y >= 200) btn.classList.add("show-scroll");
-        else btn.classList.remove("show-scroll");
+        const shouldShow = y >= 200;
+        if (scrollUpVisible === shouldShow) return;
+        scrollUpVisible = shouldShow;
+        btn.classList.toggle("show-scroll", shouldShow);
     }
 
     const scrollToTop = () => {
@@ -300,10 +332,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /*==================== CHANGE BACKGROUND HEADER ====================*/
     let headerIsCompact = null;
-    function scrollHeader() {
+    function scrollHeader(y = getScrollTop()) {
         const nav = document.getElementById("header");
         if (!nav) return;
-        const y = getScrollTop();
         const shouldCompact = y >= 80;
         if (headerIsCompact !== shouldCompact) {
             headerIsCompact = shouldCompact;
@@ -313,12 +344,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    const scheduleScrollUI = () => {
+        handleDisableHover();
+        if (scrollUiTicking) return;
+        scrollUiTicking = true;
+        requestAnimationFrame(() => {
+            scrollUiTicking = false;
+            const y = getScrollTop();
+            scrollUp(y);
+            scrollHeader(y);
+        });
+    };
+
     // Escuchar scroll en ambos: window (desktop) + mainScroller (mobile/PWA)
-    window.addEventListener("scroll", scrollUp, { passive: true });
-    window.addEventListener("scroll", scrollHeader, { passive: true });
+    window.addEventListener("scroll", scheduleScrollUI, { passive: true });
     if (mainScroller) {
-        mainScroller.addEventListener("scroll", scrollUp, { passive: true });
-        mainScroller.addEventListener("scroll", scrollHeader, { passive: true });
+        mainScroller.addEventListener("scroll", scheduleScrollUI, { passive: true });
     }
 
     scrollUp();
@@ -341,14 +382,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const muroDeltaMin = 1;
 
     const getMuroScrollContainer = () => {
-        // In the app shell, the Muro lives inside #carrete and (in feed-mode)
-        // the scroll container is the viewport itself (Facebook-style).
-        if (document.body?.dataset?.view !== 'carrete') return window;
-
-        const viewport = document.querySelector(
-            '#carrete.dm-carousel-section.is-feed-mode .dm-carousel-viewport'
-        );
-        return viewport || window;
+        if (document.body?.dataset?.view) return mainScroller || window;
+        return window;
     };
 
     let muroScrollEl = getMuroScrollContainer();
@@ -377,8 +412,12 @@ document.addEventListener('DOMContentLoaded', () => {
         muroComposer.style.removeProperty('pointer-events');
     };
 
+    let muroTicking = false;
+
     const handleMuroComposerScroll = () => {
-        if (!muroComposer) return;
+        const isCarreteView =
+            !document.body?.dataset?.view || document.body?.dataset?.view === 'carrete';
+        if (!muroComposer || !isCarreteView) return;
 
         const currentY = getScrollY();
         const delta = currentY - lastScrollY;
@@ -410,15 +449,24 @@ document.addEventListener('DOMContentLoaded', () => {
         lastScrollY = currentY;
     };
 
+    const scheduleMuroComposerScroll = () => {
+        if (muroTicking) return;
+        muroTicking = true;
+        requestAnimationFrame(() => {
+            muroTicking = false;
+            handleMuroComposerScroll();
+        });
+    };
+
     const bindMuroScrollListener = () => {
         const next = getMuroScrollContainer();
         if (next === muroScrollEl) return;
 
         // Detach previous
         if (muroScrollEl === window) {
-            window.removeEventListener('scroll', handleMuroComposerScroll);
+            window.removeEventListener('scroll', scheduleMuroComposerScroll);
         } else if (muroScrollEl) {
-            muroScrollEl.removeEventListener('scroll', handleMuroComposerScroll);
+            muroScrollEl.removeEventListener('scroll', scheduleMuroComposerScroll);
         }
 
         muroScrollEl = next;
@@ -427,9 +475,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Attach new
         if (muroScrollEl === window) {
-            window.addEventListener('scroll', handleMuroComposerScroll, { passive: true });
+            window.addEventListener('scroll', scheduleMuroComposerScroll, { passive: true });
         } else if (muroScrollEl) {
-            muroScrollEl.addEventListener('scroll', handleMuroComposerScroll, { passive: true });
+            muroScrollEl.addEventListener('scroll', scheduleMuroComposerScroll, { passive: true });
         }
     };
 
@@ -456,9 +504,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         mo.observe(carreteSection, { attributes: true, attributeFilter: ['class'] });
     }
-    window.addEventListener('scroll', scrollHeader)
-    window.addEventListener('scroll', scrollUp)
-
     /*==================== DASHBOARD LOGIC ====================*/
     // State
     const PHASES = [

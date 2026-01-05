@@ -616,6 +616,8 @@ async function initCarouselModule() {
   let feedObserver = null;
   const feedVisibleRatios = new Map();
   const prefetchedFull = new Set();
+  const preloadedImages = new Set();
+  const PRIORITY_IMAGE_COUNT = 2;
   const feedQuery = window.matchMedia("(max-width: 768px)");
   const displayModeQuery = window.matchMedia("(display-mode: standalone)");
   let feedMode = feedQuery.matches || displayModeQuery.matches;
@@ -812,18 +814,22 @@ async function initCarouselModule() {
     const thumbUrl = s.thumbUrl || "";
     const displaySrc = thumbUrl || fullUrl || "";
     const blurClass = thumbUrl ? " is-blur" : "";
+    const isPriority = idx < 2;
+    const loadingAttr = isPriority ? "eager" : "lazy";
+    const fetchPriorityAttr = isPriority ? "high" : "low";
+    const initialSrc = isPriority ? displaySrc : TRANSPARENT_PIXEL;
     const media = fullUrl
       ? `
       <div class="dm-carousel-media dm-post__media is-loading">
-        <img class="dm-carousel-img dm-post-img${blurClass}"
-          src="${TRANSPARENT_PIXEL}"
+        <img class="dm-carousel-img dm-post-img img-fade-in${blurClass}"
+          src="${initialSrc}"
           data-src="${displaySrc}"
           data-full="${fullUrl}"
           data-thumb="${thumbUrl}"
           alt="${s.title || "Imagen de la galería"}"
-          loading="lazy"
+          loading="${loadingAttr}"
           decoding="async"
-          fetchpriority="low"
+          fetchpriority="${fetchPriorityAttr}"
           width="1200"
           height="900" />
         <span class="dm-img-skeleton" aria-hidden="true"></span>
@@ -1030,6 +1036,10 @@ async function initCarouselModule() {
       hydrateAvatars(track);
       setupFeedObserver();
       setupFeedPagerObserver();
+      requestAnimationFrame(() => {
+        promoteAboveFoldImages(track);
+        preloadRecurringAvatars(track);
+      });
       track.style.transition = "none";
       track.style.transform = "none";
       activeIndex = 0;
@@ -1078,6 +1088,10 @@ async function initCarouselModule() {
     newElements.forEach((el) => hydrateAvatars(el));
     setupFeedObserver();
     setupFeedPagerObserver();
+    requestAnimationFrame(() => {
+      promoteAboveFoldImages(track);
+      preloadRecurringAvatars(track);
+    });
     if (preserveScroll) {
       requestAnimationFrame(() => {
         const nextHeight = document.documentElement.scrollHeight;
@@ -1336,6 +1350,7 @@ async function initCarouselModule() {
   };
 
   const refreshLikeUI = () => {
+    if (feedMode) return;
     const current = slides[getVisualIndex()];
     if (likeCountEl) {
       likeCountEl.textContent = current?.likesCount ? String(current.likesCount) : "0";
@@ -1347,6 +1362,7 @@ async function initCarouselModule() {
   };
 
   const updateInfoPanel = () => {
+    if (feedMode) return;
     if (!infoReference || !infoAuthor) return;
     if (!slides.length) {
       infoReference.textContent = "Referencia: -";
@@ -1438,11 +1454,14 @@ async function initCarouselModule() {
   };
 
   let likeTooltipBound = false;
+  let likeTooltipOpen = false;
   const closeLikeTooltips = () => {
+    if (!likeTooltipOpen) return;
     document
       .querySelectorAll(".dm-post-like.is-open, .dm-comment-like.is-open")
       .forEach((btn) => btn.classList.remove("is-open"));
     clearFloatingLikeTooltips();
+    likeTooltipOpen = false;
   };
   const bindLikeTooltipDismiss = () => {
     if (likeTooltipBound) return;
@@ -1457,7 +1476,7 @@ async function initCarouselModule() {
       }
       closeLikeTooltips();
     });
-    document.addEventListener("scroll", closeLikeTooltips, true);
+    document.addEventListener("scroll", closeLikeTooltips, { passive: true, capture: true });
   };
   const toggleLikeTooltip = (likeBtn) => {
     if (!likeBtn) return;
@@ -1466,6 +1485,7 @@ async function initCarouselModule() {
     closeLikeTooltips();
     if (!isOpen) {
       likeBtn.classList.add("is-open");
+      likeTooltipOpen = true;
       positionLikeTooltip(likeBtn);
     }
   };
@@ -1503,6 +1523,23 @@ async function initCarouselModule() {
     const img = new Image();
     img.decoding = "async";
     img.src = src;
+  };
+
+  const preloadImageUrl = (src) => {
+    if (!src || src.startsWith("data:")) return;
+    const href = resolveUrl(src);
+    if (!href || preloadedImages.has(href)) return;
+    const link = document.createElement("link");
+    link.rel = "preload";
+    link.as = "image";
+    link.href = href;
+    link.setAttribute("fetchpriority", "high");
+    document.head.appendChild(link);
+    preloadedImages.add(href);
+  };
+
+  const preloadImageSet = (urls = []) => {
+    urls.forEach((url) => preloadImageUrl(url));
   };
 
   const resolveUrl = (src) => {
@@ -1567,6 +1604,59 @@ async function initCarouselModule() {
     imgEl.addEventListener("load", handleLoaded, { once: true });
     imgEl.addEventListener("error", () => markPostImageError(imgEl), { once: true });
   };
+
+  const promoteAboveFoldImages = (root = track) => {
+    if (!root) return;
+    const images = Array.from(root.querySelectorAll(".dm-post-img"));
+    if (!images.length) return;
+    const viewportH = window.innerHeight || document.documentElement.clientHeight || 0;
+    const visible = images.filter((img) => {
+      const rect = img.getBoundingClientRect();
+      return rect.bottom > 0 && rect.top < viewportH;
+    });
+    const candidates = (visible.length ? visible : images).slice(0, PRIORITY_IMAGE_COUNT);
+    const candidateSet = new Set(candidates);
+    images.forEach((img) => {
+      const isPriority = candidateSet.has(img);
+      if (isPriority) {
+        img.setAttribute("loading", "eager");
+        img.setAttribute("fetchpriority", "high");
+        img.dataset.priority = "true";
+        loadLazyImage(img);
+        preloadImageUrl(img.dataset.full || img.dataset.src || img.src || "");
+        return;
+      }
+      if (img.dataset.priority === "true") return;
+      img.setAttribute("loading", "lazy");
+      img.setAttribute("fetchpriority", "low");
+    });
+  };
+
+  const preloadRecurringAvatars = (root = document) => {
+    const avatars = Array.from(
+      root.querySelectorAll("[data-author-avatar], [data-avatar-img], [data-dm-avatar-img]")
+    );
+    if (!avatars.length) return;
+    const counts = new Map();
+    avatars.forEach((img) => {
+      const src = img.currentSrc || img.src || "";
+      if (!src || src.startsWith("data:")) return;
+      const href = resolveUrl(src);
+      if (!href) return;
+      counts.set(href, (counts.get(href) || 0) + 1);
+    });
+    const frequent = Array.from(counts.entries())
+      .filter((entry) => entry[1] > 1)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map((entry) => entry[0]);
+    preloadImageSet(frequent);
+  };
+
+  window.addEventListener("dm:avatar-updated", (event) => {
+    const url = event?.detail?.url || "";
+    preloadImageUrl(url);
+  });
 
   const loadFullImage = (imgEl) => {
     if (!imgEl) return;
@@ -2050,6 +2140,7 @@ async function initCarouselModule() {
     teardownFeedObserver();
     const slideEls = track.querySelectorAll(".dm-carousel-slide");
     if (!slideEls.length) return;
+    const observerThreshold = feedMode ? 0.5 : [0.25, 0.5, 0.75, 1];
     feedObserver = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -2078,16 +2169,20 @@ async function initCarouselModule() {
         });
         if (nextIndex !== activeIndex) {
           activeIndex = nextIndex;
-          refreshLikeUI();
-          updateInfoPanel();
+          if (!feedMode) {
+            refreshLikeUI();
+            updateInfoPanel();
+          }
         }
       },
-      { root: feedMode ? null : viewport, rootMargin: "200px 0px", threshold: [0.25, 0.5, 0.75, 1] }
+      { root: feedMode ? null : viewport, rootMargin: "200px 0px", threshold: observerThreshold }
     );
     slideEls.forEach((slideEl) => feedObserver.observe(slideEl));
     activeIndex = Math.min(activeIndex, slideEls.length - 1);
-    refreshLikeUI();
-    updateInfoPanel();
+    if (!feedMode) {
+      refreshLikeUI();
+      updateInfoPanel();
+    }
   };
 
   const renderDots = (visibleSlides) => {
@@ -2172,6 +2267,7 @@ async function initCarouselModule() {
       autoTimer = null;
     }
     renderSlides();
+    bindViewportInputListeners();
   };
 
   if (feedQuery.addEventListener) {
@@ -2249,6 +2345,7 @@ async function initCarouselModule() {
   });
 
   let wheelLock = false;
+  let inputListenersPassive = feedMode;
   let touchStartY = 0;
   let touchStartX = 0;
   let touchDeltaY = 0;
@@ -2268,7 +2365,9 @@ async function initCarouselModule() {
     if (feedMode || viewportHasVerticalScroll() || !slides.length || isTransitioning) return;
     const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
     if (Math.abs(delta) < WHEEL_THRESHOLD) return;
-    event.preventDefault();
+    if (!inputListenersPassive && event.cancelable) {
+      event.preventDefault();
+    }
     if (wheelLock) return;
     wheelLock = true;
     moveTo(delta > 0 ? currentIndex + 1 : currentIndex - 1);
@@ -2296,7 +2395,7 @@ async function initCarouselModule() {
     touchDeltaX = touch.clientX - touchStartX;
     // Evitar bloquear scroll vertical por pequeños desvíos horizontales.
     const isHorizontalSwipe = Math.abs(touchDeltaX) > Math.abs(touchDeltaY) * 1.3 && Math.abs(touchDeltaX) > 12;
-    if (isHorizontalSwipe && event.cancelable) {
+    if (isHorizontalSwipe && event.cancelable && !inputListenersPassive) {
       event.preventDefault();
     }
   };
@@ -2311,12 +2410,22 @@ async function initCarouselModule() {
     touchDeltaX = 0;
   };
 
-  if (viewport) {
-    viewport.addEventListener("wheel", handleWheel, { passive: false });
+  const bindViewportInputListeners = () => {
+    if (!viewport) return;
+    const shouldBePassive = feedMode || viewportHasVerticalScroll();
+    inputListenersPassive = shouldBePassive;
+    viewport.removeEventListener("wheel", handleWheel);
+    viewport.removeEventListener("touchstart", handleTouchStart);
+    viewport.removeEventListener("touchmove", handleTouchMove);
+    viewport.removeEventListener("touchend", handleTouchEnd);
+    const wheelOptions = { passive: shouldBePassive };
+    viewport.addEventListener("wheel", handleWheel, wheelOptions);
     viewport.addEventListener("touchstart", handleTouchStart, { passive: true });
-    viewport.addEventListener("touchmove", handleTouchMove, { passive: false });
-    viewport.addEventListener("touchend", handleTouchEnd);
-  }
+    viewport.addEventListener("touchmove", handleTouchMove, wheelOptions);
+    viewport.addEventListener("touchend", handleTouchEnd, { passive: true });
+  };
+
+  bindViewportInputListeners();
 
   const requireUser = () => {
     const user = auth?.currentUser;
