@@ -110,6 +110,10 @@ html {
   background: transparent;
   box-shadow: none;
   border-radius: 0;
+  max-width: 100%;
+  width: 100%;
+  margin: 0;
+  overflow-x: hidden;
 }
 
 .dm-carousel-section.is-feed-mode .dm-carousel-track {
@@ -119,6 +123,19 @@ html {
   padding: 6px 0 12px;
   flex-direction: column;
   will-change: auto;
+  transform: none !important;
+}
+
+.dm-carousel-section.is-feed-mode,
+.dm-carousel-section.is-feed-mode .dm-carousel-stage,
+.dm-carousel-section.is-feed-mode .dm-carousel-left,
+.dm-carousel-section.is-feed-mode .dm-carousel-viewport,
+.dm-carousel-section.is-feed-mode .dm-carousel-track,
+.dm-carousel-section.is-feed-mode .dm-carousel-slide {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 .dm-carousel-section.is-feed-mode .dm-carousel-slide {
@@ -127,12 +144,20 @@ html {
   flex-direction: column;
   border: 1px solid #e5e7eb;
   box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+  contain: paint;
 }
 
 .dm-carousel-section.is-feed-mode .dm-carousel-slide,
 .dm-carousel-section.is-feed-mode .dm-post__media {
   transform: translateZ(0);
   will-change: transform;
+}
+
+@supports (content-visibility: auto) {
+  .dm-carousel-section.is-feed-mode .dm-post {
+    content-visibility: auto;
+    contain-intrinsic-size: 480px 620px;
+  }
 }
 
 .dm-carousel-section.is-feed-mode .dm-post__media {

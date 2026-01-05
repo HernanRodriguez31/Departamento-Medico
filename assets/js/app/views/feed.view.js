@@ -42,7 +42,7 @@ const createSkeletonCard = () => {
   return card;
 };
 
-const createPostCard = (post, onAction) => {
+const createPostCard = (post, onAction, index = 0) => {
   const card = document.createElement("article");
   card.className = "app-card feed-card";
   card.dataset.postId = post.id;
@@ -82,9 +82,16 @@ const createPostCard = (post, onAction) => {
     const media = document.createElement("div");
     media.className = "feed-card__media";
     const img = document.createElement("img");
+    const isPriority = index < 2;
     img.src = post.imageUrl;
     img.alt = "Imagen del post";
-    img.loading = "lazy";
+    img.loading = isPriority ? "eager" : "lazy";
+    img.decoding = "async";
+    img.fetchPriority = isPriority ? "high" : "low";
+    img.classList.add("img-fade-in");
+    const markLoaded = () => img.classList.add("is-loaded");
+    img.addEventListener("load", markLoaded, { once: true });
+    if (img.complete) markLoaded();
     media.appendChild(img);
     body.appendChild(media);
   }
@@ -385,8 +392,9 @@ export default function renderFeed(container, options = {}) {
 
   const appendPosts = (posts = []) => {
     if (!listEl) return;
-    posts.forEach((post) => {
-      const card = createPostCard(post, handleAction);
+    const startIndex = listEl.querySelectorAll(".feed-card").length;
+    posts.forEach((post, idx) => {
+      const card = createPostCard(post, handleAction, startIndex + idx);
       listEl.appendChild(card);
     });
     tryFocusPost();

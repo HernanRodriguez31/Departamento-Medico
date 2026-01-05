@@ -1,15 +1,17 @@
 const CACHE_PREFIX = "brisa-app-";
 // Bump this whenever we change precached assets (CSS/JS) to ensure clients
 // receive the updated files instead of an older cached copy.
-const CACHE_VERSION = "v11";
+const CACHE_VERSION = "v12";
 const CACHE = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const APP_SHELL_URL = "/app/index.html";
 const OFFLINE_URL = "/offline.html";
 const PRECACHE_URLS = [
   APP_SHELL_URL,
   OFFLINE_URL,
+  "/css/app.css",
   "/assets/css/pages/app.css",
-  "/assets/js/pages/app.js"
+  "/assets/js/pages/app.js",
+  "/js/app-mobile.js"
 ];
 
 importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js");
@@ -17,6 +19,15 @@ importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-com
 
 let firebaseInitialized = false;
 let messagingReady = false;
+
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDabEuXGyD5muXCGrbQ1WB9j-CFmVnxudU",
+  authDomain: "departamento-medico-brisa.firebaseapp.com",
+  projectId: "departamento-medico-brisa",
+  storageBucket: "departamento-medico-brisa.firebasestorage.app",
+  messagingSenderId: "830022654524",
+  appId: "1:830022654524:web:45321f121e62d2815cc139"
+};
 
 const setupMessaging = () => {
   if (messagingReady) return;
@@ -39,16 +50,26 @@ const setupMessaging = () => {
       });
     });
     messagingReady = true;
-  } catch (e) {
-    // Waiting for INIT_FIREBASE.
-  }
+  } catch (e) {}
 };
 
-self.addEventListener("message", (event) => {
-  if (event.data?.type === "INIT_FIREBASE" && !firebaseInitialized) {
-    firebase.initializeApp(event.data.config);
+const initFirebase = (config) => {
+  if (firebaseInitialized) return;
+  if (!config) return;
+  try {
+    if (!firebase.apps || firebase.apps.length === 0) {
+      firebase.initializeApp(config);
+    }
     firebaseInitialized = true;
     setupMessaging();
+  } catch (e) {}
+};
+
+initFirebase(self.__FIREBASE_CONFIG__ || FIREBASE_CONFIG);
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "INIT_FIREBASE") {
+    initFirebase(event.data.config || FIREBASE_CONFIG);
   }
 });
 

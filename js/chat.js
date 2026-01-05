@@ -1,6 +1,5 @@
 import { getAuth, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
-  getFirestore,
   collection,
   collectionGroup,
   doc,
@@ -13,10 +12,12 @@ import {
   getDoc,
   getDocs,
   setDoc,
+  updateDoc,
   deleteDoc,
   serverTimestamp,
   arrayUnion,
-  runTransaction
+  increment,
+  FieldPath
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getFirebase } from "../assets/js/common/firebaseClient.js";
 import { COLLECTIONS } from "../assets/js/common/collections.js";
@@ -52,6 +53,10 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     if (!currentUser) return false;
     const readBy = Array.isArray(msg?.readBy) ? msg.readBy : [];
     return readBy.includes(currentUser.uid);
+  };
+  const isMissingDocError = (err) => {
+    const code = err?.code || "";
+    return code === "not-found" || code === "failed-precondition";
   };
 
   // Estado en memoria
@@ -952,16 +957,15 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     if (isSpecialConversation(conversationId)) return;
     try {
       const ref = doc(db, CONVERSATIONS_COLLECTION, conversationId);
-      await runTransaction(db, async (tx) => {
-        const snap = await tx.get(ref);
-        if (!snap.exists()) return;
-        const data = snap.data() || {};
-        const unreadMap = { ...(data.unreadCountByUid || {}) };
-        if (!unreadMap[currentUser.uid]) return;
-        unreadMap[currentUser.uid] = 0;
-        tx.set(ref, { unreadCountByUid: unreadMap }, { merge: true });
-      });
+      await updateDoc(
+        ref,
+        new FieldPath("unreadCountByUid", currentUser.uid),
+        0,
+        "updatedAt",
+        serverTimestamp()
+      );
     } catch (e) {
+      if (isMissingDocError(e)) return;
       console.warn('No se pudo limpiar el unread de la conversacion:', e);
     }
   }
@@ -1450,33 +1454,50 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   async function upsertConversationSummary({ conversationId, fromUid, toUid, text }) {
     if (!conversationId || !fromUid || !toUid) return;
     if (isSpecialConversation(conversationId)) return;
+    const participants = [fromUid, toUid].sort();
     try {
       const ref = doc(db, CONVERSATIONS_COLLECTION, conversationId);
-      await runTransaction(db, async (tx) => {
-        const snap = await tx.get(ref);
-        const data = snap.exists() ? snap.data() : {};
-        const unreadMap = { ...(data.unreadCountByUid || {}) };
-        const prevUnread = Number(unreadMap[toUid] || 0);
-        unreadMap[toUid] = prevUnread + 1;
-        unreadMap[fromUid] = 0;
-        const participants =
-          Array.isArray(data.participants) && data.participants.length
-            ? data.participants
-            : [fromUid, toUid].sort();
-        tx.set(
-          ref,
-          {
-            participants,
-            lastMessageText: text,
-            lastMessageAt: serverTimestamp(),
-            lastSenderUid: fromUid,
-            updatedAt: serverTimestamp(),
-            unreadCountByUid: unreadMap
-          },
-          { merge: true }
-        );
-      });
+      await updateDoc(
+        ref,
+        "participants",
+        participants,
+        "lastMessageText",
+        text,
+        "lastMessageAt",
+        serverTimestamp(),
+        "lastSenderUid",
+        fromUid,
+        "updatedAt",
+        serverTimestamp(),
+        new FieldPath("unreadCountByUid", toUid),
+        increment(1),
+        new FieldPath("unreadCountByUid", fromUid),
+        0
+      );
     } catch (e) {
+      if (isMissingDocError(e)) {
+        try {
+          const ref = doc(db, CONVERSATIONS_COLLECTION, conversationId);
+          await setDoc(
+            ref,
+            {
+              participants,
+              lastMessageText: text,
+              lastMessageAt: serverTimestamp(),
+              lastSenderUid: fromUid,
+              updatedAt: serverTimestamp(),
+              unreadCountByUid: {
+                [toUid]: 1,
+                [fromUid]: 0
+              }
+            },
+            { merge: true }
+          );
+          return;
+        } catch (err) {
+          console.warn('No se pudo crear la conversacion:', err);
+        }
+      }
       console.warn('No se pudo actualizar la conversacion:', e);
     }
   }

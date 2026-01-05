@@ -4181,6 +4181,7 @@ img {
         right: 0;
         bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
         overflow-y: auto;
+        overflow-x: hidden;
         -webkit-overflow-scrolling: touch;
         overscroll-behavior-y: contain;
         touch-action: pan-y;

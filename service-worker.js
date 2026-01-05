@@ -13,6 +13,18 @@ const PRECACHE_URLS = [
   "/assets/js/common/notifications.js"
 ];
 
+self.addEventListener("push", () => {
+  // No-op placeholder to silence messaging warnings on root scope.
+});
+
+self.addEventListener("pushsubscriptionchange", () => {
+  // No-op placeholder to silence messaging warnings on root scope.
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+});
+
 const safeCachePut = async (cache, request, response) => {
   if (!response || !response.ok) return;
   if (response.status === 206 || request.headers.has("range")) return;

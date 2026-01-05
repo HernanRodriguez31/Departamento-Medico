@@ -686,6 +686,11 @@ async function initCarouselModule() {
 
   const buildFeedSkeleton = () => buildFeedSkeletonCards(FEED_SKELETON_COUNT);
   const buildFeedPaginationSkeleton = () => buildFeedSkeletonCards(PAGE_SKELETON_COUNT);
+  const resetFeedHorizontalOffset = () => {
+    if (!viewport) return;
+    viewport.scrollLeft = 0;
+    if (track) track.style.transform = "none";
+  };
 
   // Infinite scroll sentinel for feed pagination.
   const ensureFeedSentinel = () => {
@@ -720,6 +725,7 @@ async function initCarouselModule() {
     track.innerHTML = buildFeedSkeleton();
     track.appendChild(ensureFeedSentinel());
     updateFeedSentinel({ loading: true, hasMore: true, errorMessage: "" });
+    resetFeedHorizontalOffset();
   };
 
   const teardownFeedPagerObserver = () => {
@@ -1041,7 +1047,7 @@ async function initCarouselModule() {
         preloadRecurringAvatars(track);
       });
       track.style.transition = "none";
-      track.style.transform = "none";
+      resetFeedHorizontalOffset();
       activeIndex = 0;
       isTransitioning = false;
       if (autoTimer) clearInterval(autoTimer);
@@ -1092,6 +1098,7 @@ async function initCarouselModule() {
       promoteAboveFoldImages(track);
       preloadRecurringAvatars(track);
     });
+    resetFeedHorizontalOffset();
     if (preserveScroll) {
       requestAnimationFrame(() => {
         const nextHeight = document.documentElement.scrollHeight;
@@ -2267,6 +2274,9 @@ async function initCarouselModule() {
       autoTimer = null;
     }
     renderSlides();
+    if (feedMode) {
+      requestAnimationFrame(resetFeedHorizontalOffset);
+    }
     bindViewportInputListeners();
   };
 

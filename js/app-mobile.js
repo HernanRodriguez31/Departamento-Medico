@@ -174,6 +174,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const carouselHeader = carreteSection ? carreteSection.querySelector('.dm-carousel-header') : null
     const carouselViewport = carreteSection ? carreteSection.querySelector('.dm-carousel-viewport') : null
     const carouselHeaderAnchor = carouselHeader ? document.createComment('dm-carousel-header-anchor') : null
+    const resetMuroHorizontalOffset = () => {
+        const mainEl = document.querySelector("main.main");
+        const targets = [carouselViewport, mainEl, document.documentElement, document.body];
+        targets.forEach((el) => {
+            if (!el || typeof el.scrollLeft !== "number") return;
+            el.scrollLeft = 0;
+        });
+    }
+    const scheduleResetMuroOffset = () => {
+        requestAnimationFrame(() => {
+            resetMuroHorizontalOffset();
+            requestAnimationFrame(resetMuroHorizontalOffset);
+        });
+    }
 
     const syncMuroHeaderPlacement = () => {
         if (!carreteSection || !carouselHeader || !carouselViewport || !carouselHeaderAnchor) return
@@ -189,12 +203,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 carouselViewport.insertBefore(carouselHeader, carouselViewport.firstChild)
             }
+            scheduleResetMuroOffset()
             return
         }
 
         if (carouselHeaderAnchor.parentNode && carouselHeader.parentNode !== carouselHeaderAnchor.parentNode) {
             carouselHeaderAnchor.parentNode.insertBefore(carouselHeader, carouselHeaderAnchor.nextSibling)
         }
+        scheduleResetMuroOffset()
     }
 
     const updateNavState = (route) => {
@@ -227,6 +243,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // (alto del header y de la barra inferior).
         scheduleSyncAppShellVars()
         syncMuroHeaderPlacement()
+        if (route === 'carrete') {
+            scheduleResetMuroOffset()
+        }
     }
 
     const handleShellChange = () => setViewFromHash()
