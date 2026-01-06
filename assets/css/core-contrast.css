@@ -1400,3 +1400,63 @@ body.ui-clarity .region-accordion {
     justify-self: end;
   }
 }
+
+@media (max-width: 640px) {
+  .orgtree .structure__toggle-container {
+    padding: 0.2rem;
+  }
+
+  .orgtree .structure__main-btn {
+    --dashboard-pad-x: 1.1rem;
+    --dashboard-pad-y: 0.95rem;
+    border-top-width: 2px;
+  }
+
+  .orgtree .dashboard-header-left {
+    gap: 0.75rem;
+    text-align: left;
+  }
+
+  .orgtree .dashboard-title-group {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .orgtree .structure__main-btn .dashboard-icon-box {
+    margin-left: 0;
+    padding: 7px;
+    border-radius: 10px;
+  }
+
+  .orgtree .structure__main-btn .dashboard-icon-box svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .orgtree .dashboard-header-left h2.dashboard-eyebrow {
+    font-size: 13px;
+    letter-spacing: 0.18em;
+    line-height: 1.1;
+  }
+
+  .orgtree .dashboard-header-left h1.dashboard-title {
+    font-size: 22px;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+  }
+
+  .orgtree .dashboard-header-right {
+    gap: 0.6rem;
+  }
+
+  .orgtree .header-info-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .orgtree .dashboard-chevron svg {
+    width: 18px;
+    height: 18px;
+  }
+}
