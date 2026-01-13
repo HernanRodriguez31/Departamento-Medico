@@ -90,8 +90,8 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   let incomingUnsub = null;
   let incomingReady = false;
   let incomingCutoff = null;
-  const PANEL_BASE_NO_TRAY = 84;
-  const PANEL_BASE_WITH_TRAY = 60;
+  const PANEL_OFFSET_BASE = 0;
+  const PANEL_OFFSET_EXTRA = 8;
   const MAX_RENDER_MESSAGES = 200;
   let isSending = false;
   let pendingDeleteId = null;
@@ -146,16 +146,86 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     const style = document.createElement('style');
     style.id = 'brisa-chat-pulse-style';
     style.textContent = `
+      .brisa-chat-fab {
+        position: fixed;
+        left: 18px;
+        bottom: var(--dm-fab-bottom);
+        width: var(--dm-chat-fab-size, 58px);
+        height: var(--dm-chat-fab-size, 58px);
+        z-index: 50;
+      }
+
+      .brisa-chat-fab .brisa-chat-bubble {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: auto;
+      }
+
+      .brisa-chat-fab .brisa-chat-panel {
+        position: absolute;
+        bottom: calc(120% + var(--brisa-panel-offset, 0px));
+        right: 0;
+        left: auto;
+        width: 18rem;
+        z-index: 40;
+        pointer-events: auto;
+      }
+
+      .brisa-chat-fab[data-side="left"] .brisa-chat-panel {
+        left: 0;
+        right: auto;
+      }
+
       .brisa-chat-bubble--pulse { animation: brisaChatPulse 0.9s ease-out; }
       .brisa-chat-bubble.is-dragging { opacity: .9; }
+      .brisa-chat-bubble::after {
+        content: '';
+        position: absolute;
+        inset: -8px;
+        border-radius: 999px;
+        border: 1px solid rgba(122, 184, 0, 0.28);
+        opacity: 0;
+        animation: pulse-glow 3s ease-out infinite;
+        pointer-events: none;
+      }
+
+      .brisa-chat-bubble:hover::after {
+        animation-play-state: paused;
+        opacity: 0;
+      }
+
       @keyframes brisaChatPulse {
         0% { transform: scale(1); }
         30% { transform: scale(1.08); }
         100% { transform: scale(1); }
       }
-      @media (max-width: 768px) {
+      @keyframes pulse-glow {
+        0% { transform: scale(0.95); opacity: 0.35; }
+        70% { transform: scale(1.35); opacity: 0; }
+        100% { transform: scale(1.35); opacity: 0; }
+      }
+      @media (max-width: 768px), (display-mode: standalone) {
         #brisa-chat-pill-tray { display: none !important; }
         .brisa-chat-bubble { touch-action: none; }
+        .brisa-chat-fab {
+          left: 0;
+          right: auto;
+          bottom: calc(var(--bottom-nav-h) + 20px + env(safe-area-inset-bottom));
+        }
+      }
+
+      @media (min-width: 1024px) {
+        .brisa-chat-fab {
+          left: 32px;
+        }
+      }
+
+      .app-shell #brisa-chat-root .brisa-chat-fab {
+        bottom: calc(var(--bottom-nav-h) + 20px + env(safe-area-inset-bottom));
+        left: 0;
+        right: auto;
       }
     `;
     document.head.appendChild(style);
@@ -172,19 +242,21 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
 
   const applyBubblePosition = (bubble, { side, yPct } = {}) => {
     if (!bubble || !isMobileShell()) return;
+    const target = document.getElementById('brisa-chat-fab') || bubble;
     const { topMin, topMax } = getBubbleBounds(bubble);
     const pct = Number.isFinite(yPct) ? yPct : 0.5;
     const targetTop = clamp(Math.round(pct * window.innerHeight), topMin, topMax);
     const resolvedSide = side === 'right' ? 'right' : 'left';
-    bubble.style.top = `${targetTop}px`;
-    bubble.style.bottom = 'auto';
+    target.style.top = `${targetTop}px`;
+    target.style.bottom = 'auto';
     if (resolvedSide === 'right') {
-      bubble.style.right = `${BUBBLE_MARGIN}px`;
-      bubble.style.left = 'auto';
+      target.style.right = `${BUBBLE_MARGIN}px`;
+      target.style.left = 'auto';
     } else {
-      bubble.style.left = `${BUBBLE_MARGIN}px`;
-      bubble.style.right = 'auto';
+      target.style.left = `${BUBBLE_MARGIN}px`;
+      target.style.right = 'auto';
     }
+    if (target?.dataset) target.dataset.side = resolvedSide;
   };
 
   const readBubblePosition = () => {
@@ -221,14 +293,8 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     }
 
     root.innerHTML = `
-      <div class="brisa-chat-bubble" id="brisa-chat-bubble">
-        <svg class="brisa-chat-bubble-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
-        </svg>
-        <div class="brisa-chat-badge" id="brisa-chat-badge">1</div>
-      </div>
-
-      <div class="brisa-chat-panel" id="brisa-chat-panel">
+      <div class="brisa-chat-fab" id="brisa-chat-fab" data-side="left">
+        <div class="brisa-chat-panel absolute bottom-[120%] right-0 z-40 w-72" id="brisa-chat-panel">
         <div class="brisa-chat-panel-header">
           <div>
             <div class="brisa-chat-panel-title">Médicos conectados <span id="brisa-chat-online-count" class="brisa-chat-online-count">0</span></div>
@@ -270,6 +336,14 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
 
           <div class="brisa-chat-section-label">Médicos conectados</div>
           <div id="brisa-chat-users"></div>
+        </div>
+      </div>
+
+        <div class="brisa-chat-bubble flex items-center justify-center rounded-full border border-white/20 z-50 !bg-gradient-to-br from-[#8BC71A] via-[#7AB800] to-[#5A8A00] !shadow-[0_14px_28px_rgba(15,23,42,0.18),_0_4px_10px_rgba(15,23,42,0.12)] transition-all duration-300 ease-out hover:-translate-y-1 hover:brightness-110 hover:!shadow-[0_18px_34px_rgba(15,23,42,0.22),_0_6px_14px_rgba(15,23,42,0.14)]" id="brisa-chat-bubble">
+          <svg class="brisa-chat-bubble-icon text-white drop-shadow-sm" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+          </svg>
+          <div class="brisa-chat-badge" id="brisa-chat-badge">1</div>
         </div>
       </div>
 
@@ -352,9 +426,10 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     if (!panel) return;
     const hasTray = pillTray && pillTray.children.length > 0;
     const trayHeight = hasTray ? pillTray.offsetHeight : 0;
-    const base = hasTray ? PANEL_BASE_WITH_TRAY : PANEL_BASE_NO_TRAY;
-    const extra = hasTray ? trayHeight + 8 : 0;
-    panel.style.bottom = `${base + extra}px`;
+    const offset = hasTray
+      ? trayHeight + PANEL_OFFSET_BASE + PANEL_OFFSET_EXTRA
+      : PANEL_OFFSET_BASE;
+    panel.style.setProperty('--brisa-panel-offset', `${offset}px`);
   }
 
   function getChatRoot() {
@@ -381,8 +456,10 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     const panel = document.getElementById('brisa-chat-panel');
     const pill = document.getElementById('brisa-chat-pill');
     const tray = document.getElementById('brisa-chat-pill-tray');
+    const fab = document.getElementById('brisa-chat-fab');
     if (bubble) bubble.style.display = 'none';
     if (panel) panel.style.display = 'none';
+    if (fab) fab.style.display = 'none';
     if (pill) pill.style.display = 'none';
     if (tray) tray.style.display = 'none';
     const win = document.getElementById('brisa-chat-window');
@@ -397,8 +474,10 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     const panel = document.getElementById('brisa-chat-panel');
     const pill = document.getElementById('brisa-chat-pill');
     const tray = document.getElementById('brisa-chat-pill-tray');
+    const fab = document.getElementById('brisa-chat-fab');
     if (bubble) bubble.style.display = '';
     if (panel) panel.style.display = '';
+    if (fab) fab.style.display = '';
     if (pill) pill.style.display = '';
     if (tray) tray.style.display = '';
     const targetParent = embeddedParent || document.body;
@@ -1712,6 +1791,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   // ---------- HANDLERS DE UI ----------
   function attachUIHandlers() {
     const bubble = document.getElementById('brisa-chat-bubble');
+    const fab = document.getElementById('brisa-chat-fab');
     const panel = document.getElementById('brisa-chat-panel');
     const panelClose = document.getElementById('brisa-chat-panel-close');
     const panelSoundToggle = document.getElementById('brisa-chat-panel-sound-toggle');
@@ -1755,7 +1835,9 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       saveBubblePosition({ side, yPct });
     };
 
-    if (bubble && isMobileShell()) {
+    const dragTarget = fab || bubble;
+
+    if (bubble && dragTarget && isMobileShell()) {
       restoreBubblePosition();
       const handleResize = () => {
         restoreBubblePosition();
@@ -1787,15 +1869,16 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         const targetTop = clamp(e.clientY - height / 2, topMin, topMax);
         lastTopPx = targetTop;
         lastSide = e.clientX > window.innerWidth / 2 ? 'right' : 'left';
-        bubble.style.top = `${targetTop}px`;
-        bubble.style.bottom = 'auto';
+        dragTarget.style.top = `${targetTop}px`;
+        dragTarget.style.bottom = 'auto';
         if (lastSide === 'right') {
-          bubble.style.right = `${BUBBLE_MARGIN}px`;
-          bubble.style.left = 'auto';
+          dragTarget.style.right = `${BUBBLE_MARGIN}px`;
+          dragTarget.style.left = 'auto';
         } else {
-          bubble.style.left = `${BUBBLE_MARGIN}px`;
-          bubble.style.right = 'auto';
+          dragTarget.style.left = `${BUBBLE_MARGIN}px`;
+          dragTarget.style.right = 'auto';
         }
+        if (dragTarget?.dataset) dragTarget.dataset.side = lastSide;
       });
 
       const finalizeDrag = (e) => {
@@ -1811,7 +1894,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
           try {
             bubble.releasePointerCapture(activePointerId);
           } catch (err) {}
-          const fallbackTop = bubble.getBoundingClientRect().top;
+          const fallbackTop = dragTarget.getBoundingClientRect().top;
           const finalTop = Number.isFinite(lastTopPx) ? lastTopPx : fallbackTop;
           persistBubblePosition(lastSide, finalTop);
           lastTopPx = null;
