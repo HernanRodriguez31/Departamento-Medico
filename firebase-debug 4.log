@@ -1,0 +1,65 @@
+[debug] [2026-01-13T20:06:04.671Z] ----------------------------------------------------------------------
+[debug] [2026-01-13T20:06:04.679Z] Command:       /opt/homebrew/Cellar/node@20/20.19.6/bin/node /opt/homebrew/bin/firebase emulators:start --only functions
+[debug] [2026-01-13T20:06:04.679Z] CLI Version:   15.2.1
+[debug] [2026-01-13T20:06:04.679Z] Platform:      darwin
+[debug] [2026-01-13T20:06:04.679Z] Node Version:  v20.19.6
+[debug] [2026-01-13T20:06:04.679Z] Time:          Tue Jan 13 2026 17:06:04 GMT-0300 (Argentina Standard Time)
+[debug] [2026-01-13T20:06:04.679Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-01-13T20:06:05.544Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-01-13T20:06:05.544Z] > authorizing via signed-in user (hernangabrielrodriguez@gmail.com)
+[info] i  emulators: Starting emulators: functions {"metadata":{"emulator":{"name":"hub"},"message":"Starting emulators: functions"}}
+[warn] ⚠  hub: emulator hub unable to start on port 4400, starting on 4401 instead. {"metadata":{"emulator":{"name":"hub"},"message":"emulator hub unable to start on port 4400, starting on 4401 instead."}}
+[warn] ⚠  ui: Emulator UI unable to start on port 4000, starting on 4001 instead. {"metadata":{"emulator":{"name":"ui"},"message":"Emulator UI unable to start on port 4000, starting on 4001 instead."}}
+[warn] ⚠  logging: Logging Emulator unable to start on port 4500, starting on 4501 instead. {"metadata":{"emulator":{"name":"logging"},"message":"Logging Emulator unable to start on port 4500, starting on 4501 instead."}}
+[debug] [2026-01-13T20:06:05.812Z] [logging] Logging Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2026-01-13T20:06:05.812Z] assigned listening specs for emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4401},{"address":"::1","family":"IPv6","port":4401}],"ui":[{"address":"127.0.0.1","family":"IPv4","port":4001},{"address":"::1","family":"IPv6","port":4001}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4501}]},"metadata":{"message":"assigned listening specs for emulators"}}
+[debug] [2026-01-13T20:06:05.814Z] Found emulator hub locator: {"version":"15.2.1","origins":["http://127.0.0.1:4400","http://[::1]:4400"],"pid":4423}
+[debug] [2026-01-13T20:06:05.815Z] Write emulator hub locator at /var/folders/q_/j3zzlvkd0050gr2mv69mxv7c0000gn/T/hub-departamento-medico-brisa.json
+[debug] [2026-01-13T20:06:05.947Z] [functions] Functions Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2026-01-13T20:06:05.947Z] [eventarc] Eventarc Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2026-01-13T20:06:05.947Z] [tasks] Cloud Tasks Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2026-01-13T20:06:05.947Z] late-assigned ports for functions and eventarc emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4401},{"address":"::1","family":"IPv6","port":4401}],"ui":[{"address":"127.0.0.1","family":"IPv4","port":4001},{"address":"::1","family":"IPv6","port":4001}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4501}],"functions":[{"address":"127.0.0.1","family":"IPv4","port":5001}],"eventarc":[{"address":"127.0.0.1","family":"IPv4","port":9299}],"tasks":[{"address":"127.0.0.1","family":"IPv4","port":9499}]},"metadata":{"message":"late-assigned ports for functions and eventarc emulators"}}
+[warn] ⚠  functions: The following emulators are not running, calls to these services from the Functions emulator will affect production: apphosting, auth, firestore, database, hosting, pubsub, storage, dataconnect {"metadata":{"emulator":{"name":"functions"},"message":"The following emulators are not running, calls to these services from the Functions emulator will affect production: \u001b[1mapphosting, auth, firestore, database, hosting, pubsub, storage, dataconnect\u001b[22m"}}
+[debug] [2026-01-13T20:06:05.954Z] defaultcredentials: writing to file /Users/hernanrodriguez/.config/firebase/hernangabrielrodriguez_gmail_com_application_default_credentials.json
+[debug] [2026-01-13T20:06:05.955Z] Setting GAC to /Users/hernanrodriguez/.config/firebase/hernangabrielrodriguez_gmail_com_application_default_credentials.json {"metadata":{"emulator":{"name":"functions"},"message":"Setting GAC to /Users/hernanrodriguez/.config/firebase/hernangabrielrodriguez_gmail_com_application_default_credentials.json"}}
+[debug] [2026-01-13T20:06:05.955Z] Checked if tokens are valid: false, expires at: 1768334762775
+[debug] [2026-01-13T20:06:05.955Z] Checked if tokens are valid: false, expires at: 1768334762775
+[debug] [2026-01-13T20:06:05.956Z] > refreshing access token with scopes: []
+[debug] [2026-01-13T20:06:05.957Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-01-13T20:06:05.957Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-01-13T20:06:06.136Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2026-01-13T20:06:06.136Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-01-13T20:06:06.156Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/departamento-medico-brisa/adminSdkConfig [none]
+[debug] [2026-01-13T20:06:06.739Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/departamento-medico-brisa/adminSdkConfig 200
+[debug] [2026-01-13T20:06:06.741Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/departamento-medico-brisa/adminSdkConfig {"projectId":"departamento-medico-brisa","storageBucket":"departamento-medico-brisa.firebasestorage.app"}
+[info] i  functions: Watching "/Users/hernanrodriguez/Desktop/Escritorio - MacBook Air M2 de Hernán R/Creacion de Paginas Web/Departamento Medico/functions" for Cloud Functions... {"metadata":{"emulator":{"name":"functions"},"message":"Watching \"/Users/hernanrodriguez/Desktop/Escritorio - MacBook Air M2 de Hernán R/Creacion de Paginas Web/Departamento Medico/functions\" for Cloud Functions..."}}
+[debug] [2026-01-13T20:06:06.950Z] Validating nodejs source
+[debug] [2026-01-13T20:06:08.118Z] > [functions] package.json contents: {
+  "name": "functions",
+  "private": true,
+  "engines": {
+    "node": "20"
+  },
+  "main": "index.js",
+  "scripts": {
+    "lint": "echo \"No lint configured\"",
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run serve",
+    "deploy": "firebase deploy --only functions"
+  },
+  "dependencies": {
+    "@simplewebauthn/server": "^13.2.2",
+    "cors": "^2.8.5",
+    "firebase-admin": "^13.6.0",
+    "firebase-functions": "^7.0.3"
+  }
+}
+[debug] [2026-01-13T20:06:08.119Z] Building nodejs source
+[debug] [2026-01-13T20:06:08.120Z] Failed to find version of module node: reached end of search path /Users/hernanrodriguez/Desktop/Escritorio - MacBook Air M2 de Hernán R/Creacion de Paginas Web/Departamento Medico/functions/node_modules
+[info] ✔  functions: Using node@20 from host. 
+[debug] [2026-01-13T20:06:08.122Z] Could not find functions.yaml. Must use http discovery
+[debug] [2026-01-13T20:06:08.139Z] Found firebase-functions binary at '/Users/hernanrodriguez/Desktop/Escritorio - MacBook Air M2 de Hernán R/Creacion de Paginas Web/Departamento Medico/functions/node_modules/.bin/firebase-functions'
+[info] Serving at port 8366
+
