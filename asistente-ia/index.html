@@ -719,14 +719,26 @@
             };
 
             const isGemini = selectedModel === "gemini";
-            const THEME = isGemini ? { accent: "#1565C0" } : { accent: "#7AB800" };
-            const accent = THEME.accent;
-            const accentSoftBorder = isGemini ? "rgba(21,101,192,0.35)" : "rgba(122,184,0,0.35)";
+            const themeClasses = isGemini
+                ? {
+                    shellGlow: "shadow-blue-500/20",
+                    header: "bg-gradient-to-r from-[#4b90ff]/90 to-[#0054e8]/90",
+                    toggle: "bg-[#0054e8]",
+                    send: "bg-[#0054e8] hover:bg-[#0046c5]",
+                    inputRing: "focus-within:ring-blue-100"
+                }
+                : {
+                    shellGlow: "shadow-green-500/20",
+                    header: "bg-gradient-to-r from-[#10a37f]/90 to-[#0d8c6d]/90",
+                    toggle: "bg-[#0d8c6d]",
+                    send: "bg-[#0d8c6d] hover:bg-[#0b7a60]",
+                    inputRing: "focus-within:ring-emerald-100"
+                };
             const activeModelMeta = isGemini ? models.gemini : models.gpt;
             const modelName = isGemini ? "Gemini Pro" : "ChatGPT";
 
             const toggleModel = () => {
-                setSelectedModel(isGemini ? "gpt" : "gemini");
+                setSelectedModel((prev) => (prev === "gemini" ? "gpt" : "gemini"));
             };
 
             const requestClosePanel = () => {
@@ -947,10 +959,10 @@
                 ? "w-full h-full flex flex-col items-center justify-stretch font-sans text-slate-800 pointer-events-auto"
                 : "fixed z-50 bottom-4 left-1/2 -translate-x-1/2 md:bottom-8 font-sans text-slate-800 flex flex-col items-center pointer-events-none";
             const panelClass = isEmbedMode
-                ? "w-full h-full max-h-none rounded-none"
+                ? "w-full h-full max-h-none rounded-2xl"
                 : (isExpanded
-                    ? "fixed inset-4 md:inset-auto md:w-[600px] md:h-[80vh] md:bottom-32 md:left-1/2 md:-translate-x-1/2 z-50"
-                    : "w-[calc(100vw-32px)] md:w-[380px] h-[550px] max-h-[calc(100vh-140px)]");
+                    ? "fixed inset-4 md:inset-auto md:w-[600px] md:h-[80vh] md:bottom-32 md:left-1/2 md:-translate-x-1/2 z-50 rounded-2xl"
+                    : "w-[calc(100vw-32px)] md:w-[380px] h-[550px] max-h-[calc(100vh-140px)] rounded-2xl");
             const panelSpacingClass = isEmbedMode ? "" : "mb-4";
             const modelPickerClass = `flex flex-row gap-3 mb-4 items-center justify-center transition-all duration-300 pointer-events-auto 
                     ${(!isChatOpen || isModelPickerOpen) ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-10 scale-90 pointer-events-none absolute bottom-20'}
@@ -991,11 +1003,10 @@
                 {/* --- 1. VENTANA DE CHAT --- */}
                 {isChatOpen && (
                     <div
-                        className={`pointer-events-auto overflow-hidden bg-white border border-gray-200 shadow-xl rounded-3xl lg:rounded-[2rem] flex flex-col transition-all duration-300 origin-bottom ${panelSpacingClass} ${panelClass} dm-chat-frame`}
-                        style={{ borderColor: accentSoftBorder }}
+                        className={`pointer-events-auto overflow-hidden bg-white/95 border border-gray-200 shadow-2xl ${themeClasses.shellGlow} rounded-2xl backdrop-blur-sm flex flex-col transition-all duration-300 origin-bottom ${panelSpacingClass} ${panelClass} dm-chat-frame`}
                     >
                     {/* Header */}
-                    <div className="flex items-center justify-between px-4 py-3" style={{ backgroundColor: accent }}>
+                    <div className={`flex items-center justify-between px-4 py-4 ${themeClasses.header} backdrop-blur-md border-b border-white/20`}>
                         <div className="flex items-center gap-3">
                             {renderBotAvatar("w-8 h-8 rounded-full")}
                             <span className="text-white font-bold tracking-tight">Boti Brisa - Asistente IA</span>
@@ -1011,8 +1022,8 @@
                     </div>
 
                     {/* Sub-header */}
-                    <div className="bg-gray-50 border-b border-black/5 px-4 py-3 flex items-center justify-between gap-3">
-                        <div className="bg-white border border-black/5 shadow-sm rounded-full px-3 py-2 flex items-center gap-2">
+                    <div className="bg-white/70 backdrop-blur-md border-b border-white/60 px-4 py-3 flex items-center justify-between gap-3">
+                        <div className="bg-white/90 border border-white/60 shadow-sm rounded-full px-3 py-2 flex items-center gap-2">
                             <span className="w-5 h-5 flex items-center justify-center">
                                 {activeModelMeta?.icon}
                             </span>
@@ -1026,8 +1037,7 @@
                                 aria-checked={isGemini}
                                 aria-label="Change model"
                                 onClick={toggleModel}
-                                className="relative inline-flex h-6 w-11 items-center rounded-full transition"
-                                style={{ backgroundColor: accent }}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition shadow-inner ${themeClasses.toggle}`}
                             >
                                 <span
                                     className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${isGemini ? "translate-x-5" : "translate-x-1"}`}
@@ -1037,32 +1047,48 @@
                     </div>
 
                     {/* Chat Body */}
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 relative dm-chat-messages">
+                    <div className="flex-1 overflow-y-auto p-4 pb-20 space-y-4 bg-slate-50 relative dm-chat-messages">
                         <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: "radial-gradient(#000 1px, transparent 1px)", backgroundSize: "20px 20px" }}></div>
-                        {messages.map((msg) => (
-                            <div key={msg.id} className={`flex w-full group ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div
-                                className={`max-w-[85%] px-4 py-3 text-sm shadow-sm leading-relaxed ${
-                                    msg.role === 'user'
-                                        ? 'text-white rounded-2xl rounded-tr-none'
-                                        : msg.role === 'system'
-                                        ? 'bg-slate-100 text-slate-600 rounded-xl text-center text-xs border border-slate-200 w-full mb-2'
-                                        : 'bg-white border border-slate-200 text-slate-700 rounded-2xl rounded-tl-none'
-                                }`}
-                                style={msg.role === 'user' ? { backgroundColor: accent } : undefined}
-                            >
-                                {renderMessageText(msg.text)}
+                        {messages.map((msg) => {
+                            const isUser = msg.role === 'user';
+                            const isSystem = msg.role === 'system';
+                            const bubbleClass = isSystem
+                                ? 'bg-white/80 text-slate-500 rounded-xl text-center text-xs border border-slate-200/60 w-full max-w-[90%]'
+                                : isUser
+                                    ? 'bg-white text-slate-700 shadow-sm border border-slate-200/70 rounded-2xl rounded-tr-none max-w-[85%]'
+                                    : 'bg-white/70 text-slate-700 border border-white/60 shadow-sm backdrop-blur-sm rounded-2xl rounded-tl-none max-w-[85%]';
+
+                            return (
+                            <div key={msg.id} className={`flex w-full ${isSystem ? 'justify-center' : isUser ? 'justify-end' : 'justify-start'}`}>
+                                {!isUser && !isSystem && (
+                                    <div className="mr-2 mt-0.5 shrink-0">
+                                        {renderBotAvatar("w-8 h-8 rounded-full ring-1 ring-white/70 shadow-sm")}
+                                    </div>
+                                )}
+                                <div
+                                    className={`px-4 py-3 text-sm leading-relaxed ${bubbleClass}`}
+                                >
+                                    {renderMessageText(msg.text)}
+                                </div>
                             </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                         {isTyping && (
-                        <div className="flex justify-start"><div className="bg-white px-4 py-3 rounded-2xl rounded-tl-none shadow-sm flex gap-1"><span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span><span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce delay-100"></span></div></div>
+                        <div className="flex items-start">
+                            <div className="mr-2 mt-0.5 shrink-0">
+                                {renderBotAvatar("w-8 h-8 rounded-full ring-1 ring-white/70 shadow-sm")}
+                            </div>
+                            <div className="bg-white/70 border border-white/60 px-4 py-3 rounded-2xl rounded-tl-none shadow-sm backdrop-blur-sm flex gap-1">
+                                <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span>
+                                <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce delay-100"></span>
+                            </div>
+                        </div>
                         )}
                         <div ref={messagesEndRef} />
                     </div>
 
                     {/* Chat Input Redise�ado */}
-                    <div className="p-3 bg-white border-t border-slate-100 relative">
+                    <div className="relative px-4 pt-4 pb-2 bg-transparent">
                         
                         {/* Previsualizaci�n de imagen (Pop-up flotante) */}
                         {selectedFile && (
@@ -1080,7 +1106,7 @@
                             </div>
                         )}
 
-                        <div className="flex items-center gap-2 min-h-[52px] bg-slate-50 border border-slate-200 rounded-2xl px-2 py-2 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                        <div className={`flex items-center gap-2 min-h-[54px] bg-white border border-gray-200 rounded-full px-3 py-2 shadow-sm transition-all focus-within:ring-2 -translate-y-2 ${themeClasses.inputRing}`}>
                             
                             {/* Input de archivo oculto + Bot�n Clip */}
                             <input 
@@ -1122,8 +1148,7 @@
                             <button 
                                 onClick={handleSend} 
                                 disabled={(!inputText.trim() && !selectedFile) || isTyping} 
-                                className={`p-2.5 rounded-xl mb-0.5 transition-all duration-300 shadow-sm ${(!inputText.trim() && !selectedFile) ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' : 'text-white hover:brightness-95 active:brightness-90 hover:shadow-md active:scale-95'}`}
-                                style={(!inputText.trim() && !selectedFile) || isTyping ? undefined : { backgroundColor: accent }}
+                                className={`p-2.5 rounded-xl mb-0.5 transition-all duration-300 shadow-sm ${(!inputText.trim() && !selectedFile) ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' : `text-white ${themeClasses.send} hover:brightness-95 active:brightness-90 hover:shadow-md active:scale-95`}`}
                             >
                                 <Send size={18} />
                             </button>
