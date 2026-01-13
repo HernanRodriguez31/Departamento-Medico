@@ -283,7 +283,7 @@ const shouldNotifyPostLike = async ({ postId, toUid, fromUid }) => {
   return allow;
 };
 
-exports.onChatMessageCreated = onDocumentCreated(
+exports.onChatMessageCreated_v2 = onDocumentCreated(
   "dm_chats/{conversationId}/messages/{messageId}",
   async (event) => {
     const snap = event.data;
@@ -383,7 +383,7 @@ exports.onChatMessageCreated = onDocumentCreated(
   }
 );
 
-exports.onPostCommentCreated = onDocumentCreated(
+exports.onPostCommentCreated_v2 = onDocumentCreated(
   `${POSTS_COLLECTION}/{postId}/comments/{commentId}`,
   async (event) => {
     const snap = event.data;
@@ -475,7 +475,7 @@ exports.onPostCommentCreated = onDocumentCreated(
   }
 );
 
-exports.onPostLikeCreated = onDocumentCreated(
+exports.onPostLikeCreated_v2 = onDocumentCreated(
   `${POSTS_COLLECTION}/{postId}/likes/{uid}`,
   async (event) => {
     const snap = event.data;
@@ -575,7 +575,7 @@ exports.onPostLikeCreated = onDocumentCreated(
   }
 );
 
-exports.aiChat = onRequest(
+exports.aiChat_v2 = onRequest(
   { secrets: ["OPENAI_API_KEY", "GEMINI_API_KEY"] },
   async (req, res) => {
     const startedAt = Date.now();
