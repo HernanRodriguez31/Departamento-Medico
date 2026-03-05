@@ -2513,6 +2513,11 @@ img {
     pointer-events: none;
 }
 
+.orgtree .dashboard-header::before {
+    content: none;
+    display: none;
+}
+
 /* ... existing styles ... */
 
 .dashboard-header:hover {

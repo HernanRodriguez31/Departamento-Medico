@@ -374,29 +374,44 @@ body.ui-clarity .region-accordion {
   border: 1px solid var(--org-border-soft);
   box-shadow: var(--org-shadow-1), var(--org-shadow-2);
   border-radius: var(--org-radius-lg);
-  padding: 0.25rem;
+  padding: 0;
+  overflow: hidden;
+}
+.orgtree .structure__toggle-container::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--first-color, #7AB800);
+  pointer-events: none;
+  z-index: 2;
 }
 .orgtree .dashboard-container {
+  width: 100%;
+  max-width: none;
   border: none;
   box-shadow: none;
   background: transparent;
+  border-radius: inherit;
 }
 .orgtree .structure__main-btn {
   width: 100%;
   --dashboard-pad-x: 2.5rem;
   --dashboard-pad-y: 1.75rem;
-  --dashboard-accent-h: 2px;
   padding: var(--dashboard-pad-y) var(--dashboard-pad-x);
   border: none;
-  border-top: 3px solid var(--first-color, #7AB800);
-  border-radius: var(--org-radius-lg);
+  border-top: none;
+  border-bottom: none;
+  border-radius: inherit;
   box-shadow: none;
   background: transparent;
+  position: relative;
+  z-index: 1;
 }
 
 .orgtree .structure__main-btn::before {
-  content: none;
-  display: none;
+  content: none !important;
+  display: none !important;
 }
 
 .orgtree .dashboard-header-left {
@@ -451,11 +466,11 @@ body.ui-clarity .region-accordion {
 }
 .orgtree .structure__main-btn:hover {
   background: #f8fafc;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+  box-shadow: none;
 }
 .orgtree .structure__main-btn:focus-visible {
-  outline: 2px solid var(--org-focus);
-  outline-offset: 4px;
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--org-focus);
 }
 .orgtree .structure__main-btn.expanded .structure__chevron svg {
   transform: rotate(180deg);
@@ -483,7 +498,6 @@ body.ui-clarity .region-accordion {
   .orgtree .structure__main-btn {
     --dashboard-pad-x: 2.5rem;
     --dashboard-pad-y: 1.75rem;
-    --dashboard-accent-h: 5px;
   }
 
   .orgtree .structure__main-btn .dashboard-icon-box {
@@ -534,11 +548,8 @@ body.ui-clarity .region-accordion {
   }
 
   .orgtree .structure__main-btn::before {
-    background: var(--first-color, #7AB800);
-    opacity: 1;
-    left: 0.35rem;
-    right: 0.35rem;
-    clip-path: polygon(0 50%, 18px 0, calc(100% - 18px) 0, 100% 50%, calc(100% - 18px) 100%, 18px 100%);
+    content: none !important;
+    display: none !important;
   }
 
   .orgtree .structure__toggle-container,
@@ -1403,13 +1414,12 @@ body.ui-clarity .region-accordion {
 
 @media (max-width: 640px) {
   .orgtree .structure__toggle-container {
-    padding: 0.2rem;
+    padding: 0;
   }
 
   .orgtree .structure__main-btn {
     --dashboard-pad-x: 1.1rem;
     --dashboard-pad-y: 0.95rem;
-    border-top-width: 2px;
   }
 
   .orgtree .dashboard-header-left {
