@@ -575,9 +575,7 @@ exports.onPostLikeCreated_v2 = onDocumentCreated(
   }
 );
 
-exports.aiChat_v2 = onRequest(
-  { secrets: ["OPENAI_API_KEY", "GEMINI_API_KEY"] },
-  async (req, res) => {
+const aiChatHandler = async (req, res) => {
     const startedAt = Date.now();
     let uid = null;
     let provider = "unknown";
@@ -878,7 +876,16 @@ exports.aiChat_v2 = onRequest(
 
     logAi(502, { error: lastError });
     return res.status(502).json({ ok: false, error: lastError });
-  }
+};
+
+exports.aiChat = onRequest(
+  { secrets: ["OPENAI_API_KEY", "GEMINI_API_KEY"] },
+  aiChatHandler
+);
+
+exports.aiChat_v2 = onRequest(
+  { secrets: ["OPENAI_API_KEY", "GEMINI_API_KEY"] },
+  aiChatHandler
 );
 
 // Actualizacion forzada

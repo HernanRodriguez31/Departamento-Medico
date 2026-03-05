@@ -128,21 +128,6 @@
         import { createRoot } from 'react-dom/client';
         // Importamos todos los iconos que usas
         import { Send, X, Paperclip, Mic, MicOff } from 'lucide-react';
-        import { doc, getDoc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
-        import { getFirebase } from '../assets/js/common/firebase.js';
-        // HELPER: Convierte archivos de imagen a Base64 para que Gemini los vea
-        const convertirImagenABase64 = (file) => {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = () => {
-                    // Quitamos el prefijo "data:image/jpeg;base64," para enviar solo los datos puros
-                    const base64String = reader.result.split(',')[1];
-                    resolve(base64String);
-                };
-                reader.onerror = (error) => reject(error);
-            });
-        };
 
         // HELPER AVANZADO: Limpia Markdown y prepara el texto para una lectura natural
         const limpiarTextoParaVoz = (texto) => {
@@ -169,47 +154,6 @@
         // Variable global para guardar la charla fuera de la funcion
         // El 'role: user' eres tu, 'role: model' es Boti.
         let historialClinico = [];
-        const openAiConfig = { apiKey: null };
-        const gestionarApiKey = async () => {
-            if (openAiConfig.apiKey) return openAiConfig.apiKey;
-            const { db } = getFirebase();
-            const docRef = doc(db, 'configuracion', 'api_keys');
-            try {
-                const snapshot = await getDoc(docRef);
-                if (snapshot.exists()) {
-                    const data = snapshot.data() || {};
-                    const storedKey = typeof data.openai === 'string'
-                        ? data.openai.trim()
-                        : typeof data.openaiApiKey === 'string'
-                            ? data.openaiApiKey.trim()
-                            : typeof data.apiKey === 'string'
-                                ? data.apiKey.trim()
-                                : '';
-                    if (storedKey) {
-                        openAiConfig.apiKey = storedKey;
-                        return storedKey;
-                    }
-                }
-            } catch (error) {
-                console.warn('No se pudo leer la API Key desde Firestore.', error);
-            }
-            const promptedKey = window.prompt("Ingrese la API Key por única vez para guardarla en BD");
-            const cleanKey = typeof promptedKey === 'string' ? promptedKey.trim() : '';
-            if (!cleanKey) {
-                throw new Error('openai_key_missing');
-            }
-            openAiConfig.apiKey = cleanKey;
-            try {
-                await setDoc(
-                    docRef,
-                    { openai: cleanKey, updatedAt: serverTimestamp() },
-                    { merge: true }
-                );
-            } catch (error) {
-                console.warn('No se pudo guardar la API Key en Firestore.', error);
-            }
-            return cleanKey;
-        };
 
         // AHORA EL WIDGET ACEPTA EL NOMBRE DEL USUARIO DESDE "AFUERA"
         const MedicalChatWidget = ({ nombreUsuario = "Doctor/a" }) => {
@@ -410,18 +354,14 @@
                         : window.location.search) || ""
                 );
             const isDebugAi = getAllParams().get("debugAi") === "1";
-            const PROD_AI_ENDPOINT = "https://us-central1-departamento-medico-brisa.cloudfunctions.net/aiChat";
-            const EMU_AI_ENDPOINT = "https://us-central1-departamento-medico-brisa.cloudfunctions.net/aiChat";
+            const DEFAULT_AI_ENDPOINT = "/api/ai";
+            const ATTACHMENTS_DISABLED_MESSAGE = "Los archivos adjuntos no estan habilitados en este momento. Envia la consulta solo en texto.";
             const resolveAiEndpoint = () => {
                 const params = getAllParams();
                 const forcedEndpoint = params.get("aiEndpoint");
 
-                // 1. Prioridad: Si hay una URL forzada en los parametros, usarla.
                 if (forcedEndpoint) return forcedEndpoint;
-
-                // 2. Por defecto: Usar SIEMPRE la conexion directa a Google Cloud.
-                // Esto arregla el error en Netlify y evita el error 404 de /api/ai.
-                return PROD_AI_ENDPOINT;
+                return DEFAULT_AI_ENDPOINT;
             };
             if (!aiEndpointRef.current) {
                 aiEndpointRef.current = resolveAiEndpoint();
@@ -459,7 +399,7 @@
                 return null;
             };
             // --- FUNCI�N FINAL "RESCATE 2:00 AM" ---
-            const obtenerRespuestaGemini = async (nuevoMensajeUsuario, imagenBase64 = null, history = []) => {
+            const obtenerRespuestaGemini = async (nuevoMensajeUsuario, history = []) => {
                 
                 // USAMOS SOLO LOS MODELOS QUE APARECIERON EN TU LISTA VERDE
                 // Intento 1: La joya de la corona (2.5 Flash) que tienes activada
@@ -508,12 +448,6 @@
                         : nuevoMensajeUsuario;
 
                     const partesUsuario = [{ text: textoFinal }];
-                    
-                    if (imagenBase64) {
-                        partesUsuario.push({
-                            inline_data: { mime_type: "image/jpeg", data: imagenBase64 }
-                        });
-                    }
 
                     const token = await getAuthToken();
                     if (!token) {
@@ -596,14 +530,10 @@
             // MOTOR 2: OPENAI GPT (via proxy seguro)
             // ==========================================
 
-            const obtenerRespuestaGPT = async (nuevoMensajeUsuario, imagenBase64 = null, history = []) => {
+            const obtenerRespuestaGPT = async (nuevoMensajeUsuario, history = []) => {
                 try {
                     const token = await getAuthToken();
                     if (!token) return "Necesitas iniciar sesi\u00f3n para usar el asistente.";
-                    const apiKey = await gestionarApiKey();
-                    if (!apiKey) {
-                        return "No se pudo obtener la API Key de OpenAI.";
-                    }
 
                     let contextoAdicional = "";
                     if (typeof buscarEnProtocolos === 'function') {
@@ -642,8 +572,7 @@
                         body: JSON.stringify({
                             provider: "openai",
                             prompt: textoFinal,
-                            previousMessages,
-                            openaiApiKey: apiKey
+                            previousMessages
                         })
                     });
 
@@ -885,38 +814,37 @@
             // --- TU NUEVA FUNCI�N 'HANDLE SEND' MEJORADA ---
             const handleSend = async () => {
                 if (!inputText.trim() && !selectedFile) return; // Evita enviar vac�os
+                if (selectedFile) {
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                    setSelectedFile(null);
+                    updateMessages((prev) => [
+                        ...prev,
+                        { id: Date.now(), role: 'system', text: ATTACHMENTS_DISABLED_MESSAGE }
+                    ]);
+                    return;
+                }
 
                 // 1. Preparamos el mensaje visual
                 const newUserMsg = { 
                     id: Date.now(), 
                     role: 'user', 
                     text: inputText,
-                    image: selectedFile ? URL.createObjectURL(selectedFile) : null // Para mostrarla en el chat
+                    image: null
                 };
 
                 const historyForRequest = [...messages];
                 updateMessages((prev) => [...prev, newUserMsg]);
                 setInputText('');
                 setIsTyping(true);
-                
-                // Guardamos la imagen actual para procesarla y luego limpiamos el estado
-                const fileToUpload = selectedFile; 
-                setSelectedFile(null); // Limpiamos el "clip" inmediatamente
 
                 try {
                     let responseText = "";
-                    
-                    // 2. Procesamos la imagen si existe
-                    let base64Image = null;
-                    if (fileToUpload) {
-                        base64Image = await convertirImagenABase64(fileToUpload);
-                    }
 
                     // --- SELECTOR DE CEREBRO ---
                     if (selectedModel === 'gpt') {
-                        responseText = await obtenerRespuestaGPT(newUserMsg.text, base64Image, historyForRequest);
+                        responseText = await obtenerRespuestaGPT(newUserMsg.text, historyForRequest);
                     } else {
-                        responseText = await obtenerRespuestaGemini(newUserMsg.text, base64Image, historyForRequest);
+                        responseText = await obtenerRespuestaGemini(newUserMsg.text, historyForRequest);
                     }
                     
                     updateMessages((prev) => [

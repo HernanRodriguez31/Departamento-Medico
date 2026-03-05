@@ -2,6 +2,7 @@
 
 ## Endpoint
 - `POST /api/ai` (Hosting rewrite to `functions.aiChat`)
+- Temporary compatibility alias: `functions.aiChat_v2`
 
 ## Auth
 - Requires a Firebase ID token in `Authorization: Bearer <token>`.
@@ -43,5 +44,6 @@ firebase deploy --only functions
 
 ## Notes
 - All keys live server-side only. No API keys in the client.
+- The assistant client uses `/api/ai` by default and no longer reads or sends OpenAI keys from Firestore.
 - Basic in-memory rate limit per UID (see `AI_RATE_LIMIT_*` in `functions/index.js`).
 - Logs include uid, provider, timestamp, and status.
