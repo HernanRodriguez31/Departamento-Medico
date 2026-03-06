@@ -12,6 +12,46 @@
         radial-gradient(circle at 82% 12%, rgba(37, 99, 235, 0.07), transparent 25%),
         radial-gradient(circle at 20% 88%, rgba(13, 148, 136, 0.07), transparent 24%),
         linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(248, 250, 252, 0.9));
+    --dm-network-constellation:
+        url("data:image/svg+xml,%0A%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%271600%27%20height%3D%271200%27%20viewBox%3D%270%200%201600%201200%27%20fill%3D%27none%27%3E%0A%20%20%3Cg%20stroke%3D%27%23d9dee7%27%20stroke-opacity%3D%27.78%27%20stroke-width%3D%271.25%27%3E%0A%20%20%20%20%3Cpath%20d%3D%27M54%2080L148%20268L362%20344L552%20264L734%20404L952%20440%27%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%27M54%2080L82%20522L334%20724L512%20600L734%20404%27%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%27M148%20268L82%20522L334%20724L194%201046%27%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%27M362%20344L512%20600L334%20724L602%20936L804%201056%27%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%27M512%20600L734%20404L804%201056L1002%20920L1268%201088%27%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%27M734%20404L952%20440L1116%20690L1002%20920L804%201056%27%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%27M952%20440L1116%20690L1328%20624L1492%20270%27%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%27M1116%20690L1002%20920L1328%20624L1416%20862L1552%20382%27%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%27M1002%20920L1268%201088L1416%20862L1328%20624%27%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%27M1416%20862L1552%20382L1580%20980L1268%201088%27%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%27M82%20522L0%20472M194%201046L0%20812M1492%20270L1600%20180M1580%20980L1600%20760%27%2F%3E%0A%20%20%3C%2Fg%3E%0A%20%20%3Cg%20fill%3D%27%23d7dde8%27%20fill-opacity%3D%27.92%27%3E%0A%20%20%20%20%3Ccircle%20cx%3D%2754%27%20cy%3D%2780%27%20r%3D%2712%27%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%27148%27%20cy%3D%27268%27%20r%3D%2710%27%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%2782%27%20cy%3D%27522%27%20r%3D%2710%27%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%27362%27%20cy%3D%27344%27%20r%3D%2711%27%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%27334%27%20cy%3D%27724%27%20r%3D%2710%27%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%27194%27%20cy%3D%271046%27%20r%3D%2712%27%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%27512%27%20cy%3D%27600%27%20r%3D%2710%27%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%27734%27%20cy%3D%27404%27%20r%3D%2711%27%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%27804%27%20cy%3D%271056%27%20r%3D%2712%27%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%27602%27%20cy%3D%27936%27%20r%3D%2710%27%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%27952%27%20cy%3D%27440%27%20r%3D%2710%27%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%271116%27%20cy%3D%27690%27%20r%3D%2711%27%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%271002%27%20cy%3D%27920%27%20r%3D%2710%27%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%271328%27%20cy%3D%27624%27%20r%3D%2711%27%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%271492%27%20cy%3D%27270%27%20r%3D%2710%27%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%271416%27%20cy%3D%27862%27%20r%3D%2711%27%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%271268%27%20cy%3D%271088%27%20r%3D%2710%27%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%271552%27%20cy%3D%27382%27%20r%3D%2710%27%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%271580%27%20cy%3D%27980%27%20r%3D%2711%27%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%270%27%20cy%3D%27472%27%20r%3D%2710%27%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%270%27%20cy%3D%27812%27%20r%3D%2710%27%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%271600%27%20cy%3D%27180%27%20r%3D%2710%27%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%271600%27%20cy%3D%27760%27%20r%3D%2710%27%2F%3E%0A%20%20%3C%2Fg%3E%0A%3C%2Fsvg%3E");
+    --dm-home-base:
+        linear-gradient(135deg, #fbfcfb 0%, #f5f7f6 44%, #f4f8fb 100%);
+    --dm-home-atmosphere:
+        radial-gradient(ellipse at 50% 34%, rgba(255, 255, 255, 0.97) 0%, rgba(255, 255, 255, 0.93) 26%, rgba(255, 255, 255, 0.74) 50%, transparent 84%),
+        radial-gradient(circle at 12% 18%, rgba(122, 184, 0, 0.16) 0%, transparent 33%),
+        radial-gradient(circle at 85% 14%, rgba(56, 189, 248, 0.1) 0%, transparent 28%),
+        radial-gradient(circle at 84% 86%, rgba(52, 211, 153, 0.06) 0%, transparent 24%),
+        radial-gradient(circle at 18% 84%, rgba(122, 184, 0, 0.08) 0%, transparent 24%);
+    --dm-home-atmosphere-mobile:
+        radial-gradient(ellipse at 50% 20%, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.88) 42%, transparent 88%),
+        radial-gradient(circle at 14% 16%, rgba(122, 184, 0, 0.11) 0%, transparent 26%),
+        radial-gradient(circle at 86% 16%, rgba(56, 189, 248, 0.08) 0%, transparent 24%);
+    --dm-home-bg:
+        var(--dm-home-atmosphere),
+        var(--dm-network-constellation),
+        var(--dm-home-base);
+    --dm-home-bg-mobile:
+        var(--dm-home-atmosphere-mobile),
+        var(--dm-home-base);
+    --dm-login-base:
+        linear-gradient(135deg, #f9fbf8 0%, #eef5ef 46%, #eef6fb 100%);
+    --dm-login-atmosphere:
+        radial-gradient(ellipse at 50% 36%, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.92) 22%, rgba(255, 255, 255, 0.66) 52%, transparent 84%),
+        radial-gradient(circle at 18% 16%, rgba(122, 184, 0, 0.24) 0%, transparent 34%),
+        radial-gradient(circle at 82% 18%, rgba(56, 189, 248, 0.18) 0%, transparent 31%),
+        radial-gradient(circle at 24% 82%, rgba(122, 184, 0, 0.12) 0%, transparent 26%),
+        radial-gradient(circle at 88% 84%, rgba(96, 165, 250, 0.12) 0%, transparent 26%);
+    --dm-login-atmosphere-mobile:
+        radial-gradient(ellipse at 50% 30%, rgba(255, 255, 255, 0.97) 0%, rgba(255, 255, 255, 0.9) 34%, rgba(255, 255, 255, 0.72) 58%, transparent 92%),
+        radial-gradient(circle at 18% 14%, rgba(122, 184, 0, 0.18) 0%, transparent 30%),
+        radial-gradient(circle at 84% 14%, rgba(56, 189, 248, 0.14) 0%, transparent 28%);
+    --dm-login-bg:
+        var(--dm-login-atmosphere),
+        var(--dm-network-constellation),
+        var(--dm-login-base);
+    --dm-login-bg-mobile:
+        var(--dm-login-atmosphere-mobile),
+        var(--dm-login-base);
     --surface: #ffffff;
     --border: #e5e7eb;
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);

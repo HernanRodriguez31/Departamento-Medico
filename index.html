@@ -138,7 +138,7 @@
     </script>
 
     <!-- Styles -->
-    <link rel="stylesheet" href="css/variables.css" />
+    <link rel="stylesheet" href="css/variables.css?v=20260306-network-bg-1" />
     <link rel="stylesheet" href="css/style.css?v=20260305-orgtree-header-1" />
     <link rel="stylesheet" href="css/structure.css" />
     <link
@@ -147,7 +147,7 @@
     />
     <link
       rel="stylesheet"
-      href="assets/css/pages/index.css?v=20260306-cubes-5"
+      href="assets/css/pages/index.css?v=20260306-cubes-10"
     />
     <link
       rel="stylesheet"
@@ -155,11 +155,19 @@
     />
 
     <style>
-      /* Fondo general igual al de comités */
+      /* Fondo corporativo sutil para la home */
       body {
         background-color: var(--body-color);
-        --dm-page-bg: none;
-        background-image: none;
+        --dm-page-bg: var(--dm-home-bg);
+        background-image: var(--dm-page-bg);
+        background-size: cover;
+        background-position: center top;
+      }
+
+      @media (max-width: 768px) {
+        body {
+          --dm-page-bg: var(--dm-home-bg-mobile);
+        }
       }
 
       /* Card principal */
