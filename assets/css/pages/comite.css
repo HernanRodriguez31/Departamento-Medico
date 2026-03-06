@@ -697,22 +697,7 @@ body.comite-variant-alt .project-stage-dot.is-inactive {
     display: none;
 }
 
-#brisa-chat-root {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 9999;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
-}
-
-.brisa-chat-fab {
-    position: fixed;
-    bottom: var(--dm-fab-bottom, 18px);
-    left: 18px;
-    width: var(--dm-chat-fab-size, 58px);
-    height: var(--dm-chat-fab-size, 58px);
-    z-index: 50;
-}
+/* El layout del chat compartido vive en js/chat.js para mantener paridad con la home. */
 
 .brisa-chat-bubble {
     position: absolute;
@@ -755,25 +740,6 @@ body.comite-variant-alt .project-stage-dot.is-inactive {
     align-items: center;
     justify-content: center;
     box-shadow: 0 4px 12px rgba(229, 57, 53, 0.35);
-}
-
-.brisa-chat-panel {
-    position: absolute;
-    bottom: calc(120% + var(--brisa-panel-offset, 0px));
-    right: 0;
-    left: auto;
-    width: 18rem;
-    max-height: 420px;
-    background: rgba(255, 255, 255, 0.94);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    z-index: 40;
-    border-radius: 18px;
-    border: 1px solid rgba(255, 255, 255, 0.65);
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
-    overflow: hidden;
-    display: none;
-    pointer-events: auto;
 }
 
 .brisa-chat-panel-header {
@@ -908,23 +874,6 @@ body.comite-variant-alt .project-stage-dot.is-inactive {
     align-items: center;
     justify-content: center;
     box-shadow: 0 6px 12px rgba(229, 57, 53, 0.35);
-}
-
-.brisa-chat-window {
-    position: fixed;
-    bottom: 84px;
-    left: 292px;
-    width: 320px;
-    max-height: 420px;
-    background: linear-gradient(160deg, rgba(255, 255, 255, 0.98), rgba(247, 249, 252, 0.95));
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    border-radius: 18px;
-    border: 1px solid rgba(15, 23, 42, 0.05);
-    box-shadow: 0 14px 38px rgba(15, 23, 42, 0.16);
-    display: none;
-    flex-direction: column;
-    pointer-events: auto;
 }
 
 .brisa-chat-window-header {
@@ -1108,48 +1057,6 @@ body.comite-variant-alt .project-stage-dot.is-inactive {
 .brisa-chat-send-btn svg {
     width: 14px;
     height: 14px;
-}
-
-.brisa-chat-pill {
-    position: fixed;
-    bottom: 18px;
-    left: 86px;
-    height: 34px;
-    max-width: 220px;
-    padding: 0 12px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border: 1px solid rgba(209, 213, 219, 0.85);
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
-    display: none;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-    pointer-events: auto;
-}
-
-.brisa-chat-pill-tray {
-    position: fixed;
-    bottom: 18px;
-    left: 86px;
-    display: flex;
-    flex-direction: column-reverse;
-    gap: 8px;
-    align-items: flex-start;
-    z-index: 9999;
-    pointer-events: auto;
-}
-
-.brisa-chat-pill--tray {
-    position: static;
-    width: 210px;
-    pointer-events: auto;
-    display: flex;
-    align-items: center;
-    padding-left: 10px;
-    padding-right: 10px;
 }
 
 .brisa-chat-pill-label {
@@ -1381,27 +1288,6 @@ body.comite-variant-alt .project-stage-dot.is-inactive {
     50% {
         background: linear-gradient(135deg, #7ab800, #5a8a00);
         color: #fff;
-    }
-}
-
-@media (max-width: 768px) {
-    .brisa-chat-panel {
-        right: 0;
-        left: auto;
-        width: 18rem;
-    }
-
-    .brisa-chat-window {
-        left: 10px;
-        right: 10px;
-        width: auto;
-        bottom: 76px;
-    }
-
-    .brisa-chat-pill {
-        left: 78px;
-        right: auto;
-        max-width: 50vw;
     }
 }
 

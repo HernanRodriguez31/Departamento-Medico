@@ -180,10 +180,20 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     const style = document.createElement('style');
     style.id = 'brisa-chat-pulse-style';
     style.textContent = `
+      #brisa-chat-root {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 21500;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      }
+
       .brisa-chat-fab {
         position: fixed;
         left: 18px;
-        bottom: var(--dm-fab-bottom);
+        right: auto;
+        top: auto;
+        bottom: var(--dm-fab-bottom, 18px);
         width: var(--dm-chat-fab-size, 58px);
         height: var(--dm-chat-fab-size, 58px);
         z-index: 50;
@@ -203,8 +213,15 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         right: 0;
         left: auto;
         width: 18rem;
+        display: none;
         flex-direction: column;
         max-height: min(420px, var(--brisa-panel-max-height, 420px));
+        background: rgba(255, 255, 255, 0.94);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.65);
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
         overflow: hidden;
         z-index: 40;
         pointer-events: auto;
@@ -213,6 +230,66 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       .brisa-chat-fab[data-side="left"] .brisa-chat-panel {
         left: 0;
         right: auto;
+      }
+
+      .brisa-chat-window {
+        position: fixed;
+        bottom: 84px;
+        left: 292px;
+        width: 320px;
+        max-height: 420px;
+        background: linear-gradient(160deg, rgba(255, 255, 255, 0.98), rgba(247, 249, 252, 0.95));
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        border-radius: 18px;
+        border: 1px solid rgba(15, 23, 42, 0.05);
+        box-shadow: 0 14px 38px rgba(15, 23, 42, 0.16);
+        display: none;
+        flex-direction: column;
+        pointer-events: auto;
+        z-index: 45;
+      }
+
+      .brisa-chat-pill {
+        position: fixed;
+        bottom: 18px;
+        left: 86px;
+        height: 34px;
+        max-width: 220px;
+        padding: 0 12px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border: 1px solid rgba(209, 213, 219, 0.85);
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
+        display: none;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+        pointer-events: auto;
+      }
+
+      .brisa-chat-pill-tray {
+        position: fixed;
+        bottom: 18px;
+        left: 86px;
+        display: flex;
+        flex-direction: column-reverse;
+        gap: 8px;
+        align-items: flex-start;
+        z-index: 21500;
+        pointer-events: auto;
+      }
+
+      .brisa-chat-pill--tray {
+        position: static;
+        width: 210px;
+        pointer-events: auto;
+        display: flex;
+        align-items: center;
+        padding-left: 10px;
+        padding-right: 10px;
       }
 
       .brisa-chat-bubble--pulse { animation: brisaChatPulse 0.9s ease-out; }
@@ -249,6 +326,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         .brisa-chat-fab {
           left: 0;
           right: auto;
+          top: auto;
           bottom: calc(var(--bottom-nav-h) + 20px + env(safe-area-inset-bottom));
         }
         .brisa-chat-fab .brisa-chat-panel {
@@ -281,6 +359,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       @media (min-width: 1024px) {
         .brisa-chat-fab {
           left: 32px;
+          bottom: var(--dm-fab-bottom, 2rem);
         }
 
         .brisa-chat-fab[data-side="left"] .brisa-chat-panel {
@@ -293,6 +372,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         bottom: calc(var(--bottom-nav-h) + 20px + env(safe-area-inset-bottom));
         left: 0;
         right: auto;
+        top: auto;
       }
 
       .brisa-chat-search {
