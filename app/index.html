@@ -3827,7 +3827,7 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
 
     </script>
 
-    <script type="module" src="/js/chat.js?v=20260305-chat-comites-parity-1"></script>
+    <script type="module" src="/js/chat.js?v=20260306-chat-desktop-layout-1"></script>
     <script type="module">
         (() => {
             let chatLoaded = false;
@@ -3835,7 +3835,7 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
             const loadChat = () => {
                 if (chatLoaded) return Promise.resolve();
                 if (chatLoading) return chatLoading;
-                chatLoading = import('/js/chat.js?v=20260305-chat-comites-parity-1')
+                chatLoading = import('/js/chat.js?v=20260306-chat-desktop-layout-1')
                     .then(() => {
                         chatLoaded = true;
                     })
@@ -3859,7 +3859,7 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
             }
         })();
     </script>
-    <script type="module" src="/assets/js/pages/app.js?v=20260305-session-1"></script>
+    <script type="module" src="/assets/js/pages/app.js?v=20260306-chat-desktop-layout-1"></script>
     <script type="module">
         import { getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
         import { doc, setDoc, serverTimestamp, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";

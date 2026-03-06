@@ -34,7 +34,7 @@ import { getFirebase } from "../common/firebaseClient.js";
 import { COLLECTIONS } from "../common/collections.js";
 import { requireAuth, buildLoginRedirectUrl } from "../shared/authGate.js";
 import { handleFirebaseError, debugLog } from "../shared/errors.js";
-import { initAssistantShell } from "../shared/assistant-shell.js";
+import { initAssistantShell } from "../shared/assistant-shell.js?v=20260306-chat-desktop-layout-1";
 import { initUserMenu } from "../common/user-menu.js?v=20260305-session-1";
 import { hydrateAvatars } from "../common/user-profiles.js";
 import { initSessionGuard } from "../shared/sessionGuard.js?v=20260305-session-1";

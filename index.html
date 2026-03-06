@@ -5654,7 +5654,7 @@
           const loadChat = () => {
             if (chatLoaded) return Promise.resolve();
             if (chatLoading) return chatLoading;
-            chatLoading = import("/js/chat.js?v=20260305-chat-comites-parity-1")
+            chatLoading = import("/js/chat.js?v=20260306-chat-desktop-layout-1")
               .then(() => {
                 chatLoaded = true;
               })
@@ -5695,7 +5695,7 @@
           }
         })();
       </script>
-      <script type="module" src="assets/js/pages/index.js?v=20260305-session-1"></script>
+      <script type="module" src="assets/js/pages/index.js?v=20260306-chat-desktop-layout-1"></script>
       <script type="module">
         import {
           getToken,

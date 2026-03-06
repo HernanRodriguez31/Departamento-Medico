@@ -40,7 +40,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   const USER_SEARCH_MIN_CHARS = 2;
   const ASSISTANT_MODEL_STORAGE_KEY = 'dm_ai_model';
   const ASSISTANT_DEFAULT_MODEL = 'gemini';
-  const ASSISTANT_SHELL_MODULE_URL = '/assets/js/shared/assistant-shell.js?v=20260305-chat-ai-entry-4';
+  const ASSISTANT_SHELL_MODULE_URL = '/assets/js/shared/assistant-shell.js?v=20260306-chat-desktop-layout-1';
   const VIRTUAL_REPLIES = [
     'Estoy en línea, contame tu caso.',
     'Recibido, ¿algún detalle extra?',
@@ -54,6 +54,14 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       if (location.pathname.startsWith('/app/')) return true;
     } catch (e) {}
     return typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 768px)').matches;
+  };
+  const detectChatDesktopContext = () => {
+    try {
+      const pathname = window.location.pathname || '';
+      if (pathname.startsWith('/app/')) return 'app';
+      if (pathname.includes('/pages/comites/')) return 'committee';
+    } catch (error) {}
+    return 'home';
   };
   const isReadByMe = (msg) => {
     if (!currentUser) return false;
@@ -186,11 +194,17 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         pointer-events: none;
         z-index: 21500;
         font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+        --dm-fab-bottom: 18px;
+        --brisa-chat-fab-left: 18px;
+        --brisa-chat-panel-width: 18rem;
+        --brisa-chat-panel-gap: 16px;
+        --brisa-chat-window-gap: 18px;
+        --brisa-chat-window-left: 292px;
       }
 
       .brisa-chat-fab {
         position: fixed;
-        left: 18px;
+        left: var(--brisa-chat-fab-left, 18px);
         right: auto;
         top: auto;
         bottom: var(--dm-fab-bottom, 18px);
@@ -212,7 +226,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         bottom: calc(120% + var(--brisa-panel-offset, 0px));
         right: 0;
         left: auto;
-        width: 18rem;
+        width: var(--brisa-chat-panel-width, 18rem);
         display: none;
         flex-direction: column;
         max-height: min(420px, var(--brisa-panel-max-height, 420px));
@@ -235,7 +249,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       .brisa-chat-window {
         position: fixed;
         bottom: 84px;
-        left: 292px;
+        left: var(--brisa-chat-window-left, 292px);
         width: 320px;
         max-height: 420px;
         background: linear-gradient(160deg, rgba(255, 255, 255, 0.98), rgba(247, 249, 252, 0.95));
@@ -357,20 +371,58 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       }
 
       @media (min-width: 1024px) {
+        #brisa-chat-root[data-chat-context="home"] {
+          --dm-fab-bottom: 2rem;
+          --brisa-chat-fab-left: 32px;
+          --brisa-chat-window-left: calc(
+            var(--brisa-chat-fab-left, 32px) +
+            var(--dm-chat-fab-size, 58px) +
+            var(--brisa-chat-panel-gap, 16px) +
+            var(--brisa-chat-panel-width, 18rem) +
+            var(--brisa-chat-window-gap, 18px)
+          );
+        }
+
+        #brisa-chat-root[data-chat-context="committee"] {
+          --dm-fab-bottom: 18px;
+          --brisa-chat-fab-left: 18px;
+          --brisa-chat-window-left: calc(
+            var(--brisa-chat-fab-left, 18px) +
+            var(--brisa-chat-panel-width, 18rem) +
+            var(--brisa-chat-window-gap, 18px)
+          );
+        }
+
+        #brisa-chat-root[data-chat-context="app"] {
+          --brisa-chat-fab-left: 0px;
+          --brisa-chat-window-left: 292px;
+        }
+
         .brisa-chat-fab {
-          left: 32px;
+          left: var(--brisa-chat-fab-left, 32px);
           bottom: var(--dm-fab-bottom, 2rem);
         }
 
+        #brisa-chat-root[data-chat-context="home"] .brisa-chat-fab[data-side="left"] .brisa-chat-panel,
+        #brisa-chat-root[data-chat-context="app"] .brisa-chat-fab[data-side="left"] .brisa-chat-panel {
+          left: calc(100% + var(--brisa-chat-panel-gap, 16px));
+          right: auto;
+        }
+
+        #brisa-chat-root[data-chat-context="committee"] .brisa-chat-fab[data-side="left"] .brisa-chat-panel {
+          left: 0;
+          right: auto;
+        }
+
         .brisa-chat-fab[data-side="left"] .brisa-chat-panel {
-          left: calc(100% + 16px);
+          left: calc(100% + var(--brisa-chat-panel-gap, 16px));
           right: auto;
         }
       }
 
       .app-shell #brisa-chat-root .brisa-chat-fab {
         bottom: calc(var(--bottom-nav-h) + 20px + env(safe-area-inset-bottom));
-        left: 0;
+        left: var(--brisa-chat-fab-left, 0px);
         right: auto;
         top: auto;
       }
@@ -840,6 +892,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       root.id = 'brisa-chat-root';
       document.body.appendChild(root);
     }
+    root.dataset.chatContext = detectChatDesktopContext();
 
     root.innerHTML = `
       <div class="brisa-chat-fab" id="brisa-chat-fab" data-side="left">
@@ -1030,6 +1083,11 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     return document.getElementById('brisa-chat-root');
   }
 
+  function getChatContext() {
+    const root = getChatRoot();
+    return root?.dataset?.chatContext || detectChatDesktopContext();
+  }
+
   function isEmbeddedMode() {
     const root = getChatRoot();
     return root ? root.classList.contains('brisa-chat--embedded') : false;
@@ -1038,6 +1096,29 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   function isPanelVisible(panel) {
     if (!panel) return false;
     return window.getComputedStyle(panel).display !== 'none';
+  }
+
+  function isElementVisible(el) {
+    if (!el) return false;
+    const style = window.getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden') return false;
+    const rect = el.getBoundingClientRect();
+    return rect.width > 0 || rect.height > 0;
+  }
+
+  function captureAnchorSnapshot(el) {
+    if (!isElementVisible(el)) return null;
+    const rect = el.getBoundingClientRect();
+    return {
+      getBoundingClientRect: () => rect
+    };
+  }
+
+  function resolveAssistantAnchorForChat({ panel, windowEl, bubble }) {
+    if (isElementVisible(windowEl)) return windowEl;
+    const panelAnchor = captureAnchorSnapshot(panel);
+    if (panelAnchor) return panelAnchor;
+    return isElementVisible(bubble) ? bubble : null;
   }
 
   function mountChat(containerEl) {
@@ -3081,6 +3162,12 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     if (quickAi) {
       const openAssistant = async () => {
         try {
+          const anchorEl = resolveAssistantAnchorForChat({
+            panel,
+            windowEl: win,
+            bubble
+          });
+          const context = getChatContext();
           closeUsersPanel();
           setChatState({
             isChatOpen: false,
@@ -3090,7 +3177,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
           });
           const shell = await ensureAssistantShellReady();
           const model = resolveAssistantModel();
-          await shell.openChat?.(model);
+          await shell.openChat?.(model, { anchorEl, context });
           updateAssistantQuickRow();
         } catch (error) {
           console.warn('No se pudo abrir el Asistente IA desde el chat:', error);

@@ -135,6 +135,8 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
       gemini: false,
       gpt: false
     },
+    anchorEl: null,
+    anchorContext: "",
     scrollLocked: false,
     scrollY: 0,
     bodyStyles: {}
@@ -171,6 +173,29 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
     return Math.min(Math.max(value, min), max);
   };
 
+  const getPrimaryTrigger = () =>
+    document.getElementById("dmAssistantFab") ||
+    document.getElementById("aiFab") ||
+    triggers[0] ||
+    null;
+
+  const resolveAnchorRect = (anchor) => {
+    if (!anchor || typeof anchor.getBoundingClientRect !== "function") return null;
+    const rect = anchor.getBoundingClientRect();
+    if (!rect) return null;
+    const width = rect.width || Math.max(0, (rect.right || 0) - (rect.left || 0));
+    const height = rect.height || Math.max(0, (rect.bottom || 0) - (rect.top || 0));
+    if (!width && !height && !rect.left && !rect.top && !rect.right && !rect.bottom) {
+      return null;
+    }
+    return rect;
+  };
+
+  const resolveAnchorContext = (context) => {
+    if (context === "home" || context === "committee" || context === "app") return context;
+    return "";
+  };
+
   const updateAnchoredState = () => {
     const desktop = isDesktop();
     shell.classList.toggle("dm-ai-shell--anchored", desktop);
@@ -183,6 +208,7 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
       if (panel) {
         panel.style.left = "";
         panel.style.top = "";
+        panel.style.right = "";
       }
     }
     return desktop;
@@ -190,7 +216,7 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
 
   const positionPicker = () => {
     if (!selector || !updateAnchoredState()) return;
-    const fab = document.getElementById("dmAssistantFab");
+    const fab = getPrimaryTrigger();
     if (!fab) return;
     const fabRect = fab.getBoundingClientRect();
     const pickerRect = selector.getBoundingClientRect();
@@ -204,16 +230,37 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
 
   const positionChat = () => {
     if (!panel || !updateAnchoredState()) return;
-    const fab = document.getElementById("dmAssistantFab");
+    const panelRect = panel.getBoundingClientRect();
+    const panelWidth = panelRect.width || panel.offsetWidth || 440;
+    const panelHeight = panelRect.height || panel.offsetHeight || 0;
+    const margin = 12;
+    const customAnchorRect = resolveAnchorRect(state.anchorEl);
+
+    if (customAnchorRect) {
+      const gap = 16;
+      const opensRight =
+        customAnchorRect.right + gap + panelWidth <= window.innerWidth - margin;
+      let left = opensRight
+        ? customAnchorRect.right + gap
+        : customAnchorRect.left - panelWidth - gap;
+      left = clamp(left, margin, window.innerWidth - panelWidth - margin);
+      const preferredTop = customAnchorRect.top;
+      const top = clamp(preferredTop, margin, window.innerHeight - panelHeight - margin);
+      panel.style.left = `${Math.round(left)}px`;
+      panel.style.top = `${Math.round(top)}px`;
+      panel.style.right = "auto";
+      return;
+    }
+
+    const fab = getPrimaryTrigger();
     if (!fab) return;
     const fabRect = fab.getBoundingClientRect();
-    const panelRect = panel.getBoundingClientRect();
-    const panelHeight = panelRect.height || panel.offsetHeight || 0;
     const left = fabRect.right + 12;
     const top = fabRect.bottom - panelHeight;
-    const clampedTop = clamp(top, 12, window.innerHeight - panelHeight - 12);
+    const clampedTop = clamp(top, margin, window.innerHeight - panelHeight - margin);
     panel.style.left = `${Math.round(left)}px`;
     panel.style.top = `${Math.round(clampedTop)}px`;
+    panel.style.right = "auto";
   };
 
   const handleViewportChange = () => {
@@ -315,6 +362,9 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
   const closePanel = () => {
     if (!state.panelOpen) return;
     state.panelOpen = false;
+    state.anchorEl = null;
+    state.anchorContext = "";
+    delete shell.dataset.anchorContext;
     document.body.classList.remove("dm-ai-open");
     shell.classList.remove("is-open");
     shell.setAttribute("aria-hidden", "true");
@@ -345,12 +395,23 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
     else openPicker();
   };
 
-  const openChat = async (model) => {
+  const openChat = async (model, { anchorEl = null, context = "" } = {}) => {
     if (!model) return;
+    state.anchorEl = anchorEl || null;
+    state.anchorContext = resolveAnchorContext(context);
+    if (state.anchorContext) {
+      shell.dataset.anchorContext = state.anchorContext;
+    } else {
+      delete shell.dataset.anchorContext;
+    }
     setActiveModel(model, { persist: true, notify: false });
     await ensureFrameLoaded(model);
     setActiveFrame(model);
-    await openPanel();
+    if (state.panelOpen) {
+      positionChat();
+    } else {
+      await openPanel();
+    }
     sendModelToIframe(model);
     closePicker();
     syncScrollLock();
@@ -468,7 +529,8 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
       return {
         pickerOpen: state.pickerOpen,
         panelOpen: state.panelOpen,
-        activeModel: state.activeModel
+        activeModel: state.activeModel,
+        anchorContext: state.anchorContext
       };
     }
   };
