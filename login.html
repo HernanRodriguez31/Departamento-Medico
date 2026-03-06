@@ -655,7 +655,7 @@
                 <div class="divider"></div>
 
                 <div class="form-group">
-                    <input type="email" id="email" name="username" placeholder="Usuario" autocomplete="username">
+                    <input type="text" id="email" name="username" placeholder="Usuario o correo" autocomplete="username" autocapitalize="off" spellcheck="false">
                 </div>
                 <div class="form-group password-wrapper">
                     <input type="password" id="password" name="password" placeholder="Contraseña" autocomplete="current-password">
@@ -701,13 +701,12 @@
     <!-- FIREBASE AND AUTH LOGIC DO NOT TOUCH -->
     <script type="module">
         import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-        import { doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { collection, doc, getDoc, getDocs, limit, query, setDoc, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
         import { getFirebase } from "/assets/js/common/firebaseClient.js";
 
         const { auth, db } = getFirebase();
         const loginForm = document.getElementById('login-form');
         let loginInProgress = false;
-        const LOGIN_ALIAS_DOMAIN = "dm.local";
 
         const normalizeCredential = (value = "") => {
             const raw = String(value || "").trim();
@@ -718,10 +717,29 @@
                     email: raw.toLowerCase()
                 };
             }
-            const alias = raw.toLowerCase();
             return {
                 visible: raw,
-                email: `${alias}@${LOGIN_ALIAS_DOMAIN}`
+                email: ""
+            };
+        };
+
+        const resolveCredential = async (value = "") => {
+            const normalized = normalizeCredential(value);
+            if (!normalized.visible) return normalized;
+            if (normalized.email) return normalized;
+
+            const alias = normalized.visible.toLowerCase();
+            const usersRef = collection(db, "usuarios");
+            const aliasQuery = query(usersRef, where("username", "==", alias), limit(1));
+            const snap = await getDocs(aliasQuery);
+            if (snap.empty) {
+                return normalized;
+            }
+
+            const profile = snap.docs[0]?.data() || {};
+            return {
+                visible: normalized.visible,
+                email: String(profile.email || "").trim().toLowerCase()
             };
         };
 
@@ -912,7 +930,6 @@
             const credentialInput = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value.trim();
             const errorMsg = document.getElementById('error-msg');
-            const credential = normalizeCredential(credentialInput);
 
             errorMsg.style.display = 'none';
 
@@ -922,9 +939,15 @@
 
             loginInProgress = true;
             try {
+                const credential = await resolveCredential(credentialInput);
                 if (!credential.visible || !password) {
                     mostrarError("Por favor ingresa usuario y contraseña.");
                     return;
+                }
+                if (!credential.email) {
+                    const err = new Error('auth/invalid-credential');
+                    err.code = 'auth/invalid-credential';
+                    throw err;
                 }
                 // Short wait to ensure spinner is seen (optional)
                 // await new Promise(r => setTimeout(r, 800)); // REMOVED for speed

@@ -41,7 +41,7 @@ const displayName = required(parseArg("--display-name"), "--display-name");
 const puesto = required(parseArg("--puesto"), "--puesto");
 const unidadNegocio = parseArg("--unidad-negocio", "");
 const unidadGestion = parseArg("--unidad-gestion", "");
-const username = parseArg("--username", "");
+const username = parseArg("--username", "").toLowerCase();
 const rol = parseArg("--rol", "medico");
 const estado = parseArg("--estado", "offline");
 
