@@ -707,6 +707,23 @@
         const { auth, db } = getFirebase();
         const loginForm = document.getElementById('login-form');
         let loginInProgress = false;
+        const LOGIN_ALIAS_DOMAIN = "dm.local";
+
+        const normalizeCredential = (value = "") => {
+            const raw = String(value || "").trim();
+            if (!raw) return { visible: "", email: "" };
+            if (raw.includes("@")) {
+                return {
+                    visible: raw,
+                    email: raw.toLowerCase()
+                };
+            }
+            const alias = raw.toLowerCase();
+            return {
+                visible: raw,
+                email: `${alias}@${LOGIN_ALIAS_DOMAIN}`
+            };
+        };
 
         const restoreSavedEmail = () => {
             const emailInput = document.getElementById('email');
@@ -762,12 +779,12 @@
             return displayName;
         };
 
-        const finalizeLogin = async (user, email) => {
-            const displayName = await ensureUserProfile(user, email);
+        const finalizeLogin = async (user, { profileEmail = "", visibleCredential = "" } = {}) => {
+            const displayName = await ensureUserProfile(user, profileEmail);
             sessionStorage.setItem('isLoggedIn', 'true');
             localStorage.setItem('user_nombre', displayName);
             try {
-                if (email) localStorage.setItem('saved_email', email.trim());
+                if (visibleCredential) localStorage.setItem('saved_email', visibleCredential.trim());
             } catch (error) {
                 // no-op
             }
@@ -892,9 +909,10 @@
 
         window.login = async () => {
             if (loginInProgress) return;
-            const email = document.getElementById('email').value.trim();
+            const credentialInput = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value.trim();
             const errorMsg = document.getElementById('error-msg');
+            const credential = normalizeCredential(credentialInput);
 
             errorMsg.style.display = 'none';
 
@@ -904,17 +922,20 @@
 
             loginInProgress = true;
             try {
-                if (!email || !password) {
+                if (!credential.visible || !password) {
                     mostrarError("Por favor ingresa usuario y contraseña.");
                     return;
                 }
                 // Short wait to ensure spinner is seen (optional)
                 // await new Promise(r => setTimeout(r, 800)); // REMOVED for speed
 
-                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                const userCredential = await signInWithEmailAndPassword(auth, credential.email, password);
                 const user = userCredential.user;
 
-                await finalizeLogin(user, email);
+                await finalizeLogin(user, {
+                    profileEmail: credential.email,
+                    visibleCredential: credential.visible
+                });
 
                 // Overlay is already active; keep it brief before redirecting
                 setTimeout(() => {
