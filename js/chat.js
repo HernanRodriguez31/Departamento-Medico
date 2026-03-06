@@ -35,6 +35,8 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   const SPECIAL_CONVERSATIONS = new Set(['dm_group_chat', 'dm_foro_general']);
   const APP_ID = 'departamento-medico-brisa';
   const VIRTUAL_DOCTOR_UID = 'virtual_doctor';
+  const PRESENCE_STALE_MS = 3 * 60 * 60 * 1000;
+  const PRESENCE_HEARTBEAT_MS = 60 * 1000;
   const VIRTUAL_REPLIES = [
     'Estoy en línea, contame tu caso.',
     'Recibido, ¿algún detalle extra?',
@@ -113,6 +115,25 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     if (/^Dr\.?/i.test(base)) return base.replace(/^dr/i, 'Dr');
     return `Dr. ${base}`;
   }
+  const timestampToMs = (value) => {
+    if (!value) return 0;
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value?.toMillis === 'function') return value.toMillis();
+    if (typeof value?.seconds === 'number') {
+      return value.seconds * 1000 + Math.floor((value.nanoseconds || 0) / 1e6);
+    }
+    if (typeof value === 'string') {
+      const parsed = Date.parse(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    if (value instanceof Date) return value.getTime();
+    return 0;
+  };
+  const isPresenceFresh = (updatedAt) => {
+    const updatedMs = timestampToMs(updatedAt);
+    if (!updatedMs) return true;
+    return Date.now() - updatedMs <= PRESENCE_STALE_MS;
+  };
   newMsgAudio.preload = 'auto';
   newMsgAudio.playsInline = true;
   newMsgAudio.muted = false;
@@ -125,6 +146,8 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   let soundEnabled = (localStorage.getItem(SOUND_KEY) || 'on') !== 'muted';
   let lastPresenceUser = null;
   let lastPresenceProfile = null;
+  let lastPresenceHeartbeatAt = 0;
+  let presenceHeartbeatBound = false;
   let incomingSessionStart = 0;
   let bubblePulseTimeout = null;
   let lastBubblePulseAt = 0;
@@ -801,9 +824,31 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     return buildRole(profile) || 'Médico';
   }
 
+  function resolveDirectoryBusinessUnit(profile = {}) {
+    return (
+      profile.businessUnit ||
+      profile.unidadNegocio ||
+      profile.bu ||
+      profile.business_unit ||
+      ''
+    );
+  }
+
+  function resolveDirectoryManagementUnit(profile = {}) {
+    return (
+      profile.managementUnit ||
+      profile.unidadGestion ||
+      profile.mu ||
+      profile.management_unit ||
+      ''
+    );
+  }
+
   function buildSearchDirectoryEntry(uid, profile = {}) {
     const displayName = resolveDirectoryName(profile);
     const role = resolveDirectoryRole(profile);
+    const businessUnit = resolveDirectoryBusinessUnit(profile);
+    const managementUnit = resolveDirectoryManagementUnit(profile);
     const candidates = [
       profile.displayName,
       profile.nombreCompleto,
@@ -822,6 +867,8 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       uid,
       displayName,
       role,
+      businessUnit,
+      managementUnit,
       searchKey: normalizeSearchText(candidates)
     };
   }
@@ -843,10 +890,10 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     else delete status.dataset.tone;
   }
 
-  function buildUserMeta(role, { includePresence = false, isOnline = false } = {}) {
-    const base = (role || 'Médico').trim() || 'Médico';
-    if (!includePresence) return base;
-    return `${base} · ${isOnline ? 'Activo' : 'Inactivo'}`;
+  function buildUserMeta({ businessUnit = '', managementUnit = '', role = '' } = {}) {
+    const parts = [businessUnit, managementUnit].map((part) => String(part || '').trim()).filter(Boolean);
+    if (parts.length) return parts.join(' · ');
+    return (role || 'Médico').trim() || 'Médico';
   }
 
   function buildEmptyState(message) {
@@ -989,7 +1036,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         const row = buildUserRow({
           uid: entry.uid,
           name: entry.displayName,
-          meta: buildUserMeta(entry.role),
+          meta: buildUserMeta(entry),
           isOnline: true,
           onOpen: () => {
             openDirectConversation(entry.uid, entry.displayName);
@@ -1019,7 +1066,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         const row = buildUserRow({
           uid: entry.uid,
           name: entry.displayName,
-          meta: buildUserMeta(entry.role),
+          meta: buildUserMeta(entry),
           isOnline: true,
           onOpen: () => {
             openDirectConversation(entry.uid, entry.displayName);
@@ -1057,7 +1104,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       const row = buildUserRow({
         uid: entry.uid,
         name: entry.displayName,
-        meta: buildUserMeta(entry.role, { includePresence: true, isOnline }),
+        meta: buildUserMeta(entry),
         isOnline,
         onOpen: () => {
           openDirectConversation(entry.uid, entry.displayName, { clearSearch: true });
@@ -1080,6 +1127,8 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
           uid: user.uid,
           displayName: buildDisplayName(profile, user),
           role: buildRole(profile),
+          businessUnit: resolveDirectoryBusinessUnit(profile),
+          managementUnit: resolveDirectoryManagementUnit(profile),
           online,
           updatedAt: serverTimestamp()
         },
@@ -1117,6 +1166,67 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     offlineTimer = null;
   };
 
+  async function touchPresenceHeartbeat({ force = false } = {}) {
+    if (!currentUser || !db || document.hidden) return;
+    const now = Date.now();
+    if (!force && now - lastPresenceHeartbeatAt < PRESENCE_HEARTBEAT_MS) return;
+    lastPresenceHeartbeatAt = now;
+    await updatePresenceStatus(currentUser, currentProfile, true);
+  }
+
+  function bindPresenceHeartbeat() {
+    if (presenceHeartbeatBound) return;
+    presenceHeartbeatBound = true;
+    const refreshPresence = () => {
+      if (Date.now() - lastPresenceHeartbeatAt < PRESENCE_HEARTBEAT_MS) return;
+      void touchPresenceHeartbeat();
+    };
+    window.addEventListener('pointerdown', refreshPresence, { passive: true, capture: true });
+    window.addEventListener('keydown', refreshPresence, { capture: true });
+    window.addEventListener('touchstart', refreshPresence, { passive: true, capture: true });
+    window.addEventListener('focus', refreshPresence);
+    window.addEventListener('mousemove', refreshPresence, { passive: true });
+    window.addEventListener('scroll', refreshPresence, { passive: true });
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        void touchPresenceHeartbeat({ force: true });
+      }
+    });
+  }
+
+  async function handleSignedOutState() {
+    await markOffline();
+    if (presenceUnsub) presenceUnsub();
+    presenceUnsub = null;
+    stopIncomingWatcher();
+    conversationSubs.forEach(unsub => unsub());
+    conversationSubs.clear();
+    conversationMessages.clear();
+    conversationPeers.clear();
+    minimizedPills.forEach(p => p.remove());
+    minimizedPills.clear();
+    presenceMap.clear();
+    presenceRows.clear();
+    currentProfile = null;
+    onlineUsers = [];
+    allUsersCache = [];
+    allUsersPromise = null;
+    activeSearchQuery = '';
+    isUserDirectoryLoading = false;
+    userDirectoryError = '';
+    unreadByConversation.clear();
+    totalUnreadCount = 0;
+    onlineCount = 0;
+    lastPresenceHeartbeatAt = 0;
+    updateCountsUI();
+    updateDocumentBadge();
+    const loggedFlag = sessionStorage.getItem('isLoggedIn') === 'true';
+    if (loggedFlag) {
+      showPill('Chat no disponible (Auth). Reingresá sesión.');
+    }
+    adjustPanelForTray();
+  }
+
   // ---------- PRESENCIA ----------
   function getConversationId(uid1, uid2) {
     return [uid1, uid2].sort().join('__');
@@ -1147,9 +1257,8 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     presenceUnsub = onSnapshot(presenceQuery, snapshot => {
       presenceMap.clear();
       onlineUsers = [];
-
-      onlineCount = snapshot.size;
-      updateCountsUI();
+      let filteredCount = 0;
+      let hasSelfPresence = false;
 
       if (currentUser) {
         const selfName = formatDoctorName(currentUser.displayName || currentUser.email || 'Vos');
@@ -1160,21 +1269,35 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         const data = docSnap.data() || {};
         const uid = data.uid || docSnap.id;
         if (!uid) return;
+        if (!isPresenceFresh(data.updatedAt)) return;
         const doctorName = formatDoctorName(data.displayName || data.email || 'Médico');
         const role = data.role || 'Médico';
-        presenceMap.set(uid, { name: doctorName, role, online: true });
+        const businessUnit = resolveDirectoryBusinessUnit(data);
+        const managementUnit = resolveDirectoryManagementUnit(data);
+        presenceMap.set(uid, { name: doctorName, role, businessUnit, managementUnit, online: true });
+        filteredCount += 1;
+        if (currentUser && uid === currentUser.uid) {
+          hasSelfPresence = true;
+        }
         if (!currentUser || uid === currentUser.uid) return;
 
         onlineUsers.push({
           uid,
           displayName: doctorName,
-          role
+          role,
+          businessUnit,
+          managementUnit
         });
 
         const conversationId = getConversationId(currentUser.uid, uid);
         ensureConversationSubscription(conversationId);
       });
 
+      if (currentUser && !hasSelfPresence) {
+        filteredCount += 1;
+      }
+      onlineCount = filteredCount;
+      updateCountsUI();
       renderUsersPanel();
     });
   }
@@ -2528,6 +2651,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
 
     injectChatShell();
     attachUIHandlers();
+    bindPresenceHeartbeat();
     ['click', 'touchstart', 'keydown', 'pointermove', 'wheel', 'scroll'].forEach(evt => {
       document.addEventListener(evt, primeAudio, { capture: true });
       document.addEventListener(evt, resumePendingSound, { capture: true });
@@ -2553,11 +2677,12 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     }, { capture: true });
 
     auth.onAuthStateChanged(async user => {
-      if (!user) {
+      currentUser = user || null;
+      if (!currentUser) {
+        await handleSignedOutState();
         window.location.replace(buildLoginRedirectUrl());
         return;
       }
-      currentUser = user || null;
       if (currentUser) {
         currentProfile = null;
         try {
@@ -2566,36 +2691,11 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         } catch (e) {
           console.warn('No se pudo cargar el perfil del usuario:', e);
         }
-        await updatePresenceStatus(currentUser, currentProfile, true);
+        lastPresenceHeartbeatAt = 0;
+        await touchPresenceHeartbeat({ force: true });
         subscribePresence();
         ensureIncomingWatcher();
         updateCountsUI();
-      } else {
-        await markOffline();
-        if (presenceUnsub) presenceUnsub();
-        stopIncomingWatcher();
-        conversationSubs.forEach(unsub => unsub());
-        conversationSubs.clear();
-        conversationMessages.clear();
-        conversationPeers.clear();
-        minimizedPills.forEach(p => p.remove());
-        minimizedPills.clear();
-        currentProfile = null;
-        onlineUsers = [];
-        allUsersCache = [];
-        allUsersPromise = null;
-        activeSearchQuery = '';
-        isUserDirectoryLoading = false;
-        userDirectoryError = '';
-        unreadByConversation.clear();
-        totalUnreadCount = 0;
-        onlineCount = 0;
-        updateCountsUI();
-        updateDocumentBadge();
-        const loggedFlag = sessionStorage.getItem('isLoggedIn') === 'true';
-        if (loggedFlag) {
-          showPill('Chat no disponible (Auth). Reingresá sesión.');
-        }
       }
       adjustPanelForTray();
     });

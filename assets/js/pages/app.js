@@ -1,4 +1,4 @@
-import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { EmailAuthProvider, reauthenticateWithCredential } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
   getFirestore,
@@ -36,54 +36,13 @@ import { requireAuth, buildLoginRedirectUrl } from "../shared/authGate.js";
 import { handleFirebaseError } from "../shared/errors.js";
 import { initAssistantShell } from "../shared/assistant-shell.js";
 import { logger, once, throttle } from "../common/app-logger.js";
-import { initUserMenu } from "../common/user-menu.js";
+import { initUserMenu } from "../common/user-menu.js?v=20260305-session-1";
 import { hydrateAvatars } from "../common/user-profiles.js";
+import { initSessionGuard } from "../shared/sessionGuard.js?v=20260305-session-1";
 
 function ensureFirebase() {
   return getFirebase();
 }
-
-const INACTIVITY_LIMIT_MS = 30 * 60 * 1000;
-let inactivityTimerId = null;
-let inactivityBound = false;
-
-const buildAuthRedirect = () => buildLoginRedirectUrl(window.location.hash || "#carrete");
-
-const initSessionGuard = (auth) => {
-  if (!auth || inactivityBound) return;
-  inactivityBound = true;
-
-  const resetTimer = () => {
-    if (inactivityTimerId) {
-      clearTimeout(inactivityTimerId);
-    }
-    inactivityTimerId = setTimeout(async () => {
-      if (!auth.currentUser) {
-        window.location.replace(buildAuthRedirect());
-        return;
-      }
-      try {
-        await signOut(auth);
-      } catch (e) {
-        // no-op
-      }
-      window.location.replace(buildAuthRedirect());
-    }, INACTIVITY_LIMIT_MS);
-  };
-
-  const events = ["mousemove", "mousedown", "keydown", "touchstart", "scroll"];
-  events.forEach((eventName) => {
-    window.addEventListener(eventName, resetTimer, { passive: true });
-  });
-  window.addEventListener("focus", resetTimer);
-  resetTimer();
-
-  onAuthStateChanged(auth, (user) => {
-    if (!user) {
-      window.location.replace(buildAuthRedirect());
-    }
-  });
-};
 
 const { POSTS: POSTS_COLLECTION, COMMENTS: COMMENTS_COLLECTION, USERS: USERS_COLLECTION } = COLLECTIONS;
 
@@ -2926,8 +2885,8 @@ async function initCarouselModule() {
 }
 
 const boot = () => {
-  const { auth } = ensureFirebase();
-  initSessionGuard(auth);
+  const { auth, db } = ensureFirebase();
+  initSessionGuard({ auth, db, fallbackHash: "#carrete" });
   initUserMenu({ variant: "mobile" });
   const assistantShell = initAssistantShell({ variant: "mobile" });
   const aiFab = document.getElementById("aiFab");

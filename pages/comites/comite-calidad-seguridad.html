@@ -81,6 +81,7 @@
             getDocUrl
         } from "../../js/committee-links.js";
         import { hydrateAvatars, resolveUidForAuthor } from "../../assets/js/common/user-profiles.js";
+        import { initSessionGuard } from "../../assets/js/shared/sessionGuard.js?v=20260305-session-1";
 
         const appId = 'departamento-medico-brisa';
         const COMMITTEE_ID = "comite_calidad_seguridad";
@@ -93,6 +94,9 @@
             db = firebase?.db || null;
         } catch (e) {
             console.error("Error initializing Firebase:", e);
+        }
+        if (auth) {
+            initSessionGuard({ auth, db, loginPath: "../../login.html" });
         }
         let isAdmin = false;
 
@@ -1969,7 +1973,7 @@ async function joinCurrentCommittee() {
     </footer>
 
 
-    <script type="module" src="../../js/chat.js"></script>
+    <script type="module" src="../../js/chat.js?v=20260305-session-1"></script>
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>

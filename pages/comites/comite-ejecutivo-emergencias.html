@@ -57,7 +57,7 @@
 <!-- Firebase SDKs -->
     <script type="module">
         import { getFirebase } from "/assets/js/common/firebaseClient.js";
-        import { EmailAuthProvider, onAuthStateChanged, reauthenticateWithCredential, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+        import { EmailAuthProvider, onAuthStateChanged, reauthenticateWithCredential } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
         import { collection, addDoc, deleteDoc, updateDoc, doc, onSnapshot, serverTimestamp, query, orderBy, writeBatch, getDoc, getDocs, where, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
         import {
             assignProjectNumbers,
@@ -66,6 +66,7 @@
             getDocUrl
         } from "../../js/committee-links.js";
         import { hydrateAvatars, resolveUidForAuthor } from "../../assets/js/common/user-profiles.js";
+        import { initSessionGuard, performManagedLogout } from "../../assets/js/shared/sessionGuard.js?v=20260305-session-1";
 
         let db = null;
         let auth = null;
@@ -77,6 +78,9 @@
             db = firebase?.db || null;
         } catch (e) {
             console.error("Error initializing Firebase:", e);
+        }
+        if (auth) {
+            initSessionGuard({ auth, db, loginPath: "../../login.html" });
         }
         let isAdmin = false;
 
@@ -424,13 +428,15 @@
             if (userPanelLogout) {
                 userPanelLogout.addEventListener('click', async () => {
                     try {
-                        await signOut(auth);
+                        await performManagedLogout({
+                            auth,
+                            db,
+                            loginPath: "../../login.html",
+                            reason: "manual_logout"
+                        });
                     } catch (e) {
                         console.error("Error al cerrar sesión:", e);
                     }
-                    sessionStorage.clear();
-                    localStorage.removeItem('user_nombre');
-                    window.location.href = "../../login.html";
                 });
             }
         }
@@ -1980,7 +1986,7 @@ async function joinCurrentCommittee() {
     </footer>
 
 
-    <script type="module" src="../../js/chat.js"></script>
+    <script type="module" src="../../js/chat.js?v=20260305-session-1"></script>
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>

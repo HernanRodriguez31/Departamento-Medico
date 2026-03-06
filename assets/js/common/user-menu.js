@@ -1,8 +1,9 @@
-import { onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { getFirebase } from "./firebaseClient.js";
 import { logger, once as logOnce } from "./app-logger.js";
+import { performManagedLogout } from "../shared/sessionGuard.js?v=20260305-session-1";
 import {
   buildInitials,
   resolveNameFromDoc,
@@ -393,11 +394,14 @@ const initMenuInstance = (container, { auth, db, storage }) => {
     closeDropdown();
     if (!auth) return;
     try {
-      await signOut(auth);
+      await performManagedLogout({
+        auth,
+        db,
+        reason: "manual_logout"
+      });
     } catch (err) {
       warnOnce("logout", "No se pudo cerrar sesion.", err);
     }
-    window.location.href = "/login.html";
   });
 
   if (menu.notifToggle && !menu.notifToggle.hasAttribute("data-dm-user-notif-external")) {

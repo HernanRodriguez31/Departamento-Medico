@@ -14,6 +14,7 @@ import {
 const CONVERSATIONS_COLLECTION = "dm_conversations";
 const PROFILE_COLLECTION = "usuarios";
 const MAX_CONVERSATIONS = 50;
+const CHAT_MODULE_URL = "/js/chat.js?v=20260305-session-1";
 
 const QUICK_ITEMS = [
   {
@@ -196,7 +197,7 @@ export default function renderMessages(container) {
   const ensureChatApi = async () => {
     if (window.BrisaChat) return window.BrisaChat;
     if (!chatLoadPromise) {
-      chatLoadPromise = import("/js/chat.js");
+      chatLoadPromise = import(CHAT_MODULE_URL);
     }
     await chatLoadPromise;
     return window.BrisaChat;
