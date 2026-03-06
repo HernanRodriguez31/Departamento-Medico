@@ -39,7 +39,7 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
     <title>Dto Médico</title>
     <meta
@@ -48,7 +48,8 @@
     />
     <meta name="application-name" content="Dto Médico" />
     <meta name="apple-mobile-web-app-title" content="Dto Médico" />
-    <meta name="theme-color" content="#7AB800" />
+    <meta name="theme-color" content="#7AB800" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#5a8a00" media="(prefers-color-scheme: dark)" />
 
     <!-- Favicon -->
     <link
@@ -560,7 +561,7 @@
         }
 
         .leader-card__header {
-          min-height: auto;
+          min-height: unset;
           gap: 0.38rem;
         }
 
@@ -731,8 +732,8 @@
         width: 18rem;
         max-height: 420px;
         background: rgba(255, 255, 255, 0.94);
-        backdrop-filter: blur(18px);
         -webkit-backdrop-filter: blur(18px);
+        backdrop-filter: blur(18px);
         z-index: 40;
         border-radius: 18px;
         border: 1px solid rgba(255, 255, 255, 0.65);
@@ -892,8 +893,8 @@
           rgba(255, 255, 255, 0.98),
           rgba(247, 249, 252, 0.95)
         );
-        backdrop-filter: blur(18px);
         -webkit-backdrop-filter: blur(18px);
+        backdrop-filter: blur(18px);
         border-radius: 18px;
         border: 1px solid rgba(15, 23, 42, 0.05);
         box-shadow: 0 14px 38px rgba(15, 23, 42, 0.16);
@@ -1099,8 +1100,8 @@
         padding: 0 12px;
         border-radius: 999px;
         background: rgba(255, 255, 255, 0.9);
-        backdrop-filter: blur(14px);
         -webkit-backdrop-filter: blur(14px);
+        backdrop-filter: blur(14px);
         border: 1px solid rgba(209, 213, 219, 0.85);
         box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
         display: none;
@@ -1408,6 +1409,10 @@
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
         transition: color 0.18s ease, background 0.18s ease,
           border-color 0.18s ease, box-shadow 0.18s ease;
+        -webkit-appearance: none;
+        appearance: none;
+        text-align: left;
+        font: inherit;
       }
 
       .user-panel-trigger:hover {
@@ -1601,6 +1606,87 @@
       .push-toggle-hint {
         font-size: 11px;
         color: #6b7280;
+        padding-top: 2px;
+      }
+
+      .splash-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: #ffffff;
+        z-index: 9999999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        transition: opacity 0.6s ease-out;
+      }
+
+      .splash-screen__spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #4ade80;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        margin-top: 20px;
+      }
+
+      .hero-section--compact {
+        padding-top: 9rem;
+        padding-bottom: 1rem;
+      }
+
+      .hero-section__description {
+        font-size: 1.15rem;
+      }
+
+      .hero-section__actions {
+        animation-delay: 0.2s;
+        animation-fill-mode: forwards;
+      }
+
+      .section--tight-top {
+        padding-top: 1rem;
+      }
+
+      .section--research {
+        background-color: #f9fafb;
+        padding-top: 2rem;
+        padding-bottom: 6rem;
+      }
+
+      .dm-carousel-error.is-hidden {
+        display: none;
+      }
+
+      .login-input--with-toggle {
+        padding-right: 2.5rem;
+      }
+
+      .login-forgot__icon {
+        margin-right: 4px;
+      }
+
+      .push-banner__title {
+        font-weight: 700;
+        color: #111827;
+        font-size: 15px;
+        text-align: center;
+      }
+
+      .push-banner__text {
+        color: #4b5563;
+        font-size: 13px;
+        text-align: center;
+      }
+
+      .push-banner__hint {
+        color: #6b7280;
+        font-size: 12px;
+        text-align: center;
       }
 
       .push-banner {
@@ -1725,39 +1811,13 @@
   </head>
 
   <body>
-    <div
-      id="splash-screen"
-      style="
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        background-color: #ffffff;
-        z-index: 9999999;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        transition: opacity 0.6s ease-out;
-      "
-    >
+    <div id="splash-screen" class="splash-screen">
       <img
         src="assets/images/logo-dpto-medico-large.png"
         class="splash-logo"
         alt="Departamento Médico"
       />
-      <div
-        style="
-          width: 40px;
-          height: 40px;
-          border: 4px solid #f3f3f3;
-          border-top: 4px solid #4ade80;
-          border-radius: 50%;
-          animation: spin 0.8s linear infinite;
-          margin-top: 20px;
-        "
-      ></div>
+      <div class="splash-screen__spinner"></div>
       <style>
         @keyframes spin {
           0% {
@@ -1877,10 +1937,11 @@
               </div>
 
               <div class="user-panel" data-dm-user-menu data-variant="desktop">
-                <div
+                <button
                   id="user-panel-trigger"
                   class="user-panel-trigger"
                   data-dm-user-trigger
+                  type="button"
                   aria-haspopup="menu"
                   aria-expanded="false"
                 >
@@ -1912,7 +1973,7 @@
                     aria-label="Información usuario"
                     >i</span
                   >
-                </div>
+                </button>
                 <div
                   id="user-panel-dropdown"
                   class="user-panel-dropdown"
@@ -1987,7 +2048,6 @@
                   <div
                     id="push-toggle-hint"
                     class="push-toggle-hint"
-                    style="padding-top: 2px"
                   ></div>
                   <button
                     id="user-panel-logout"
@@ -2120,7 +2180,7 @@
                 <a
                   href="https://brisasaludybienestar.com/"
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   class="portal-link"
                   id="portal-action"
                 >
@@ -2145,22 +2205,20 @@
         <!-- HERO / INTRO -->
         <section
           id="estructura-hero"
-          class="section text-center reveal-on-scroll"
-          style="padding-top: 9rem; padding-bottom: 1rem"
+          class="section text-center reveal-on-scroll hero-section--compact"
         >
           <div class="container">
             <h1 class="section__title mb-2">Departamento Médico</h1>
             <p class="section__subtitle mb-2">
               Un ecosistema que potencia el talento
             </p>
-            <p class="section__description mb-1" style="font-size: 1.15rem">
+            <p class="section__description mb-1 hero-section__description">
               Un espacio diseñado para conectar tus capacidades con el resto del
               equipo. Facilitamos la colaboración para impulsar juntos la
               excelencia médica y el desarrollo profesional.
             </p>
             <div
-              class="flex flex-col sm:flex-row gap-4 justify-center max-w-3xl mx-auto w-full px-4 opacity-0 animate-fade-in-up"
-              style="animation-delay: 0.2s; animation-fill-mode: forwards"
+              class="flex flex-col sm:flex-row gap-4 justify-center max-w-3xl mx-auto w-full px-4 opacity-0 animate-fade-in-up hero-section__actions"
             >
               <!-- Button 1: Documento Estructural -->
               <a
@@ -2215,9 +2273,8 @@
 
         <!-- MISION -->
         <section
-          class="section reveal-on-scroll"
+          class="section reveal-on-scroll section--tight-top"
           id="mision"
-          style="padding-top: 1rem"
         >
           <div class="container">
             <div class="section__header">
@@ -2742,9 +2799,8 @@
 
         <!-- DOCUMENTACIÓN OFICIAL (New Section) -->
         <section
-          class="section reveal-on-scroll"
+          class="section reveal-on-scroll section--tight-top"
           id="documentacion"
-          style="padding-top: 1rem"
         >
           <!-- Reduced top padding -->
           <div class="container text-center">
@@ -3248,13 +3304,8 @@
 
         <!-- HERRAMIENTAS DE INVESTIGACIÓN -->
         <section
-          class="section reveal-on-scroll"
+          class="section reveal-on-scroll section--research"
           id="investigacion"
-          style="
-            background-color: #f9fafb;
-            padding-top: 2rem;
-            padding-bottom: 6rem;
-          "
         >
           <div class="container">
             <div class="section__header">
@@ -3301,6 +3352,7 @@
                     <button
                       type="submit"
                       class="research__button research__button--blue"
+                      aria-label="Buscar en PubMed"
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -3375,6 +3427,7 @@
                       type="submit"
                       class="research__button research__button--black"
                       title="Buscar (copia al portapapeles)"
+                      aria-label="Buscar en OpenEvidence"
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -3427,7 +3480,6 @@
                   name="dm-muro-text"
                   autocomplete="off"
                   autocorrect="off"
-                  autocapitalize="off"
                   spellcheck="false"
                   inputmode="text"
                   data-1p-ignore="true"
@@ -3736,9 +3788,8 @@
             </form>
             <div
               id="dm-carousel-error"
-              class="dm-carousel-error"
+              class="dm-carousel-error is-hidden"
               role="alert"
-              style="display: none"
             ></div>
           </div>
         </div>
@@ -3859,7 +3910,7 @@
                   class="calendar-edit-btn calendar-edit-btn--floating"
                   href="https://calendar.google.com/calendar/u/0/r?cid=aca87c4282b359a629e92fa3a0fcf15d043c5647e3eb7a081f74f9d4365bd559@group.calendar.google.com"
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   >Editar Calendario</a
                 >
                 <iframe
@@ -3909,7 +3960,7 @@
       </footer>
 
       <!-- SCROLL UP -->
-      <a href="#" class="scrollup" id="scroll-up">
+      <a href="#" class="scrollup" id="scroll-up" aria-label="Volver arriba">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="24"
@@ -4359,8 +4410,8 @@
                                     d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2zM5 8h6a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" />
                             </svg>
                         </div>
-                        <input type="text" id="password" name="password" class="login-input password-masked"
-                            placeholder="Ingrese código de acceso" autocomplete="off" style="padding-right: 2.5rem;"
+                        <input type="text" id="password" name="password" class="login-input password-masked login-input--with-toggle"
+                            placeholder="Ingrese código de acceso" autocomplete="off"
                             spellcheck="false" autocorrect="off" autocapitalize="off">
 
                         <button type="button" class="password-toggle" onclick="togglePasswordVisibility()"
@@ -4384,7 +4435,7 @@
                 <div class="login-links">
                     <a href="#" onclick="handleForgotPassword(event)" class="login-forgot">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor"
-                            viewBox="0 0 16 16" style="margin-right: 4px;">
+                            viewBox="0 0 16 16" class="login-forgot__icon">
                             <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
                             <path
                                 d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286zm1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94z" />
@@ -5874,21 +5925,14 @@
         };
       </script>
       <div id="push-permission-banner" class="push-banner hidden">
-        <div
-          style="
-            font-weight: 700;
-            color: #111827;
-            font-size: 15px;
-            text-align: center;
-          "
-        >
+        <div class="push-banner__title">
           Notificaciones del Departamento Médico
         </div>
-        <div style="color: #4b5563; font-size: 13px; text-align: center">
+        <div class="push-banner__text">
           Las notificaciones te permiten recibir avisos importantes cuando llega
           un mensaje nuevo, incluso si no estás en la plataforma.
         </div>
-        <div style="color: #6b7280; font-size: 12px; text-align: center">
+        <div class="push-banner__hint">
           Podés cambiarlo cuando quieras desde el menú de usuario o el candado
           🔒 del navegador.
         </div>
