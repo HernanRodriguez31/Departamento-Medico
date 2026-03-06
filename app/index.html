@@ -3827,7 +3827,7 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
 
     </script>
 
-    <script type="module" src="/js/chat.js?v=20260305-session-1"></script>
+    <script type="module" src="/js/chat.js?v=20260305-chat-ai-entry-4"></script>
     <script type="module">
         (() => {
             let chatLoaded = false;
@@ -3835,7 +3835,7 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
             const loadChat = () => {
                 if (chatLoaded) return Promise.resolve();
                 if (chatLoading) return chatLoading;
-                chatLoading = import('/js/chat.js?v=20260305-session-1')
+                chatLoading = import('/js/chat.js?v=20260305-chat-ai-entry-4')
                     .then(() => {
                         chatLoaded = true;
                     })

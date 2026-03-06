@@ -37,6 +37,10 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   const VIRTUAL_DOCTOR_UID = 'virtual_doctor';
   const PRESENCE_STALE_MS = 3 * 60 * 60 * 1000;
   const PRESENCE_HEARTBEAT_MS = 60 * 1000;
+  const USER_SEARCH_MIN_CHARS = 2;
+  const ASSISTANT_MODEL_STORAGE_KEY = 'dm_ai_model';
+  const ASSISTANT_DEFAULT_MODEL = 'gemini';
+  const ASSISTANT_SHELL_MODULE_URL = '/assets/js/shared/assistant-shell.js?v=20260305-chat-ai-entry-4';
   const VIRTUAL_REPLIES = [
     'Estoy en línea, contame tu caso.',
     'Recibido, ¿algún detalle extra?',
@@ -80,6 +84,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   let onlineUsers = [];
   let allUsersCache = [];
   let allUsersPromise = null;
+  let assistantShellPromise = null;
   let activeSearchQuery = '';
   let isUserDirectoryLoading = false;
   let userDirectoryError = '';
@@ -198,6 +203,9 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         right: 0;
         left: auto;
         width: 18rem;
+        flex-direction: column;
+        max-height: min(420px, var(--brisa-panel-max-height, 420px));
+        overflow: hidden;
         z-index: 40;
         pointer-events: auto;
       }
@@ -243,11 +251,41 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
           right: auto;
           bottom: calc(var(--bottom-nav-h) + 20px + env(safe-area-inset-bottom));
         }
+        .brisa-chat-fab .brisa-chat-panel {
+          width: min(21rem, calc(100vw - 16px));
+        }
+        .brisa-chat-window {
+          left: 8px;
+          right: 8px;
+          width: auto;
+          height: min(76dvh, 620px);
+          max-height: calc(100dvh - 20px - env(safe-area-inset-bottom));
+          bottom: calc(var(--bottom-nav-h, 0px) + 76px + env(safe-area-inset-bottom));
+          border-radius: 20px;
+        }
+        .brisa-chat-window-header {
+          padding: 10px 14px;
+        }
+        .brisa-chat-window-subtitle {
+          padding: 0 18px 4px;
+        }
+        .brisa-chat-window-body {
+          padding: 10px 10px 8px;
+        }
+        .brisa-chat-window-footer {
+          padding: 8px 10px 10px;
+          gap: 6px;
+        }
       }
 
       @media (min-width: 1024px) {
         .brisa-chat-fab {
           left: 32px;
+        }
+
+        .brisa-chat-fab[data-side="left"] .brisa-chat-panel {
+          left: calc(100% + 16px);
+          right: auto;
         }
       }
 
@@ -258,9 +296,13 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       }
 
       .brisa-chat-search {
+        position: sticky;
+        top: 0;
+        z-index: 2;
         padding: 10px 12px 8px;
         border-bottom: 1px solid rgba(15, 23, 42, 0.06);
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(248, 250, 252, 0.94));
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(249, 250, 251, 0.98));
+        box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05);
       }
 
       .brisa-chat-search-label {
@@ -289,7 +331,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
 
       .brisa-chat-search-input {
         width: 100%;
-        min-height: 34px;
+        min-height: 38px;
         border-radius: 10px;
         border: 1px solid rgba(148, 163, 184, 0.28);
         background: rgba(255, 255, 255, 0.96);
@@ -336,6 +378,52 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         color: #6b7280;
       }
 
+      .brisa-chat-panel-body {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        max-height: none;
+        overflow: hidden;
+      }
+
+      .brisa-chat-panel-scroll {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding-bottom: 8px;
+      }
+
+      .brisa-chat-section-label--split {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      #brisa-chat-users {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .brisa-chat-row-main {
+        min-width: 0;
+      }
+
+      .brisa-chat-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .brisa-chat-meta {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        overflow: hidden;
+        line-clamp: 2;
+      }
+
       .brisa-chat-row--offline .brisa-chat-status-dot {
         background: #cbd5e1;
         box-shadow: none;
@@ -347,6 +435,266 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
 
       .brisa-chat-row--offline .brisa-chat-icon-btn svg {
         color: #64748b;
+      }
+
+      .brisa-chat-row--assistant {
+        position: relative;
+        align-items: center;
+        gap: 10px;
+        border: 1px solid rgba(122, 184, 0, 0.16);
+        background: linear-gradient(180deg, rgba(247, 251, 241, 0.96), rgba(255, 255, 255, 0.98));
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88);
+      }
+
+      .brisa-chat-row--assistant:hover {
+        border-color: rgba(122, 184, 0, 0.26);
+        box-shadow: 0 10px 22px rgba(122, 184, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.92);
+      }
+
+      .brisa-chat-status-dot--assistant {
+        width: 18px;
+        height: 18px;
+        min-width: 18px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #16a34a 0%, #7ab800 55%, #d1e975 100%);
+        box-shadow: 0 8px 18px rgba(122, 184, 0, 0.22);
+        color: #ffffff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .brisa-chat-status-dot--assistant svg {
+        width: 10px;
+        height: 10px;
+      }
+
+      .brisa-chat-row-accent {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        min-width: 68px;
+        padding: 5px 8px;
+        border-radius: 999px;
+        border: 1px solid rgba(122, 184, 0, 0.2);
+        background: rgba(122, 184, 0, 0.1);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+        color: #3f6212;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        white-space: nowrap;
+      }
+
+      .brisa-chat-row--assistant[data-model="gpt"] .brisa-chat-row-accent {
+        border-color: rgba(15, 23, 42, 0.12);
+        background: rgba(15, 23, 42, 0.06);
+        color: #0f172a;
+      }
+    `;
+    document.head.appendChild(style);
+  };
+
+  const ensureAssistantShellStylesInjected = () => {
+    if (document.getElementById('brisa-chat-assistant-style')) return;
+    const style = document.createElement('style');
+    style.id = 'brisa-chat-assistant-style';
+    style.textContent = `
+      .dm-ai-shell {
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
+        pointer-events: none;
+      }
+
+      .dm-ai-shell.is-open {
+        pointer-events: auto;
+      }
+
+      .dm-ai-selector {
+        position: fixed;
+        left: 88px;
+        top: 50%;
+        transform: translateY(-50%) translateX(-8px);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease, transform 0.2s ease;
+        z-index: 99999;
+      }
+
+      .dm-ai-selector.is-open {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateY(-50%) translateX(0);
+      }
+
+      .dm-ai-selector__btn {
+        width: 44px;
+        height: 44px;
+        border-radius: 999px;
+        border: 1.5px solid var(--primary-color, #2e6b46);
+        background: #ffffff;
+        display: grid;
+        place-items: center;
+        box-shadow: 0 8px 18px rgba(46, 107, 70, 0.18);
+        color: #0f172a;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .dm-ai-selector__btn.is-active {
+        box-shadow: 0 10px 22px rgba(46, 107, 70, 0.28);
+        transform: translateY(-1px);
+      }
+
+      .dm-ai-selector__btn svg {
+        width: 20px;
+        height: 20px;
+      }
+
+      .dm-ai-shell--desktop .dm-ai-backdrop {
+        position: absolute;
+        inset: 0;
+        background: transparent;
+        opacity: 0;
+      }
+
+      .dm-ai-shell--desktop .dm-ai-panel {
+        position: absolute;
+        left: 88px;
+        top: 50%;
+        transform: translateY(-50%) scale(0.98);
+        width: 440px;
+        height: 600px;
+        max-height: calc(100vh - 24px);
+        background: #ffffff;
+        border-radius: 18px;
+        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+        display: flex;
+        flex-direction: column;
+        opacity: 0;
+        transition: transform 0.2s ease, opacity 0.2s ease;
+        z-index: 99999;
+        overflow: hidden;
+      }
+
+      .dm-ai-shell--desktop.is-open .dm-ai-panel {
+        opacity: 1;
+        transform: translateY(-50%) scale(1);
+      }
+
+      .dm-ai-shell--desktop .dm-ai-body,
+      .dm-ai-shell .dm-ai-body {
+        flex: 1 1 auto;
+        overflow: hidden;
+      }
+
+      .dm-ai-shell--desktop .dm-ai-iframe,
+      .dm-ai-shell .dm-ai-iframe {
+        width: 100%;
+        height: 100%;
+        border: 0;
+        background: #f8fafc;
+        display: none;
+      }
+
+      .dm-ai-shell--desktop .dm-ai-iframe.is-active,
+      .dm-ai-shell .dm-ai-iframe.is-active {
+        display: block;
+      }
+
+      @media (min-width: 1024px) {
+        .dm-ai-selector__btn {
+          width: 56px;
+          height: 56px;
+        }
+
+        .dm-ai-selector__btn svg {
+          width: 24px;
+          height: 24px;
+        }
+
+        .dm-ai-selector--anchored {
+          transform: translateX(-8px);
+        }
+
+        .dm-ai-selector--anchored.is-open {
+          transform: translateX(0);
+        }
+
+        .dm-ai-shell--anchored .dm-ai-panel {
+          transform: scale(0.98);
+        }
+
+        .dm-ai-shell--anchored.is-open .dm-ai-panel {
+          transform: scale(1);
+        }
+      }
+
+      @media (max-width: 1023px) {
+        .dm-ai-selector {
+          left: 50%;
+          top: auto;
+          bottom: calc(env(safe-area-inset-bottom) + 108px);
+          transform: translate(-50%, 12px);
+          flex-direction: row;
+          align-items: center;
+          z-index: 22005;
+        }
+
+        .dm-ai-selector.is-open {
+          transform: translate(-50%, 0);
+        }
+
+        .dm-ai-selector__btn {
+          width: 46px;
+          height: 46px;
+        }
+
+        .dm-ai-selector__btn svg {
+          width: 22px;
+          height: 22px;
+        }
+
+        .dm-ai-shell {
+          z-index: 22000;
+        }
+
+        .dm-ai-shell .dm-ai-backdrop {
+          position: absolute;
+          inset: 0;
+          background: rgba(15, 23, 42, 0.55);
+          opacity: 0;
+          transition: opacity 0.2s ease;
+        }
+
+        .dm-ai-shell.is-open .dm-ai-backdrop {
+          opacity: 1;
+        }
+
+        .dm-ai-shell .dm-ai-panel {
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          height: 85vh;
+          background: #ffffff;
+          border-radius: 18px 18px 0 0;
+          box-shadow: 0 -24px 50px rgba(15, 23, 42, 0.2);
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          transform: translateY(100%);
+          transition: transform 0.25s ease;
+        }
+
+        .dm-ai-shell.is-open .dm-ai-panel {
+          transform: translateY(0);
+        }
       }
     `;
     document.head.appendChild(style);
@@ -457,26 +805,39 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
             </div>
             <div class="brisa-chat-search-status" id="brisa-chat-search-status" aria-live="polite"></div>
           </div>
-          <div class="brisa-chat-section-label" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-            <span>Accesos rápidos</span>
-          </div>
-          <div class="brisa-chat-row" id="brisa-chat-quick-group">
-            <div class="brisa-chat-status-dot brisa-chat-status-dot--online"></div>
-            <div class="brisa-chat-row-main">
-              <div class="brisa-chat-name">Chat grupal</div>
-              <div class="brisa-chat-meta">Sala común · Todos los médicos</div>
+          <div class="brisa-chat-panel-scroll" id="brisa-chat-panel-scroll">
+            <div class="brisa-chat-section-label brisa-chat-section-label--split">
+              <span>Accesos rápidos</span>
             </div>
-          </div>
-          <div class="brisa-chat-row" id="brisa-chat-quick-foro">
-            <div class="brisa-chat-status-dot brisa-chat-status-dot--online"></div>
-            <div class="brisa-chat-row-main">
-              <div class="brisa-chat-name">Foro general</div>
-              <div class="brisa-chat-meta">Vinculado al Foro del sitio</div>
+            <div class="brisa-chat-row" id="brisa-chat-quick-group">
+              <div class="brisa-chat-status-dot brisa-chat-status-dot--online"></div>
+              <div class="brisa-chat-row-main">
+                <div class="brisa-chat-name">Chat grupal</div>
+                <div class="brisa-chat-meta">Sala común · Todos los médicos</div>
+              </div>
             </div>
+            <div class="brisa-chat-row" id="brisa-chat-quick-foro">
+              <div class="brisa-chat-status-dot brisa-chat-status-dot--online"></div>
+              <div class="brisa-chat-row-main">
+                <div class="brisa-chat-name">Foro general</div>
+                <div class="brisa-chat-meta">Vinculado al Foro del sitio</div>
+              </div>
+            </div>
+            <div class="brisa-chat-row brisa-chat-row--assistant" id="brisa-chat-quick-ai" role="button" tabindex="0" aria-label="Abrir Asistente IA">
+              <div class="brisa-chat-status-dot brisa-chat-status-dot--assistant" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2.75a.75.75 0 0 1 .75.75 5.5 5.5 0 0 0 5.5 5.5.75.75 0 0 1 0 1.5 5.5 5.5 0 0 0-5.5 5.5.75.75 0 0 1-1.5 0 5.5 5.5 0 0 0-5.5-5.5.75.75 0 0 1 0-1.5 5.5 5.5 0 0 0 5.5-5.5.75.75 0 0 1 .75-.75Zm6.5 12.5a.5.5 0 0 1 .5.5 2.75 2.75 0 0 0 2.75 2.75.5.5 0 0 1 0 1 2.75 2.75 0 0 0-2.75 2.75.5.5 0 0 1-1 0 2.75 2.75 0 0 0-2.75-2.75.5.5 0 0 1 0-1 2.75 2.75 0 0 0 2.75-2.75.5.5 0 0 1 .5-.5Z" />
+                </svg>
+              </div>
+              <div class="brisa-chat-row-main">
+                <div class="brisa-chat-name">Asistente IA</div>
+                <div class="brisa-chat-meta">Consulta asistida · Último modelo</div>
+              </div>
+              <div class="brisa-chat-row-accent" id="brisa-chat-quick-ai-model">Gemini</div>
+            </div>
+            <div class="brisa-chat-section-label" id="brisa-chat-users-label">Médicos conectados</div>
+            <div id="brisa-chat-users"></div>
           </div>
-
-          <div class="brisa-chat-section-label" id="brisa-chat-users-label">Médicos conectados</div>
-          <div id="brisa-chat-users"></div>
         </div>
       </div>
 
@@ -560,6 +921,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     `;
 
     pillTray = document.getElementById('brisa-chat-pill-tray');
+    updateAssistantQuickRow();
   }
 
   function adjustPanelForTray() {
@@ -571,6 +933,17 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       ? trayHeight + PANEL_OFFSET_BASE + PANEL_OFFSET_EXTRA
       : PANEL_OFFSET_BASE;
     panel.style.setProperty('--brisa-panel-offset', `${offset}px`);
+    syncPanelViewportBounds();
+  }
+
+  function syncPanelViewportBounds() {
+    const panel = document.getElementById('brisa-chat-panel');
+    const fab = document.getElementById('brisa-chat-fab');
+    if (!panel || !fab) return;
+    const fabRect = fab.getBoundingClientRect();
+    const topMargin = 16;
+    const availableAbove = Math.max(0, Math.floor(fabRect.top - topMargin));
+    panel.style.setProperty('--brisa-panel-max-height', `${availableAbove}px`);
   }
 
   function getChatRoot() {
@@ -580,6 +953,11 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   function isEmbeddedMode() {
     const root = getChatRoot();
     return root ? root.classList.contains('brisa-chat--embedded') : false;
+  }
+
+  function isPanelVisible(panel) {
+    if (!panel) return false;
+    return window.getComputedStyle(panel).display !== 'none';
   }
 
   function mountChat(containerEl) {
@@ -634,7 +1012,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   function isConversationActuallyVisible(conversationId) {
     const panel = document.getElementById('brisa-chat-panel');
     const win = document.getElementById('brisa-chat-window');
-    const panelVisible = isEmbeddedMode() ? true : panel && panel.style.display === 'block';
+    const panelVisible = isEmbeddedMode() ? true : isPanelVisible(panel);
     const winVisible = win && win.style.display !== 'none';
     if (!panelVisible || !winVisible) return false;
     if (!conversationId) return false;
@@ -890,6 +1268,50 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     else delete status.dataset.tone;
   }
 
+  function resolveAssistantModel() {
+    const liveModel = window.__dmAssistantShell?.state?.activeModel;
+    if (liveModel === 'gpt' || liveModel === 'gemini') return liveModel;
+    try {
+      const stored = localStorage.getItem(ASSISTANT_MODEL_STORAGE_KEY);
+      if (stored === 'gpt' || stored === 'gemini') return stored;
+    } catch (e) {}
+    return ASSISTANT_DEFAULT_MODEL;
+  }
+
+  function getAssistantModelLabel(model = resolveAssistantModel()) {
+    return model === 'gpt' ? 'ChatGPT' : 'Gemini';
+  }
+
+  function updateAssistantQuickRow() {
+    const row = document.getElementById('brisa-chat-quick-ai');
+    const badge = document.getElementById('brisa-chat-quick-ai-model');
+    if (!row || !badge) return;
+    const model = resolveAssistantModel();
+    const label = getAssistantModelLabel(model);
+    row.dataset.model = model;
+    row.setAttribute('aria-label', `Abrir Asistente IA en ${label}`);
+    badge.textContent = label;
+  }
+
+  async function ensureAssistantShellReady() {
+    ensureAssistantShellStylesInjected();
+    if (window.__dmAssistantShell?.openChat) {
+      updateAssistantQuickRow();
+      return window.__dmAssistantShell;
+    }
+    if (!assistantShellPromise) {
+      assistantShellPromise = import(ASSISTANT_SHELL_MODULE_URL)
+        .then(({ initAssistantShell }) => initAssistantShell({ variant: isMobileShell() ? 'mobile' : 'desktop' }))
+        .catch((error) => {
+          assistantShellPromise = null;
+          throw error;
+        });
+    }
+    const shell = await assistantShellPromise;
+    updateAssistantQuickRow();
+    return shell;
+  }
+
   function buildUserMeta({ businessUnit = '', managementUnit = '', role = '' } = {}) {
     const parts = [businessUnit, managementUnit].map((part) => String(part || '').trim()).filter(Boolean);
     if (parts.length) return parts.join(' · ');
@@ -1018,12 +1440,12 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     presenceRows.clear();
 
     const hasInput = activeSearchQuery.length > 0;
-    const isSearchActive = activeSearchQuery.length >= 3;
+    const isSearchActive = activeSearchQuery.length >= USER_SEARCH_MIN_CHARS;
 
     if (!isSearchActive) {
       label.textContent = 'Médicos conectados';
       if (hasInput) {
-        setSearchStatus('Escribí al menos 3 letras para buscar usuarios.', 'hint');
+        setSearchStatus(`Escribí al menos ${USER_SEARCH_MIN_CHARS} letras para buscar usuarios.`, 'hint');
       } else {
         setSearchStatus('');
       }
@@ -2316,6 +2738,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     const input = document.getElementById('brisa-chat-input');
     const quickGroup = document.getElementById('brisa-chat-quick-group');
     const quickForo = document.getElementById('brisa-chat-quick-foro');
+    const quickAi = document.getElementById('brisa-chat-quick-ai');
     const deleteModal = document.getElementById('brisa-chat-delete-modal');
     const deletePass = document.getElementById('brisa-chat-delete-pass');
     const deleteCancel = document.getElementById('brisa-chat-delete-cancel');
@@ -2324,6 +2747,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     const deleteConvPass = document.getElementById('brisa-chat-delete-conv-pass');
     const deleteConvCancel = document.getElementById('brisa-chat-delete-conv-cancel');
     const deleteConvConfirm = document.getElementById('brisa-chat-delete-conv-confirm');
+    const panelScroll = document.getElementById('brisa-chat-panel-scroll');
 
     let dragTimer = null;
     let dragging = false;
@@ -2331,6 +2755,22 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     let activePointerId = null;
     let lastSide = 'left';
     let lastTopPx = null;
+
+    const resetPanelSearchState = () => {
+      resetUserSearch();
+      if (panelScroll) panelScroll.scrollTop = 0;
+      if (searchInput) searchInput.blur();
+    };
+
+    const closeUsersPanel = ({ minimizeConversation = false } = {}) => {
+      if (panel && isPanelVisible(panel)) {
+        resetPanelSearchState();
+        panel.style.display = 'none';
+      }
+      if (minimizeConversation) {
+        minimizeActiveConversation();
+      }
+    };
 
     const restoreBubblePosition = () => {
       if (!bubble || !isMobileShell()) return;
@@ -2354,6 +2794,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       restoreBubblePosition();
       const handleResize = () => {
         restoreBubblePosition();
+        syncPanelViewportBounds();
       };
       window.addEventListener('resize', handleResize);
       window.addEventListener('orientationchange', handleResize);
@@ -2410,6 +2851,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
           const fallbackTop = dragTarget.getBoundingClientRect().top;
           const finalTop = Number.isFinite(lastTopPx) ? lastTopPx : fallbackTop;
           persistBubblePosition(lastSide, finalTop);
+          syncPanelViewportBounds();
           lastTopPx = null;
           setTimeout(() => {
             suppressClick = false;
@@ -2428,10 +2870,16 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
           suppressClick = false;
           return;
         }
-        const visible = panel.style.display === 'block';
-        panel.style.display = visible ? 'none' : 'block';
+        const visible = isPanelVisible(panel);
+        syncPanelViewportBounds();
         if (visible) {
-          minimizeActiveConversation();
+          closeUsersPanel({ minimizeConversation: true });
+        } else {
+          resetPanelSearchState();
+          updateAssistantQuickRow();
+          panel.style.display = 'flex';
+        }
+        if (visible) {
           setChatState({
             isChatOpen: false,
             isMinimized: true,
@@ -2443,8 +2891,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     }
     if (panelClose && panel) {
       panelClose.addEventListener('click', () => {
-        panel.style.display = 'none';
-        minimizeActiveConversation();
+        closeUsersPanel({ minimizeConversation: true });
       });
     }
     if (panelSoundToggle) {
@@ -2483,7 +2930,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
           return;
         }
 
-        if (activeSearchQuery.length < 3) {
+        if (activeSearchQuery.length < USER_SEARCH_MIN_CHARS) {
           renderUsersPanel();
           return;
         }
@@ -2551,6 +2998,34 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         openSpecialConversation('dm_foro_general', 'Foro general', 'Mensajes vinculados al foro');
       });
     }
+    if (quickAi) {
+      const openAssistant = async () => {
+        try {
+          closeUsersPanel();
+          setChatState({
+            isChatOpen: false,
+            isMinimized: true,
+            activeConversationId: null,
+            activePeerUid: null
+          });
+          const shell = await ensureAssistantShellReady();
+          const model = resolveAssistantModel();
+          await shell.openChat?.(model);
+          updateAssistantQuickRow();
+        } catch (error) {
+          console.warn('No se pudo abrir el Asistente IA desde el chat:', error);
+        }
+      };
+      quickAi.addEventListener('click', () => {
+        openAssistant();
+      });
+      quickAi.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          openAssistant();
+        }
+      });
+    }
     if (deletePass) {
       deletePass.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
@@ -2596,15 +3071,15 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       const insideDeleteConv = deleteConvModal?.contains(target);
       const insideToast = document.getElementById('brisa-chat-toast')?.contains(target);
 
-      const panelVisible = panel && panel.style.display === 'block';
+      const panelIsVisible = isPanelVisible(panel);
       const winVisible = win && win.style.display !== 'none';
 
       if (isDeleteModalOpen || isDeleteConversationModalOpen) return;
       if (isEmbeddedMode()) return;
         if (!insidePanel && !insideWin && !insideBubble && !insideTray && !insideDelete && !insideDeleteConv && !insideToast) {
-          if (panelVisible) panel.style.display = 'none';
+          if (panelIsVisible) closeUsersPanel();
           if (winVisible) minimizeActiveConversation();
-          if (panelVisible) {
+          if (panelIsVisible) {
             setChatState({
               isChatOpen: false,
               isMinimized: true,
@@ -2698,6 +3173,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         updateCountsUI();
       }
       adjustPanelForTray();
+      syncPanelViewportBounds();
     });
   }
 
@@ -2742,7 +3218,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     getState: () => {
       const panel = document.getElementById('brisa-chat-panel');
       const win = document.getElementById('brisa-chat-window');
-      const panelVisible = panel && panel.style.display === 'block';
+      const panelVisible = isPanelVisible(panel);
       const winVisible = win && win.style.display !== 'none';
       const isChatOpen = !!(panelVisible && winVisible);
       const isMinimized = !!(panelVisible && !winVisible);
