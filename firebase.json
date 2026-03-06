@@ -12,10 +12,16 @@
     "public": ".",
     "ignore": [
       "firebase.json",
+      ".git",
+      ".git/**",
+      ".vscode/**",
       "**/.*",
       "**/node_modules/**",
+      "**/*.md",
+      "**/*.log",
       "functions/**",
       "carga-usuarios/**",
+      "carga - usuarios/**",
       "tools/**",
       "docs/**"
     ],
@@ -27,6 +33,15 @@
     ],
     "headers": [
       {
+        "source": "**/*.@(jpg|jpeg|gif|png|webp|svg|css|js)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=31536000, immutable"
+          }
+        ]
+      },
+      {
         "source": "/asistente-ia/**",
         "headers": [
           {
@@ -36,11 +51,20 @@
         ]
       },
       {
-        "source": "**/*.@(jpg|jpeg|gif|png|webp|svg|css|js)",
+        "source": "/service-worker.js",
         "headers": [
           {
             "key": "Cache-Control",
-            "value": "public, max-age=31536000, immutable"
+            "value": "no-cache"
+          }
+        ]
+      },
+      {
+        "source": "/app/service-worker.js",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
           }
         ]
       }

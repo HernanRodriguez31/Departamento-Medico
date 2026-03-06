@@ -1,13 +1,14 @@
 const CACHE_PREFIX = "brisa-root-";
-const CACHE_VERSION = "v13";
+const CACHE_VERSION = "v14";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const OFFLINE_URL = "/offline.html";
 const PRECACHE_URLS = [
   "/",
   "/index.html",
   OFFLINE_URL,
+  "/css/style.css?v=20260305-orgtree-header-1",
   "/assets/css/pages/index.css",
-  "/assets/css/core-contrast.css",
+  "/assets/css/core-contrast.css?v=20260305-orgtree-header-1",
   "/assets/js/pages/index.js",
   "/assets/js/common/firebaseClient.js",
   "/assets/js/common/notifications.js"
