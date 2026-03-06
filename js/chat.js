@@ -72,9 +72,15 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   const conversationMessages = new Map(); // id -> array de msgs
   const conversationPeers = new Map(); // id -> { uid, name, subtitle }
   const presenceMap = new Map(); // uid -> { name, role }
-  const presenceRows = new Map(); // uid -> row element
+  const presenceRows = new Map(); // uid -> row element visible en panel
   const minimizedPills = new Map(); // id -> element
   const conversationReady = new Set(); // id inicializado
+  let onlineUsers = [];
+  let allUsersCache = [];
+  let allUsersPromise = null;
+  let activeSearchQuery = '';
+  let isUserDirectoryLoading = false;
+  let userDirectoryError = '';
   const chatState = {
     isChatOpen: false,
     isMinimized: true,
@@ -227,6 +233,98 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         left: 0;
         right: auto;
       }
+
+      .brisa-chat-search {
+        padding: 10px 12px 8px;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(248, 250, 252, 0.94));
+      }
+
+      .brisa-chat-search-label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #9ca3af;
+      }
+
+      .brisa-chat-search-field {
+        position: relative;
+      }
+
+      .brisa-chat-search-icon {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 14px;
+        height: 14px;
+        color: #94a3b8;
+        pointer-events: none;
+      }
+
+      .brisa-chat-search-input {
+        width: 100%;
+        min-height: 34px;
+        border-radius: 10px;
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        background: rgba(255, 255, 255, 0.96);
+        padding: 0 12px 0 34px;
+        font-size: 12px;
+        color: #0f172a;
+        outline: none;
+        transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+      }
+
+      .brisa-chat-search-input:focus {
+        border-color: rgba(122, 184, 0, 0.48);
+        box-shadow: 0 0 0 3px rgba(122, 184, 0, 0.12);
+        background: #fff;
+      }
+
+      .brisa-chat-search-status {
+        min-height: 16px;
+        margin-top: 6px;
+        font-size: 11px;
+        line-height: 1.35;
+        color: #6b7280;
+      }
+
+      .brisa-chat-search-status[data-tone="error"] {
+        color: #b42318;
+      }
+
+      .brisa-chat-search-status[data-tone="success"] {
+        color: #3f6212;
+      }
+
+      .brisa-chat-search-status[data-tone="loading"] {
+        color: #475467;
+      }
+
+      .brisa-chat-search-status[data-tone="hint"] {
+        color: #667085;
+      }
+
+      .brisa-chat-empty {
+        padding: 12px 14px 14px;
+        font-size: 12px;
+        color: #6b7280;
+      }
+
+      .brisa-chat-row--offline .brisa-chat-status-dot {
+        background: #cbd5e1;
+        box-shadow: none;
+      }
+
+      .brisa-chat-row--offline .brisa-chat-icon-btn {
+        background: rgba(148, 163, 184, 0.12);
+      }
+
+      .brisa-chat-row--offline .brisa-chat-icon-btn svg {
+        color: #64748b;
+      }
     `;
     document.head.appendChild(style);
   };
@@ -316,6 +414,26 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
           </div>
         </div>
         <div class="brisa-chat-panel-body">
+          <div class="brisa-chat-search">
+            <label class="brisa-chat-search-label" for="brisa-chat-user-search">Buscar usuarios</label>
+            <div class="brisa-chat-search-field">
+              <svg class="brisa-chat-search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <circle cx="11" cy="11" r="7"></circle>
+                <path d="m20 20-3.5-3.5"></path>
+              </svg>
+              <input
+                id="brisa-chat-user-search"
+                class="brisa-chat-search-input"
+                type="search"
+                placeholder="Buscar por nombre"
+                autocomplete="off"
+                spellcheck="false"
+                aria-label="Buscar usuarios por nombre"
+                aria-describedby="brisa-chat-search-status"
+              />
+            </div>
+            <div class="brisa-chat-search-status" id="brisa-chat-search-status" aria-live="polite"></div>
+          </div>
           <div class="brisa-chat-section-label" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
             <span>Accesos rápidos</span>
           </div>
@@ -334,7 +452,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
             </div>
           </div>
 
-          <div class="brisa-chat-section-label">Médicos conectados</div>
+          <div class="brisa-chat-section-label" id="brisa-chat-users-label">Médicos conectados</div>
           <div id="brisa-chat-users"></div>
         </div>
       </div>
@@ -654,6 +772,303 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     );
   }
 
+  function normalizeSearchText(value) {
+    return String(value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function resolveDirectoryName(profile = {}) {
+    const primary =
+      profile.displayName ||
+      profile.nombreCompleto ||
+      profile.apellidoNombre ||
+      profile.fullName ||
+      profile.name ||
+      profile.nombre ||
+      '';
+    const lastName = profile.apellido || profile.lastName || '';
+    const firstName = profile.nombre || profile.firstName || '';
+    const combined = `${lastName} ${firstName}`.trim();
+    const fallback = profile.email || profile.correo || profile.mail || 'Médico';
+    return buildDisplayName(primary || combined ? { displayName: primary || combined } : { displayName: fallback });
+  }
+
+  function resolveDirectoryRole(profile = {}) {
+    return buildRole(profile) || 'Médico';
+  }
+
+  function buildSearchDirectoryEntry(uid, profile = {}) {
+    const displayName = resolveDirectoryName(profile);
+    const role = resolveDirectoryRole(profile);
+    const candidates = [
+      profile.displayName,
+      profile.nombreCompleto,
+      profile.apellidoNombre,
+      profile.fullName,
+      profile.name,
+      profile.nombre,
+      profile.apellido && profile.nombre
+        ? `${profile.apellido} ${profile.nombre}`.trim()
+        : '',
+      displayName
+    ]
+      .filter(Boolean)
+      .join(' ');
+    return {
+      uid,
+      displayName,
+      role,
+      searchKey: normalizeSearchText(candidates)
+    };
+  }
+
+  function getSearchElements() {
+    return {
+      input: document.getElementById('brisa-chat-user-search'),
+      status: document.getElementById('brisa-chat-search-status'),
+      label: document.getElementById('brisa-chat-users-label'),
+      container: document.getElementById('brisa-chat-users')
+    };
+  }
+
+  function setSearchStatus(message = '', tone = '') {
+    const { status } = getSearchElements();
+    if (!status) return;
+    status.textContent = message;
+    if (tone) status.dataset.tone = tone;
+    else delete status.dataset.tone;
+  }
+
+  function buildUserMeta(role, { includePresence = false, isOnline = false } = {}) {
+    const base = (role || 'Médico').trim() || 'Médico';
+    if (!includePresence) return base;
+    return `${base} · ${isOnline ? 'Activo' : 'Inactivo'}`;
+  }
+
+  function buildEmptyState(message) {
+    const empty = document.createElement('div');
+    empty.className = 'brisa-chat-empty';
+    empty.textContent = message;
+    return empty;
+  }
+
+  function buildUserRow({ uid = '', name = 'Médico', meta = 'Médico', isOnline = false, disabled = false, onOpen = null }) {
+    const row = document.createElement('div');
+    row.className = 'brisa-chat-row';
+    if (disabled) row.classList.add('brisa-chat-row--disabled');
+    if (!isOnline) row.classList.add('brisa-chat-row--offline');
+    if (uid) row.dataset.uid = uid;
+    row.dataset.name = name;
+
+    const dot = document.createElement('div');
+    dot.className = 'brisa-chat-status-dot';
+    if (isOnline) dot.classList.add('brisa-chat-status-dot--online');
+
+    const main = document.createElement('div');
+    main.className = 'brisa-chat-row-main';
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'brisa-chat-name';
+    nameEl.textContent = name;
+
+    const metaEl = document.createElement('div');
+    metaEl.className = 'brisa-chat-meta';
+    metaEl.textContent = meta;
+
+    main.appendChild(nameEl);
+    main.appendChild(metaEl);
+    row.appendChild(dot);
+    row.appendChild(main);
+
+    if (!disabled) {
+      const action = document.createElement('button');
+      action.className = 'brisa-chat-icon-btn';
+      action.type = 'button';
+      action.setAttribute('aria-label', `Abrir chat con ${name}`);
+      action.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M22 2 11 13" /><path d="M22 2 15 22 11 13 2 9 22 2" />
+        </svg>
+      `;
+      if (typeof onOpen === 'function') {
+        action.addEventListener('click', (event) => {
+          event.stopPropagation();
+          onOpen();
+        });
+      }
+      row.appendChild(action);
+    }
+
+    if (!disabled && typeof onOpen === 'function') {
+      row.addEventListener('click', onOpen);
+    }
+
+    return row;
+  }
+
+  function applyUnreadForRow(uid) {
+    if (!uid || !currentUser) return;
+    const conversationId = getConversationId(currentUser.uid, uid);
+    const unread = unreadByConversation.get(conversationId) || 0;
+    setRowUnreadForPeer(uid, unread);
+  }
+
+  async function loadAllUsersDirectory() {
+    if (allUsersCache.length) return allUsersCache;
+    if (allUsersPromise) return allUsersPromise;
+
+    allUsersPromise = (async () => {
+      const snap = await getDocs(collection(db, 'usuarios'));
+      const next = [];
+      snap.forEach((docSnap) => {
+        const uid = docSnap.id;
+        if (!uid || uid === currentUser?.uid) return;
+        const entry = buildSearchDirectoryEntry(uid, docSnap.data() || {});
+        if (!entry.searchKey) return;
+        next.push(entry);
+      });
+      allUsersCache = next;
+      return allUsersCache;
+    })();
+
+    try {
+      return await allUsersPromise;
+    } finally {
+      allUsersPromise = null;
+    }
+  }
+
+  function resetUserSearch({ preserveValue = false } = {}) {
+    const { input } = getSearchElements();
+    activeSearchQuery = '';
+    userDirectoryError = '';
+    if (input && !preserveValue) {
+      input.value = '';
+    }
+    renderUsersPanel();
+  }
+
+  async function openDirectConversation(uid, displayName, { clearSearch = false } = {}) {
+    if (!uid) return;
+    if (clearSearch) {
+      resetUserSearch();
+    }
+    openConversation(uid, displayName);
+    if (currentUser) {
+      await hydratePeerProfile(getConversationId(currentUser.uid, uid), uid);
+    }
+  }
+
+  function renderUsersPanel() {
+    const { container, label } = getSearchElements();
+    if (!container || !label) return;
+
+    container.innerHTML = '';
+    presenceRows.clear();
+
+    const hasInput = activeSearchQuery.length > 0;
+    const isSearchActive = activeSearchQuery.length >= 3;
+
+    if (!isSearchActive) {
+      label.textContent = 'Médicos conectados';
+      if (hasInput) {
+        setSearchStatus('Escribí al menos 3 letras para buscar usuarios.', 'hint');
+      } else {
+        setSearchStatus('');
+      }
+
+      if (currentUser) {
+        container.appendChild(buildSelfRow());
+      }
+
+      onlineUsers.forEach((entry) => {
+        const row = buildUserRow({
+          uid: entry.uid,
+          name: entry.displayName,
+          meta: buildUserMeta(entry.role),
+          isOnline: true,
+          onOpen: () => {
+            openDirectConversation(entry.uid, entry.displayName);
+          }
+        });
+        presenceRows.set(entry.uid, row);
+        container.appendChild(row);
+        applyUnreadForRow(entry.uid);
+      });
+      return;
+    }
+
+    label.textContent = 'Resultados';
+
+    if (isUserDirectoryLoading) {
+      setSearchStatus('Buscando usuarios…', 'loading');
+      return;
+    }
+
+    if (userDirectoryError) {
+      label.textContent = 'Médicos conectados';
+      setSearchStatus(userDirectoryError, 'error');
+      if (currentUser) {
+        container.appendChild(buildSelfRow());
+      }
+      onlineUsers.forEach((entry) => {
+        const row = buildUserRow({
+          uid: entry.uid,
+          name: entry.displayName,
+          meta: buildUserMeta(entry.role),
+          isOnline: true,
+          onOpen: () => {
+            openDirectConversation(entry.uid, entry.displayName);
+          }
+        });
+        presenceRows.set(entry.uid, row);
+        container.appendChild(row);
+        applyUnreadForRow(entry.uid);
+      });
+      return;
+    }
+
+    const results = allUsersCache
+      .filter((entry) => entry.searchKey.includes(activeSearchQuery))
+      .sort((a, b) => {
+        const aOnline = presenceMap.has(a.uid) ? 0 : 1;
+        const bOnline = presenceMap.has(b.uid) ? 0 : 1;
+        if (aOnline !== bOnline) return aOnline - bOnline;
+        return a.displayName.localeCompare(b.displayName, 'es', { sensitivity: 'base' });
+      });
+
+    if (!results.length) {
+      setSearchStatus('No hay usuarios que coincidan.', 'hint');
+      container.appendChild(buildEmptyState('No hay usuarios que coincidan.'));
+      return;
+    }
+
+    setSearchStatus(
+      `${results.length} resultado${results.length === 1 ? '' : 's'} encontrado${results.length === 1 ? '' : 's'}.`,
+      'success'
+    );
+
+    results.forEach((entry) => {
+      const isOnline = presenceMap.has(entry.uid);
+      const row = buildUserRow({
+        uid: entry.uid,
+        name: entry.displayName,
+        meta: buildUserMeta(entry.role, { includePresence: true, isOnline }),
+        isOnline,
+        onOpen: () => {
+          openDirectConversation(entry.uid, entry.displayName, { clearSearch: true });
+        }
+      });
+      presenceRows.set(entry.uid, row);
+      container.appendChild(row);
+      applyUnreadForRow(entry.uid);
+    });
+  }
+
   async function updatePresenceStatus(user, profile, online) {
     if (!user || !db) return;
     lastPresenceUser = user;
@@ -727,77 +1142,51 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   function subscribePresence() {
     if (presenceUnsub) presenceUnsub();
     presenceMap.clear();
+    onlineUsers = [];
     const presenceQuery = query(collection(db, PRESENCE_COLLECTION), where('online', '==', true));
     presenceUnsub = onSnapshot(presenceQuery, snapshot => {
-        const container = document.getElementById('brisa-chat-users');
-        if (!container) return;
-        container.innerHTML = '';
-        presenceRows.clear();
+      presenceMap.clear();
+      onlineUsers = [];
 
-    const totalOnline = currentUser ? Math.max(snapshot.size - 0, 0) : snapshot.size;
-    onlineCount = currentUser ? Math.max(snapshot.size, 0) : totalOnline;
-    updateCountsUI();
+      onlineCount = snapshot.size;
+      updateCountsUI();
 
-    if (currentUser) {
-      const selfName = formatDoctorName(currentUser.displayName || currentUser.email || 'Vos');
-      presenceMap.set(currentUser.uid, { name: selfName, role: 'Sesión actual' });
-      container.appendChild(buildSelfRow());
-    }
+      if (currentUser) {
+        const selfName = formatDoctorName(currentUser.displayName || currentUser.email || 'Vos');
+        presenceMap.set(currentUser.uid, { name: selfName, role: 'Sesión actual', online: true });
+      }
 
-        snapshot.forEach(doc => {
-          const data = doc.data();
-          const uid = data.uid || doc.id;
-          if (!uid) return;
-          const doctorName = formatDoctorName(data.displayName || data.email || 'Médico');
-          presenceMap.set(uid, { name: doctorName, role: data.role || 'Médico' });
-          if (!currentUser || uid === currentUser.uid) return;
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data() || {};
+        const uid = data.uid || docSnap.id;
+        if (!uid) return;
+        const doctorName = formatDoctorName(data.displayName || data.email || 'Médico');
+        const role = data.role || 'Médico';
+        presenceMap.set(uid, { name: doctorName, role, online: true });
+        if (!currentUser || uid === currentUser.uid) return;
 
-          const row = document.createElement('div');
-          row.className = 'brisa-chat-row';
-          row.dataset.uid = uid;
-          row.dataset.name = doctorName;
-          presenceRows.set(uid, row);
-
-          row.innerHTML = `
-            <div class="brisa-chat-status-dot brisa-chat-status-dot--online"></div>
-            <div class="brisa-chat-row-main">
-              <div class="brisa-chat-name">${row.dataset.name}</div>
-              <div class="brisa-chat-meta">${data.role || 'Médico'}</div>
-            </div>
-            <button class="brisa-chat-icon-btn" type="button" aria-label="Enviar mensaje">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <path d="M22 2 11 13" /><path d="M22 2 15 22 11 13 2 9 22 2" />
-              </svg>
-            </button>
-          `;
-
-          row.addEventListener('click', () => openConversation(uid, row.dataset.name));
-          container.appendChild(row);
-
-          // Aplicar indicador de no leídos si existe
-          if (currentUser) {
-            const convId = getConversationId(currentUser.uid, uid);
-            const unread = unreadByConversation.get(convId) || 0;
-            setRowUnreadForPeer(uid, unread);
-
-            // Mantener listener en segundo plano para recibir mensajes sin abrir el chat.
-            ensureConversationSubscription(convId);
-          }
+        onlineUsers.push({
+          uid,
+          displayName: doctorName,
+          role
         });
+
+        const conversationId = getConversationId(currentUser.uid, uid);
+        ensureConversationSubscription(conversationId);
       });
+
+      renderUsersPanel();
+    });
   }
 
   function buildSelfRow() {
-    const row = document.createElement('div');
-    row.className = 'brisa-chat-row brisa-chat-row--disabled';
-    row.innerHTML = `
-      <div class="brisa-chat-status-dot brisa-chat-status-dot--online"></div>
-      <div class="brisa-chat-row-main">
-        <div class="brisa-chat-name">${formatDoctorName(currentUser?.displayName || currentUser?.email || 'Vos')}</div>
-        <div class="brisa-chat-meta">Sesión actual</div>
-      </div>
-    `;
-    return row;
+    return buildUserRow({
+      uid: currentUser?.uid || '',
+      name: formatDoctorName(currentUser?.displayName || currentUser?.email || 'Vos'),
+      meta: 'Sesión actual',
+      isOnline: true,
+      disabled: true
+    });
   }
 
   // ---------- MENSAJES Y SUSCRIPCIONES ----------
@@ -1795,6 +2184,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     const panel = document.getElementById('brisa-chat-panel');
     const panelClose = document.getElementById('brisa-chat-panel-close');
     const panelSoundToggle = document.getElementById('brisa-chat-panel-sound-toggle');
+    const searchInput = document.getElementById('brisa-chat-user-search');
     const win = document.getElementById('brisa-chat-window');
     const winClose = document.getElementById('brisa-chat-window-close');
     const winMin = document.getElementById('brisa-chat-window-min');
@@ -1958,6 +2348,47 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         soundEnabled = !soundEnabled;
         localStorage.setItem(SOUND_KEY, soundEnabled ? 'on' : 'muted');
         updateSoundIcon();
+      });
+    }
+    if (searchInput) {
+      searchInput.addEventListener('input', async () => {
+        activeSearchQuery = normalizeSearchText(searchInput.value);
+        userDirectoryError = '';
+
+        if (!activeSearchQuery) {
+          renderUsersPanel();
+          return;
+        }
+
+        if (activeSearchQuery.length < 3) {
+          renderUsersPanel();
+          return;
+        }
+
+        if (allUsersCache.length) {
+          renderUsersPanel();
+          return;
+        }
+
+        isUserDirectoryLoading = true;
+        renderUsersPanel();
+
+        try {
+          await loadAllUsersDirectory();
+        } catch (error) {
+          console.warn('No se pudo cargar el directorio de usuarios del chat:', error);
+          userDirectoryError = 'No se pudo cargar la lista de usuarios.';
+        } finally {
+          isUserDirectoryLoading = false;
+          renderUsersPanel();
+        }
+      });
+
+      searchInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          resetUserSearch();
+        }
       });
     }
     if (winClose && win) {
@@ -2150,6 +2581,12 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         minimizedPills.forEach(p => p.remove());
         minimizedPills.clear();
         currentProfile = null;
+        onlineUsers = [];
+        allUsersCache = [];
+        allUsersPromise = null;
+        activeSearchQuery = '';
+        isUserDirectoryLoading = false;
+        userDirectoryError = '';
         unreadByConversation.clear();
         totalUnreadCount = 0;
         onlineCount = 0;
