@@ -2131,7 +2131,7 @@ body.ui-clarity .region-accordion {
   }
 
   .orgtree .structure__inner-container.orgtree-panel {
-    padding: 2.25rem 0.65rem 2.25rem;
+    padding: 1rem 0.65rem 2.25rem;
     background: var(--org-mobile-surface-muted);
     border: 0;
     box-shadow: none;
@@ -2605,7 +2605,7 @@ body.ui-clarity .region-accordion {
   }
 
   .orgtree .structure__toggle-container {
-    margin-top: 0 !important;
+    margin-block: 0.95rem !important;
   }
 
   .orgtree .structure__main-btn {
@@ -2614,7 +2614,7 @@ body.ui-clarity .region-accordion {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 6.15rem;
+    min-height: 5.7rem;
   }
 
   .orgtree .structure__main-btn .dashboard-icon-box,
@@ -2636,13 +2636,13 @@ body.ui-clarity .region-accordion {
     align-items: center;
     justify-content: center;
     text-align: center;
-    gap: 0.42rem;
+    gap: 0.18rem;
   }
 
   .orgtree .dashboard-header-left h2.dashboard-eyebrow {
-    font-size: 0.9rem;
-    font-weight: 600;
-    letter-spacing: 0.14em;
+    font-size: clamp(1.03rem, 3.9vw, 1.12rem);
+    font-weight: 800;
+    letter-spacing: 0.035em;
     line-height: 1;
   }
 
@@ -2650,8 +2650,8 @@ body.ui-clarity .region-accordion {
     display: inline-block;
     max-width: none;
     margin: 0 auto;
-    font-size: clamp(1.4rem, 4.9vw, 1.52rem);
-    line-height: 1.05;
+    font-size: clamp(1.22rem, 4.3vw, 1.34rem);
+    line-height: 1.04;
     letter-spacing: -0.018em;
     white-space: nowrap;
   }
@@ -2669,12 +2669,12 @@ body.ui-clarity .region-accordion {
 
   .orgtree .dashboard-header-left h2.dashboard-eyebrow {
     color: var(--org-brisa-accent);
-    letter-spacing: 0.11em;
+    letter-spacing: 0.035em;
   }
 
   .orgtree .dashboard-header-left h1.dashboard-title {
     max-width: none;
-    font-size: clamp(1.35rem, 4.45vw, 1.46rem);
+    font-size: clamp(1.22rem, 4.3vw, 1.34rem);
   }
 
   .orgtree .structure__director-card {
