@@ -53,13 +53,45 @@
         box-sizing: border-box;
         margin: 0;
         position: relative;
+        isolation: isolate;
         padding: clamp(16px, 3vw, 40px);
-        background-color: #f7faf8;
-        background-image: var(--login-page-bg);
-        background-repeat: no-repeat;
-        background-position: center top;
-        background-size: cover;
+        background-color: #f1f2f2;
         color: var(--text-color);
+      }
+
+      body::before,
+      body::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      body::before {
+        z-index: -2;
+        background-color: #ededed;
+        background-image: url("assets/images/login-dna-bg.webp?v=20260306-login-dna-1");
+        background-repeat: no-repeat;
+        background-position: center center;
+        background-size: cover;
+      }
+
+      body::after {
+        z-index: -1;
+        background:
+          linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.48) 0%,
+            rgba(255, 255, 255, 0.42) 26%,
+            rgba(255, 255, 255, 0.38) 100%
+          ),
+          radial-gradient(
+            ellipse at 50% 42%,
+            rgba(255, 255, 255, 0.76) 0%,
+            rgba(255, 255, 255, 0.56) 28%,
+            rgba(255, 255, 255, 0.18) 64%,
+            transparent 86%
+          );
       }
 
       .login-card {
@@ -468,7 +500,28 @@
       @media (max-width: 520px) {
         body {
           padding: 16px;
-          --login-page-bg: var(--login-page-bg-mobile);
+        }
+
+        body::before {
+          background-position: 62% 22%;
+          background-size: auto 118%;
+        }
+
+        body::after {
+          background:
+            linear-gradient(
+              180deg,
+              rgba(255, 255, 255, 0.62) 0%,
+              rgba(255, 255, 255, 0.52) 28%,
+              rgba(255, 255, 255, 0.42) 100%
+            ),
+            radial-gradient(
+              ellipse at 50% 34%,
+              rgba(255, 255, 255, 0.84) 0%,
+              rgba(255, 255, 255, 0.68) 26%,
+              rgba(255, 255, 255, 0.26) 60%,
+              transparent 88%
+            );
         }
 
         .login-card {
