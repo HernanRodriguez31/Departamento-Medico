@@ -23,6 +23,41 @@
   --org-subtle: rgba(0, 0, 0, 0.04);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .orgtree .structure__content-wrapper,
+  .orgtree .group-content,
+  .orgtree .coordination-card,
+  .orgtree .staff-badge,
+  .orgtree .group-leader-badge,
+  .orgtree .structure__director-card,
+  .orgtree .group-header-btn,
+  .orgtree .region-btn {
+    transition: none !important;
+  }
+
+  .orgtree .coordination-card:active,
+  .orgtree .staff-badge:active,
+  .orgtree .structure__director-card:active,
+  .orgtree .group-leader-badge:active {
+    transform: none !important;
+    filter: none !important;
+  }
+}
+
+.hero-section--compact {
+  padding-top: 9rem;
+  padding-bottom: 1rem;
+}
+
+.hero-section__description {
+  font-size: 1.15rem;
+}
+
+.hero-section__actions {
+  animation-delay: 0.2s;
+  animation-fill-mode: forwards;
+}
+
 /* Cards / contenedores principales */
 .card,
 .section-card,
@@ -2096,13 +2131,13 @@ body.ui-clarity .region-accordion {
   }
 
   .orgtree .structure__inner-container.orgtree-panel {
-    padding: 0.5rem 0 0.75rem;
+    padding: 2.25rem 0.65rem 2.25rem;
     background: var(--org-mobile-surface-muted);
     border: 0;
     box-shadow: none;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
-    border-radius: 0 0 1.25rem 1.25rem;
+    border-radius: 1.75rem 1.75rem 1.25rem 1.25rem;
   }
 
   .orgtree .structure__inner-container.orgtree-panel::before,
@@ -2119,8 +2154,8 @@ body.ui-clarity .region-accordion {
   }
 
   .orgtree .structure__director-container {
-    margin-top: 0.35rem;
-    margin-bottom: 1.25rem;
+    margin-top: 0;
+    margin-bottom: 1.5rem;
   }
 
   .orgtree .structure__director-card,
@@ -2295,7 +2330,7 @@ body.ui-clarity .region-accordion {
 
   /* Mobile organigram hierarchy refinement: nested panels with explicit depth. */
   .orgtree .structure__inner-container.orgtree-panel {
-    background: #f3f4f6;
+    background: #f8fafc;
   }
 
   .orgtree .structure__director-card {
@@ -2567,5 +2602,178 @@ body.ui-clarity .region-accordion {
     background: rgba(122, 184, 0, 0.08);
     color: var(--first-color-ink);
     border: 1px solid rgba(122, 184, 0, 0.12);
+  }
+
+  .orgtree .structure__toggle-container {
+    margin-top: 0 !important;
+  }
+
+  .orgtree .structure__main-btn {
+    --dashboard-pad-x: 1.35rem;
+    --dashboard-pad-y: 1.35rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 6.15rem;
+  }
+
+  .orgtree .structure__main-btn .dashboard-icon-box,
+  .orgtree .dashboard-header-right,
+  .orgtree .dashboard-divider {
+    display: none !important;
+  }
+
+  .orgtree .dashboard-header-left {
+    width: 100%;
+    justify-content: center;
+    align-items: center;
+    gap: 0;
+    text-align: center;
+  }
+
+  .orgtree .dashboard-title-group {
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 0.42rem;
+  }
+
+  .orgtree .dashboard-header-left h2.dashboard-eyebrow {
+    font-size: 0.9rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    line-height: 1;
+  }
+
+  .orgtree .dashboard-header-left h1.dashboard-title {
+    display: inline-block;
+    max-width: none;
+    margin: 0 auto;
+    font-size: clamp(1.4rem, 4.9vw, 1.52rem);
+    line-height: 1.05;
+    letter-spacing: -0.018em;
+    white-space: nowrap;
+  }
+
+  .orgtree {
+    --org-brisa-accent: #7ab800;
+    --org-brisa-accent-ink: #7ab800;
+    --org-brisa-accent-soft: rgba(122, 184, 0, 0.10);
+    --org-brisa-accent-ring: rgba(122, 184, 0, 0.24);
+  }
+
+  .orgtree .structure__main-btn {
+    border-top: 2px solid var(--org-brisa-accent);
+  }
+
+  .orgtree .dashboard-header-left h2.dashboard-eyebrow {
+    color: var(--org-brisa-accent);
+    letter-spacing: 0.11em;
+  }
+
+  .orgtree .dashboard-header-left h1.dashboard-title {
+    max-width: none;
+    font-size: clamp(1.35rem, 4.45vw, 1.46rem);
+  }
+
+  .orgtree .structure__director-card {
+    background: #ffffff;
+    border-color: var(--org-brisa-accent-ring) !important;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.10) !important;
+  }
+
+  .orgtree .structure__director-icon-wrapper {
+    background: var(--org-brisa-accent);
+    color: #ffffff;
+    border: 2px solid #ffffff;
+    box-shadow:
+      0 10px 22px rgba(122, 184, 0, 0.18),
+      0 0 0 1px rgba(122, 184, 0, 0.10);
+  }
+
+  .orgtree .structure__director-name {
+    color: #111827;
+  }
+
+  .orgtree .structure__director-role {
+    color: var(--org-brisa-accent);
+    font-weight: 700;
+  }
+
+  .orgtree .structure__director-subroles,
+  .orgtree .structure__director-subroles span {
+    color: #64748b;
+  }
+
+  .orgtree .structure__connector-line {
+    background: rgba(122, 184, 0, 0.18);
+  }
+
+  .orgtree .leader-label,
+  .orgtree .coordination-card__role,
+  .orgtree .staff-badge.coordinator .staff-role,
+  .orgtree .region-coordination-title,
+  .orgtree .group-subtitle {
+    color: var(--org-brisa-accent-ink);
+  }
+
+  .orgtree .group-card,
+  .orgtree .region-accordion,
+  .orgtree .region-coordination-block {
+    border-color: rgba(122, 184, 0, 0.16) !important;
+  }
+
+  .orgtree .group-card.active-group,
+  .orgtree .group-card[aria-expanded="true"],
+  .orgtree .region-accordion.open {
+    border-color: rgba(122, 184, 0, 0.24) !important;
+  }
+
+  .orgtree .group-card > .group-content.open {
+    border-top-color: rgba(122, 184, 0, 0.16) !important;
+  }
+
+  .orgtree .region-coordination-block {
+    padding: 0.72rem !important;
+  }
+
+  .orgtree .group-icon-circle,
+  .orgtree .leader-icon-circle,
+  .orgtree .coordination-card__icon,
+  .orgtree .staff-badge.coordinator .staff-icon-circle {
+    background: var(--org-brisa-accent-soft) !important;
+    color: var(--org-brisa-accent) !important;
+    border-color: var(--org-brisa-accent-ring) !important;
+  }
+
+  .orgtree .coordination-card__role,
+  .orgtree .staff-badge.coordinator .staff-role {
+    background: rgba(122, 184, 0, 0.08);
+    border-color: rgba(122, 184, 0, 0.14);
+  }
+
+  .orgtree .sector-card {
+    border-top-color: rgba(122, 184, 0, 0.52) !important;
+  }
+
+  .orgtree .group-chevron,
+  .orgtree .region-chevron,
+  .orgtree .structure__chevron {
+    background: rgba(122, 184, 0, 0.08);
+    border-color: var(--org-brisa-accent-ring);
+    color: var(--org-brisa-accent);
+  }
+
+  .orgtree .group-chevron::before,
+  .orgtree .region-chevron::before {
+    color: var(--org-brisa-accent);
+  }
+
+  .orgtree .group-header-btn .group-chevron svg,
+  .orgtree .group-header-btn .structure__chevron svg,
+  .orgtree .region-btn .region-chevron svg,
+  .orgtree .structure__main-btn .dashboard-chevron svg {
+    color: var(--org-brisa-accent);
   }
 }

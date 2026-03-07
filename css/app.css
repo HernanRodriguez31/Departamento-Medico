@@ -4028,7 +4028,6 @@ img {
     html,
     body {
         touch-action: pan-x pan-y;
-        -webkit-text-size-adjust: 100%;
         text-size-adjust: 100%;
     }
 
@@ -4209,7 +4208,6 @@ img {
 
     body[data-view="carrete"] #carrete,
     body[data-view="estructura"] #estructura-hero,
-    body[data-view="estructura"] #referentes,
     body[data-view="estructura"] #estructura-funcional,
     body[data-view="comites"] #comites,
     body[data-view="evidencia"] #investigacion,
@@ -4306,36 +4304,49 @@ img {
     }
 
     #estructura-hero {
-        padding-top: 4.25rem !important;
-        padding-bottom: 1rem !important;
+        padding-top: 3.35rem !important;
+        padding-bottom: 0.5rem !important;
+    }
+
+    #estructura-hero .container {
+        padding-left: 1.25rem;
+        padding-right: 1.25rem;
     }
 
     #estructura-hero .section__title {
-        margin-bottom: 1.6rem;
+        max-width: 11ch;
+        margin: 0 auto 0.9rem !important;
+        font-size: 1.75rem;
+        line-height: 1.05;
+        letter-spacing: -0.035em;
     }
 
     #estructura-hero .section__subtitle {
-        margin-top: 0;
+        max-width: 18ch;
+        margin: 0 auto 1rem !important;
+        font-size: 1.02rem;
+        line-height: 1.38;
+        font-weight: 700;
     }
 
-    #estructura-hero .section__description {
-        margin-bottom: 0;
+    #estructura-hero .section__description,
+    #estructura-hero .hero-section__description {
+        max-width: 31ch;
+        margin: 0 auto !important;
+        padding-left: 1.25rem;
+        padding-right: 1.25rem;
+        font-size: 0.875rem;
+        line-height: 1.72;
     }
 
-    #estructura-hero .flex.flex-col {
-        display: none;
-    }
-
+    #estructura-hero .flex.flex-col,
+    #estructura-hero .hero-section__actions,
     #estructura-hero .hero-logo {
-        margin-top: 0;
-    }
-
-    #referentes {
-        padding-top: 1.5rem;
+        display: none !important;
     }
 
     #estructura-funcional {
-        padding-top: 2.5rem;
+        padding-top: 0.6rem !important;
     }
 
     .dm-accordion {
@@ -4344,5 +4355,21 @@ img {
 
     .show-scroll {
         bottom: calc(var(--bottom-nav-h) + 16px + env(safe-area-inset-bottom));
+    }
+
+    body[data-view="estructura"] .header,
+    body[data-view="estructura"] .scroll-header {
+        background: rgba(255, 255, 255, 0.82);
+        backdrop-filter: blur(18px) saturate(180%);
+        -webkit-backdrop-filter: blur(18px) saturate(180%);
+        box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.72);
+        z-index: 120;
+    }
+
+    body[data-view="estructura"] .header__container,
+    body[data-view="estructura"] .scroll-header .header__container {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
     }
 }

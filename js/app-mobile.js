@@ -1422,10 +1422,6 @@ function extractRegionalCoordinators(coordinationSectors = []) {
         });
 }
 
-function getRegionCoordinationTitle(regionName = '') {
-    return `Coordinadores ${regionName}`.toLocaleUpperCase('es-AR');
-}
-
 function createRegionElement(region) {
     const regionWrapper = document.createElement('div');
     regionWrapper.className = 'region-accordion';
@@ -1509,9 +1505,6 @@ function createRegionCoordinationBlock(region, coordinationSectors = []) {
     const block = document.createElement('section');
     block.className = 'region-coordination-block';
     block.innerHTML = `
-        <div class="region-coordination-header">
-            <span class="region-coordination-title">${getRegionCoordinationTitle(region.name)}</span>
-        </div>
         <div class="coordination-grid" data-count="${coordinators.length}">
             <!-- Coordinators injected here -->
         </div>
