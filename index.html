@@ -147,7 +147,7 @@
     />
     <link
       rel="stylesheet"
-      href="assets/css/pages/index.css?v=20260306-cubes-10"
+      href="assets/css/pages/index.css?v=20260307-chat-aladdin-1"
     />
     <link
       rel="stylesheet"
@@ -5776,7 +5776,7 @@
           const loadChat = () => {
             if (chatLoaded) return Promise.resolve();
             if (chatLoading) return chatLoading;
-            chatLoading = import("/js/chat.js?v=20260306-chat-desktop-layout-1")
+            chatLoading = import("/js/chat.js?v=20260307-chat-aladdin-1")
               .then(() => {
                 chatLoaded = true;
               })

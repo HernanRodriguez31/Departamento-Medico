@@ -14,7 +14,7 @@ import {
 const CONVERSATIONS_COLLECTION = "dm_conversations";
 const PROFILE_COLLECTION = "usuarios";
 const MAX_CONVERSATIONS = 50;
-const CHAT_MODULE_URL = "/js/chat.js?v=20260305-session-1";
+const CHAT_MODULE_URL = "/js/chat.js?v=20260307-chat-aladdin-1";
 
 const QUICK_ITEMS = [
   {

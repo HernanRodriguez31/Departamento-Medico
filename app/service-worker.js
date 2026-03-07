@@ -1,7 +1,7 @@
 const CACHE_PREFIX = "brisa-app-";
 // Bump this whenever we change precached assets (CSS/JS) to ensure clients
 // receive the updated files instead of an older cached copy.
-const CACHE_VERSION = "v18";
+const CACHE_VERSION = "v19";
 const CACHE = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const APP_SHELL_URL = "/app/index.html";
 const OFFLINE_URL = "/offline.html";
@@ -9,9 +9,9 @@ const PRECACHE_URLS = [
   APP_SHELL_URL,
   OFFLINE_URL,
   "/css/app.css",
-  "/assets/css/pages/app.css",
+  "/assets/css/pages/app.css?v=20260307-chat-aladdin-1",
   "/assets/js/pages/app.js?v=20260306-chat-desktop-layout-1",
-  "/js/chat.js?v=20260306-chat-desktop-layout-1",
+  "/js/chat.js?v=20260307-chat-aladdin-1",
   "/js/app-mobile.js"
 ];
 

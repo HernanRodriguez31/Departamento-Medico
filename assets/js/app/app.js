@@ -17,7 +17,7 @@ const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)
 const viewLoaders = {
   feed: () => import("./views/feed.view.js"),
   groups: () => import("./views/groups.view.js"),
-  messages: () => import("./views/messages.view.js?v=20260305-session-1"),
+  messages: () => import("./views/messages.view.js?v=20260307-chat-aladdin-1"),
   notifications: () => import("./views/notifications.view.js")
 };
 

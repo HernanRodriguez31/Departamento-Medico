@@ -62,7 +62,7 @@
     <link rel="stylesheet" href="/css/app.css">
     <link rel="stylesheet" href="/css/structure.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="/assets/css/pages/app.css">
+    <link rel="stylesheet" href="/assets/css/pages/app.css?v=20260307-chat-aladdin-1">
     <link rel="stylesheet" href="/assets/css/core-contrast.css">
     <link rel="manifest" href="/app/manifest.json">
 
@@ -3827,7 +3827,7 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
 
     </script>
 
-    <script type="module" src="/js/chat.js?v=20260306-chat-desktop-layout-1"></script>
+    <script type="module" src="/js/chat.js?v=20260307-chat-aladdin-1"></script>
     <script type="module">
         (() => {
             let chatLoaded = false;
@@ -3835,7 +3835,7 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
             const loadChat = () => {
                 if (chatLoaded) return Promise.resolve();
                 if (chatLoading) return chatLoading;
-                chatLoading = import('/js/chat.js?v=20260306-chat-desktop-layout-1')
+                chatLoading = import('/js/chat.js?v=20260307-chat-aladdin-1')
                     .then(() => {
                         chatLoaded = true;
                     })
