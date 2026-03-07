@@ -102,6 +102,18 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     activeConversationId: null,
     activePeerUid: null
   };
+  const CHAT_SURFACE_STATES = Object.freeze({
+    CLOSED: 'closed',
+    OPENING: 'opening',
+    OPEN: 'open',
+    CLOSING: 'closing'
+  });
+  const CHAT_SURFACE_META = Object.freeze({
+    panel: { display: 'flex', open: 460, close: 320 },
+    window: { display: 'flex', open: 420, close: 280 },
+    pill: { display: 'flex', open: 260, close: 260 }
+  });
+  const REDUCED_MOTION_MS = 140;
   const setChatState = (next = {}) => {
     chatState.isChatOpen = Boolean(next.isChatOpen);
     chatState.isMinimized = Boolean(next.isMinimized);
@@ -163,6 +175,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   let presenceHeartbeatBound = false;
   let incomingSessionStart = 0;
   let bubblePulseTimeout = null;
+  let bubbleReactionTimeout = null;
   let lastBubblePulseAt = 0;
   const BUBBLE_MARGIN = 0;
   const BUBBLE_TOP_MIN = 80;
@@ -200,6 +213,13 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         --brisa-chat-panel-gap: 16px;
         --brisa-chat-window-gap: 18px;
         --brisa-chat-window-left: 292px;
+        --brisa-chat-open-ease: cubic-bezier(.22, 1, .36, 1);
+        --brisa-chat-close-ease: cubic-bezier(.4, 0, .2, 1);
+        --brisa-chat-panel-open-ms: 460ms;
+        --brisa-chat-panel-close-ms: 320ms;
+        --brisa-chat-window-open-ms: 420ms;
+        --brisa-chat-window-close-ms: 280ms;
+        --brisa-chat-pill-ms: 260ms;
       }
 
       .brisa-chat-fab {
@@ -211,6 +231,13 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         width: var(--dm-chat-fab-size, 58px);
         height: var(--dm-chat-fab-size, 58px);
         z-index: 50;
+        --brisa-chat-panel-shift-x: -12px;
+        --brisa-chat-panel-origin-x: 28px;
+      }
+
+      .brisa-chat-fab[data-side="right"] {
+        --brisa-chat-panel-shift-x: 12px;
+        --brisa-chat-panel-origin-x: calc(100% - 28px);
       }
 
       .brisa-chat-fab .brisa-chat-bubble {
@@ -219,6 +246,11 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         width: 100%;
         height: 100%;
         pointer-events: auto;
+        transform: translateZ(0);
+        transform-origin: center;
+        backface-visibility: hidden;
+        will-change: transform, filter, box-shadow;
+        transition: filter 220ms ease, box-shadow 220ms ease, transform 220ms ease;
       }
 
       .brisa-chat-fab .brisa-chat-panel {
@@ -238,7 +270,14 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
         overflow: hidden;
         z-index: 40;
-        pointer-events: auto;
+        pointer-events: none;
+        visibility: hidden;
+        opacity: 0;
+        transform: translate3d(var(--brisa-chat-panel-shift-x, -12px), 24px, 0) scale(0.26, 0.38);
+        transform-origin: var(--brisa-chat-panel-origin-x, 28px) calc(100% + 18px);
+        filter: blur(12px) saturate(0.92);
+        clip-path: inset(18% 10% 0 10% round 999px);
+        will-change: transform, opacity, filter, clip-path, border-radius;
       }
 
       .brisa-chat-fab[data-side="left"] .brisa-chat-panel {
@@ -260,8 +299,18 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         box-shadow: 0 14px 38px rgba(15, 23, 42, 0.16);
         display: none;
         flex-direction: column;
-        pointer-events: auto;
+        pointer-events: none;
         z-index: 45;
+        visibility: hidden;
+        opacity: 0;
+        --brisa-chat-window-from-x: -42px;
+        --brisa-chat-window-from-y: 24px;
+        --brisa-chat-window-scale-x: 0.82;
+        --brisa-chat-window-scale-y: 0.88;
+        transform: translate3d(var(--brisa-chat-window-from-x), var(--brisa-chat-window-from-y), 0) scale(var(--brisa-chat-window-scale-x), var(--brisa-chat-window-scale-y));
+        transform-origin: 0 100%;
+        filter: blur(10px) saturate(0.94);
+        will-change: transform, opacity, filter, border-radius;
       }
 
       .brisa-chat-pill {
@@ -281,7 +330,13 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         align-items: center;
         gap: 6px;
         cursor: pointer;
-        pointer-events: auto;
+        pointer-events: none;
+        visibility: hidden;
+        opacity: 0;
+        transform: translate3d(-34px, 18px, 0) scale(0.8);
+        transform-origin: 0 100%;
+        filter: blur(10px) saturate(0.96);
+        will-change: transform, opacity, filter;
       }
 
       .brisa-chat-pill-tray {
@@ -306,8 +361,97 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         padding-right: 10px;
       }
 
+      .brisa-chat-panel[data-chat-origin="panel"] {
+        transform-origin: 20px 20px;
+      }
+
+      .brisa-chat-window[data-chat-origin="panel"] {
+        --brisa-chat-window-from-x: -40px;
+        --brisa-chat-window-from-y: 24px;
+        --brisa-chat-window-scale-x: 0.82;
+        --brisa-chat-window-scale-y: 0.88;
+        transform-origin: 0 100%;
+      }
+
+      .brisa-chat-window[data-chat-origin="pill"] {
+        --brisa-chat-window-from-x: -78px;
+        --brisa-chat-window-from-y: 38px;
+        --brisa-chat-window-scale-x: 0.62;
+        --brisa-chat-window-scale-y: 0.42;
+        transform-origin: 0 100%;
+      }
+
+      .brisa-chat-window[data-chat-origin="bubble"] {
+        --brisa-chat-window-from-x: 0px;
+        --brisa-chat-window-from-y: 82px;
+        --brisa-chat-window-scale-x: 0.54;
+        --brisa-chat-window-scale-y: 0.28;
+        transform-origin: 24px calc(100% - 18px);
+      }
+
+      .brisa-chat-panel[data-chat-state="open"],
+      .brisa-chat-window[data-chat-state="open"],
+      .brisa-chat-pill[data-chat-state="open"] {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        transform: translate3d(0, 0, 0) scale(1);
+        filter: blur(0) saturate(1);
+        clip-path: inset(0 round 18px);
+      }
+
+      .brisa-chat-pill[data-chat-state="open"] {
+        clip-path: none;
+      }
+
+      .brisa-chat-panel[data-chat-state="opening"],
+      .brisa-chat-panel[data-chat-state="closing"],
+      .brisa-chat-window[data-chat-state="opening"],
+      .brisa-chat-window[data-chat-state="closing"],
+      .brisa-chat-pill[data-chat-state="opening"],
+      .brisa-chat-pill[data-chat-state="closing"] {
+        visibility: visible;
+        pointer-events: none;
+      }
+
+      .brisa-chat-panel[data-chat-state="opening"] {
+        animation: brisaChatPanelOpen var(--brisa-chat-panel-open-ms) var(--brisa-chat-open-ease) forwards;
+      }
+
+      .brisa-chat-panel[data-chat-state="closing"] {
+        animation: brisaChatPanelClose var(--brisa-chat-panel-close-ms) var(--brisa-chat-close-ease) forwards;
+      }
+
+      .brisa-chat-window[data-chat-state="opening"] {
+        animation: brisaChatWindowOpen var(--brisa-chat-window-open-ms) var(--brisa-chat-open-ease) forwards;
+      }
+
+      .brisa-chat-window[data-chat-state="closing"] {
+        animation: brisaChatWindowClose var(--brisa-chat-window-close-ms) var(--brisa-chat-close-ease) forwards;
+      }
+
+      .brisa-chat-pill[data-chat-state="opening"] {
+        animation: brisaChatPillOpen var(--brisa-chat-pill-ms) var(--brisa-chat-open-ease) forwards;
+      }
+
+      .brisa-chat-pill[data-chat-state="closing"] {
+        animation: brisaChatPillClose var(--brisa-chat-pill-ms) var(--brisa-chat-close-ease) forwards;
+      }
+
       .brisa-chat-bubble--pulse { animation: brisaChatPulse 0.9s ease-out; }
       .brisa-chat-bubble.is-dragging { opacity: .9; }
+      .brisa-chat-bubble[data-chat-react="opening"] {
+        animation: brisaChatBubbleOpen 460ms var(--brisa-chat-open-ease);
+      }
+
+      .brisa-chat-bubble[data-chat-react="closing"] {
+        animation: brisaChatBubbleClose 320ms var(--brisa-chat-close-ease);
+      }
+
+      .brisa-chat-bubble[data-chat-react="restoring"] {
+        animation: brisaChatBubbleRestore 260ms var(--brisa-chat-open-ease);
+      }
+
       .brisa-chat-bubble::after {
         content: '';
         position: absolute;
@@ -329,11 +473,203 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         30% { transform: scale(1.08); }
         100% { transform: scale(1); }
       }
+
+      @keyframes brisaChatBubbleOpen {
+        0% {
+          transform: scale(1) translateY(0);
+          filter: brightness(1);
+        }
+        38% {
+          transform: scale(0.92, 1.12) translateY(1px);
+          filter: brightness(1.08);
+        }
+        62% {
+          transform: scale(1.06, 0.95) translateY(-1px);
+          filter: brightness(1.12);
+        }
+        100% {
+          transform: scale(1) translateY(0);
+          filter: brightness(1);
+        }
+      }
+
+      @keyframes brisaChatBubbleClose {
+        0% {
+          transform: scale(1) translateY(0);
+          filter: brightness(1);
+        }
+        35% {
+          transform: scale(1.04, 0.96);
+          filter: brightness(1.08);
+        }
+        100% {
+          transform: scale(0.96, 1.04);
+          filter: brightness(1);
+        }
+      }
+
+      @keyframes brisaChatBubbleRestore {
+        0% {
+          transform: scale(0.94);
+          filter: brightness(1.04);
+        }
+        55% {
+          transform: scale(1.06);
+          filter: brightness(1.1);
+        }
+        100% {
+          transform: scale(1);
+          filter: brightness(1);
+        }
+      }
+
+      @keyframes brisaChatPanelOpen {
+        0% {
+          opacity: 0;
+          transform: translate3d(var(--brisa-chat-panel-shift-x, -12px), 24px, 0) scale(0.26, 0.38);
+          border-radius: 999px;
+          filter: blur(12px) saturate(0.92);
+          clip-path: inset(18% 10% 0 10% round 999px);
+        }
+        58% {
+          opacity: 1;
+          transform: translate3d(0, -4px, 0) scale(1.02, 1.03);
+          border-radius: 28px;
+          filter: blur(0) saturate(1);
+          clip-path: inset(0 round 28px);
+        }
+        100% {
+          opacity: 1;
+          transform: translate3d(0, 0, 0) scale(1);
+          border-radius: 18px;
+          filter: blur(0) saturate(1);
+          clip-path: inset(0 round 18px);
+        }
+      }
+
+      @keyframes brisaChatPanelClose {
+        0% {
+          opacity: 1;
+          transform: translate3d(0, 0, 0) scale(1);
+          border-radius: 18px;
+          filter: blur(0) saturate(1);
+          clip-path: inset(0 round 18px);
+        }
+        38% {
+          opacity: 1;
+          transform: translate3d(0, -2px, 0) scale(0.94, 0.96);
+          border-radius: 26px;
+          clip-path: inset(0 round 26px);
+        }
+        100% {
+          opacity: 0;
+          transform: translate3d(var(--brisa-chat-panel-shift-x, -12px), 24px, 0) scale(0.26, 0.38);
+          border-radius: 999px;
+          filter: blur(12px) saturate(0.92);
+          clip-path: inset(18% 10% 0 10% round 999px);
+        }
+      }
+
+      @keyframes brisaChatWindowOpen {
+        0% {
+          opacity: 0;
+          transform: translate3d(var(--brisa-chat-window-from-x), var(--brisa-chat-window-from-y), 0) scale(var(--brisa-chat-window-scale-x), var(--brisa-chat-window-scale-y));
+          border-radius: 28px;
+          filter: blur(10px) saturate(0.94);
+        }
+        55% {
+          opacity: 1;
+          transform: translate3d(0, -4px, 0) scale(1.02);
+          border-radius: 22px;
+          filter: blur(0) saturate(1);
+        }
+        100% {
+          opacity: 1;
+          transform: translate3d(0, 0, 0) scale(1);
+          border-radius: 18px;
+          filter: blur(0) saturate(1);
+        }
+      }
+
+      @keyframes brisaChatWindowClose {
+        0% {
+          opacity: 1;
+          transform: translate3d(0, 0, 0) scale(1);
+          border-radius: 18px;
+          filter: blur(0) saturate(1);
+        }
+        36% {
+          opacity: 1;
+          transform: translate3d(0, -2px, 0) scale(0.94);
+          border-radius: 24px;
+        }
+        100% {
+          opacity: 0;
+          transform: translate3d(var(--brisa-chat-window-from-x), var(--brisa-chat-window-from-y), 0) scale(var(--brisa-chat-window-scale-x), var(--brisa-chat-window-scale-y));
+          border-radius: 30px;
+          filter: blur(10px) saturate(0.94);
+        }
+      }
+
+      @keyframes brisaChatPillOpen {
+        0% {
+          opacity: 0;
+          transform: translate3d(-34px, 18px, 0) scale(0.8);
+          filter: blur(10px) saturate(0.96);
+        }
+        60% {
+          opacity: 1;
+          transform: translate3d(0, -2px, 0) scale(1.04);
+          filter: blur(0) saturate(1);
+        }
+        100% {
+          opacity: 1;
+          transform: translate3d(0, 0, 0) scale(1);
+          filter: blur(0) saturate(1);
+        }
+      }
+
+      @keyframes brisaChatPillClose {
+        0% {
+          opacity: 1;
+          transform: translate3d(0, 0, 0) scale(1);
+          filter: blur(0) saturate(1);
+        }
+        100% {
+          opacity: 0;
+          transform: translate3d(-34px, 18px, 0) scale(0.8);
+          filter: blur(10px) saturate(0.96);
+        }
+      }
+
       @keyframes pulse-glow {
         0% { transform: scale(0.95); opacity: 0.35; }
         70% { transform: scale(1.35); opacity: 0; }
         100% { transform: scale(1.35); opacity: 0; }
       }
+
+      @media (prefers-reduced-motion: reduce) {
+        #brisa-chat-root {
+          --brisa-chat-panel-open-ms: 140ms;
+          --brisa-chat-panel-close-ms: 140ms;
+          --brisa-chat-window-open-ms: 140ms;
+          --brisa-chat-window-close-ms: 140ms;
+          --brisa-chat-pill-ms: 140ms;
+        }
+
+        .brisa-chat-bubble,
+        .brisa-chat-panel,
+        .brisa-chat-window,
+        .brisa-chat-pill {
+          transition-duration: 140ms !important;
+        }
+
+        .brisa-chat-bubble::after {
+          animation: none;
+          opacity: 0;
+        }
+      }
+
       @media (max-width: 768px), (display-mode: standalone) {
         #brisa-chat-pill-tray { display: none !important; }
         .brisa-chat-bubble { touch-action: none; }
@@ -833,6 +1169,211 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   };
 
   const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+  const prefersReducedMotion = () => typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const normalizeChatOrigin = (origin, fallback = 'bubble') => (
+    origin === 'panel' || origin === 'pill' || origin === 'bubble'
+      ? origin
+      : fallback
+  );
+  const getSurfaceDisplay = (kind) => CHAT_SURFACE_META[kind]?.display || 'block';
+  const getSurfaceDuration = (kind, phase) => (
+    prefersReducedMotion()
+      ? REDUCED_MOTION_MS
+      : (CHAT_SURFACE_META[kind]?.[phase] || 0)
+  );
+  const getSurfaceState = (el) => el?.dataset?.chatState || CHAT_SURFACE_STATES.CLOSED;
+  const isSurfaceOpenish = (el) => getSurfaceState(el) !== CHAT_SURFACE_STATES.CLOSED;
+
+  function applySurfaceState(el, state, origin) {
+    if (!el) return;
+    el.dataset.chatState = state;
+    el.dataset.chatOrigin = normalizeChatOrigin(origin, el.dataset.chatOrigin || 'bubble');
+    el.setAttribute(
+      'aria-hidden',
+      state === CHAT_SURFACE_STATES.OPEN || state === CHAT_SURFACE_STATES.OPENING ? 'false' : 'true'
+    );
+  }
+
+  function clearSurfaceTransition(el) {
+    if (!el?._brisaChatTransition) return;
+    const transition = el._brisaChatTransition;
+    if (transition.rafOne) cancelAnimationFrame(transition.rafOne);
+    if (transition.rafTwo) cancelAnimationFrame(transition.rafTwo);
+    if (transition.timeoutId) clearTimeout(transition.timeoutId);
+    if (typeof transition.cleanup === 'function') transition.cleanup();
+    delete el._brisaChatTransition;
+  }
+
+  function finalizeSurfaceMutation(kind) {
+    if (kind === 'pill') {
+      adjustPanelForTray();
+    }
+    if (kind === 'panel') {
+      syncPanelViewportBounds();
+    }
+  }
+
+  function setSurfaceImmediate(el, kind, visible, origin = 'bubble') {
+    if (!el) return;
+    clearSurfaceTransition(el);
+    applySurfaceState(
+      el,
+      visible ? CHAT_SURFACE_STATES.OPEN : CHAT_SURFACE_STATES.CLOSED,
+      origin
+    );
+    el.style.display = visible ? getSurfaceDisplay(kind) : 'none';
+    finalizeSurfaceMutation(kind);
+  }
+
+  function transitionSurface(el, kind, visible, { origin = 'bubble', immediate = false } = {}) {
+    if (!el) return Promise.resolve(false);
+
+    const normalizedOrigin = normalizeChatOrigin(origin, kind === 'window' ? 'panel' : 'bubble');
+    const currentState = getSurfaceState(el);
+    const currentVisible = currentState === CHAT_SURFACE_STATES.OPEN || currentState === CHAT_SURFACE_STATES.OPENING;
+
+    if (immediate) {
+      setSurfaceImmediate(el, kind, visible, normalizedOrigin);
+      return Promise.resolve(true);
+    }
+
+    if (visible && currentVisible) {
+      applySurfaceState(el, currentState, normalizedOrigin);
+      finalizeSurfaceMutation(kind);
+      return Promise.resolve(false);
+    }
+
+    if (!visible && currentState === CHAT_SURFACE_STATES.CLOSED) {
+      applySurfaceState(el, currentState, normalizedOrigin);
+      finalizeSurfaceMutation(kind);
+      return Promise.resolve(false);
+    }
+
+    clearSurfaceTransition(el);
+
+    if (visible) {
+      el.style.display = getSurfaceDisplay(kind);
+      applySurfaceState(el, CHAT_SURFACE_STATES.CLOSED, normalizedOrigin);
+      void el.offsetWidth;
+    }
+
+    return new Promise((resolve) => {
+      const token = Symbol(`${kind}-${visible ? 'open' : 'close'}`);
+      const duration = getSurfaceDuration(kind, visible ? 'open' : 'close');
+      const nextState = visible ? CHAT_SURFACE_STATES.OPENING : CHAT_SURFACE_STATES.CLOSING;
+      const settledState = visible ? CHAT_SURFACE_STATES.OPEN : CHAT_SURFACE_STATES.CLOSED;
+
+      const finish = () => {
+        if (el._brisaChatTransition?.token !== token) return;
+        clearSurfaceTransition(el);
+        applySurfaceState(el, settledState, normalizedOrigin);
+        if (!visible) {
+          el.style.display = 'none';
+        }
+        finalizeSurfaceMutation(kind);
+        resolve(true);
+      };
+
+      const handleAnimationEnd = (event) => {
+        if (event.target !== el) return;
+        finish();
+      };
+
+      const applyNextState = () => {
+        if (el._brisaChatTransition?.token !== token) return;
+        applySurfaceState(el, nextState, normalizedOrigin);
+        if (duration === 0) finish();
+      };
+
+      el.addEventListener('animationend', handleAnimationEnd);
+      el._brisaChatTransition = {
+        token,
+        cleanup: () => {
+          el.removeEventListener('animationend', handleAnimationEnd);
+        },
+        timeoutId: setTimeout(finish, duration + 96)
+      };
+
+      if (visible) {
+        el._brisaChatTransition.rafOne = requestAnimationFrame(() => {
+          if (el._brisaChatTransition?.token !== token) return;
+          el._brisaChatTransition.rafTwo = requestAnimationFrame(applyNextState);
+        });
+      } else {
+        applyNextState();
+      }
+    });
+  }
+
+  function initializeSurfaceElement(el, kind, { origin = 'bubble', visible = false } = {}) {
+    if (!el) return;
+    clearSurfaceTransition(el);
+    applySurfaceState(
+      el,
+      visible ? CHAT_SURFACE_STATES.OPEN : CHAT_SURFACE_STATES.CLOSED,
+      origin
+    );
+    el.style.display = visible ? getSurfaceDisplay(kind) : 'none';
+  }
+
+  function isSurfaceVisible(el) {
+    if (!el) return false;
+    const hasManagedState = typeof el.dataset?.chatState === 'string';
+    if (hasManagedState && !isSurfaceOpenish(el)) return false;
+    const style = window.getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden') return false;
+    const rect = el.getBoundingClientRect();
+    return rect.width > 0 || rect.height > 0;
+  }
+
+  function resolveWindowOpenOrigin(options = {}) {
+    const requested = normalizeChatOrigin(options.origin, 'bubble');
+    if (isEmbeddedMode()) return requested === 'pill' ? 'panel' : requested;
+    if (isMobileShell()) return 'bubble';
+    if (options.origin) return requested;
+    const panel = document.getElementById('brisa-chat-panel');
+    return isPanelVisible(panel) ? 'panel' : 'bubble';
+  }
+
+  function resolveWindowCloseOrigin({ minimize = false, origin = null } = {}) {
+    if (origin) {
+      const requested = normalizeChatOrigin(origin, 'bubble');
+      return isMobileShell() && requested === 'pill' ? 'bubble' : requested;
+    }
+    if (isEmbeddedMode()) return 'panel';
+    if (isMobileShell()) return 'bubble';
+    if (minimize) return 'pill';
+    const panel = document.getElementById('brisa-chat-panel');
+    return isPanelVisible(panel) ? 'panel' : 'bubble';
+  }
+
+  function focusChatInput() {
+    const input = document.getElementById('brisa-chat-input');
+    if (!input) return;
+    const delay = prefersReducedMotion() ? 20 : 120;
+    setTimeout(() => {
+      try {
+        input.focus({ preventScroll: true });
+      } catch (error) {
+        input.focus();
+      }
+    }, delay);
+  }
+
+  function triggerBubbleReaction(type = 'opening') {
+    const bubble = document.getElementById('brisa-chat-bubble');
+    if (!bubble) return;
+    bubble.dataset.chatReact = type;
+    if (bubbleReactionTimeout) clearTimeout(bubbleReactionTimeout);
+    const duration = type === 'closing'
+      ? getSurfaceDuration('panel', 'close')
+      : getSurfaceDuration('panel', 'open');
+    bubbleReactionTimeout = setTimeout(() => {
+      if (bubble.dataset.chatReact === type) {
+        bubble.dataset.chatReact = 'idle';
+      }
+    }, duration + 96);
+  }
 
   const getBubbleBounds = (bubble) => {
     const height = bubble?.offsetHeight || 58;
@@ -1054,13 +1595,23 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     `;
 
     pillTray = document.getElementById('brisa-chat-pill-tray');
+    initializeSurfaceElement(document.getElementById('brisa-chat-panel'), 'panel');
+    initializeSurfaceElement(document.getElementById('brisa-chat-window'), 'window', { origin: 'panel' });
+    initializeSurfaceElement(document.getElementById('brisa-chat-pill'), 'pill', { origin: 'pill' });
+    const bubble = document.getElementById('brisa-chat-bubble');
+    if (bubble) {
+      bubble.dataset.chatReact = 'idle';
+    }
     updateAssistantQuickRow();
   }
 
   function adjustPanelForTray() {
     const panel = document.getElementById('brisa-chat-panel');
     if (!panel) return;
-    const hasTray = pillTray && pillTray.children.length > 0;
+    const visibleTrayItems = pillTray
+      ? Array.from(pillTray.children).filter((child) => isSurfaceVisible(child)).length
+      : 0;
+    const hasTray = visibleTrayItems > 0;
     const trayHeight = hasTray ? pillTray.offsetHeight : 0;
     const offset = hasTray
       ? trayHeight + PANEL_OFFSET_BASE + PANEL_OFFSET_EXTRA
@@ -1094,16 +1645,11 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   }
 
   function isPanelVisible(panel) {
-    if (!panel) return false;
-    return window.getComputedStyle(panel).display !== 'none';
+    return isSurfaceVisible(panel);
   }
 
   function isElementVisible(el) {
-    if (!el) return false;
-    const style = window.getComputedStyle(el);
-    if (style.display === 'none' || style.visibility === 'hidden') return false;
-    const rect = el.getBoundingClientRect();
-    return rect.width > 0 || rect.height > 0;
+    return isSurfaceVisible(el);
   }
 
   function captureAnchorSnapshot(el) {
@@ -1138,12 +1684,12 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     const tray = document.getElementById('brisa-chat-pill-tray');
     const fab = document.getElementById('brisa-chat-fab');
     if (bubble) bubble.style.display = 'none';
-    if (panel) panel.style.display = 'none';
+    setSurfaceImmediate(panel, 'panel', false, 'bubble');
     if (fab) fab.style.display = 'none';
-    if (pill) pill.style.display = 'none';
+    setSurfaceImmediate(pill, 'pill', false, 'pill');
     if (tray) tray.style.display = 'none';
     const win = document.getElementById('brisa-chat-window');
-    if (win) win.style.display = 'flex';
+    setSurfaceImmediate(win, 'window', true, 'panel');
   }
 
   function unmountChat() {
@@ -1156,9 +1702,13 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     const tray = document.getElementById('brisa-chat-pill-tray');
     const fab = document.getElementById('brisa-chat-fab');
     if (bubble) bubble.style.display = '';
-    if (panel) panel.style.display = '';
+    if (panel) {
+      panel.style.display = getSurfaceState(panel) === CHAT_SURFACE_STATES.CLOSED ? 'none' : getSurfaceDisplay('panel');
+    }
     if (fab) fab.style.display = '';
-    if (pill) pill.style.display = '';
+    if (pill) {
+      pill.style.display = getSurfaceState(pill) === CHAT_SURFACE_STATES.CLOSED ? 'none' : getSurfaceDisplay('pill');
+    }
     if (tray) tray.style.display = '';
     const targetParent = embeddedParent || document.body;
     if (targetParent && root.parentElement !== targetParent) {
@@ -1171,11 +1721,9 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   }
 
   function isConversationActuallyVisible(conversationId) {
-    const panel = document.getElementById('brisa-chat-panel');
     const win = document.getElementById('brisa-chat-window');
-    const panelVisible = isEmbeddedMode() ? true : isPanelVisible(panel);
-    const winVisible = win && win.style.display !== 'none';
-    if (!panelVisible || !winVisible) return false;
+    const winVisible = isSurfaceVisible(win);
+    if (!winVisible) return false;
     if (!conversationId) return false;
     const sameConversation = activeConversationId === conversationId;
     const tabVisible = !document.hidden;
@@ -1582,12 +2130,12 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     renderUsersPanel();
   }
 
-  async function openDirectConversation(uid, displayName, { clearSearch = false } = {}) {
+  async function openDirectConversation(uid, displayName, { clearSearch = false, origin = 'panel' } = {}) {
     if (!uid) return;
     if (clearSearch) {
       resetUserSearch();
     }
-    openConversation(uid, displayName);
+    openConversation(uid, displayName, { origin });
     if (currentUser) {
       await hydratePeerProfile(getConversationId(currentUser.uid, uid), uid);
     }
@@ -2108,6 +2656,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
 
     const msgs = conversationMessages.get(activeConversationId) || [];
     msgs.forEach(msg => renderMessage(msg));
+    list.scrollTop = list.scrollHeight;
   }
 
   function handleIncomingForMinimized(conversationId, { force = false } = {}) {
@@ -2754,13 +3303,25 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     const title = document.getElementById('brisa-chat-window-title');
     const subtitle = document.getElementById('brisa-chat-window-subtitle');
     const msgs = document.getElementById('brisa-chat-messages');
+    const openOrigin = resolveWindowOpenOrigin(options);
+    const pill = minimizedPills.get(conversationId);
 
     if (win && title && subtitle && msgs) {
       title.textContent = peer.name;
       subtitle.textContent = peer.subtitle || 'Departamento Médico';
       msgs.innerHTML = '';
-      win.style.display = 'flex';
+      if (pill) {
+        transitionSurface(pill, 'pill', false, { origin: 'pill', immediate: isEmbeddedMode() });
+      }
+      if (openOrigin === 'bubble') {
+        triggerBubbleReaction('restoring');
+      }
       renderActiveConversation();
+      transitionSurface(win, 'window', true, { origin: openOrigin, immediate: isEmbeddedMode() })
+        .then(() => {
+          if (activeConversationId !== conversationId) return;
+          focusChatInput();
+        });
       markAllAsRead(conversationId);
       clearUnread(conversationId);
       resetConversationUnread(conversationId);
@@ -2773,15 +3334,30 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   function minimizeActiveConversation() {
     if (isEmbeddedMode()) return;
     if (!activeConversationId || !activePeer) return;
+    const conversationId = activeConversationId;
+    const peerUid = activePeer.uid;
+    const closeOrigin = resolveWindowCloseOrigin({ minimize: true });
     const win = document.getElementById('brisa-chat-window');
-    if (win) win.style.display = 'none';
-    const pill = getOrCreatePill(activeConversationId, activePeer.name);
-    stopBlink(activeConversationId);
+    const pill = getOrCreatePill(conversationId, activePeer.name);
+    if (closeOrigin === 'bubble') {
+      triggerBubbleReaction('closing');
+    }
+    const closePromise = transitionSurface(win, 'window', false, {
+      origin: closeOrigin,
+      immediate: isEmbeddedMode()
+    });
+    if (pill) {
+      closePromise.finally(() => {
+        if (!minimizedPills.has(conversationId)) return;
+        transitionSurface(pill, 'pill', true, { origin: 'pill' });
+      });
+    }
+    stopBlink(conversationId);
     setChatState({
       isChatOpen: true,
       isMinimized: true,
-      activeConversationId,
-      activePeerUid: activePeer.uid
+      activeConversationId: conversationId,
+      activePeerUid: peerUid
     });
   }
 
@@ -2791,6 +3367,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     if (minimizedPills.has(conversationId)) {
       const existing = minimizedPills.get(conversationId);
       existing.querySelector('.brisa-chat-pill-label').textContent = label;
+      transitionSurface(existing, 'pill', true, { origin: 'pill' });
       return existing;
     }
 
@@ -2822,7 +3399,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       e.stopPropagation();
       const peer = conversationPeers.get(conversationId);
       if (peer) {
-        openConversationById(conversationId, peer);
+        openConversationById(conversationId, peer, { origin: 'pill' });
       }
     });
 
@@ -2834,11 +3411,12 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     pill.addEventListener('click', () => {
       const peer = conversationPeers.get(conversationId);
       if (peer) {
-        openConversationById(conversationId, peer);
+        openConversationById(conversationId, peer, { origin: 'pill' });
       }
     });
 
     pillTray.appendChild(pill);
+    initializeSurfaceElement(pill, 'pill', { origin: 'pill' });
     minimizedPills.set(conversationId, pill);
     adjustPanelForTray();
     return pill;
@@ -2849,7 +3427,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     if (pill) pill.classList.remove('brisa-chat-pill--blink');
   }
 
-  function removeConversation(conversationId) {
+  function removeConversation(conversationId, options = {}) {
     const unsub = conversationSubs.get(conversationId);
     if (unsub) unsub();
     conversationSubs.delete(conversationId);
@@ -2865,15 +3443,29 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     updateDocumentBadge();
 
     const pill = minimizedPills.get(conversationId);
-    if (pill) pill.remove();
     minimizedPills.delete(conversationId);
-    adjustPanelForTray();
+    if (pill) {
+      transitionSurface(pill, 'pill', false, { origin: 'pill' })
+        .finally(() => {
+          pill.remove();
+          adjustPanelForTray();
+        });
+    } else {
+      adjustPanelForTray();
+    }
 
     if (activeConversationId === conversationId) {
       activeConversationId = null;
       activePeer = null;
       const win = document.getElementById('brisa-chat-window');
-      if (win) win.style.display = 'none';
+      const closeOrigin = resolveWindowCloseOrigin({ origin: options.windowOrigin });
+      if (closeOrigin === 'bubble') {
+        triggerBubbleReaction('closing');
+      }
+      transitionSurface(win, 'window', false, {
+        origin: closeOrigin,
+        immediate: isEmbeddedMode()
+      });
       setChatState({
         isChatOpen: false,
         isMinimized: true,
@@ -2923,10 +3515,13 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       if (searchInput) searchInput.blur();
     };
 
-    const closeUsersPanel = ({ minimizeConversation = false } = {}) => {
+    const closeUsersPanel = ({ minimizeConversation = false, origin = 'bubble' } = {}) => {
       if (panel && isPanelVisible(panel)) {
         resetPanelSearchState();
-        panel.style.display = 'none';
+        if (origin === 'bubble') {
+          triggerBubbleReaction('closing');
+        }
+        transitionSurface(panel, 'panel', false, { origin });
       }
       if (minimizeConversation) {
         minimizeActiveConversation();
@@ -3034,13 +3629,14 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         const visible = isPanelVisible(panel);
         syncPanelViewportBounds();
         if (visible) {
-          closeUsersPanel({ minimizeConversation: true });
+          closeUsersPanel({ minimizeConversation: true, origin: 'bubble' });
         } else {
           resetPanelSearchState();
           updateAssistantQuickRow();
-          panel.style.display = 'flex';
+          triggerBubbleReaction('opening');
+          transitionSurface(panel, 'panel', true, { origin: 'bubble' });
         }
-        if (visible) {
+        if (visible && !activeConversationId) {
           setChatState({
             isChatOpen: false,
             isMinimized: true,
@@ -3052,7 +3648,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     }
     if (panelClose && panel) {
       panelClose.addEventListener('click', () => {
-        closeUsersPanel({ minimizeConversation: true });
+        closeUsersPanel({ minimizeConversation: true, origin: 'bubble' });
       });
     }
     if (panelSoundToggle) {
@@ -3124,8 +3720,16 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     }
     if (winClose && win) {
       winClose.addEventListener('click', () => {
-        if (activeConversationId) removeConversation(activeConversationId);
-        win.style.display = 'none';
+        if (activeConversationId) {
+          removeConversation(activeConversationId, {
+            windowOrigin: resolveWindowCloseOrigin({ minimize: false })
+          });
+        } else {
+          transitionSurface(win, 'window', false, {
+            origin: resolveWindowCloseOrigin({ minimize: false }),
+            immediate: isEmbeddedMode()
+          });
+        }
       });
     }
     if (winMin && win) {
@@ -3151,12 +3755,12 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     }
     if (quickGroup) {
       quickGroup.addEventListener('click', () => {
-        openSpecialConversation('dm_group_chat', 'Chat grupal', 'Sala común · Departamento Médico');
+        openSpecialConversation('dm_group_chat', 'Chat grupal', 'Sala común · Departamento Médico', { origin: 'panel' });
       });
     }
     if (quickForo) {
       quickForo.addEventListener('click', () => {
-        openSpecialConversation('dm_foro_general', 'Foro general', 'Mensajes vinculados al foro');
+        openSpecialConversation('dm_foro_general', 'Foro general', 'Mensajes vinculados al foro', { origin: 'panel' });
       });
     }
     if (quickAi) {
@@ -3168,7 +3772,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
             bubble
           });
           const context = getChatContext();
-          closeUsersPanel();
+          closeUsersPanel({ origin: 'bubble' });
           setChatState({
             isChatOpen: false,
             isMinimized: true,
@@ -3239,23 +3843,23 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       const insideToast = document.getElementById('brisa-chat-toast')?.contains(target);
 
       const panelIsVisible = isPanelVisible(panel);
-      const winVisible = win && win.style.display !== 'none';
+      const winVisible = isSurfaceVisible(win);
 
       if (isDeleteModalOpen || isDeleteConversationModalOpen) return;
       if (isEmbeddedMode()) return;
-        if (!insidePanel && !insideWin && !insideBubble && !insideTray && !insideDelete && !insideDeleteConv && !insideToast) {
-          if (panelIsVisible) closeUsersPanel();
-          if (winVisible) minimizeActiveConversation();
-          if (panelIsVisible) {
-            setChatState({
-              isChatOpen: false,
-              isMinimized: true,
-              activeConversationId: null,
-              activePeerUid: null
-            });
-          }
+      if (!insidePanel && !insideWin && !insideBubble && !insideTray && !insideDelete && !insideDeleteConv && !insideToast) {
+        if (panelIsVisible) closeUsersPanel({ origin: 'bubble' });
+        if (winVisible) minimizeActiveConversation();
+        if (panelIsVisible && !winVisible) {
+          setChatState({
+            isChatOpen: false,
+            isMinimized: true,
+            activeConversationId: null,
+            activePeerUid: null
+          });
         }
-      });
+      }
+    });
 
     if (deleteCancel) deleteCancel.addEventListener('click', (e) => { e.stopPropagation(); hideDeleteModal(); });
     if (deleteConfirm) deleteConfirm.addEventListener('click', (e) => { e.stopPropagation(); confirmDeleteMessage(); });
@@ -3385,15 +3989,18 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     getState: () => {
       const panel = document.getElementById('brisa-chat-panel');
       const win = document.getElementById('brisa-chat-window');
+      const trayHasVisiblePills = pillTray
+        ? Array.from(pillTray.children).some((child) => isSurfaceVisible(child))
+        : false;
       const panelVisible = isPanelVisible(panel);
-      const winVisible = win && win.style.display !== 'none';
-      const isChatOpen = !!(panelVisible && winVisible);
-      const isMinimized = !!(panelVisible && !winVisible);
+      const winVisible = isSurfaceVisible(win);
+      const isChatOpen = !!winVisible;
+      const isMinimized = !!(!winVisible && trayHasVisiblePills);
       return {
         isChatOpen,
         isMinimized,
-        activeConversationId: isChatOpen ? activeConversationId : null,
-        activePeerUid: isChatOpen ? (activePeer?.uid || null) : null,
+        activeConversationId: (isChatOpen || isMinimized || panelVisible) ? activeConversationId : null,
+        activePeerUid: (isChatOpen || isMinimized) ? (activePeer?.uid || null) : null,
         tabVisible: document.visibilityState === 'visible' && document.hasFocus()
       };
     }

@@ -4073,7 +4073,7 @@ body.dm-modal-open .brisa-chat-panel {
   }
 
   .brisa-chat-bubble {
-    transition: all 300ms ease;
+    transition: none;
   }
 
   .brisa-chat-bubble:active {
