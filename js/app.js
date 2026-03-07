@@ -1118,9 +1118,52 @@ function createGroupElement(group) {
     return groupCard;
 }
 
+function isHierarchicalMobileView() {
+    return window.matchMedia('(max-width: 640px)').matches;
+}
+
+function splitRegionSectors(sectors = []) {
+    const sectorsWithStaff = (Array.isArray(sectors) ? sectors : []).filter(
+        sector => Array.isArray(sector?.staff) && sector.staff.length > 0
+    );
+
+    const coordinationSectors = [];
+    const operationalSectors = [];
+
+    sectorsWithStaff.forEach(sector => {
+        const onlyCoordinators = sector.staff.every(person => person?.isCoordinator);
+        if (onlyCoordinators) {
+            coordinationSectors.push(sector);
+            return;
+        }
+        operationalSectors.push(sector);
+    });
+
+    return { coordinationSectors, operationalSectors };
+}
+
+function extractRegionalCoordinators(coordinationSectors = []) {
+    const seen = new Set();
+
+    return coordinationSectors
+        .flatMap(sector => sector.staff || [])
+        .filter(person => {
+            const key = `${person.name}|${person.role || ''}|${person.isCoordinator ? '1' : '0'}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+}
+
+function getRegionCoordinationTitle(regionName = '') {
+    return `Coordinadores ${regionName}`.toLocaleUpperCase('es-AR');
+}
+
 function createRegionElement(region) {
     const regionWrapper = document.createElement('div');
     regionWrapper.className = 'region-accordion';
+    const useHierarchicalMobile = isHierarchicalMobileView();
+    const { coordinationSectors, operationalSectors } = splitRegionSectors(region.sectors);
 
     regionWrapper.innerHTML = `
         <button class="region-btn">
@@ -1135,20 +1178,42 @@ function createRegionElement(region) {
 
         <div class="group-content"> <!-- Reusing group-content class for animation -->
             <div class="group-content-inner">
-                <div class="sectors-container">
+                <div class="region-structure">
+                    <div class="region-coordination-slot" id="region-coordination-${region.id}"></div>
+                    <div class="sectors-container">
                     <div class="sectors-list">
                         <div class="sectors-inner" id="sectors-list-${region.id}">
                             <!-- Sectors injected here -->
                         </div>
                     </div>
                 </div>
+                </div>
             </div>
         </div>
     `;
 
-    // Inject Sectors
+    const coordinationSlot = regionWrapper.querySelector(`#region-coordination-${region.id}`);
     const sectorsList = regionWrapper.querySelector(`#sectors-list-${region.id}`);
-    region.sectors.forEach(sector => {
+    const sectorsContainer = regionWrapper.querySelector('.sectors-container');
+
+    if (useHierarchicalMobile && coordinationSectors.length && coordinationSlot) {
+        const coordinationBlock = createRegionCoordinationBlock(region, coordinationSectors);
+        if (coordinationBlock) {
+            coordinationSlot.appendChild(coordinationBlock);
+            coordinationSlot.classList.add('has-content');
+        }
+    }
+
+    const sectorsToRender = useHierarchicalMobile ? operationalSectors : region.sectors;
+    const visibleSectors = (Array.isArray(sectorsToRender) ? sectorsToRender : []).filter(
+        sector => Array.isArray(sector?.staff) && sector.staff.length > 0
+    );
+
+    if (useHierarchicalMobile && !visibleSectors.length && sectorsContainer) {
+        sectorsContainer.classList.add('is-empty');
+    }
+
+    visibleSectors.forEach(sector => {
         sectorsList.appendChild(createSectorElement(sector));
     });
 
@@ -1170,8 +1235,89 @@ function createRegionElement(region) {
     return regionWrapper;
 }
 
+function createRegionCoordinationBlock(region, coordinationSectors = []) {
+    const coordinators = extractRegionalCoordinators(coordinationSectors);
+    if (!coordinators.length) return null;
+
+    const block = document.createElement('section');
+    block.className = 'region-coordination-block';
+    block.innerHTML = `
+        <div class="region-coordination-header">
+            <span class="region-coordination-title">${getRegionCoordinationTitle(region.name)}</span>
+        </div>
+        <div class="coordination-grid" data-count="${coordinators.length}">
+            <!-- Coordinators injected here -->
+        </div>
+    `;
+
+    const grid = block.querySelector('.coordination-grid');
+    coordinators.forEach(person => {
+        grid.appendChild(createCoordinationCard(person));
+    });
+
+    return block;
+}
+
+function createCoordinationCard(person) {
+    const card = document.createElement('article');
+    card.className = 'coordination-card';
+    card.innerHTML = `
+        <div class="coordination-card__icon">
+            ${StructureIcons.ClipboardCheck}
+        </div>
+        <div class="coordination-card__info">
+            <span class="coordination-card__name">${person.name}</span>
+            <span class="coordination-card__role">${person.role || 'Coordinador'}</span>
+        </div>
+    `;
+
+    return card;
+}
+
+function classifySectorLayout(staff = []) {
+    const staffCount = Array.isArray(staff) ? staff.length : 0;
+
+    if (staffCount !== 2) {
+        return {
+            layout: 'stack',
+            pairKind: 'none',
+            staffCount
+        };
+    }
+
+    const coordinatorCount = staff.filter(person => person?.isCoordinator).length;
+
+    if (coordinatorCount === 2) {
+        return {
+            layout: 'peer-pair',
+            pairKind: 'coordinator',
+            staffCount
+        };
+    }
+
+    if (coordinatorCount === 0) {
+        return {
+            layout: 'peer-pair',
+            pairKind: 'staff',
+            staffCount
+        };
+    }
+
+    return {
+        layout: 'stack',
+        pairKind: 'mixed',
+        staffCount
+    };
+}
+
 function createSectorElement(sector) {
     if (!sector.staff || sector.staff.length === 0) return document.createElement('div');
+
+    const { layout, pairKind, staffCount } = classifySectorLayout(sector.staff);
+
+    if (isHierarchicalMobileView()) {
+        return createMobileSectorElement(sector, { layout, pairKind, staffCount });
+    }
 
     const sectorDiv = document.createElement('div');
     sectorDiv.className = 'sector-item';
@@ -1181,9 +1327,46 @@ function createSectorElement(sector) {
             ${StructureIcons.MapPin}
             ${sector.name}
         </h4>
-        <div class="staff-grid" id="staff-grid-${sector.name.replace(/\s+/g, '-')}">
+        <div
+            class="staff-grid"
+            id="staff-grid-${sector.name.replace(/\s+/g, '-')}"
+            data-layout="${layout}"
+            data-pair-kind="${pairKind}"
+            data-staff-count="${staffCount}"
+        >
             <!-- Staff injected here -->
         </div>
+    `;
+
+    const staffGrid = sectorDiv.querySelector('.staff-grid');
+    sector.staff.forEach(person => {
+        staffGrid.appendChild(createStaffBadge(person));
+    });
+
+    return sectorDiv;
+}
+
+function createMobileSectorElement(sector, { layout, pairKind, staffCount }) {
+    const sectorDiv = document.createElement('div');
+    sectorDiv.className = 'sector-item sector-item--card';
+
+    sectorDiv.innerHTML = `
+        <article class="sector-card">
+            <div class="sector-card__header">
+                <h4 class="sector-card__title">${sector.name}</h4>
+            </div>
+            <div class="sector-card__body">
+                <div
+                    class="staff-grid"
+                    id="staff-grid-${sector.name.replace(/\s+/g, '-')}"
+                    data-layout="${layout}"
+                    data-pair-kind="${pairKind}"
+                    data-staff-count="${staffCount}"
+                >
+                    <!-- Staff injected here -->
+                </div>
+            </div>
+        </article>
     `;
 
     const staffGrid = sectorDiv.querySelector('.staff-grid');
