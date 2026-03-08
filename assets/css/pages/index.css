@@ -846,6 +846,7 @@ html {
   box-shadow: 0 4px 10px rgba(15, 23, 42, 0.05);
   opacity: 0.25;
   transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+  -webkit-backdrop-filter: blur(2px);
   backdrop-filter: blur(2px);
 }
 
@@ -1742,6 +1743,7 @@ html {
     border: 1px solid #e5e7eb;
     border-radius: 16px;
     background: rgba(255, 255, 255, 0.96);
+    -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
     box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
     opacity: 1;
@@ -4107,8 +4109,8 @@ body.dm-modal-open .brisa-chat-panel {
     0 18px 40px rgba(15, 23, 42, 0.12),
     0 2px 0 rgba(255, 255, 255, 0.55) inset;
 
-  backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 
 .visitas-label,

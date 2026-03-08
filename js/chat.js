@@ -287,8 +287,8 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         flex-direction: column;
         max-height: min(420px, var(--brisa-panel-max-height, 420px));
         background: rgba(255, 255, 255, 0.94);
-        backdrop-filter: blur(18px);
         -webkit-backdrop-filter: blur(18px);
+        backdrop-filter: blur(18px);
         border-radius: 18px;
         border: 1px solid rgba(255, 255, 255, 0.65);
         box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
@@ -316,8 +316,8 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         width: 320px;
         max-height: 420px;
         background: linear-gradient(160deg, rgba(255, 255, 255, 0.98), rgba(247, 249, 252, 0.95));
-        backdrop-filter: blur(18px);
         -webkit-backdrop-filter: blur(18px);
+        backdrop-filter: blur(18px);
         border-radius: 18px;
         border: 1px solid rgba(15, 23, 42, 0.05);
         box-shadow: 0 14px 38px rgba(15, 23, 42, 0.16);
@@ -346,8 +346,8 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         padding: 0 12px;
         border-radius: 999px;
         background: rgba(255, 255, 255, 0.9);
-        backdrop-filter: blur(14px);
         -webkit-backdrop-filter: blur(14px);
+        backdrop-filter: blur(14px);
         border: 1px solid rgba(209, 213, 219, 0.85);
         box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
         display: none;
@@ -1628,6 +1628,51 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     }
   }
 
+  function moveFocusOutsideMobileChat(preferredTargets = []) {
+    const root = getChatRoot();
+    const viewport = document.getElementById('brisa-chat-mobile-viewport');
+    const active = document.activeElement;
+    const isFocusInsideMobileChat =
+      !!active &&
+      active !== document.body &&
+      ((viewport && viewport.contains(active)) || (root && root.contains(active)));
+
+    if (!isFocusInsideMobileChat) return true;
+
+    const activeNavItem = document.querySelector(
+      '.dm-bottom-nav__item[aria-current="page"], .dm-bottom-nav__item.is-active'
+    );
+    const bubble = document.getElementById('brisa-chat-bubble');
+    const fab = document.getElementById('brisa-chat-fab');
+    const targets = [...preferredTargets, activeNavItem, bubble, fab].filter(Boolean);
+    const uniqueTargets = targets.filter((target, index) => targets.indexOf(target) === index);
+
+    uniqueTargets.forEach((target) => {
+      if (
+        target &&
+        (target === bubble || target === fab) &&
+        !target.hasAttribute('tabindex')
+      ) {
+        target.setAttribute('tabindex', '-1');
+      }
+    });
+
+    for (const target of uniqueTargets) {
+      if (!focusElementSafely(target)) continue;
+      const focusedNow = document.activeElement;
+      if (!focusedNow) continue;
+      if (!viewport || !viewport.contains(focusedNow)) {
+        return true;
+      }
+    }
+
+    if (active && typeof active.blur === 'function') {
+      active.blur();
+    }
+
+    return !viewport || !viewport.contains(document.activeElement);
+  }
+
   function restoreFocusAfterDetailClose() {
     const searchInput = document.getElementById('brisa-chat-user-search');
     const panelClose = document.getElementById('brisa-chat-panel-close');
@@ -1994,7 +2039,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     root.style.pointerEvents = 'auto';
     if (overlay) overlay.setAttribute('aria-hidden', 'false');
     if (viewport) viewport.setAttribute('aria-hidden', 'false');
-    if ('inert' in viewport) viewport.inert = false;
+    if (viewport && 'inert' in viewport) viewport.inert = false;
     setDocumentScrollLocked(true);
     setSurfaceImmediate(panel, 'panel', true, 'bubble');
     if (detail) {
@@ -2009,10 +2054,17 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     if (!isCompactMobileChat()) return false;
     const root = getChatRoot();
     const win = document.getElementById('brisa-chat-window');
+    const searchInput = document.getElementById('brisa-chat-user-search');
+    const panelClose = document.getElementById('brisa-chat-panel-close');
     if (!root || !win) return false;
+    moveFocusOutsideMobileChat([searchInput, panelClose]);
     restoreFocusAfterDetailClose();
     root.classList.remove('brisa-chat-root--mobile-detail');
     setSurfaceImmediate(win, 'window', false, 'panel');
+    requestAnimationFrame(() => {
+      moveFocusOutsideMobileChat([searchInput, panelClose]);
+      restoreFocusAfterDetailClose();
+    });
     setChatState({
       isChatOpen: false,
       isMinimized: false,
@@ -2031,6 +2083,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     const win = document.getElementById('brisa-chat-window');
     if (!root || !panel || !win) return false;
 
+    moveFocusOutsideMobileChat();
     restoreFocusAfterHubClose();
     root.classList.remove('brisa-chat-root--mobile-detail', 'brisa-chat-root--mobile-open');
     root.style.pointerEvents = '';
@@ -2042,6 +2095,10 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     setDocumentScrollLocked(false);
     activeConversationId = null;
     activePeer = null;
+    requestAnimationFrame(() => {
+      moveFocusOutsideMobileChat();
+      restoreFocusAfterHubClose();
+    });
     setChatState({
       isChatOpen: false,
       isMinimized: false,
@@ -4062,26 +4119,34 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       bubble.addEventListener('pointercancel', finalizeDrag);
     }
 
+    const toggleMobileHubFromFab = (event) => {
+      if (!(isCompactMobileChat() && !isEmbeddedMode())) return false;
+      if (event?.target && (panel?.contains(event.target) || win?.contains(event.target))) return false;
+      if (suppressClick) {
+        suppressClick = false;
+        return true;
+      }
+      if (isMobileHubOpen()) {
+        closeMobileHub();
+      } else {
+        resetPanelSearchState();
+        updateAssistantQuickRow();
+        openMobileHub({ detail: false });
+        setChatState({
+          isChatOpen: false,
+          isMinimized: false,
+          activeConversationId,
+          activePeerUid: activePeer?.uid || null
+        });
+      }
+      return true;
+    };
+
     if (bubble && panel) {
-      bubble.addEventListener('click', () => {
+      bubble.addEventListener('click', (event) => {
+        if (toggleMobileHubFromFab(event)) return;
         if (suppressClick) {
           suppressClick = false;
-          return;
-        }
-        if (isCompactMobileChat() && !isEmbeddedMode()) {
-          if (isMobileHubOpen()) {
-            closeMobileHub();
-          } else {
-            resetPanelSearchState();
-            updateAssistantQuickRow();
-            openMobileHub({ detail: false });
-            setChatState({
-              isChatOpen: false,
-              isMinimized: false,
-              activeConversationId,
-              activePeerUid: activePeer?.uid || null
-            });
-          }
           return;
         }
         const visible = isPanelVisible(panel);
@@ -4102,6 +4167,12 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
             activePeerUid: null
           });
         }
+      });
+    }
+    if (fab) {
+      fab.addEventListener('click', (event) => {
+        if (bubble && event?.target && bubble.contains(event.target)) return;
+        toggleMobileHubFromFab(event);
       });
     }
     if (panelClose && panel) {

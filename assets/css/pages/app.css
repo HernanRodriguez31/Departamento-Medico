@@ -21,6 +21,7 @@ html {
 }
 
 .disable-hover .header {
+  -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
 
@@ -686,6 +687,7 @@ html {
   box-shadow: 0 4px 10px rgba(15, 23, 42, 0.05);
   opacity: 0.25;
   transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+  -webkit-backdrop-filter: blur(2px);
   backdrop-filter: blur(2px);
 }
 
@@ -1564,6 +1566,7 @@ html {
     border: 1px solid #e5e7eb;
     border-radius: 16px;
     background: rgba(255, 255, 255, 0.96);
+    -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
     box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
     opacity: 1;
@@ -2836,8 +2839,8 @@ html {
   border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 999px;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
-  backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
 }
 
 .calendar-toggle {
@@ -3057,8 +3060,8 @@ body.dm-modal-open .brisa-chat-panel {
   width: 18rem;
   max-height: 420px;
   background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
   z-index: 40;
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.65);
@@ -3209,8 +3212,8 @@ body.dm-modal-open .brisa-chat-panel {
   width: 320px;
   max-height: 420px;
   background: linear-gradient(160deg, rgba(255, 255, 255, 0.98), rgba(247, 249, 252, 0.95));
-  backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
   border-radius: 18px;
   border: 1px solid rgba(15, 23, 42, 0.05);
   box-shadow: 0 14px 38px rgba(15, 23, 42, 0.16);
@@ -3462,8 +3465,8 @@ body.dm-modal-open .brisa-chat-panel {
   padding: 0 12px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
   border: 1px solid rgba(209, 213, 219, 0.85);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
   display: none;

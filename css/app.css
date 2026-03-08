@@ -61,8 +61,8 @@ body {
 /* GLASS PANEL UTILITY (Deep Liquid Style) */
 .glass-panel {
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.6));
-    backdrop-filter: blur(40px) saturate(200%);
     -webkit-backdrop-filter: blur(40px) saturate(200%);
+    backdrop-filter: blur(40px) saturate(200%);
     border: 1px solid rgba(255, 255, 255, 0.9);
     border-bottom: 1px solid rgba(255, 255, 255, 0.4);
     border-right: 1px solid rgba(255, 255, 255, 0.4);
@@ -457,6 +457,7 @@ img {
     /* Initial transparent/white */
     transition: all 0.4s ease;
     /* Smooth transition for height/padding */
+    -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
 }
 
@@ -679,8 +680,8 @@ img {
     border: 1px solid rgba(15, 23, 42, 0.08);
     border-radius: 999px;
     box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
-    backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
 }
 
 .nav__link {
@@ -848,8 +849,8 @@ img {
 .service__card {
     /* Glass effect applied via class or here */
     background: rgba(255, 255, 255, 0.65);
-    backdrop-filter: blur(25px) saturate(180%);
     -webkit-backdrop-filter: blur(25px) saturate(180%);
+    backdrop-filter: blur(25px) saturate(180%);
     border: 1px solid rgba(255, 255, 255, 0.5);
     box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
     border-radius: 24px;
@@ -1472,9 +1473,9 @@ img {
     height: 100%;
     /* Rich blue gradient overlay for a premium look */
     background: linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(30, 58, 138, 0.8) 100%);
+    -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
     /* Increased blur for better focus on modal */
-    -webkit-backdrop-filter: blur(8px);
     z-index: 1;
 }
 
@@ -1827,6 +1828,7 @@ img {
     padding: 0 !important;
     box-shadow: none;
     border: none;
+    -webkit-backdrop-filter: none;
     backdrop-filter: none;
 }
 
@@ -2146,8 +2148,8 @@ img {
         box-shadow: 0 -1px 4px rgba(0, 0, 0, 0.15);
         border-radius: 1.5rem 1.5rem 0 0;
         transition: .3s;
-        backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
+        backdrop-filter: blur(12px);
     }
 
     /* Show menu */
@@ -2164,6 +2166,7 @@ img {
         box-shadow: none;
         padding: 0;
         border-radius: 0;
+        -webkit-backdrop-filter: none;
         backdrop-filter: none;
     }
 
@@ -2534,6 +2537,7 @@ img {
     margin-top: 0.75rem;
     width: 16rem;
     background-color: rgba(17, 24, 39, 0.95);
+    -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
     color: #ffffff;
     font-size: 11px;
@@ -3117,6 +3121,7 @@ img {
     margin-bottom: 0.75rem;
     width: 16rem;
     background-color: rgba(17, 24, 39, 0.95);
+    -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
     color: #ffffff;
     font-size: 11px;
@@ -3677,6 +3682,7 @@ img {
     width: 100%;
     height: 100%;
     background: rgba(255, 255, 255, 0.9);
+    -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
     z-index: 9999;
     display: flex;
@@ -3957,8 +3963,8 @@ img {
     padding-bottom: calc(env(safe-area-inset-bottom) + 6px);
     background: rgba(255, 255, 255, 0.9);
     border-top: 1px solid rgba(0, 0, 0, 0.06);
-    backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
     display: none;
     align-items: center;
     justify-content: space-around;
@@ -4181,7 +4187,6 @@ img {
         bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
         overflow-y: auto;
         overflow-x: hidden;
-        -webkit-overflow-scrolling: touch;
         overscroll-behavior-y: contain;
         touch-action: pan-y;
         padding-bottom: 16px;
@@ -4236,7 +4241,6 @@ img {
         display: flex;
         flex-direction: column;
         overflow: auto;
-        -webkit-overflow-scrolling: touch;
         overscroll-behavior: contain;
     }
 
@@ -4360,8 +4364,8 @@ img {
     body[data-view="estructura"] .header,
     body[data-view="estructura"] .scroll-header {
         background: rgba(255, 255, 255, 0.82);
-        backdrop-filter: blur(18px) saturate(180%);
         -webkit-backdrop-filter: blur(18px) saturate(180%);
+        backdrop-filter: blur(18px) saturate(180%);
         box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
         border-bottom: 1px solid rgba(255, 255, 255, 0.72);
         z-index: 120;
@@ -4369,7 +4373,7 @@ img {
 
     body[data-view="estructura"] .header__container,
     body[data-view="estructura"] .scroll-header .header__container {
-        backdrop-filter: none;
         -webkit-backdrop-filter: none;
+        backdrop-filter: none;
     }
 }
