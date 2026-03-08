@@ -316,6 +316,14 @@
             const textareaRef = useRef(null);
             const aiEndpointRef = useRef(null);
             const aiLoggedRef = useRef(false);
+            const embeddedSwipeRef = useRef({
+                pointerId: null,
+                startX: 0,
+                startY: 0,
+                lastX: 0,
+                lastTime: 0,
+                axis: null,
+            });
 
             useEffect(() => {
                 const loader = document.getElementById('app-loader');
@@ -709,9 +717,93 @@
                 return () => window.removeEventListener('message', handleExternalModel);
             }, [isChatOpen]);
 
+            useEffect(() => {
+                if (!isEmbedMode) return undefined;
+
+                const state = embeddedSwipeRef.current;
+                const isEditableTarget = (target) => {
+                    if (!target || typeof target.closest !== 'function') return false;
+                    return Boolean(
+                        target.closest(
+                            'input, textarea, select, button, [contenteditable="true"], [contenteditable=""], [role="textbox"], [data-no-ai-swipe]'
+                        )
+                    );
+                };
+                const resetSwipeState = () => {
+                    state.pointerId = null;
+                    state.startX = 0;
+                    state.startY = 0;
+                    state.lastX = 0;
+                    state.lastTime = 0;
+                    state.axis = null;
+                };
+                const commitSwipe = (direction) => {
+                    try {
+                        window.parent?.postMessage(
+                            { type: 'dm-ai-swipe-intent', direction },
+                            window.location.origin
+                        );
+                    } catch (error) {
+                        // no-op
+                    }
+                };
+                const handlePointerDown = (event) => {
+                    if (!event.isPrimary || isEditableTarget(event.target)) return;
+                    state.pointerId = event.pointerId;
+                    state.startX = event.clientX;
+                    state.startY = event.clientY;
+                    state.lastX = event.clientX;
+                    state.lastTime = event.timeStamp || performance.now();
+                    state.axis = null;
+                };
+                const handlePointerMove = (event) => {
+                    if (event.pointerId !== state.pointerId) return;
+                    const dx = event.clientX - state.startX;
+                    const dy = event.clientY - state.startY;
+                    if (!state.axis) {
+                        if (Math.max(Math.abs(dx), Math.abs(dy)) < 7) return;
+                        state.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+                    }
+                    state.lastX = event.clientX;
+                    state.lastTime = event.timeStamp || performance.now();
+                };
+                const finalizePointer = (event) => {
+                    if (event.pointerId !== state.pointerId) return;
+                    const dx = event.clientX - state.startX;
+                    const dy = event.clientY - state.startY;
+                    const elapsed = Math.max((event.timeStamp || performance.now()) - state.lastTime, 1);
+                    const velocityX = Math.abs(event.clientX - state.lastX) / elapsed;
+                    const commitDistance = Math.min(56, window.innerWidth * 0.13);
+                    const shouldCommit = state.axis === 'x'
+                        && Math.abs(dx) > Math.abs(dy)
+                        && (
+                            Math.abs(dx) >= commitDistance
+                            || velocityX >= 0.26
+                        );
+                    if (shouldCommit) {
+                        commitSwipe(dx > 0 ? 'prev' : 'next');
+                    }
+                    resetSwipeState();
+                };
+                const cancelPointer = () => resetSwipeState();
+
+                document.addEventListener('pointerdown', handlePointerDown, { passive: true });
+                document.addEventListener('pointermove', handlePointerMove, { passive: true });
+                document.addEventListener('pointerup', finalizePointer, { passive: true });
+                document.addEventListener('pointercancel', cancelPointer, { passive: true });
+
+                return () => {
+                    document.removeEventListener('pointerdown', handlePointerDown);
+                    document.removeEventListener('pointermove', handlePointerMove);
+                    document.removeEventListener('pointerup', finalizePointer);
+                    document.removeEventListener('pointercancel', cancelPointer);
+                    resetSwipeState();
+                };
+            }, [isEmbedMode]);
+
             const botImageSrc = "./boti-brisa.jpg";
             const getGreetingText = (modelKey) => (
-                `Hola. Soy Boti Brisa. Estoy operando con el modelo ${models[modelKey].name}. ¿Cómo puedo asistirte hoy?`
+                `Hola. Soy Boti Brisa. ¿Cómo puedo asistirte hoy?`
             );
 
             const renderBotAvatar = (className) => {
@@ -931,16 +1023,18 @@
                 {/* --- 1. VENTANA DE CHAT --- */}
                 {isChatOpen && (
                     <div
-                        className={`pointer-events-auto overflow-hidden bg-white/95 border border-gray-200 shadow-2xl ${themeClasses.shellGlow} rounded-2xl backdrop-blur-sm flex flex-col transition-all duration-300 origin-bottom ${panelSpacingClass} ${panelClass} dm-chat-frame`}
+                        className={`pointer-events-auto overflow-hidden backdrop-blur-sm flex flex-col transition-all duration-300 origin-bottom ${panelSpacingClass} ${panelClass} dm-chat-frame ${isEmbedMode ? 'bg-transparent border-0 shadow-none rounded-[20px]' : `bg-white/95 border border-gray-200 shadow-2xl ${themeClasses.shellGlow} rounded-2xl`}`}
                     >
                     {/* Header */}
+                    {!isEmbedMode && (
                     <div className={`flex items-center justify-between px-4 py-4 ${themeClasses.header} backdrop-blur-md border-b border-white/20`}>
                         <div className="flex items-center gap-3">
                             {renderBotAvatar("w-8 h-8 rounded-full")}
-                            <span className="text-white font-bold tracking-tight">Boti Brisa - Asistente IA</span>
+                            <span className="text-white font-bold tracking-tight">Boti Brisa</span>
                         </div>
                         <button
                             onClick={requestClosePanel}
+                            data-no-ai-swipe="true"
                             className="p-2 rounded-full text-white hover:bg-white/15 active:bg-white/20 transition"
                             title="Cerrar"
                             aria-label="Cerrar"
@@ -948,9 +1042,10 @@
                             <X size={18} />
                         </button>
                     </div>
+                    )}
 
                     {/* Sub-header */}
-                    <div className="bg-white/70 backdrop-blur-md border-b border-white/60 px-4 py-3 flex items-center justify-between gap-3">
+                    <div className={`bg-white/70 backdrop-blur-md border-b border-white/60 flex items-center justify-between gap-3 ${isEmbedMode ? 'px-4 py-3' : 'px-4 py-3'}`}>
                         <div className="bg-white/90 border border-white/60 shadow-sm rounded-full px-3 py-2 flex items-center gap-2">
                             <span className="w-5 h-5 flex items-center justify-center">
                                 {activeModelMeta?.icon}
@@ -958,13 +1053,14 @@
                             <span className="text-sm font-medium text-slate-800">{modelName}</span>
                         </div>
                         <div className="flex items-center gap-3">
-                            <span className="text-xs text-slate-500">Change Model</span>
+                            <span className="text-xs text-slate-500">{isEmbedMode ? 'Modelo' : 'Cambiar modelo'}</span>
                             <button
                                 type="button"
                                 role="switch"
                                 aria-checked={isGemini}
-                                aria-label="Change model"
+                                aria-label="Cambiar modelo"
                                 onClick={toggleModel}
+                                data-no-ai-swipe="true"
                                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition shadow-inner ${themeClasses.toggle}`}
                             >
                                 <span
@@ -1034,7 +1130,7 @@
                             </div>
                         )}
 
-                        <div className={`flex items-center gap-2 min-h-[54px] bg-white border border-gray-200 rounded-full px-3 py-2 shadow-sm transition-all focus-within:ring-2 -translate-y-2 ${themeClasses.inputRing}`}>
+                        <div data-no-ai-swipe="true" className={`flex items-center gap-2 min-h-[54px] bg-white border border-gray-200 rounded-full px-3 py-2 shadow-sm transition-all focus-within:ring-2 -translate-y-2 ${themeClasses.inputRing}`}>
                             
                             {/* Input de archivo oculto + Bot�n Clip */}
                             <input 
@@ -1046,6 +1142,7 @@
                             />
                             <button 
                                 onClick={() => fileInputRef.current?.click()}
+                                data-no-ai-swipe="true"
                                 className={`p-2 rounded-xl transition-all duration-200 mb-0.5 ${selectedFile ? 'text-blue-600 bg-blue-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50'}`}
                                 title="Adjuntar imagen cl�nica"
                             >
@@ -1054,6 +1151,7 @@
                             {/* NUEVO: Boton Microfono */}
                             <button 
                                 onClick={toggleListening}
+                                data-no-ai-swipe="true"
                                 className={`p-2 rounded-xl transition-all duration-200 mb-0.5 ${isListening ? 'bg-red-500 text-white animate-pulse shadow-md' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50'}`}
                                 title="Dictar por voz"
                             >
@@ -1067,6 +1165,7 @@
                                 onChange={(e) => setInputText(e.target.value)} 
                                 onKeyDown={handleKeyPress} 
                                 placeholder={selectedFile ? "A�ade un comentario a la imagen..." : "Escriba su consulta..."} 
+                                data-no-ai-swipe="true"
                                 className="w-full flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-sm leading-5 resize-none py-2.5 min-h-[44px] text-slate-700 max-h-32 placeholder:text-slate-400" 
                                 rows={1} 
                                 style={{ height: '44px' }} 
@@ -1076,6 +1175,7 @@
                             <button 
                                 onClick={handleSend} 
                                 disabled={(!inputText.trim() && !selectedFile) || isTyping} 
+                                data-no-ai-swipe="true"
                                 className={`p-2.5 rounded-xl mb-0.5 transition-all duration-300 shadow-sm ${(!inputText.trim() && !selectedFile) ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' : `text-white ${themeClasses.send} hover:brightness-95 active:brightness-90 hover:shadow-md active:scale-95`}`}
                             >
                                 <Send size={18} />

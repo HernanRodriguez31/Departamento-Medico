@@ -135,9 +135,10 @@ document.addEventListener('DOMContentLoaded', () => {
         investigacion: 'ia',
         'galeria-operativa': 'muro'
     }
-    const VIEW_NODE_SELECTORS = {
+    const MOBILE_VIEW_ROOTS = {
         muro: ['#carrete'],
         estructura: ['#estructura-hero', '#estructura-funcional'],
+        ia: [],
         comites: ['#comites'],
         foro: ['#foro']
     }
@@ -264,7 +265,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return entry ? normalizeViewId(entry.viewId) : 'muro'
     }
     const getViewNodes = (viewId) => {
-        const selectors = VIEW_NODE_SELECTORS[normalizeViewId(viewId)] || []
+        const selectors = MOBILE_VIEW_ROOTS[normalizeViewId(viewId)] || []
         return selectors
             .map((selector) => document.querySelector(selector))
             .filter(Boolean)
@@ -293,14 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const normalized = normalizeViewId(viewId)
         if (isPagerMode()) {
             if (normalized === 'ia') return null
-            if (normalized === 'muro') {
-                const pageScroller = pagerState.scrollersByView.get('muro') || null
-                const viewport = pagerState.realPagesByView.get('muro')
-                    ?.querySelector?.('#carrete .dm-carousel-viewport')
-                const section = pagerState.realPagesByView.get('muro')?.querySelector?.('#carrete')
-                if (section?.classList.contains('is-feed-mode') && viewport) return viewport
-                return pageScroller
-            }
+            if (normalized === 'muro') return pagerState.scrollersByView.get('muro') || null
             if (normalized === 'foro') {
                 return pagerState.realPagesByView.get('foro')
                     ?.querySelector?.('#forum-messages-general')
@@ -564,6 +558,19 @@ document.addEventListener('DOMContentLoaded', () => {
         syncMobilePagerMode()
     }
 
+    const handleAssistantShellSwipe = (event) => {
+        if (!isPagerMode() || getCurrentViewId() !== 'ia') return
+        const direction = event.detail?.direction === 'prev' ? 'prev' : 'next'
+        const targetViewId = direction === 'prev'
+            ? getPrevViewId('ia')
+            : getNextViewId('ia')
+        navigateToView(targetViewId, {
+            source: 'assistant-shell-swipe',
+            historyMode: 'push',
+            direction: direction === 'prev' ? -1 : 1
+        })
+    }
+
     const handleBottomNavClick = (event) => {
         const routeEl = event.target.closest('[data-route]')
         if (!routeEl || !bottomNav?.contains(routeEl)) return
@@ -610,6 +617,7 @@ document.addEventListener('DOMContentLoaded', () => {
     })
     window.addEventListener('dm:assistant-shell-state', handleAssistantShellState)
     window.addEventListener('dm:assistant-shell-ready', handleAssistantShellReady)
+    window.addEventListener('dm:assistant-shell-swipe', handleAssistantShellSwipe)
 
     window.__dmMobileShell = {
         navigateToView,
@@ -617,9 +625,6 @@ document.addEventListener('DOMContentLoaded', () => {
         getNextViewId,
         getPrevViewId
     }
-
-    syncViewFromLocation({ source: 'init', allowCanonicalReplace: true, forceEmit: true })
-    syncMobilePagerMode()
 
     function clearPagerSettleTimer() {
         if (pagerState.pendingSettleTimer) {
@@ -1352,6 +1357,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         mo.observe(carreteSection, { attributes: true, attributeFilter: ['class'] });
     }
+
+    syncViewFromLocation({ source: 'init', allowCanonicalReplace: true, forceEmit: true })
+    syncMobilePagerMode()
     /*==================== DASHBOARD LOGIC ====================*/
     // State
     const PHASES = [

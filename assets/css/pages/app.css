@@ -1552,7 +1552,7 @@ html {
     justify-content: center;
   }
 
-  .dm-muro-composer {
+  body[data-view="carrete"] .dm-muro-composer {
     display: block;
     position: fixed;
     top: calc(var(--app-header-h, 80px) + env(safe-area-inset-top));
@@ -1572,6 +1572,10 @@ html {
     opacity: 1;
     transition: transform 0.3s ease, opacity 0.24s ease;
     will-change: transform, opacity;
+  }
+
+  body[data-view]:not([data-view="carrete"]) .dm-muro-composer {
+    display: none !important;
   }
 
   .dm-muro-composer.is-hidden {
@@ -1599,8 +1603,7 @@ html {
     - By making the feed viewport the scroll container (Facebook-style), scrolling
       stays reliable even if window scroll is not available.
   */
-  body[data-view="carrete"] #carrete.dm-carousel-section.is-feed-mode,
-  body.dm-mobile-pager-mode .dm-mobile-page[data-view="muro"] #carrete.dm-carousel-section.is-feed-mode {
+  body[data-view="carrete"]:not(.dm-mobile-pager-mode) #carrete.dm-carousel-section.is-feed-mode {
     /*
       En el modo app, el contenedor principal (main) ya está dimensionado
       entre header y bottom nav. Usamos 100% para no exceder el alto útil
@@ -1608,6 +1611,14 @@ html {
     */
     height: 100%;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  body.dm-mobile-pager-mode .dm-mobile-page[data-view="muro"] #carrete.dm-carousel-section.is-feed-mode {
+    min-height: 100%;
+    height: auto;
+    overflow: visible;
     display: flex;
     flex-direction: column;
   }
@@ -1649,13 +1660,41 @@ html {
     min-height: 0;
   }
 
-  body[data-view="carrete"] #carrete .dm-carousel-viewport,
-  body.dm-mobile-pager-mode .dm-mobile-page[data-view="muro"] #carrete .dm-carousel-viewport {
+  body[data-view="carrete"]:not(.dm-mobile-pager-mode) #carrete .dm-carousel-viewport {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-y: contain;
+  }
+
+  body.dm-mobile-pager-mode .dm-mobile-page[data-view="muro"] #carrete .dm-carousel-stage,
+  body.dm-mobile-pager-mode .dm-mobile-page[data-view="muro"] #carrete .dm-carousel-left,
+  body.dm-mobile-pager-mode .dm-mobile-page[data-view="muro"] #carrete .dm-carousel-viewport {
+    height: auto;
+    min-height: 0;
+  }
+
+  body.dm-mobile-pager-mode .dm-mobile-page[data-view="muro"] #carrete .dm-carousel-viewport {
+    flex: none;
+    overflow: visible !important;
+    max-height: none;
+    touch-action: auto;
+    overscroll-behavior: auto;
+  }
+
+  body.dm-mobile-pager-mode .dm-mobile-page[data-view="comites"] #comites .comite__card-header {
+    min-height: 0;
+    padding: 16px 16px 10px !important;
+  }
+
+  body.dm-mobile-pager-mode .dm-mobile-page[data-view="comites"] #comites .comite__desc {
+    max-width: 100%;
+  }
+
+  body.dm-mobile-pager-mode .dm-mobile-page[data-view="comites"] #comites .committee-stats {
+    margin: 8px 0 12px !important;
+    width: 100%;
   }
 
   .dm-carousel-header {
@@ -4243,7 +4282,6 @@ body.dm-scroll-locked {
   background: rgba(15, 23, 42, 0.55);
   opacity: 0;
   transition: opacity 0.2s ease;
-  touch-action: pan-y;
 }
 
 .dm-ai-shell.is-open .dm-ai-backdrop {
@@ -4292,10 +4330,14 @@ body.dm-scroll-locked {
   bottom: auto;
   height: 100%;
   flex: 1 1 auto;
-  border-radius: 0;
-  box-shadow: none;
+  border-radius: 24px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 22px 48px rgba(15, 23, 42, 0.12);
   transform: none;
   transition: none;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.98)),
+    linear-gradient(135deg, rgba(122, 184, 0, 0.06), rgba(37, 99, 235, 0.05));
 }
 
 .dm-ai-shell.dm-ai-shell--embedded .dm-ai-body {
@@ -4313,7 +4355,6 @@ body.dm-scroll-locked {
   padding: 10px 16px 12px;
   border-bottom: 1px solid #e2e8f0;
   background: #ffffff;
-  touch-action: pan-y;
 }
 
 .dm-ai-shell .dm-ai-handle {
@@ -4335,8 +4376,24 @@ body.dm-scroll-locked {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  font-weight: 700;
   color: #0f172a;
+}
+
+.dm-ai-shell .dm-ai-title__copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dm-ai-shell .dm-ai-title__label {
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.dm-ai-shell .dm-ai-title__meta {
+  font-size: 0.73rem;
+  font-weight: 600;
+  color: #64748b;
 }
 
 .dm-ai-shell .dm-ai-title__icon {
@@ -4344,7 +4401,29 @@ body.dm-scroll-locked {
   height: 28px;
   border-radius: 999px;
   object-fit: cover;
-  border: 1px solid rgba(122, 184, 0, 0.4);
+  border: 1px solid rgba(122, 184, 0, 0.35);
+}
+
+.dm-ai-shell .dm-ai-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dm-ai-shell .dm-ai-model-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(122, 184, 0, 0.22);
+  background: rgba(248, 250, 252, 0.9);
+  color: #0f172a;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
 }
 
 .dm-ai-shell .dm-ai-close {
@@ -4362,6 +4441,42 @@ body.dm-scroll-locked {
 .dm-ai-shell .dm-ai-body {
   flex: 1 1 auto;
   overflow: hidden;
+}
+
+.dm-ai-shell[data-active-model="gemini"] {
+  --dm-ai-accent: #2563eb;
+  --dm-ai-accent-soft: rgba(37, 99, 235, 0.18);
+}
+
+.dm-ai-shell[data-active-model="gpt"] {
+  --dm-ai-accent: #109d7b;
+  --dm-ai-accent-soft: rgba(16, 157, 123, 0.18);
+}
+
+.dm-ai-shell[data-active-model] .dm-ai-title__icon,
+.dm-ai-shell[data-active-model] .dm-ai-model-chip {
+  border-color: var(--dm-ai-accent-soft);
+}
+
+.dm-ai-shell[data-active-model] .dm-ai-model-chip {
+  color: var(--dm-ai-accent);
+  background: color-mix(in srgb, var(--dm-ai-accent) 8%, white);
+}
+
+.dm-ai-shell.dm-ai-shell--embedded[data-active-model] .dm-ai-panel {
+  border-color: var(--dm-ai-accent-soft);
+  box-shadow:
+    0 22px 48px rgba(15, 23, 42, 0.12),
+    0 0 0 1px color-mix(in srgb, var(--dm-ai-accent) 14%, transparent);
+}
+
+.dm-ai-shell.dm-ai-shell--embedded[data-active-model] .dm-ai-header {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--dm-ai-accent) 7%, white), rgba(255,255,255,0.98));
+}
+
+.dm-ai-shell.dm-ai-shell--embedded .dm-ai-header {
+  padding: 12px 16px 10px;
 }
 
 .dm-ai-shell .dm-ai-iframe {

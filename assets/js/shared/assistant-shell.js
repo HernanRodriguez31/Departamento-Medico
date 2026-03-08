@@ -51,9 +51,15 @@ const buildShellMarkup = () => `
       <div class="dm-ai-header-row">
         <div class="dm-ai-title">
           <img class="dm-ai-title__icon" src="${ASSISTANT_ICON_SRC}" alt="" aria-hidden="true" />
-          <span>Asistente IA</span>
+          <span class="dm-ai-title__copy">
+            <span class="dm-ai-title__label">Boti Brisa</span>
+            <span class="dm-ai-title__meta">IA del servicio</span>
+          </span>
         </div>
-        <button class="dm-ai-close" type="button" data-dm-ai-close aria-label="Cerrar asistente">×</button>
+        <div class="dm-ai-header-actions">
+          <span class="dm-ai-model-chip" data-dm-ai-model-chip>Gemini</span>
+          <button class="dm-ai-close" type="button" data-dm-ai-close aria-label="Cerrar asistente">×</button>
+        </div>
       </div>
     </div>
     <div class="dm-ai-body">
@@ -122,6 +128,7 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
     gpt: shell.querySelector('[data-dm-ai-frame="gpt"]')
   };
   const panel = shell.querySelector(".dm-ai-panel");
+  const modelChip = shell.querySelector("[data-dm-ai-model-chip]");
   const triggers = [
     document.getElementById("aiFab"),
     document.getElementById("dmAssistantFab")
@@ -152,6 +159,11 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
     scrollLocked: false,
     scrollY: 0,
     bodyStyles: {}
+  };
+
+  const MODEL_LABELS = {
+    gemini: "Gemini",
+    gpt: "ChatGPT"
   };
 
   const dispatchShellState = (source = "internal") => {
@@ -321,8 +333,17 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
     });
   };
 
+  const syncShellModelState = () => {
+    const nextModel = state.activeModel === "gpt" ? "gpt" : "gemini";
+    shell.dataset.activeModel = nextModel;
+    if (modelChip) {
+      modelChip.textContent = MODEL_LABELS[nextModel] || "Modelo";
+    }
+  };
+
   const setActiveModel = (model, { persist = true, notify = true } = {}) => {
     if (!model || model === state.activeModel) {
+      syncShellModelState();
       updateSelectorUI();
       return;
     }
@@ -334,6 +355,7 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
         // no-op
       }
     }
+    syncShellModelState();
     updateSelectorUI();
     if (notify) {
       sendModelToIframe(model);
@@ -550,6 +572,19 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
       if (activeFrame && event.source !== activeFrame.contentWindow) return;
       sendModelToIframe(state.activeModel);
     }
+    if (payload.type === "dm-ai-swipe-intent" && payload.direction) {
+      const activeFrame = frames[state.activeModel];
+      if (!activeFrame || event.source !== activeFrame.contentWindow) return;
+      if (!isEmbedded()) return;
+      window.dispatchEvent(
+        new CustomEvent("dm:assistant-shell-swipe", {
+          detail: {
+            direction: payload.direction === "prev" ? "prev" : "next",
+            source: "iframe"
+          }
+        })
+      );
+    }
   };
 
   const warmup = () => {
@@ -607,6 +642,7 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
 
   // Guard: if a previous session left the body locked, release it.
   unlockScroll();
+  syncShellModelState();
   updateSelectorUI();
   syncScrollLock();
 
