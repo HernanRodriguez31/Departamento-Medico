@@ -184,10 +184,15 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   let bubblePulseTimeout = null;
   let bubbleReactionTimeout = null;
   let lastBubblePulseAt = 0;
-  const BUBBLE_MARGIN = 0;
+  let cancelBubbleDragSession = null;
+  const BUBBLE_MARGIN = 8;
   const BUBBLE_TOP_MIN = 80;
-  const BUBBLE_BOTTOM_GAP = 110;
-  const bubblePositionKey = () => `brisa_chat_bubble_pos_v1_${currentUser?.uid || auth?.currentUser?.uid || 'anon'}`;
+  const BUBBLE_BOTTOM_GAP = 154;
+  const BUBBLE_DEFAULT_SIDE = 'right';
+  const BUBBLE_DEFAULT_Y_PCT = 1;
+  const BUBBLE_DRAG_THRESHOLD_PX = 5;
+  const BUBBLE_SNAP_TRANSITION_MS = 180;
+  const bubblePositionKey = () => `brisa_chat_bubble_pos_v2_${currentUser?.uid || auth?.currentUser?.uid || 'anon'}`;
 
   const pulseChatBubble = () => {
     const bubble = document.getElementById('brisa-chat-bubble');
@@ -216,6 +221,8 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
         --dm-fab-bottom: 18px;
         --brisa-chat-fab-left: 18px;
+        --brisa-chat-fab-right: 8px;
+        --brisa-chat-mobile-fab-bottom: calc(var(--bottom-nav-h, 0px) + 36px + env(safe-area-inset-bottom));
         --brisa-chat-panel-width: 18rem;
         --brisa-chat-panel-gap: 16px;
         --brisa-chat-window-gap: 18px;
@@ -277,11 +284,22 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         width: 100%;
         height: 100%;
         pointer-events: auto;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-drag: none;
+        -webkit-tap-highlight-color: transparent;
+        cursor: grab;
         transform: translateZ(0);
         transform-origin: center;
         backface-visibility: hidden;
-        will-change: transform, filter, box-shadow;
         transition: filter 220ms ease, box-shadow 220ms ease, transform 220ms ease;
+      }
+
+      .brisa-chat-fab .brisa-chat-bubble svg,
+      .brisa-chat-fab .brisa-chat-bubble img {
+        pointer-events: none;
+        user-select: none;
+        -webkit-user-drag: none;
       }
 
       .brisa-chat-fab .brisa-chat-panel {
@@ -470,7 +488,21 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       }
 
       .brisa-chat-bubble--pulse { animation: brisaChatPulse 0.9s ease-out; }
-      .brisa-chat-bubble.is-dragging { opacity: .9; }
+      .brisa-chat-fab.is-dragging {
+        transition: none !important;
+        will-change: transform;
+      }
+      .brisa-chat-fab.is-snapping {
+        transition:
+          top ${BUBBLE_SNAP_TRANSITION_MS}ms var(--brisa-chat-open-ease),
+          left ${BUBBLE_SNAP_TRANSITION_MS}ms var(--brisa-chat-open-ease),
+          right ${BUBBLE_SNAP_TRANSITION_MS}ms var(--brisa-chat-open-ease),
+          transform ${BUBBLE_SNAP_TRANSITION_MS}ms var(--brisa-chat-open-ease);
+      }
+      .brisa-chat-bubble.is-dragging {
+        opacity: .9;
+        cursor: grabbing;
+      }
       .brisa-chat-bubble[data-chat-react="opening"] {
         animation: brisaChatBubbleOpen 460ms var(--brisa-chat-open-ease);
       }
@@ -703,12 +735,11 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
 
       @media (max-width: 768px), (display-mode: standalone) {
         #brisa-chat-pill-tray { display: none !important; }
-        .brisa-chat-bubble { touch-action: none; }
         .brisa-chat-fab {
-          left: 0;
-          right: auto;
+          left: auto;
+          right: var(--brisa-chat-fab-right, 8px);
           top: auto;
-          bottom: calc(var(--bottom-nav-h) + 20px + env(safe-area-inset-bottom));
+          bottom: var(--brisa-chat-mobile-fab-bottom, calc(var(--bottom-nav-h, 0px) + 36px + env(safe-area-inset-bottom)));
         }
         .brisa-chat-fab .brisa-chat-panel {
           width: min(21rem, calc(100vw - 16px));
@@ -792,6 +823,14 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         left: var(--brisa-chat-fab-left, 0px);
         right: auto;
         top: auto;
+      }
+
+      @media (max-width: 768px), (display-mode: standalone) {
+        .app-shell #brisa-chat-root .brisa-chat-fab {
+          bottom: var(--brisa-chat-mobile-fab-bottom, calc(var(--bottom-nav-h, 0px) + 36px + env(safe-area-inset-bottom)));
+          left: auto;
+          right: var(--brisa-chat-fab-right, 8px);
+        }
       }
 
       .brisa-chat-search {
@@ -1724,27 +1763,57 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     }, duration + 96);
   }
 
+  const getViewportMetrics = () => {
+    const docEl = document.documentElement;
+    const visualViewport = window.visualViewport;
+    const layoutWidth = docEl?.clientWidth || window.innerWidth;
+    const offsetLeft = visualViewport ? Math.round(visualViewport.offsetLeft) : 0;
+    const offsetTop = visualViewport ? Math.round(visualViewport.offsetTop) : 0;
+    const width = visualViewport ? Math.round(visualViewport.width) : window.innerWidth;
+    const height = visualViewport ? Math.round(visualViewport.height) : window.innerHeight;
+    const rightInset = Math.max(
+      BUBBLE_MARGIN,
+      layoutWidth - offsetLeft - width + BUBBLE_MARGIN
+    );
+    return { layoutWidth, offsetLeft, offsetTop, width, height, rightInset };
+  };
+
   const getBubbleBounds = (bubble) => {
-    const height = bubble?.offsetHeight || 58;
-    const topMin = BUBBLE_TOP_MIN;
-    const topMax = Math.max(topMin, window.innerHeight - height - BUBBLE_BOTTOM_GAP);
-    return { height, topMin, topMax };
+    const target = document.getElementById('brisa-chat-fab') || bubble;
+    const viewport = getViewportMetrics();
+    const width = target?.offsetWidth || bubble?.offsetWidth || 58;
+    const height = target?.offsetHeight || bubble?.offsetHeight || 58;
+    const topMin = viewport.offsetTop + BUBBLE_TOP_MIN;
+    const topMax = Math.max(
+      topMin,
+      viewport.offsetTop + viewport.height - height - BUBBLE_BOTTOM_GAP
+    );
+    const leftMin = viewport.offsetLeft + BUBBLE_MARGIN;
+    const leftMax = Math.max(
+      leftMin,
+      viewport.offsetLeft + viewport.width - width - BUBBLE_MARGIN
+    );
+    return { viewport, width, height, topMin, topMax, leftMin, leftMax, rightInset: viewport.rightInset };
   };
 
   const applyBubblePosition = (bubble, { side, yPct } = {}) => {
     if (!bubble || !isMobileShell()) return;
     const target = document.getElementById('brisa-chat-fab') || bubble;
-    const { topMin, topMax } = getBubbleBounds(bubble);
-    const pct = Number.isFinite(yPct) ? yPct : 0.5;
-    const targetTop = clamp(Math.round(pct * window.innerHeight), topMin, topMax);
-    const resolvedSide = side === 'right' ? 'right' : 'left';
+    const { viewport, topMin, topMax, leftMin, rightInset } = getBubbleBounds(bubble);
+    const pct = Number.isFinite(yPct) ? clamp(yPct, 0, 1) : BUBBLE_DEFAULT_Y_PCT;
+    const targetTop = clamp(
+      Math.round(viewport.offsetTop + pct * viewport.height),
+      topMin,
+      topMax
+    );
+    const resolvedSide = side === 'left' ? 'left' : BUBBLE_DEFAULT_SIDE;
     target.style.top = `${targetTop}px`;
     target.style.bottom = 'auto';
     if (resolvedSide === 'right') {
-      target.style.right = `${BUBBLE_MARGIN}px`;
+      target.style.right = `${rightInset}px`;
       target.style.left = 'auto';
     } else {
-      target.style.left = `${BUBBLE_MARGIN}px`;
+      target.style.left = `${leftMin}px`;
       target.style.right = 'auto';
     }
     if (target?.dataset) target.dataset.side = resolvedSide;
@@ -1790,7 +1859,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
           <div class="brisa-chat-mobile-stack relative w-full max-w-md max-h-[85dvh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden" id="brisa-chat-mobile-stack" role="dialog" aria-modal="true" aria-label="Chat médico"></div>
         </div>
       </div>
-      <div class="brisa-chat-fab" id="brisa-chat-fab" data-side="left">
+      <div class="brisa-chat-fab" id="brisa-chat-fab" data-side="${BUBBLE_DEFAULT_SIDE}">
         <div class="brisa-chat-panel" id="brisa-chat-panel">
           <div class="brisa-chat-panel-header">
             <div>
@@ -1869,8 +1938,8 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
           </div>
         </div>
 
-        <div class="brisa-chat-bubble flex items-center justify-center rounded-full border border-white/20 z-50 !bg-gradient-to-br from-[#8BC71A] via-[#7AB800] to-[#5A8A00] !shadow-[0_14px_28px_rgba(15,23,42,0.18),_0_4px_10px_rgba(15,23,42,0.12)] transition-all duration-300 ease-out hover:-translate-y-1 hover:brightness-110 hover:!shadow-[0_18px_34px_rgba(15,23,42,0.22),_0_6px_14px_rgba(15,23,42,0.14)]" id="brisa-chat-bubble">
-          <svg class="brisa-chat-bubble-icon text-white drop-shadow-sm" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <div class="brisa-chat-bubble flex items-center justify-center rounded-full border border-white/20 z-50 !bg-gradient-to-br from-[#8BC71A] via-[#7AB800] to-[#5A8A00] !shadow-[0_14px_28px_rgba(15,23,42,0.18),_0_4px_10px_rgba(15,23,42,0.12)] transition-all duration-300 ease-out hover:-translate-y-1 hover:brightness-110 hover:!shadow-[0_18px_34px_rgba(15,23,42,0.22),_0_6px_14px_rgba(15,23,42,0.14)]" id="brisa-chat-bubble" draggable="false">
+          <svg class="brisa-chat-bubble-icon text-white drop-shadow-sm" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" draggable="false" focusable="false" aria-hidden="true">
             <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
           </svg>
           <div class="brisa-chat-badge" id="brisa-chat-badge">1</div>
@@ -2044,6 +2113,17 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     return root?.dataset?.chatContext || detectChatDesktopContext();
   }
 
+  function forceReleaseDocumentScrollState() {
+    const body = document.body;
+    const html = document.documentElement;
+    if (!body || !html) return;
+    body.classList.remove('overflow-hidden', 'is-dragging');
+    body.style.overflow = '';
+    body.style.touchAction = '';
+    html.style.overflow = '';
+    html.style.touchAction = '';
+  }
+
   function setDocumentScrollLocked(locked) {
     const body = document.body;
     const html = document.documentElement;
@@ -2067,6 +2147,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       delete body.dataset.brisaChatTouchAction;
       delete html.dataset.brisaChatOverflow;
     }
+    forceReleaseDocumentScrollState();
   }
 
   function isMobileHubOpen() {
@@ -2145,6 +2226,9 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     setSurfaceImmediate(win, 'window', false, 'panel');
     setSurfaceImmediate(panel, 'panel', false, 'bubble');
     setDocumentScrollLocked(false);
+    if (typeof cancelBubbleDragSession === 'function') {
+      cancelBubbleDragSession({ persistPosition: false });
+    }
     syncMobileModalPlacement(false);
     moveFocusOutsideMobileChat();
     restoreFocusAfterHubClose();
@@ -4056,12 +4140,27 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     const deleteConvConfirm = document.getElementById('brisa-chat-delete-conv-confirm');
     const panelScroll = document.getElementById('brisa-chat-panel-scroll');
 
-    let dragTimer = null;
-    let dragging = false;
     let suppressClick = false;
     let activePointerId = null;
-    let lastSide = 'left';
-    let lastTopPx = null;
+    let dragAbortController = null;
+    let isDragging = false;
+    let didMove = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let pendingClientX = 0;
+    let pendingClientY = 0;
+    let startFabRect = null;
+    let startTopPx = 0;
+    let startLeftPx = 0;
+    let currentTopPx = null;
+    let currentLeftPx = 0;
+    let currentSide = BUBBLE_DEFAULT_SIDE;
+    let dragWidth = 0;
+    let dragHeight = 0;
+    let rafId = 0;
+    let snapFrameId = 0;
+    let snapCleanupTimer = 0;
+    let isSnapAnimating = false;
 
     const resetPanelSearchState = () => {
       resetUserSearch();
@@ -4084,94 +4183,320 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
 
     const restoreBubblePosition = () => {
       if (!bubble || !isMobileShell()) return;
-      const saved = readBubblePosition();
-      if (saved) {
-        applyBubblePosition(bubble, saved);
-      }
+      applyBubblePosition(
+        bubble,
+        readBubblePosition() || { side: BUBBLE_DEFAULT_SIDE, yPct: BUBBLE_DEFAULT_Y_PCT }
+      );
     };
 
     const persistBubblePosition = (side, topPx) => {
       if (!bubble || !isMobileShell()) return;
-      const { topMin, topMax } = getBubbleBounds(bubble);
+      const { viewport, topMin, topMax } = getBubbleBounds(bubble);
       const clampedTop = clamp(topPx, topMin, topMax);
-      const yPct = clampedTop / window.innerHeight;
+      const yPct = viewport.height > 0
+        ? clamp((clampedTop - viewport.offsetTop) / viewport.height, 0, 1)
+        : BUBBLE_DEFAULT_Y_PCT;
       saveBubblePosition({ side, yPct });
     };
 
     const dragTarget = fab || bubble;
+    cancelBubbleDragSession = null;
 
     if (bubble && dragTarget && isMobileShell()) {
+      bubble.setAttribute('draggable', 'false');
+      bubble.querySelectorAll('img,svg').forEach((node) => {
+        node.setAttribute('draggable', 'false');
+      });
+
       restoreBubblePosition();
       const handleResize = () => {
+        if (activePointerId !== null) {
+          queueDragFrame();
+          return;
+        }
         restoreBubblePosition();
         syncPanelViewportBounds();
       };
-      window.addEventListener('resize', handleResize);
-      window.addEventListener('orientationchange', handleResize);
+      window.addEventListener('resize', handleResize, { passive: true });
+      window.addEventListener('orientationchange', handleResize, { passive: true });
+      window.visualViewport?.addEventListener('resize', handleResize, { passive: true });
+      window.visualViewport?.addEventListener('scroll', handleResize, { passive: true });
 
-      bubble.addEventListener('pointerdown', (e) => {
-        if (e.pointerType === 'mouse' && e.button !== 0) return;
-        activePointerId = e.pointerId;
-        lastSide = e.clientX > window.innerWidth / 2 ? 'right' : 'left';
-        lastTopPx = null;
-        dragging = false;
-        suppressClick = false;
-        if (dragTimer) clearTimeout(dragTimer);
-        dragTimer = setTimeout(() => {
-          dragging = true;
-          bubble.classList.add('is-dragging');
-          try {
-            bubble.setPointerCapture(activePointerId);
-          } catch (err) {}
-        }, 250);
-      });
-
-      bubble.addEventListener('pointermove', (e) => {
-        if (!dragging || e.pointerId !== activePointerId) return;
-        e.preventDefault();
-        const { height, topMin, topMax } = getBubbleBounds(bubble);
-        const targetTop = clamp(e.clientY - height / 2, topMin, topMax);
-        lastTopPx = targetTop;
-        lastSide = e.clientX > window.innerWidth / 2 ? 'right' : 'left';
-        dragTarget.style.top = `${targetTop}px`;
-        dragTarget.style.bottom = 'auto';
-        if (lastSide === 'right') {
-          dragTarget.style.right = `${BUBBLE_MARGIN}px`;
-          dragTarget.style.left = 'auto';
-        } else {
-          dragTarget.style.left = `${BUBBLE_MARGIN}px`;
-          dragTarget.style.right = 'auto';
+      const clearSnapAnimation = () => {
+        if (snapCleanupTimer) {
+          clearTimeout(snapCleanupTimer);
+          snapCleanupTimer = 0;
         }
-        if (dragTarget?.dataset) dragTarget.dataset.side = lastSide;
-      });
-
-      const finalizeDrag = (e) => {
-        if (e.pointerId !== activePointerId) return;
-        if (dragTimer) {
-          clearTimeout(dragTimer);
-          dragTimer = null;
+        if (snapFrameId) {
+          cancelAnimationFrame(snapFrameId);
+          snapFrameId = 0;
         }
-        if (dragging) {
-          dragging = false;
-          suppressClick = true;
-          bubble.classList.remove('is-dragging');
-          try {
-            bubble.releasePointerCapture(activePointerId);
-          } catch (err) {}
-          const fallbackTop = dragTarget.getBoundingClientRect().top;
-          const finalTop = Number.isFinite(lastTopPx) ? lastTopPx : fallbackTop;
-          persistBubblePosition(lastSide, finalTop);
-          syncPanelViewportBounds();
-          lastTopPx = null;
-          setTimeout(() => {
-            suppressClick = false;
-          }, 0);
-        }
-        activePointerId = null;
+        isSnapAnimating = false;
+        dragTarget.classList.remove('is-snapping');
+        dragTarget.style.removeProperty('transform');
+        dragTarget.style.removeProperty('will-change');
       };
 
-      bubble.addEventListener('pointerup', finalizeDrag);
-      bubble.addEventListener('pointercancel', finalizeDrag);
+      const resetSuppressClick = () => {
+        setTimeout(() => {
+          suppressClick = false;
+        }, 0);
+      };
+
+      const abortTemporaryDragListeners = () => {
+        if (!dragAbortController) return;
+        dragAbortController.abort();
+        dragAbortController = null;
+      };
+
+      const cancelDragFrame = () => {
+        if (rafId) {
+          cancelAnimationFrame(rafId);
+          rafId = 0;
+        }
+      };
+
+      const getDragBounds = (viewport = getViewportMetrics()) => {
+        const topMin = viewport.offsetTop + BUBBLE_TOP_MIN;
+        const topMax = Math.max(
+          topMin,
+          viewport.offsetTop + viewport.height - dragHeight - BUBBLE_BOTTOM_GAP
+        );
+        const leftMin = viewport.offsetLeft + BUBBLE_MARGIN;
+        const leftMax = Math.max(
+          leftMin,
+          viewport.offsetLeft + viewport.width - dragWidth - BUBBLE_MARGIN
+        );
+        return { viewport, topMin, topMax, leftMin, leftMax, rightInset: viewport.rightInset };
+      };
+
+      const resolveSideFromLeft = (leftPx, viewport) =>
+        leftPx + dragWidth / 2 >= viewport.offsetLeft + viewport.width / 2
+          ? 'right'
+          : 'left';
+
+      const resolveCommittedLeft = (side, bounds) =>
+        side === 'right'
+          ? Math.max(bounds.leftMin, bounds.viewport.layoutWidth - bounds.rightInset - dragWidth)
+          : bounds.leftMin;
+
+      const resolvePendingDragPosition = () => {
+        const bounds = getDragBounds();
+        const nextLeft = clamp(
+          startLeftPx + (pendingClientX - dragStartX),
+          bounds.leftMin,
+          bounds.leftMax
+        );
+        const nextTop = clamp(
+          startTopPx + (pendingClientY - dragStartY),
+          bounds.topMin,
+          bounds.topMax
+        );
+        return {
+          bounds,
+          nextLeft,
+          nextTop,
+          side: resolveSideFromLeft(nextLeft, bounds.viewport)
+        };
+      };
+
+      const queueDragFrame = () => {
+        if (rafId || activePointerId === null) return;
+        rafId = requestAnimationFrame(() => {
+          rafId = 0;
+          if (activePointerId === null) return;
+          const { nextLeft, nextTop, side } = resolvePendingDragPosition();
+          currentLeftPx = nextLeft;
+          currentTopPx = nextTop;
+          currentSide = side;
+          dragTarget.style.transform = `translate3d(${nextLeft - startLeftPx}px, ${nextTop - startTopPx}px, 0)`;
+        });
+      };
+
+      const cleanupDrag = (reason = 'cleanup') => {
+        const pointerId = activePointerId;
+        activePointerId = null;
+        isDragging = false;
+        didMove = false;
+        dragStartX = 0;
+        dragStartY = 0;
+        pendingClientX = 0;
+        pendingClientY = 0;
+        startFabRect = null;
+        startTopPx = 0;
+        startLeftPx = 0;
+        currentTopPx = null;
+        currentLeftPx = 0;
+        currentSide = dragTarget?.dataset?.side === 'left' ? 'left' : BUBBLE_DEFAULT_SIDE;
+        dragWidth = 0;
+        dragHeight = 0;
+        cancelDragFrame();
+        abortTemporaryDragListeners();
+        dragTarget.classList.remove('is-dragging');
+        bubble.classList.remove('is-dragging');
+        document.body.style.removeProperty('user-select');
+        document.documentElement.style.removeProperty('user-select');
+        if (!isSnapAnimating) {
+          dragTarget.style.removeProperty('transform');
+          dragTarget.style.removeProperty('will-change');
+          dragTarget.classList.remove('is-snapping');
+        }
+        if (pointerId !== null && bubble.hasPointerCapture?.(pointerId)) {
+          try {
+            bubble.releasePointerCapture(pointerId);
+          } catch (e) {}
+        }
+        return reason;
+      };
+
+      const finishDrag = (reason = 'pointerup') => {
+        if (activePointerId === null) {
+          cleanupDrag(reason);
+          return;
+        }
+
+        if (didMove && isDragging) {
+          const { bounds, nextLeft, nextTop, side } = resolvePendingDragPosition();
+          const finalTop = clamp(
+            Number.isFinite(currentTopPx) ? currentTopPx : nextTop,
+            bounds.topMin,
+            bounds.topMax
+          );
+          const finalSide = (currentSide || side) === 'left' ? 'left' : BUBBLE_DEFAULT_SIDE;
+          const finalLeft = resolveCommittedLeft(finalSide, bounds);
+          const finalRight = bounds.rightInset;
+          const fromLeft = Number.isFinite(currentLeftPx) ? currentLeftPx : nextLeft;
+          const fromTop = Number.isFinite(currentTopPx) ? currentTopPx : nextTop;
+
+          isSnapAnimating = true;
+          dragTarget.classList.remove('is-dragging');
+          bubble.classList.remove('is-dragging');
+          dragTarget.classList.add('is-snapping');
+          dragTarget.style.willChange = 'transform';
+          dragTarget.style.top = `${finalTop}px`;
+          dragTarget.style.bottom = 'auto';
+          if (finalSide === 'right') {
+            dragTarget.style.right = `${finalRight}px`;
+            dragTarget.style.left = 'auto';
+          } else {
+            dragTarget.style.left = `${bounds.leftMin}px`;
+            dragTarget.style.right = 'auto';
+          }
+          if (dragTarget?.dataset) dragTarget.dataset.side = finalSide;
+          persistBubblePosition(finalSide, finalTop);
+          dragTarget.style.transform = `translate3d(${fromLeft - finalLeft}px, ${fromTop - finalTop}px, 0)`;
+          snapFrameId = requestAnimationFrame(() => {
+            snapFrameId = 0;
+            dragTarget.style.transform = 'translate3d(0, 0, 0)';
+          });
+          snapCleanupTimer = setTimeout(() => {
+            clearSnapAnimation();
+          }, BUBBLE_SNAP_TRANSITION_MS + 48);
+          suppressClick = true;
+          resetSuppressClick();
+          syncPanelViewportBounds();
+        } else {
+          clearSnapAnimation();
+        }
+
+        cleanupDrag(reason);
+      };
+
+      const handleWindowBlur = () => {
+        if (activePointerId === null) return;
+        finishDrag('blur');
+      };
+
+      const handleVisibilityChange = () => {
+        if (!document.hidden || activePointerId === null) return;
+        finishDrag('visibilitychange');
+      };
+
+      const handlePointerDown = (event) => {
+        if (!event.isPrimary) return;
+        if (event.pointerType === 'mouse' && event.button !== 0) return;
+        clearSnapAnimation();
+        cleanupDrag('pointerdown-reset');
+        suppressClick = false;
+        startFabRect = dragTarget.getBoundingClientRect();
+        const viewport = getViewportMetrics();
+        dragWidth = Math.round(startFabRect.width) || dragTarget.offsetWidth || 58;
+        dragHeight = Math.round(startFabRect.height) || dragTarget.offsetHeight || 58;
+        startLeftPx = Math.round(startFabRect.left + viewport.offsetLeft);
+        startTopPx = Math.round(startFabRect.top + viewport.offsetTop);
+        currentLeftPx = startLeftPx;
+        currentTopPx = startTopPx;
+        currentSide = dragTarget?.dataset?.side === 'left' ? 'left' : BUBBLE_DEFAULT_SIDE;
+        dragStartX = event.clientX;
+        dragStartY = event.clientY;
+        pendingClientX = event.clientX;
+        pendingClientY = event.clientY;
+        activePointerId = event.pointerId;
+        dragAbortController = new AbortController();
+        window.addEventListener('blur', handleWindowBlur, {
+          passive: true,
+          signal: dragAbortController.signal
+        });
+        document.addEventListener('visibilitychange', handleVisibilityChange, {
+          signal: dragAbortController.signal
+        });
+        try {
+          bubble.setPointerCapture(event.pointerId);
+        } catch (e) {}
+      };
+
+      const handlePointerMove = (event) => {
+        if (event.pointerId !== activePointerId) return;
+        pendingClientX = event.clientX;
+        pendingClientY = event.clientY;
+        if (!didMove) {
+          const movedX = Math.abs(event.clientX - dragStartX);
+          const movedY = Math.abs(event.clientY - dragStartY);
+          if (
+            movedX < BUBBLE_DRAG_THRESHOLD_PX &&
+            movedY < BUBBLE_DRAG_THRESHOLD_PX
+          ) {
+            return;
+          }
+          didMove = true;
+          isDragging = true;
+          dragTarget.classList.remove('is-snapping');
+          dragTarget.classList.add('is-dragging');
+          bubble.classList.add('is-dragging');
+          document.body.style.userSelect = 'none';
+          document.documentElement.style.userSelect = 'none';
+        }
+        queueDragFrame();
+      };
+
+      const handlePointerUp = (event) => {
+        if (event.pointerId !== activePointerId) return;
+        finishDrag('pointerup');
+      };
+
+      const handlePointerCancel = (event) => {
+        if (event.pointerId !== activePointerId) return;
+        finishDrag('pointercancel');
+      };
+
+      const handleLostPointerCapture = (event) => {
+        if (event.pointerId !== activePointerId) return;
+        finishDrag('lostpointercapture');
+      };
+
+      bubble.addEventListener('pointerdown', handlePointerDown);
+      bubble.addEventListener('pointermove', handlePointerMove);
+      bubble.addEventListener('pointerup', handlePointerUp);
+      bubble.addEventListener('pointercancel', handlePointerCancel);
+      bubble.addEventListener('lostpointercapture', handleLostPointerCapture);
+      bubble.addEventListener('dragstart', (event) => {
+        event.preventDefault();
+      });
+
+      cancelBubbleDragSession = () => {
+        clearSnapAnimation();
+        cleanupDrag('manual-cancel');
+      };
     }
 
     const toggleMobileHubFromFab = (event) => {

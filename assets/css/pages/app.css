@@ -3020,6 +3020,9 @@ html {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.24);
   cursor: pointer;
   pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 body.dm-modal-open #brisa-chat-root,
@@ -3032,6 +3035,9 @@ body.dm-modal-open .brisa-chat-panel {
   width: 26px;
   height: 26px;
   color: #ffffff;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .brisa-chat-badge {
@@ -3707,9 +3713,9 @@ body.dm-modal-open .brisa-chat-panel {
 
 @media (max-width: 768px) {
   .brisa-chat-fab {
-    left: 0;
-    right: auto;
-    bottom: calc(var(--bottom-nav-h) + 20px + env(safe-area-inset-bottom));
+    left: auto;
+    right: 8px;
+    bottom: calc(var(--bottom-nav-h) + 36px + env(safe-area-inset-bottom));
   }
 
   .brisa-chat-panel {
@@ -3744,9 +3750,9 @@ body.dm-modal-open .brisa-chat-panel {
 }
 
 .app-shell #brisa-chat-root .brisa-chat-fab {
-  bottom: calc(var(--bottom-nav-h) + 20px + env(safe-area-inset-bottom)) !important;
-  left: 0;
-  right: auto;
+  bottom: calc(var(--bottom-nav-h) + 36px + env(safe-area-inset-bottom)) !important;
+  left: auto;
+  right: 8px;
 }
 
 .app-shell #brisa-chat-root .brisa-chat-panel {
