@@ -1411,6 +1411,9 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       'aria-hidden',
       state === CHAT_SURFACE_STATES.OPEN || state === CHAT_SURFACE_STATES.OPENING ? 'false' : 'true'
     );
+    if ('inert' in el) {
+      el.inert = !(state === CHAT_SURFACE_STATES.OPEN || state === CHAT_SURFACE_STATES.OPENING);
+    }
   }
 
   function clearSurfaceTransition(el) {
@@ -1577,6 +1580,37 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         input.focus();
       }
     }, delay);
+  }
+
+  function focusElementSafely(target) {
+    if (!target || typeof target.focus !== 'function') return false;
+    try {
+      target.focus({ preventScroll: true });
+      return true;
+    } catch (error) {
+      try {
+        target.focus();
+        return true;
+      } catch (fallbackError) {
+        return false;
+      }
+    }
+  }
+
+  function restoreFocusAfterDetailClose() {
+    const searchInput = document.getElementById('brisa-chat-user-search');
+    const panelClose = document.getElementById('brisa-chat-panel-close');
+    const bubble = document.getElementById('brisa-chat-bubble');
+    if (focusElementSafely(searchInput)) return;
+    if (focusElementSafely(panelClose)) return;
+    focusElementSafely(bubble);
+  }
+
+  function restoreFocusAfterHubClose() {
+    const bubble = document.getElementById('brisa-chat-bubble');
+    const panelClose = document.getElementById('brisa-chat-panel-close');
+    if (focusElementSafely(bubble)) return;
+    focusElementSafely(panelClose);
   }
 
   function triggerBubbleReaction(type = 'opening') {
@@ -1913,6 +1947,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     root.style.pointerEvents = 'auto';
     if (overlay) overlay.setAttribute('aria-hidden', 'false');
     if (viewport) viewport.setAttribute('aria-hidden', 'false');
+    if ('inert' in viewport) viewport.inert = false;
     setDocumentScrollLocked(true);
     setSurfaceImmediate(panel, 'panel', true, 'bubble');
     if (detail) {
@@ -1928,6 +1963,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     const root = getChatRoot();
     const win = document.getElementById('brisa-chat-window');
     if (!root || !win) return false;
+    restoreFocusAfterDetailClose();
     root.classList.remove('brisa-chat-root--mobile-detail');
     setSurfaceImmediate(win, 'window', false, 'panel');
     setChatState({
@@ -1948,10 +1984,12 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     const win = document.getElementById('brisa-chat-window');
     if (!root || !panel || !win) return false;
 
+    restoreFocusAfterHubClose();
     root.classList.remove('brisa-chat-root--mobile-detail', 'brisa-chat-root--mobile-open');
     root.style.pointerEvents = '';
     if (overlay) overlay.setAttribute('aria-hidden', 'true');
     if (viewport) viewport.setAttribute('aria-hidden', 'true');
+    if (viewport && 'inert' in viewport) viewport.inert = true;
     setSurfaceImmediate(win, 'window', false, 'panel');
     setSurfaceImmediate(panel, 'panel', false, 'bubble');
     setDocumentScrollLocked(false);
