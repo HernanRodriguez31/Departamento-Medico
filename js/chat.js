@@ -55,6 +55,9 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     } catch (e) {}
     return typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 768px)').matches;
   };
+  const isCompactMobileChat = () => (
+    typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 640px)').matches
+  );
   const detectChatDesktopContext = () => {
     try {
       const pathname = window.location.pathname || '';
@@ -220,6 +223,27 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         --brisa-chat-window-open-ms: 420ms;
         --brisa-chat-window-close-ms: 280ms;
         --brisa-chat-pill-ms: 260ms;
+        --brisa-chat-mobile-border: #7ab800;
+      }
+
+      .brisa-chat-mobile-viewport {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        pointer-events: none;
+      }
+
+      .brisa-chat-mobile-stack {
+        position: relative;
+        display: grid;
+        width: min(95vw, 420px);
+        max-width: calc(100vw - 32px);
+        height: min(85vh, calc(100dvh - 32px));
+        max-height: min(85vh, calc(100dvh - 32px));
       }
 
       .brisa-chat-fab {
@@ -960,6 +984,201 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         background: rgba(15, 23, 42, 0.06);
         color: #0f172a;
       }
+
+      .brisa-chat-mobile-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 95;
+        background: rgba(17, 24, 39, 0.6);
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition: opacity 300ms ease, visibility 300ms ease;
+      }
+
+      .brisa-chat-window-back {
+        display: none;
+      }
+
+      @media (max-width: 640px) {
+        #brisa-chat-root.brisa-chat-root--mobile-open {
+          pointer-events: auto;
+        }
+
+        #brisa-chat-root.brisa-chat-root--mobile-open .brisa-chat-mobile-overlay {
+          opacity: 1;
+          visibility: visible;
+          pointer-events: auto;
+        }
+
+        #brisa-chat-root.brisa-chat-root--mobile-open .brisa-chat-mobile-viewport {
+          pointer-events: auto;
+        }
+
+        #brisa-chat-root.brisa-chat-root--mobile-open .brisa-chat-fab {
+          position: relative;
+          inset: auto;
+          left: auto;
+          right: auto;
+          top: auto;
+          bottom: auto;
+          width: 100%;
+          height: 100%;
+          display: block;
+          pointer-events: auto;
+          z-index: 56;
+        }
+
+        #brisa-chat-root.brisa-chat-root--mobile-open .brisa-chat-bubble {
+          opacity: 0;
+          transform: scale(0.92);
+          pointer-events: none;
+        }
+
+        .brisa-chat-fab .brisa-chat-panel,
+        .brisa-chat-window {
+          position: absolute;
+          inset: 0;
+          top: auto;
+          left: auto;
+          right: auto;
+          bottom: auto;
+          width: 100%;
+          max-width: none;
+          height: 100%;
+          max-height: none;
+          border: 2px solid var(--brisa-chat-mobile-border);
+          border-radius: 24px;
+          background: #ffffff;
+          box-shadow: 0 20px 60px -15px rgba(0, 0, 0, 0.3);
+          overflow: hidden;
+          animation: none !important;
+          filter: none !important;
+          clip-path: none !important;
+          transition: opacity 300ms ease, transform 300ms ease, visibility 300ms ease;
+        }
+
+        .brisa-chat-fab .brisa-chat-panel {
+          z-index: 56;
+          display: flex;
+          flex-direction: column;
+          transform: translate3d(0, 12px, 0) scale(0.98);
+          transform-origin: center;
+        }
+
+        .brisa-chat-window {
+          z-index: 60;
+          transform: translate3d(0, 12px, 0) scale(0.98);
+          transform-origin: center;
+        }
+
+        .brisa-chat-fab .brisa-chat-panel[data-chat-state="open"],
+        .brisa-chat-fab .brisa-chat-panel[data-chat-state="opening"],
+        .brisa-chat-window[data-chat-state="open"],
+        .brisa-chat-window[data-chat-state="opening"] {
+          opacity: 1;
+          visibility: visible;
+          pointer-events: auto;
+        }
+
+        .brisa-chat-fab .brisa-chat-panel[data-chat-state="open"],
+        .brisa-chat-fab .brisa-chat-panel[data-chat-state="opening"] {
+          transform: translate3d(0, 0, 0) scale(1);
+        }
+
+        .brisa-chat-window[data-chat-state="open"],
+        .brisa-chat-window[data-chat-state="opening"] {
+          transform: translate3d(0, 0, 0) scale(1);
+        }
+
+        #brisa-chat-root.brisa-chat-root--mobile-detail .brisa-chat-panel {
+          transform: translate3d(0, 0, 0) scale(0.985);
+          opacity: 0.96;
+          pointer-events: none;
+        }
+
+        #brisa-chat-root.brisa-chat-root--mobile-open .brisa-chat-badge,
+        #brisa-chat-root.brisa-chat-root--mobile-open .brisa-chat-pill,
+        #brisa-chat-root.brisa-chat-root--mobile-open .brisa-chat-pill-tray {
+          opacity: 0;
+          visibility: hidden;
+          pointer-events: none;
+        }
+
+        .brisa-chat-panel-header,
+        .brisa-chat-window-header {
+          padding: 18px 18px 14px;
+          border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+          background: #ffffff;
+        }
+
+        .brisa-chat-panel-body,
+        .brisa-chat-window-body {
+          min-height: 0;
+        }
+
+        .brisa-chat-panel-body {
+          display: flex;
+          flex-direction: column;
+          flex: 1 1 auto;
+        }
+
+        .brisa-chat-panel-scroll {
+          min-height: 0;
+          flex: 1 1 auto;
+          padding-bottom: 12px;
+        }
+
+        .brisa-chat-window-subtitle {
+          padding-left: 18px;
+          padding-right: 18px;
+        }
+
+        .brisa-chat-window-body {
+          flex: 1 1 auto;
+        }
+
+        .brisa-chat-window-footer {
+          padding: 14px 16px 16px;
+          background: #ffffff;
+        }
+
+        .brisa-chat-window-actions {
+          margin-left: auto;
+          gap: 8px;
+        }
+
+        .brisa-chat-window-title {
+          flex: 1 1 auto;
+          min-width: 0;
+        }
+
+        .brisa-chat-window-back {
+          display: inline-flex;
+          flex: 0 0 auto;
+        }
+
+        .brisa-chat-pill-btn {
+          width: 44px;
+          height: 44px;
+          border-radius: 14px;
+        }
+
+        .brisa-chat-pill-btn svg {
+          width: 20px;
+          height: 20px;
+        }
+      }
+
+      @media (max-width: 640px) and (prefers-reduced-motion: reduce) {
+        .brisa-chat-mobile-overlay,
+        .brisa-chat-fab .brisa-chat-panel,
+        .brisa-chat-window,
+        .brisa-chat-bubble {
+          transition: none !important;
+          animation: none !important;
+        }
+      }
     `;
     document.head.appendChild(style);
   };
@@ -1436,133 +1655,143 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     root.dataset.chatContext = detectChatDesktopContext();
 
     root.innerHTML = `
-      <div class="brisa-chat-fab" id="brisa-chat-fab" data-side="left">
-        <div class="brisa-chat-panel absolute bottom-[120%] right-0 z-40 w-72" id="brisa-chat-panel">
-        <div class="brisa-chat-panel-header">
-          <div>
-            <div class="brisa-chat-panel-title">Médicos conectados <span id="brisa-chat-online-count" class="brisa-chat-online-count">0</span></div>
-            <div class="brisa-chat-panel-subtitle">Tiempo real · Departamento Médico</div>
-          </div>
-          <div style="display:flex; gap:6px; align-items:center;">
-            <button class="brisa-chat-pill-btn" id="brisa-chat-panel-sound-toggle" type="button" aria-label="Silenciar">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <path d="M11 5 6 9H3v6h3l5 4V5Z" />
-                <path d="M19 5s2 2 2 7-2 7-2 7" />
-                <path d="M15 8s1.5 1.5 1.5 4S15 16 15 16" />
-              </svg>
-            </button>
-            <button class="brisa-chat-pill-btn" id="brisa-chat-panel-close" type="button" aria-label="Cerrar">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <path d="M18 6 6 18" /><path d="m6 6 12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-        <div class="brisa-chat-panel-body">
-          <div class="brisa-chat-search">
-            <label class="brisa-chat-search-label" for="brisa-chat-user-search">Buscar usuarios</label>
-            <div class="brisa-chat-search-field">
-              <svg class="brisa-chat-search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <circle cx="11" cy="11" r="7"></circle>
-                <path d="m20 20-3.5-3.5"></path>
-              </svg>
-              <input
-                id="brisa-chat-user-search"
-                class="brisa-chat-search-input"
-                type="search"
-                placeholder="Buscar por nombre"
-                autocomplete="off"
-                spellcheck="false"
-                aria-label="Buscar usuarios por nombre"
-                aria-describedby="brisa-chat-search-status"
-              />
-            </div>
-            <div class="brisa-chat-search-status" id="brisa-chat-search-status" aria-live="polite"></div>
-          </div>
-          <div class="brisa-chat-panel-scroll" id="brisa-chat-panel-scroll">
-            <div class="brisa-chat-section-label brisa-chat-section-label--split">
-              <span>Accesos rápidos</span>
-            </div>
-            <div class="brisa-chat-row" id="brisa-chat-quick-group">
-              <div class="brisa-chat-status-dot brisa-chat-status-dot--online"></div>
-              <div class="brisa-chat-row-main">
-                <div class="brisa-chat-name">Chat grupal</div>
-                <div class="brisa-chat-meta">Sala común · Todos los médicos</div>
+      <div class="brisa-chat-mobile-overlay" id="brisa-chat-mobile-overlay" aria-hidden="true"></div>
+      <div class="brisa-chat-mobile-viewport" id="brisa-chat-mobile-viewport" aria-hidden="true">
+        <div class="brisa-chat-mobile-stack" id="brisa-chat-mobile-stack">
+          <div class="brisa-chat-fab" id="brisa-chat-fab" data-side="left">
+            <div class="brisa-chat-panel absolute bottom-[120%] right-0 z-40 w-72" id="brisa-chat-panel">
+            <div class="brisa-chat-panel-header">
+              <div>
+                <div class="brisa-chat-panel-title">Médicos conectados <span id="brisa-chat-online-count" class="brisa-chat-online-count">0</span></div>
+                <div class="brisa-chat-panel-subtitle">Tiempo real · Departamento Médico</div>
+              </div>
+              <div style="display:flex; gap:6px; align-items:center;">
+                <button class="brisa-chat-pill-btn" id="brisa-chat-panel-sound-toggle" type="button" aria-label="Silenciar">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M11 5 6 9H3v6h3l5 4V5Z" />
+                    <path d="M19 5s2 2 2 7-2 7-2 7" />
+                    <path d="M15 8s1.5 1.5 1.5 4S15 16 15 16" />
+                  </svg>
+                </button>
+                <button class="brisa-chat-pill-btn" id="brisa-chat-panel-close" type="button" aria-label="Cerrar">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+                  </svg>
+                </button>
               </div>
             </div>
-            <div class="brisa-chat-row" id="brisa-chat-quick-foro">
-              <div class="brisa-chat-status-dot brisa-chat-status-dot--online"></div>
-              <div class="brisa-chat-row-main">
-                <div class="brisa-chat-name">Foro general</div>
-                <div class="brisa-chat-meta">Vinculado al Foro del sitio</div>
+            <div class="brisa-chat-panel-body">
+              <div class="brisa-chat-search">
+                <label class="brisa-chat-search-label" for="brisa-chat-user-search">Buscar usuarios</label>
+                <div class="brisa-chat-search-field">
+                  <svg class="brisa-chat-search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <circle cx="11" cy="11" r="7"></circle>
+                    <path d="m20 20-3.5-3.5"></path>
+                  </svg>
+                  <input
+                    id="brisa-chat-user-search"
+                    class="brisa-chat-search-input"
+                    type="search"
+                    placeholder="Buscar por nombre"
+                    autocomplete="off"
+                    spellcheck="false"
+                    aria-label="Buscar usuarios por nombre"
+                    aria-describedby="brisa-chat-search-status"
+                  />
+                </div>
+                <div class="brisa-chat-search-status" id="brisa-chat-search-status" aria-live="polite"></div>
+              </div>
+              <div class="brisa-chat-panel-scroll" id="brisa-chat-panel-scroll">
+                <div class="brisa-chat-section-label brisa-chat-section-label--split">
+                  <span>Accesos rápidos</span>
+                </div>
+                <div class="brisa-chat-row" id="brisa-chat-quick-group">
+                  <div class="brisa-chat-status-dot brisa-chat-status-dot--online"></div>
+                  <div class="brisa-chat-row-main">
+                    <div class="brisa-chat-name">Chat grupal</div>
+                    <div class="brisa-chat-meta">Sala común · Todos los médicos</div>
+                  </div>
+                </div>
+                <div class="brisa-chat-row" id="brisa-chat-quick-foro">
+                  <div class="brisa-chat-status-dot brisa-chat-status-dot--online"></div>
+                  <div class="brisa-chat-row-main">
+                    <div class="brisa-chat-name">Foro general</div>
+                    <div class="brisa-chat-meta">Vinculado al Foro del sitio</div>
+                  </div>
+                </div>
+                <div class="brisa-chat-row brisa-chat-row--assistant" id="brisa-chat-quick-ai" role="button" tabindex="0" aria-label="Abrir Asistente IA">
+                  <div class="brisa-chat-status-dot brisa-chat-status-dot--assistant" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2.75a.75.75 0 0 1 .75.75 5.5 5.5 0 0 0 5.5 5.5.75.75 0 0 1 0 1.5 5.5 5.5 0 0 0-5.5 5.5.75.75 0 0 1-1.5 0 5.5 5.5 0 0 0-5.5-5.5.75.75 0 0 1 0-1.5 5.5 5.5 0 0 0 5.5-5.5.75.75 0 0 1 .75-.75Zm6.5 12.5a.5.5 0 0 1 .5.5 2.75 2.75 0 0 0 2.75 2.75.5.5 0 0 1 0 1 2.75 2.75 0 0 0-2.75 2.75.5.5 0 0 1-1 0 2.75 2.75 0 0 0-2.75-2.75.5.5 0 0 1 0-1 2.75 2.75 0 0 0 2.75-2.75.5.5 0 0 1 .5-.5Z" />
+                    </svg>
+                  </div>
+                  <div class="brisa-chat-row-main">
+                    <div class="brisa-chat-name">Asistente IA</div>
+                    <div class="brisa-chat-meta">Consulta asistida · Último modelo</div>
+                  </div>
+                  <div class="brisa-chat-row-accent" id="brisa-chat-quick-ai-model">Gemini</div>
+                </div>
+                <div class="brisa-chat-section-label" id="brisa-chat-users-label">Médicos conectados</div>
+                <div id="brisa-chat-users"></div>
               </div>
             </div>
-            <div class="brisa-chat-row brisa-chat-row--assistant" id="brisa-chat-quick-ai" role="button" tabindex="0" aria-label="Abrir Asistente IA">
-              <div class="brisa-chat-status-dot brisa-chat-status-dot--assistant" aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2.75a.75.75 0 0 1 .75.75 5.5 5.5 0 0 0 5.5 5.5.75.75 0 0 1 0 1.5 5.5 5.5 0 0 0-5.5 5.5.75.75 0 0 1-1.5 0 5.5 5.5 0 0 0-5.5-5.5.75.75 0 0 1 0-1.5 5.5 5.5 0 0 0 5.5-5.5.75.75 0 0 1 .75-.75Zm6.5 12.5a.5.5 0 0 1 .5.5 2.75 2.75 0 0 0 2.75 2.75.5.5 0 0 1 0 1 2.75 2.75 0 0 0-2.75 2.75.5.5 0 0 1-1 0 2.75 2.75 0 0 0-2.75-2.75.5.5 0 0 1 0-1 2.75 2.75 0 0 0 2.75-2.75.5.5 0 0 1 .5-.5Z" />
+          </div>
+
+            <div class="brisa-chat-bubble flex items-center justify-center rounded-full border border-white/20 z-50 !bg-gradient-to-br from-[#8BC71A] via-[#7AB800] to-[#5A8A00] !shadow-[0_14px_28px_rgba(15,23,42,0.18),_0_4px_10px_rgba(15,23,42,0.12)] transition-all duration-300 ease-out hover:-translate-y-1 hover:brightness-110 hover:!shadow-[0_18px_34px_rgba(15,23,42,0.22),_0_6px_14px_rgba(15,23,42,0.14)]" id="brisa-chat-bubble">
+              <svg class="brisa-chat-bubble-icon text-white drop-shadow-sm" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+              </svg>
+              <div class="brisa-chat-badge" id="brisa-chat-badge">1</div>
+            </div>
+          </div>
+
+          <div class="brisa-chat-window" id="brisa-chat-window">
+            <div class="brisa-chat-window-header">
+              <button class="brisa-chat-pill-btn brisa-chat-window-back" id="brisa-chat-window-back" type="button" aria-label="Volver a la lista">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="m15 18-6-6 6-6" />
                 </svg>
+              </button>
+              <div class="brisa-chat-status-dot brisa-chat-status-dot--online"></div>
+              <div class="brisa-chat-window-title" id="brisa-chat-window-title">Chat</div>
+              <div class="brisa-chat-window-actions">
+                <button class="brisa-chat-pill-btn" id="brisa-chat-window-min" type="button" aria-label="Minimizar" data-tooltip="Minimizar">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M5 12h14"/>
+                  </svg>
+                </button>
+                <button class="brisa-chat-pill-btn" id="brisa-chat-delete-conversation" type="button" aria-label="Borrar conversación" data-tooltip="Borrar chat">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                    <path d="M10 11v6" />
+                    <path d="M14 11v6" />
+                    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                  </svg>
+                </button>
+                <button class="brisa-chat-pill-btn" id="brisa-chat-window-close" type="button" aria-label="Cerrar chat" data-tooltip="Cerrar">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+                  </svg>
+                </button>
               </div>
-              <div class="brisa-chat-row-main">
-                <div class="brisa-chat-name">Asistente IA</div>
-                <div class="brisa-chat-meta">Consulta asistida · Último modelo</div>
-              </div>
-              <div class="brisa-chat-row-accent" id="brisa-chat-quick-ai-model">Gemini</div>
             </div>
-            <div class="brisa-chat-section-label" id="brisa-chat-users-label">Médicos conectados</div>
-            <div id="brisa-chat-users"></div>
+            <div class="brisa-chat-window-subtitle" id="brisa-chat-window-subtitle"></div>
+            <div class="brisa-chat-window-body" id="brisa-chat-messages"></div>
+            <div class="brisa-chat-window-footer">
+              <div class="emoji-input-wrap" style="flex:1;">
+                <input id="brisa-chat-input" class="brisa-chat-input" type="text" placeholder="Escribí un mensaje…" autocomplete="off" />
+                <button type="button" class="emoji-btn emoji-trigger" data-emoji-target="brisa-chat-input" aria-label="Insertar emoji">😊</button>
+                <div class="emoji-panel" data-emoji-panel></div>
+              </div>
+              <button id="brisa-chat-send" class="brisa-chat-send-btn" type="button">
+                <span>Enviar</span>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 2 11 13" /><path d="M22 2 15 22 11 13 2 9 22 2" />
+                </svg>
+              </button>
+            </div>
           </div>
-        </div>
-      </div>
-
-        <div class="brisa-chat-bubble flex items-center justify-center rounded-full border border-white/20 z-50 !bg-gradient-to-br from-[#8BC71A] via-[#7AB800] to-[#5A8A00] !shadow-[0_14px_28px_rgba(15,23,42,0.18),_0_4px_10px_rgba(15,23,42,0.12)] transition-all duration-300 ease-out hover:-translate-y-1 hover:brightness-110 hover:!shadow-[0_18px_34px_rgba(15,23,42,0.22),_0_6px_14px_rgba(15,23,42,0.14)]" id="brisa-chat-bubble">
-          <svg class="brisa-chat-bubble-icon text-white drop-shadow-sm" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
-          </svg>
-          <div class="brisa-chat-badge" id="brisa-chat-badge">1</div>
-        </div>
-      </div>
-
-      <div class="brisa-chat-window" id="brisa-chat-window">
-        <div class="brisa-chat-window-header">
-          <div class="brisa-chat-status-dot brisa-chat-status-dot--online"></div>
-          <div class="brisa-chat-window-title" id="brisa-chat-window-title">Chat</div>
-          <div class="brisa-chat-window-actions">
-            <button class="brisa-chat-pill-btn" id="brisa-chat-window-min" type="button" aria-label="Minimizar" data-tooltip="Minimizar">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <path d="M5 12h14"/>
-              </svg>
-            </button>
-            <button class="brisa-chat-pill-btn" id="brisa-chat-delete-conversation" type="button" aria-label="Borrar conversación" data-tooltip="Borrar chat">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-                <path d="M10 11v6" />
-                <path d="M14 11v6" />
-                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-              </svg>
-            </button>
-            <button class="brisa-chat-pill-btn" id="brisa-chat-window-close" type="button" aria-label="Cerrar chat" data-tooltip="Cerrar">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <path d="M18 6 6 18" /><path d="m6 6 12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-        <div class="brisa-chat-window-subtitle" id="brisa-chat-window-subtitle"></div>
-        <div class="brisa-chat-window-body" id="brisa-chat-messages"></div>
-        <div class="brisa-chat-window-footer">
-          <div class="emoji-input-wrap" style="flex:1;">
-            <input id="brisa-chat-input" class="brisa-chat-input" type="text" placeholder="Escribí un mensaje…" autocomplete="off" />
-            <button type="button" class="emoji-btn emoji-trigger" data-emoji-target="brisa-chat-input" aria-label="Insertar emoji">😊</button>
-            <div class="emoji-panel" data-emoji-panel></div>
-          </div>
-          <button id="brisa-chat-send" class="brisa-chat-send-btn" type="button">
-            <span>Enviar</span>
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M22 2 11 13" /><path d="M22 2 15 22 11 13 2 9 22 2" />
-            </svg>
-          </button>
         </div>
       </div>
 
@@ -1639,6 +1868,104 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     return root?.dataset?.chatContext || detectChatDesktopContext();
   }
 
+  function setDocumentScrollLocked(locked) {
+    const body = document.body;
+    const html = document.documentElement;
+    if (!body || !html) return;
+    if (locked) {
+      if (!body.dataset.brisaChatOverflow) {
+        body.dataset.brisaChatOverflow = body.style.overflow || '';
+        body.dataset.brisaChatTouchAction = body.style.touchAction || '';
+        html.dataset.brisaChatOverflow = html.style.overflow || '';
+      }
+      body.style.overflow = 'hidden';
+      body.style.touchAction = 'none';
+      html.style.overflow = 'hidden';
+      return;
+    }
+    if (body.dataset.brisaChatOverflow !== undefined) {
+      body.style.overflow = body.dataset.brisaChatOverflow;
+      body.style.touchAction = body.dataset.brisaChatTouchAction || '';
+      html.style.overflow = html.dataset.brisaChatOverflow || '';
+      delete body.dataset.brisaChatOverflow;
+      delete body.dataset.brisaChatTouchAction;
+      delete html.dataset.brisaChatOverflow;
+    }
+  }
+
+  function isMobileHubOpen() {
+    if (!isCompactMobileChat()) return false;
+    const root = getChatRoot();
+    return root ? root.classList.contains('brisa-chat-root--mobile-open') : false;
+  }
+
+  function openMobileHub({ detail = false } = {}) {
+    if (!isCompactMobileChat() || isEmbeddedMode()) return false;
+    const root = getChatRoot();
+    const overlay = document.getElementById('brisa-chat-mobile-overlay');
+    const viewport = document.getElementById('brisa-chat-mobile-viewport');
+    const panel = document.getElementById('brisa-chat-panel');
+    const win = document.getElementById('brisa-chat-window');
+    if (!root || !panel || !win) return false;
+
+    root.classList.add('brisa-chat-root--mobile-open');
+    root.classList.toggle('brisa-chat-root--mobile-detail', Boolean(detail));
+    root.style.pointerEvents = 'auto';
+    if (overlay) overlay.setAttribute('aria-hidden', 'false');
+    if (viewport) viewport.setAttribute('aria-hidden', 'false');
+    setDocumentScrollLocked(true);
+    setSurfaceImmediate(panel, 'panel', true, 'bubble');
+    if (detail) {
+      setSurfaceImmediate(win, 'window', true, 'panel');
+    } else {
+      setSurfaceImmediate(win, 'window', false, 'panel');
+    }
+    return true;
+  }
+
+  function closeMobileDetail() {
+    if (!isCompactMobileChat()) return false;
+    const root = getChatRoot();
+    const win = document.getElementById('brisa-chat-window');
+    if (!root || !win) return false;
+    root.classList.remove('brisa-chat-root--mobile-detail');
+    setSurfaceImmediate(win, 'window', false, 'panel');
+    setChatState({
+      isChatOpen: false,
+      isMinimized: false,
+      activeConversationId,
+      activePeerUid: activePeer?.uid || null
+    });
+    return true;
+  }
+
+  function closeMobileHub() {
+    if (!isCompactMobileChat()) return false;
+    const root = getChatRoot();
+    const overlay = document.getElementById('brisa-chat-mobile-overlay');
+    const viewport = document.getElementById('brisa-chat-mobile-viewport');
+    const panel = document.getElementById('brisa-chat-panel');
+    const win = document.getElementById('brisa-chat-window');
+    if (!root || !panel || !win) return false;
+
+    root.classList.remove('brisa-chat-root--mobile-detail', 'brisa-chat-root--mobile-open');
+    root.style.pointerEvents = '';
+    if (overlay) overlay.setAttribute('aria-hidden', 'true');
+    if (viewport) viewport.setAttribute('aria-hidden', 'true');
+    setSurfaceImmediate(win, 'window', false, 'panel');
+    setSurfaceImmediate(panel, 'panel', false, 'bubble');
+    setDocumentScrollLocked(false);
+    activeConversationId = null;
+    activePeer = null;
+    setChatState({
+      isChatOpen: false,
+      isMinimized: false,
+      activeConversationId: null,
+      activePeerUid: null
+    });
+    return true;
+  }
+
   function isEmbeddedMode() {
     const root = getChatRoot();
     return root ? root.classList.contains('brisa-chat--embedded') : false;
@@ -1668,6 +1995,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   }
 
   function mountChat(containerEl) {
+    if (isCompactMobileChat() && !isEmbeddedMode()) return;
     const root = getChatRoot();
     if (!root || !containerEl) return;
     if (!embeddedParent) {
@@ -1693,6 +2021,10 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   }
 
   function unmountChat() {
+    if (isCompactMobileChat() && !isEmbeddedMode()) {
+      closeMobileHub();
+      return;
+    }
     const root = getChatRoot();
     if (!root) return;
     root.classList.remove('brisa-chat--embedded');
@@ -3313,15 +3645,22 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       if (pill) {
         transitionSurface(pill, 'pill', false, { origin: 'pill', immediate: isEmbeddedMode() });
       }
-      if (openOrigin === 'bubble') {
+      if (!isCompactMobileChat() && openOrigin === 'bubble') {
         triggerBubbleReaction('restoring');
       }
       renderActiveConversation();
-      transitionSurface(win, 'window', true, { origin: openOrigin, immediate: isEmbeddedMode() })
-        .then(() => {
-          if (activeConversationId !== conversationId) return;
+      if (isCompactMobileChat() && !isEmbeddedMode()) {
+        openMobileHub({ detail: true });
+        if (activeConversationId === conversationId) {
           focusChatInput();
-        });
+        }
+      } else {
+        transitionSurface(win, 'window', true, { origin: openOrigin, immediate: isEmbeddedMode() })
+          .then(() => {
+            if (activeConversationId !== conversationId) return;
+            focusChatInput();
+          });
+      }
       markAllAsRead(conversationId);
       clearUnread(conversationId);
       resetConversationUnread(conversationId);
@@ -3334,6 +3673,10 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   function minimizeActiveConversation() {
     if (isEmbeddedMode()) return;
     if (!activeConversationId || !activePeer) return;
+    if (isCompactMobileChat()) {
+      closeMobileDetail();
+      return;
+    }
     const conversationId = activeConversationId;
     const peerUid = activePeer.uid;
     const closeOrigin = resolveWindowCloseOrigin({ minimize: true });
@@ -3455,6 +3798,18 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     }
 
     if (activeConversationId === conversationId) {
+      if (isCompactMobileChat()) {
+        activeConversationId = null;
+        activePeer = null;
+        closeMobileDetail();
+        setChatState({
+          isChatOpen: false,
+          isMinimized: false,
+          activeConversationId: null,
+          activePeerUid: null
+        });
+        return;
+      }
       activeConversationId = null;
       activePeer = null;
       const win = document.getElementById('brisa-chat-window');
@@ -3479,11 +3834,13 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   function attachUIHandlers() {
     const bubble = document.getElementById('brisa-chat-bubble');
     const fab = document.getElementById('brisa-chat-fab');
+    const overlay = document.getElementById('brisa-chat-mobile-overlay');
     const panel = document.getElementById('brisa-chat-panel');
     const panelClose = document.getElementById('brisa-chat-panel-close');
     const panelSoundToggle = document.getElementById('brisa-chat-panel-sound-toggle');
     const searchInput = document.getElementById('brisa-chat-user-search');
     const win = document.getElementById('brisa-chat-window');
+    const winBack = document.getElementById('brisa-chat-window-back');
     const winClose = document.getElementById('brisa-chat-window-close');
     const winMin = document.getElementById('brisa-chat-window-min');
     const deleteConversationBtn = document.getElementById('brisa-chat-delete-conversation');
@@ -3626,6 +3983,22 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
           suppressClick = false;
           return;
         }
+        if (isCompactMobileChat() && !isEmbeddedMode()) {
+          if (isMobileHubOpen()) {
+            closeMobileHub();
+          } else {
+            resetPanelSearchState();
+            updateAssistantQuickRow();
+            openMobileHub({ detail: false });
+            setChatState({
+              isChatOpen: false,
+              isMinimized: false,
+              activeConversationId,
+              activePeerUid: activePeer?.uid || null
+            });
+          }
+          return;
+        }
         const visible = isPanelVisible(panel);
         syncPanelViewportBounds();
         if (visible) {
@@ -3648,7 +4021,18 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     }
     if (panelClose && panel) {
       panelClose.addEventListener('click', () => {
+        if (isCompactMobileChat() && !isEmbeddedMode()) {
+          closeMobileHub();
+          return;
+        }
         closeUsersPanel({ minimizeConversation: true, origin: 'bubble' });
+      });
+    }
+    if (overlay) {
+      overlay.addEventListener('click', (event) => {
+        if (event.target === overlay) {
+          closeMobileHub();
+        }
       });
     }
     if (panelSoundToggle) {
@@ -3718,8 +4102,19 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         }
       });
     }
+    if (winBack && win) {
+      winBack.addEventListener('click', () => {
+        if (isCompactMobileChat() && !isEmbeddedMode()) {
+          closeMobileDetail();
+        }
+      });
+    }
     if (winClose && win) {
       winClose.addEventListener('click', () => {
+        if (isCompactMobileChat() && !isEmbeddedMode()) {
+          closeMobileHub();
+          return;
+        }
         if (activeConversationId) {
           removeConversation(activeConversationId, {
             windowOrigin: resolveWindowCloseOrigin({ minimize: false })
@@ -3734,6 +4129,10 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     }
     if (winMin && win) {
       winMin.addEventListener('click', () => {
+        if (isCompactMobileChat() && !isEmbeddedMode()) {
+          closeMobileDetail();
+          return;
+        }
         minimizeActiveConversation();
       });
     }
@@ -3772,7 +4171,11 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
             bubble
           });
           const context = getChatContext();
-          closeUsersPanel({ origin: 'bubble' });
+          if (isCompactMobileChat() && !isEmbeddedMode()) {
+            closeMobileHub();
+          } else {
+            closeUsersPanel({ origin: 'bubble' });
+          }
           setChatState({
             isChatOpen: false,
             isMinimized: true,
@@ -3833,6 +4236,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     }
 
     document.addEventListener('click', (e) => {
+      if (isCompactMobileChat() && !isEmbeddedMode()) return;
       const target = e.target;
       const insidePanel = panel?.contains(target);
       const insideWin = win?.contains(target);
@@ -3960,6 +4364,17 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
 
   // Exponer API mínima para abrir conversaciones desde notificaciones
   window.BrisaChat = {
+    openHub: async (options = {}) => {
+      injectChatShell();
+      if (isCompactMobileChat() && !isEmbeddedMode()) {
+        updateAssistantQuickRow();
+        resetUserSearch();
+        openMobileHub({ detail: Boolean(options.detail) });
+      }
+    },
+    closeHub: () => {
+      closeMobileHub();
+    },
     openConversation: async (uidOrSpecial) => {
       if (!uidOrSpecial) return;
       if (uidOrSpecial === 'dm_group_chat') {
@@ -3994,13 +4409,14 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         : false;
       const panelVisible = isPanelVisible(panel);
       const winVisible = isSurfaceVisible(win);
-      const isChatOpen = !!winVisible;
-      const isMinimized = !!(!winVisible && trayHasVisiblePills);
+      const mobileHubOpen = isMobileHubOpen();
+      const isChatOpen = isCompactMobileChat() ? mobileHubOpen : !!winVisible;
+      const isMinimized = isCompactMobileChat() ? false : !!(!winVisible && trayHasVisiblePills);
       return {
         isChatOpen,
         isMinimized,
         activeConversationId: (isChatOpen || isMinimized || panelVisible) ? activeConversationId : null,
-        activePeerUid: (isChatOpen || isMinimized) ? (activePeer?.uid || null) : null,
+        activePeerUid: (isChatOpen || isMinimized || mobileHubOpen) ? (activePeer?.uid || null) : null,
         tabVisible: document.visibilityState === 'visible' && document.hasFocus()
       };
     }

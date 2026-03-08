@@ -208,7 +208,13 @@ export default function renderMessages(container) {
     try {
       const api = await ensureChatApi();
       if (!container.isConnected) return;
-      if (api && chatMount) {
+      if (!api) return;
+      if (typeof window.matchMedia === "function" && window.matchMedia("(max-width: 640px)").matches) {
+        chatMounted = true;
+        api.openHub?.();
+        return;
+      }
+      if (chatMount) {
         api.mount(chatMount);
         chatMounted = true;
       }
@@ -223,6 +229,9 @@ export default function renderMessages(container) {
     if (!uid1 || !uid2) return "";
     return [uid1, uid2].sort().join("__");
   };
+
+  const usesMobileChatHub = () =>
+    typeof window.matchMedia === "function" && window.matchMedia("(max-width: 640px)").matches;
 
   const setThreadActive = (isActive) => {
     if (shell) shell.classList.toggle("is-chat-open", isActive);
@@ -248,7 +257,7 @@ export default function renderMessages(container) {
     } else {
       updateThreadHeader("Conversacion", "Chat directo");
     }
-    setThreadActive(true);
+    setThreadActive(!usesMobileChatHub());
     await mountChat();
     const api = await ensureChatApi();
     if (!container.isConnected || !api) return;
@@ -391,7 +400,7 @@ export default function renderMessages(container) {
       activePeerUid = conversation.peerUid;
       setActiveItem(conversation.id);
       updateThreadHeader(conversation.name, conversation.subtitle || "Conversacion directa");
-      setThreadActive(true);
+      setThreadActive(!usesMobileChatHub());
       updateUnreadBadge(conversation.id, 0);
       await mountChat();
       const api = await ensureChatApi();
@@ -500,7 +509,7 @@ export default function renderMessages(container) {
       activePeerUid = convId;
       setActiveItem(convId);
       updateThreadHeader(title, subtitle);
-      setThreadActive(true);
+      setThreadActive(!usesMobileChatHub());
       await mountChat();
       const api = await ensureChatApi();
       if (!container.isConnected || !api) return;
@@ -530,7 +539,9 @@ export default function renderMessages(container) {
         container._messagesConvUnsub();
         container._messagesConvUnsub = null;
       }
-      if (window.BrisaChat?.unmount) {
+      if (usesMobileChatHub() && window.BrisaChat?.closeHub) {
+        window.BrisaChat.closeHub();
+      } else if (window.BrisaChat?.unmount) {
         window.BrisaChat.unmount();
       }
       window.removeEventListener("hashchange", onHashChange);
@@ -549,7 +560,9 @@ export default function renderMessages(container) {
       container._messagesConvUnsub();
       container._messagesConvUnsub = null;
     }
-    if (window.BrisaChat?.unmount) {
+    if (usesMobileChatHub() && window.BrisaChat?.closeHub) {
+      window.BrisaChat.closeHub();
+    } else if (window.BrisaChat?.unmount) {
       window.BrisaChat.unmount();
     }
   };

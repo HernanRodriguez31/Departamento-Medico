@@ -1127,6 +1127,41 @@
             }
         }
 
+        .brisa-chat-mobile-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 95;
+            background: rgba(17, 24, 39, 0.6);
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity 300ms ease, visibility 300ms ease;
+        }
+
+        .brisa-chat-mobile-viewport {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            pointer-events: none;
+        }
+
+        .brisa-chat-mobile-stack {
+            position: relative;
+            display: grid;
+            width: min(95vw, 420px);
+            max-width: calc(100vw - 32px);
+            height: min(85vh, calc(100dvh - 32px));
+            max-height: min(85vh, calc(100dvh - 32px));
+        }
+
+        .brisa-chat-window-back {
+            display: none;
+        }
+
         /* MOBILE (simple ajuste) */
         @media (max-width: 768px), (display-mode: standalone) {
             .brisa-chat-fab {
@@ -1165,6 +1200,120 @@
 
             .brisa-chat-mini-modal {
                 padding-bottom: calc(var(--bottom-nav-h) + 56px + env(safe-area-inset-bottom));
+            }
+        }
+
+        @media (max-width: 640px) {
+            #brisa-chat-root.brisa-chat-root--mobile-open {
+                pointer-events: auto;
+            }
+
+            #brisa-chat-root.brisa-chat-root--mobile-open .brisa-chat-mobile-overlay {
+                opacity: 1;
+                visibility: visible;
+                pointer-events: auto;
+            }
+
+            #brisa-chat-root.brisa-chat-root--mobile-open .brisa-chat-mobile-viewport {
+                pointer-events: auto;
+            }
+
+            #brisa-chat-root.brisa-chat-root--mobile-open .brisa-chat-fab {
+                position: relative;
+                inset: auto;
+                left: auto;
+                right: auto;
+                top: auto;
+                bottom: auto;
+                width: 100%;
+                height: 100%;
+                display: block;
+                pointer-events: auto;
+                z-index: 56;
+            }
+
+            #brisa-chat-root.brisa-chat-root--mobile-open .brisa-chat-bubble,
+            #brisa-chat-root.brisa-chat-root--mobile-open .brisa-chat-pill,
+            #brisa-chat-root.brisa-chat-root--mobile-open .brisa-chat-pill-tray {
+                opacity: 0;
+                visibility: hidden;
+                pointer-events: none;
+            }
+
+            #brisa-chat-root.brisa-chat-root--mobile-open .brisa-chat-bubble {
+                transform: scale(0.92);
+            }
+
+            .brisa-chat-fab .brisa-chat-panel,
+            .brisa-chat-window {
+                position: absolute;
+                inset: 0;
+                top: auto;
+                left: auto;
+                right: auto;
+                bottom: auto;
+                width: 100%;
+                max-width: none;
+                height: 100%;
+                max-height: none;
+                border: 2px solid #7ab800;
+                border-radius: 24px;
+                background: #ffffff;
+                box-shadow: 0 20px 60px -15px rgba(0, 0, 0, 0.3);
+                overflow: hidden;
+                transition: opacity 300ms ease, transform 300ms ease, visibility 300ms ease;
+                animation: none !important;
+                filter: none !important;
+                clip-path: none !important;
+            }
+
+            .brisa-chat-fab .brisa-chat-panel {
+                z-index: 56;
+                display: flex;
+                flex-direction: column;
+                transform: translate3d(0, 12px, 0) scale(0.98);
+                transform-origin: center;
+            }
+
+            .brisa-chat-window {
+                z-index: 60;
+                transform: translate3d(0, 12px, 0) scale(0.98);
+                transform-origin: center;
+            }
+
+            .brisa-chat-fab .brisa-chat-panel[data-chat-state="open"],
+            .brisa-chat-fab .brisa-chat-panel[data-chat-state="opening"],
+            .brisa-chat-window[data-chat-state="open"],
+            .brisa-chat-window[data-chat-state="opening"] {
+                opacity: 1;
+                visibility: visible;
+                pointer-events: auto;
+            }
+
+            .brisa-chat-fab .brisa-chat-panel[data-chat-state="open"],
+            .brisa-chat-fab .brisa-chat-panel[data-chat-state="opening"] {
+                transform: translate3d(0, 0, 0) scale(1);
+            }
+
+            .brisa-chat-window[data-chat-state="open"],
+            .brisa-chat-window[data-chat-state="opening"] {
+                transform: translate3d(0, 0, 0) scale(1);
+            }
+
+            #brisa-chat-root.brisa-chat-root--mobile-detail .brisa-chat-panel {
+                transform: translate3d(0, 0, 0) scale(0.985);
+                opacity: 0.96;
+                pointer-events: none;
+            }
+
+            .brisa-chat-window-back {
+                display: inline-flex;
+            }
+
+            .brisa-chat-pill-btn {
+                width: 44px;
+                height: 44px;
+                border-radius: 14px;
             }
         }
 
