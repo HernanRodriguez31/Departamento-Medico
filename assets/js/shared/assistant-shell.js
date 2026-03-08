@@ -7,6 +7,7 @@ const FRAME_SOURCES = {
 };
 const MODEL_STORAGE_KEY = "dm_ai_model";
 const DEFAULT_MODEL = "gemini";
+const ASSISTANT_ICON_SRC = "/asistente-ia/boti-brisa.jpg";
 
 const OPENAI_ICON = `
   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -45,6 +46,16 @@ const buildSelectorMarkup = () => `
 const buildShellMarkup = () => `
   <div class="dm-ai-backdrop" data-dm-ai-backdrop aria-hidden="true"></div>
   <section class="dm-ai-panel" role="dialog" aria-modal="true" aria-label="Asistente IA">
+    <div class="dm-ai-header" data-dm-ai-header>
+      <div class="dm-ai-handle" aria-hidden="true"></div>
+      <div class="dm-ai-header-row">
+        <div class="dm-ai-title">
+          <img class="dm-ai-title__icon" src="${ASSISTANT_ICON_SRC}" alt="" aria-hidden="true" />
+          <span>Asistente IA</span>
+        </div>
+        <button class="dm-ai-close" type="button" data-dm-ai-close aria-label="Cerrar asistente">×</button>
+      </div>
+    </div>
     <div class="dm-ai-body">
       <iframe class="dm-ai-iframe" data-dm-ai-frame="gemini" title="Asistente IA Gemini" loading="lazy" data-src="${FRAME_SOURCES.gemini}" aria-hidden="true"></iframe>
       <iframe class="dm-ai-iframe" data-dm-ai-frame="gpt" title="Asistente IA ChatGPT" loading="lazy" data-src="${FRAME_SOURCES.gpt}" aria-hidden="true"></iframe>
@@ -140,6 +151,21 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
     scrollLocked: false,
     scrollY: 0,
     bodyStyles: {}
+  };
+
+  const dispatchShellState = (source = "internal") => {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(
+      new CustomEvent("dm:assistant-shell-state", {
+        detail: {
+          panelOpen: state.panelOpen,
+          pickerOpen: state.pickerOpen,
+          activeModel: state.activeModel,
+          anchorContext: state.anchorContext,
+          source
+        }
+      })
+    );
   };
 
   const isBodyLocked = () =>
@@ -294,6 +320,7 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
     if (notify) {
       sendModelToIframe(model);
     }
+    dispatchShellState("model-change");
   };
 
   // Keep one iframe per model so each conversation stays alive.
@@ -357,6 +384,7 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
     positionChat();
     syncScrollLock();
     if (isDesktop()) addPanelOutsideListener();
+    dispatchShellState("panel-open");
   };
 
   const closePanel = () => {
@@ -372,6 +400,7 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
     closePicker();
     syncScrollLock();
     removePanelOutsideListener();
+    dispatchShellState("panel-close");
   };
 
   const openPicker = () => {
@@ -381,6 +410,7 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
     updateSelectorUI();
     positionPicker();
     syncScrollLock();
+    dispatchShellState("picker-open");
   };
 
   const closePicker = () => {
@@ -388,6 +418,7 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
     state.pickerOpen = false;
     selector?.classList.remove("is-open");
     syncScrollLock();
+    dispatchShellState("picker-close");
   };
 
   const togglePicker = () => {
@@ -537,6 +568,13 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
 
   if (typeof window !== "undefined") {
     window.__dmAssistantShell = api;
+    window.dispatchEvent(
+      new CustomEvent("dm:assistant-shell-ready", {
+        detail: {
+          api
+        }
+      })
+    );
   }
   shell.__assistantShellApi = api;
   return api;

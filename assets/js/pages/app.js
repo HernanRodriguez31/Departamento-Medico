@@ -2888,11 +2888,7 @@ const boot = () => {
   const { auth, db } = ensureFirebase();
   initSessionGuard({ auth, db, fallbackHash: "#carrete" });
   initUserMenu({ variant: "mobile" });
-  const assistantShell = initAssistantShell({ variant: "mobile" });
-  const aiFab = document.getElementById("aiFab");
-  if (aiFab && assistantShell) {
-    aiFab.addEventListener("click", () => assistantShell.togglePicker());
-  }
+  initAssistantShell({ variant: "mobile" });
   initCarouselModule().catch((err) => {
     throttle("muro-init", 60000, () => {
       logger.error("[Muro] Error inicializando", err);

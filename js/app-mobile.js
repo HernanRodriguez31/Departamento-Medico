@@ -106,32 +106,126 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /*==================== MOBILE APP SHELL VIEWS ====================*/
     const bottomNav = document.querySelector('.dm-bottom-nav')
-    const bottomNavLinks = bottomNav ? bottomNav.querySelectorAll('[data-route]') : []
+    const bottomNavItems = bottomNav ? Array.from(bottomNav.querySelectorAll('[data-route]')) : []
     const appShellQuery = window.matchMedia('(max-width: 768px)')
+    const swipeQuery = window.matchMedia('(max-width: 640px)')
+    const coarsePointerQuery = window.matchMedia('(pointer: coarse)')
     const displayModeQuery = window.matchMedia('(display-mode: standalone)')
+    const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
     const muroComposer = document.getElementById('dm-muro-composer')
+    const mainEl = document.querySelector('main.main')
 
-    // ------------------------------------------------------------
-    // App shell layout vars
-    // ------------------------------------------------------------
-    // El modo "app" usa un contenedor .main fijo con overflow-y:auto.
-    // Para que el top/bottom queden correctos en mobile, calculamos el
-    // alto real del header y del bottom-nav y los exponemos como CSS vars.
+    const MOBILE_VIEWS = ['muro', 'estructura', 'ia', 'comites', 'foro']
+    const VIEW_HASH = {
+        muro: 'carrete',
+        estructura: 'estructura',
+        ia: 'ia',
+        comites: 'comites',
+        foro: 'foro'
+    }
+    const HASH_ALIAS_TO_VIEW = {
+        carrete: 'muro',
+        muro: 'muro',
+        estructura: 'estructura',
+        'estructura-funcional': 'estructura',
+        comites: 'comites',
+        foro: 'foro',
+        ia: 'ia',
+        evidencia: 'ia',
+        investigacion: 'ia',
+        'galeria-operativa': 'muro'
+    }
+    const VIEW_NODE_SELECTORS = {
+        muro: ['#carrete'],
+        estructura: ['#estructura-hero', '#estructura-funcional'],
+        comites: ['#comites'],
+        foro: ['#foro']
+    }
+    const SWIPE_EDGE_GUARD_PX = 12
+    const SWIPE_DEADZONE_PX = 7
+    const SWIPE_COMMIT_DISTANCE_PX = 44
+    const SWIPE_COMMIT_RATIO = 0.13
+    const SWIPE_COMMIT_VELOCITY = 0.26
+    const SWIPE_SETTLE_DURATION_MS = 280
+    const SWIPE_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)'
+    const swipeExcludedSelector = [
+        '.dm-bottom-nav',
+        '#aiFab',
+        '#brisa-chat-root',
+        '.brisa-chat-fab',
+        '.brisa-chat-panel',
+        '.brisa-chat-window',
+        '.brisa-chat-mobile-overlay',
+        '.dm-ai-selector.is-open',
+        '.dm-carousel-viewport',
+        '.dm-slide-nav',
+        '#dm-carousel-modal.is-open',
+        'iframe',
+        'video',
+        'canvas',
+        'map',
+        'input',
+        'input[type="range"]',
+        'textarea',
+        'select',
+        '[contenteditable="true"]',
+        '.emoji-panel',
+        '.dm-info-tooltip',
+        '[data-no-swipe]'
+    ].join(', ')
+
     const rootStyle = document.documentElement.style
     let rafLayout = 0
+    let currentViewId = 'muro'
+    let lastNonIaViewId = 'muro'
+    const scrollByView = new Map()
+
+    const swipeState = {
+        activePointerId: null,
+        startX: 0,
+        startY: 0,
+        lastX: 0,
+        lastY: 0,
+        startTime: 0,
+        isTracking: false,
+        axisLocked: null,
+        isSwiping: false,
+        isSettling: false,
+        isCleaning: false,
+        didMove: false,
+        rafId: 0,
+        settleTimer: 0,
+        currentViewId: 'muro',
+        targetViewId: null,
+        direction: 0,
+        pendingDx: 0,
+        containerWidth: 0,
+        hostEl: null,
+        hostRole: '',
+        currentScrollTop: 0,
+        targetScrollTop: 0,
+        stageEl: null,
+        currentSlideEl: null,
+        targetSlideEl: null,
+        renderedCurrentViewId: null,
+        renderedTargetViewId: null,
+        assistantShellWasOpen: false,
+        assistantPreviewActive: false,
+        suppressClickUntil: 0,
+        suppressClickTimer: 0,
+        clickSuppressController: null,
+        enabled: false
+    }
+    const swipeHostControllers = new Map()
 
     function syncAppShellVars() {
-        // Evitar depender del orden de declaración de isAppShell()
         if (!(appShellQuery.matches || displayModeQuery.matches)) return
 
         const headerEl = document.querySelector('.header')
-
         const headerH = headerEl ? Math.round(headerEl.getBoundingClientRect().height) : 0
         const composerH = muroComposer ? Math.round(muroComposer.getBoundingClientRect().height) : 0
 
         if (headerH > 0) rootStyle.setProperty('--app-header-h', `${headerH}px`)
-        // Evitar recalcular el alto del bottom-nav desde el DOM para que no "derrape"
-        // en móviles. Usamos el valor fijo del CSS como referencia.
         if (bottomNav) {
             const navVar = parseFloat(
                 getComputedStyle(document.documentElement).getPropertyValue('--bottom-nav-h')
@@ -153,40 +247,122 @@ document.addEventListener('DOMContentLoaded', () => {
         })
     }
 
-    // Primer cálculo (después de layout)
-    scheduleSyncAppShellVars()
-    window.addEventListener('resize', scheduleSyncAppShellVars, { passive: true })
-    window.addEventListener('orientationchange', scheduleSyncAppShellVars, { passive: true })
-    const viewAlias = {
-        carrete: 'carrete',
-        muro: 'carrete',
-        estructura: 'estructura',
-        comites: 'comites',
-        evidencia: 'evidencia',
-        foro: 'foro',
-        'estructura-funcional': 'estructura',
-        investigacion: 'evidencia',
-        'galeria-operativa': 'carrete'
-    }
-
     const isAppShell = () => appShellQuery.matches || displayModeQuery.matches
+    const isSwipeRuntime = () => isAppShell()
+        && swipeQuery.matches
+        && (coarsePointerQuery.matches || navigator.maxTouchPoints > 0)
+    const prefersReducedMotion = () => reducedMotionQuery.matches
     const carreteSection = document.getElementById('carrete')
     const carouselHeader = carreteSection ? carreteSection.querySelector('.dm-carousel-header') : null
     const carouselViewport = carreteSection ? carreteSection.querySelector('.dm-carousel-viewport') : null
     const carouselHeaderAnchor = carouselHeader ? document.createComment('dm-carousel-header-anchor') : null
     const resetMuroHorizontalOffset = () => {
-        const mainEl = document.querySelector("main.main");
-        const targets = [carouselViewport, mainEl, document.documentElement, document.body];
+        const targets = [carouselViewport, mainEl, document.documentElement, document.body]
         targets.forEach((el) => {
-            if (!el || typeof el.scrollLeft !== "number") return;
-            el.scrollLeft = 0;
-        });
+            if (!el || typeof el.scrollLeft !== 'number') return
+            el.scrollLeft = 0
+        })
     }
     const scheduleResetMuroOffset = () => {
         requestAnimationFrame(() => {
-            resetMuroHorizontalOffset();
-            requestAnimationFrame(resetMuroHorizontalOffset);
-        });
+            resetMuroHorizontalOffset()
+            requestAnimationFrame(resetMuroHorizontalOffset)
+        })
+    }
+
+    const normalizeViewId = (value) => {
+        const raw = String(value || '')
+            .replace(/^#/, '')
+            .trim()
+            .toLowerCase()
+        return HASH_ALIAS_TO_VIEW[raw] || 'muro'
+    }
+    const getCurrentViewId = () => normalizeViewId(currentViewId || window.location.hash || 'muro')
+    const getViewIndex = (viewId) => MOBILE_VIEWS.indexOf(normalizeViewId(viewId))
+    const getNextViewId = (viewId) => {
+        const idx = getViewIndex(viewId)
+        return MOBILE_VIEWS[(idx + 1 + MOBILE_VIEWS.length) % MOBILE_VIEWS.length]
+    }
+    const getPrevViewId = (viewId) => {
+        const idx = getViewIndex(viewId)
+        return MOBILE_VIEWS[(idx - 1 + MOBILE_VIEWS.length) % MOBILE_VIEWS.length]
+    }
+    const getCanonicalHashForView = (viewId) => VIEW_HASH[normalizeViewId(viewId)] || VIEW_HASH.muro
+    const getBodyRouteForView = (viewId) => {
+        const normalized = normalizeViewId(viewId)
+        return normalized === 'muro' ? 'carrete' : normalized
+    }
+    const getViewNodes = (viewId) => {
+        const selectors = VIEW_NODE_SELECTORS[normalizeViewId(viewId)] || []
+        return selectors
+            .map((selector) => document.querySelector(selector))
+            .filter(Boolean)
+    }
+    const getAssistantShellApi = () => window.__dmAssistantShell || null
+    const getAssistantShellElements = () => {
+        const shell = document.querySelector('[data-dm-ai-shell]')
+        if (!shell) return null
+        return {
+            shell,
+            backdrop: shell.querySelector('[data-dm-ai-backdrop]'),
+            panel: shell.querySelector('.dm-ai-panel'),
+            header: shell.querySelector('[data-dm-ai-header]')
+        }
+    }
+
+    const getSwipeViewportWidth = () => {
+        const viewportWidth = window.visualViewport?.width || window.innerWidth || 0
+        const rectWidth = mainEl?.getBoundingClientRect?.().width || 0
+        return rectWidth || viewportWidth
+    }
+
+    const getViewScrollContainer = (viewId) => {
+        const normalized = normalizeViewId(viewId)
+        if (normalized === 'ia') return null
+        if (normalized === 'muro') {
+            const viewport = document.querySelector('#carrete .dm-carousel-viewport')
+            const section = document.getElementById('carrete')
+            if (section?.classList.contains('is-feed-mode') && viewport) return viewport
+            return mainEl
+        }
+        if (normalized === 'foro') {
+            return document.querySelector('#foro > .section-card') || mainEl
+        }
+        return mainEl
+    }
+
+    const getStoredScrollTop = (viewId) => {
+        const normalized = normalizeViewId(viewId)
+        const stored = scrollByView.get(normalized)
+        return typeof stored === 'number' ? stored : 0
+    }
+
+    const getActiveScrollTop = (viewId) => {
+        const el = getViewScrollContainer(viewId)
+        if (!el) return 0
+        if (el === window) return window.scrollY || 0
+        return el.scrollTop || 0
+    }
+
+    const saveScrollForView = (viewId) => {
+        const normalized = normalizeViewId(viewId)
+        if (normalized === 'ia') return
+        scrollByView.set(normalized, getActiveScrollTop(normalized))
+    }
+
+    const restoreScrollForView = (viewId) => {
+        const normalized = normalizeViewId(viewId)
+        if (normalized === 'ia') return
+        const scrollEl = getViewScrollContainer(normalized)
+        const nextTop = getStoredScrollTop(normalized)
+        if (!scrollEl) return
+        requestAnimationFrame(() => {
+            if (scrollEl === window) {
+                window.scrollTo({ top: nextTop, behavior: 'auto' })
+                return
+            }
+            scrollEl.scrollTop = nextTop
+        })
     }
 
     const syncMuroHeaderPlacement = () => {
@@ -213,57 +389,830 @@ document.addEventListener('DOMContentLoaded', () => {
         scheduleResetMuroOffset()
     }
 
-    const updateNavState = (route) => {
-        if (!bottomNavLinks.length) return
-        bottomNavLinks.forEach((link) => {
-            const isActive = link.dataset.route === route
-            link.classList.toggle('is-active', isActive)
+    const updateNavState = (viewId) => {
+        if (!bottomNavItems.length) return
+        const activeViewId = normalizeViewId(viewId)
+        bottomNavItems.forEach((item) => {
+            const itemViewId = normalizeViewId(item.dataset.route)
+            const isActive = itemViewId === activeViewId
+            item.classList.toggle('is-active', isActive)
+            if (item.tagName === 'BUTTON') {
+                item.setAttribute('aria-pressed', isActive ? 'true' : 'false')
+                return
+            }
             if (isActive) {
-                link.setAttribute('aria-current', 'page')
+                item.setAttribute('aria-current', 'page')
             } else {
-                link.removeAttribute('aria-current')
+                item.removeAttribute('aria-current')
             }
         })
     }
 
-    const setViewFromHash = () => {
-        const raw = (window.location.hash || '').replace('#', '').trim().toLowerCase()
-        const route = viewAlias[raw] || 'carrete'
-        if (!isAppShell()) {
-            document.body.removeAttribute('data-view')
-            updateNavState(route)
+    const emitViewChange = ({ viewId, previousViewId, source, direction = 0, historyMode = 'none' }) => {
+        window.dispatchEvent(
+            new CustomEvent('dm:viewchange', {
+                detail: {
+                    viewId,
+                    routeHash: getCanonicalHashForView(viewId),
+                    bodyView: getBodyRouteForView(viewId),
+                    previousViewId,
+                    source,
+                    direction,
+                    historyMode
+                }
+            })
+        )
+    }
+
+    const syncAssistantShellForView = (viewId) => {
+        const assistantShell = getAssistantShellApi()
+        if (!assistantShell) return
+        if (normalizeViewId(viewId) === 'ia') {
+            const model = assistantShell.state?.activeModel || 'gemini'
+            Promise.resolve(assistantShell.openChat(model, { context: 'app' })).catch(() => {})
+            if (assistantShell.state?.pickerOpen) {
+                assistantShell.closePicker()
+            }
             return
         }
-        if (!raw || raw !== route) {
-            history.replaceState(null, '', `#${route}`)
+        if (assistantShell.state?.panelOpen) assistantShell.closeChat()
+        if (assistantShell.state?.pickerOpen) assistantShell.closePicker()
+    }
+
+    const updateHistoryForView = (viewId, historyMode, routeChanged) => {
+        if (historyMode === 'none') return
+        const hash = `#${getCanonicalHashForView(viewId)}`
+        const shouldReplace = historyMode === 'replace' || !routeChanged
+        if (!shouldReplace && window.location.hash === hash) return
+        history[shouldReplace ? 'replaceState' : 'pushState']({ dmView: viewId }, '', hash)
+    }
+
+    const navigateToView = (targetViewId, {
+        source = 'router',
+        direction = 0,
+        historyMode = 'push',
+        forceEmit = false
+    } = {}) => {
+        const normalizedTarget = normalizeViewId(targetViewId)
+        const previousViewId = getCurrentViewId()
+        const routeChanged = normalizedTarget !== previousViewId
+        const nextHash = getCanonicalHashForView(normalizedTarget)
+        const shouldCanonicalize = window.location.hash !== `#${nextHash}`
+        const effectiveHistoryMode = historyMode === 'push' && !routeChanged ? 'replace' : historyMode
+
+        if (!isAppShell()) {
+            currentViewId = normalizedTarget
+            document.body.removeAttribute('data-view')
+            updateNavState(normalizedTarget)
+            return false
         }
-        document.body.dataset.view = route
-        updateNavState(route)
-        // Asegurar que el contenedor principal quede bien calculado
-        // (alto del header y de la barra inferior).
+
+        if (routeChanged && previousViewId !== 'ia') {
+            saveScrollForView(previousViewId)
+        }
+        if (normalizedTarget !== 'ia') {
+            lastNonIaViewId = normalizedTarget
+        }
+
+        currentViewId = normalizedTarget
+        document.body.dataset.view = getBodyRouteForView(normalizedTarget)
+        updateNavState(normalizedTarget)
         scheduleSyncAppShellVars()
         syncMuroHeaderPlacement()
-        if (route === 'carrete') {
+        if (normalizedTarget === 'muro') {
             scheduleResetMuroOffset()
+        }
+
+        if (effectiveHistoryMode !== 'none' && (routeChanged || shouldCanonicalize)) {
+            updateHistoryForView(normalizedTarget, effectiveHistoryMode, routeChanged)
+        }
+
+        syncAssistantShellForView(normalizedTarget)
+
+        if (routeChanged && normalizedTarget !== 'ia') {
+            restoreScrollForView(normalizedTarget)
+        }
+
+        if (routeChanged || shouldCanonicalize || forceEmit) {
+            emitViewChange({
+                viewId: normalizedTarget,
+                previousViewId,
+                source,
+                direction,
+                historyMode: effectiveHistoryMode
+            })
+        }
+
+        return routeChanged || shouldCanonicalize
+    }
+
+    const syncViewFromLocation = ({ source = 'location-sync', allowCanonicalReplace = true, forceEmit = false } = {}) => {
+        const rawHash = String(window.location.hash || '').replace(/^#/, '').trim().toLowerCase()
+        const viewId = normalizeViewId(rawHash || 'muro')
+        const needsCanonicalHash = !rawHash || rawHash !== getCanonicalHashForView(viewId)
+        navigateToView(viewId, {
+            source,
+            historyMode: allowCanonicalReplace && needsCanonicalHash ? 'replace' : 'none',
+            forceEmit
+        })
+    }
+
+    const handleShellChange = () => {
+        syncViewFromLocation({ source: 'shell-breakpoint', allowCanonicalReplace: true, forceEmit: true })
+        syncSwipeController()
+    }
+
+    const handleAssistantShellState = (event) => {
+        if (!isAppShell()) return
+        const detail = event.detail || {}
+        if (detail.panelOpen) {
+            if (getCurrentViewId() !== 'ia') {
+                navigateToView('ia', {
+                    source: 'assistant-shell-open',
+                    historyMode: 'push',
+                    forceEmit: true
+                })
+            }
+            return
+        }
+        if (getCurrentViewId() === 'ia') {
+            navigateToView(lastNonIaViewId || 'muro', {
+                source: 'assistant-shell-close',
+                historyMode: 'replace',
+                forceEmit: true
+            })
         }
     }
 
-    const handleShellChange = () => setViewFromHash()
+    const handleAssistantShellReady = () => {
+        if (getCurrentViewId() === 'ia') {
+            syncAssistantShellForView('ia')
+        }
+        syncSwipeController()
+    }
+
+    const handleBottomNavClick = (event) => {
+        const routeEl = event.target.closest('[data-route]')
+        if (!routeEl || !bottomNav?.contains(routeEl)) return
+        event.preventDefault()
+        navigateToView(routeEl.dataset.route, {
+            source: 'bottom-nav',
+            historyMode: 'push'
+        })
+    }
+
+    scheduleSyncAppShellVars()
+    window.addEventListener('resize', scheduleSyncAppShellVars, { passive: true })
+    window.addEventListener('orientationchange', scheduleSyncAppShellVars, { passive: true })
+    window.addEventListener('resize', syncMuroHeaderPlacement, { passive: true })
+    window.addEventListener('orientationchange', syncMuroHeaderPlacement, { passive: true })
 
     if (appShellQuery.addEventListener) {
         appShellQuery.addEventListener('change', handleShellChange)
     } else {
         appShellQuery.addListener(handleShellChange)
     }
+    if (swipeQuery.addEventListener) {
+        swipeQuery.addEventListener('change', syncSwipeController)
+    } else {
+        swipeQuery.addListener(syncSwipeController)
+    }
+    if (coarsePointerQuery.addEventListener) {
+        coarsePointerQuery.addEventListener('change', syncSwipeController)
+    } else {
+        coarsePointerQuery.addListener(syncSwipeController)
+    }
     if (displayModeQuery.addEventListener) {
         displayModeQuery.addEventListener('change', handleShellChange)
     } else {
         displayModeQuery.addListener(handleShellChange)
     }
-    window.addEventListener('hashchange', setViewFromHash)
-    setViewFromHash()
-    window.addEventListener('resize', syncMuroHeaderPlacement, { passive: true })
-    window.addEventListener('orientationchange', syncMuroHeaderPlacement, { passive: true })
+
+    bottomNav?.addEventListener('click', handleBottomNavClick)
+    window.addEventListener('hashchange', () => {
+        syncViewFromLocation({ source: 'hashchange', allowCanonicalReplace: true, forceEmit: true })
+    })
+    window.addEventListener('popstate', () => {
+        syncViewFromLocation({ source: 'popstate', allowCanonicalReplace: false, forceEmit: true })
+    })
+    window.addEventListener('dm:assistant-shell-state', handleAssistantShellState)
+    window.addEventListener('dm:assistant-shell-ready', handleAssistantShellReady)
+
+    window.__dmMobileShell = {
+        navigateToView,
+        getCurrentViewId,
+        getNextViewId,
+        getPrevViewId
+    }
+
+    syncViewFromLocation({ source: 'init', allowCanonicalReplace: true, forceEmit: true })
+    syncSwipeController()
+
+    function ensureSwipeStage() {
+        if (!mainEl) return null
+        if (swipeState.stageEl?.isConnected) return swipeState.stageEl
+        const stage = document.createElement('div')
+        stage.className = 'dm-mobile-swipe-stage'
+        stage.setAttribute('aria-hidden', 'true')
+
+        const currentSlide = document.createElement('div')
+        currentSlide.className = 'dm-mobile-swipe-slide dm-mobile-swipe-slide--current'
+        currentSlide.innerHTML = '<div class="dm-mobile-swipe-slide__content"></div>'
+
+        const targetSlide = document.createElement('div')
+        targetSlide.className = 'dm-mobile-swipe-slide dm-mobile-swipe-slide--target'
+        targetSlide.innerHTML = '<div class="dm-mobile-swipe-slide__content"></div>'
+
+        stage.appendChild(currentSlide)
+        stage.appendChild(targetSlide)
+        mainEl.appendChild(stage)
+
+        swipeState.stageEl = stage
+        swipeState.currentSlideEl = currentSlide
+        swipeState.targetSlideEl = targetSlide
+        return stage
+    }
+
+    function resetSwipeSlide(slideEl) {
+        if (!slideEl) return
+        slideEl.style.transform = ''
+        slideEl.style.transition = ''
+        slideEl.removeAttribute('data-swipe-view')
+        const content = slideEl.querySelector('.dm-mobile-swipe-slide__content')
+        if (!content) return
+        content.style.transform = ''
+        content.style.transition = ''
+        content.innerHTML = ''
+    }
+
+    function cleanupSwipeScene() {
+        resetSwipeSlide(swipeState.currentSlideEl)
+        resetSwipeSlide(swipeState.targetSlideEl)
+        if (swipeState.stageEl) {
+            delete swipeState.stageEl.dataset.currentView
+            delete swipeState.stageEl.dataset.targetView
+        }
+        swipeState.renderedCurrentViewId = null
+        swipeState.renderedTargetViewId = null
+    }
+
+    function renderViewCloneIntoSlide(viewId, slideEl, scrollTop) {
+        if (!slideEl) return false
+        resetSwipeSlide(slideEl)
+        if (viewId === 'ia') return true
+
+        const nodes = getViewNodes(viewId)
+        if (!nodes.length) return false
+
+        slideEl.dataset.swipeView = viewId
+        const content = slideEl.querySelector('.dm-mobile-swipe-slide__content')
+        if (!content) return false
+
+        const fragment = document.createDocumentFragment()
+        nodes.forEach((node) => {
+            const clone = node.cloneNode(true)
+            clone.setAttribute('aria-hidden', 'true')
+            fragment.appendChild(clone)
+        })
+        content.appendChild(fragment)
+
+        const normalizedViewId = normalizeViewId(viewId)
+        const scrollContainer = getViewScrollContainer(viewId)
+        if (scrollTop > 0 && scrollContainer === mainEl) {
+            content.style.transform = `translate3d(0, ${-scrollTop}px, 0)`
+            return true
+        }
+        if (normalizedViewId === 'muro') {
+            const previewViewport = content.querySelector('.dm-carousel-viewport')
+            if (previewViewport) previewViewport.scrollTop = scrollTop
+            return true
+        }
+        if (normalizedViewId === 'foro') {
+            const previewScroller = content.querySelector('#foro > .section-card')
+                || content.querySelector('.section-card')
+            if (previewScroller) previewScroller.scrollTop = scrollTop
+        }
+        return true
+    }
+
+    function getSwipeProgress(dx) {
+        if (!swipeState.containerWidth) return 0
+        return Math.min(Math.abs(dx) / swipeState.containerWidth, 1)
+    }
+
+    function getSwipeSettleDuration() {
+        return prefersReducedMotion() ? 160 : SWIPE_SETTLE_DURATION_MS
+    }
+
+    function setSlideTransition(slideEl, enabled) {
+        if (!slideEl) return
+        slideEl.style.transition = enabled
+            ? `transform ${getSwipeSettleDuration()}ms ${SWIPE_EASING}`
+            : 'none'
+    }
+
+    function getAssistantPreviewElements() {
+        const elements = getAssistantShellElements()
+        if (!elements) return null
+        const activeModel = getAssistantShellApi()?.state?.activeModel || 'gemini'
+        elements.shell.querySelectorAll('[data-dm-ai-frame]').forEach((frame) => {
+            const isActive = frame.dataset.dmAiFrame === activeModel
+            frame.classList.toggle('is-active', isActive)
+            frame.setAttribute('aria-hidden', isActive ? 'false' : 'true')
+        })
+        return elements
+    }
+
+    function setAssistantPreviewEnabled(enabled, progress = 0) {
+        const elements = getAssistantPreviewElements()
+        if (!elements) return
+        const { shell } = elements
+        swipeState.assistantPreviewActive = enabled
+        shell.classList.toggle('dm-ai-shell--swipe-preview', enabled)
+        if (!enabled) {
+            shell.style.transform = ''
+            shell.style.transition = ''
+            shell.style.removeProperty('--dm-ai-swipe-backdrop-opacity')
+            if (!getAssistantShellApi()?.state?.panelOpen) {
+                shell.setAttribute('aria-hidden', 'true')
+            }
+            return
+        }
+        shell.setAttribute('aria-hidden', 'false')
+        shell.style.setProperty('--dm-ai-swipe-backdrop-opacity', progress.toFixed(4))
+    }
+
+    function prepareSwipeScene(targetViewId) {
+        const stage = ensureSwipeStage()
+        if (!stage) return false
+
+        stage.dataset.currentView = swipeState.currentViewId
+        stage.dataset.targetView = targetViewId
+
+        if (swipeState.renderedCurrentViewId !== swipeState.currentViewId) {
+            if (!renderViewCloneIntoSlide(swipeState.currentViewId, swipeState.currentSlideEl, swipeState.currentScrollTop)) {
+                return false
+            }
+            swipeState.renderedCurrentViewId = swipeState.currentViewId
+        }
+
+        if (swipeState.renderedTargetViewId !== targetViewId) {
+            if (!renderViewCloneIntoSlide(targetViewId, swipeState.targetSlideEl, swipeState.targetScrollTop)) {
+                return false
+            }
+            swipeState.renderedTargetViewId = targetViewId
+        }
+
+        mainEl?.classList.add('is-swiping')
+        return true
+    }
+
+    function applySwipeFrame(dx) {
+        const direction = dx === 0
+            ? (swipeState.direction || 1)
+            : (dx < 0 ? -1 : 1)
+        const width = swipeState.containerWidth || getSwipeViewportWidth()
+        const targetOffset = direction < 0 ? dx + width : dx - width
+
+        if (swipeState.currentViewId !== 'ia' && swipeState.currentSlideEl) {
+            swipeState.currentSlideEl.style.transform = `translate3d(${dx}px, 0, 0)`
+        }
+        if (swipeState.targetViewId !== 'ia' && swipeState.targetSlideEl) {
+            swipeState.targetSlideEl.style.transform = `translate3d(${targetOffset}px, 0, 0)`
+        }
+
+        if (swipeState.currentViewId === 'ia' || swipeState.targetViewId === 'ia') {
+            const assistantElements = getAssistantPreviewElements()
+            if (assistantElements?.shell) {
+                const progress = getSwipeProgress(dx)
+                setAssistantPreviewEnabled(true, swipeState.currentViewId === 'ia' ? 1 : progress)
+                const shellOffset = swipeState.currentViewId === 'ia' ? dx : targetOffset
+                assistantElements.shell.style.transform = `translate3d(${shellOffset}px, 0, 0)`
+            }
+        } else {
+            setAssistantPreviewEnabled(false)
+        }
+    }
+
+    function scheduleSwipeRender() {
+        if (swipeState.rafId) return
+        swipeState.rafId = requestAnimationFrame(() => {
+            swipeState.rafId = 0
+            applySwipeFrame(swipeState.pendingDx)
+        })
+    }
+
+    function clearSwipeClickSuppression(controller = swipeState.clickSuppressController) {
+        if (!controller) return
+        if (swipeState.suppressClickTimer) {
+            clearTimeout(swipeState.suppressClickTimer)
+            swipeState.suppressClickTimer = 0
+        }
+        if (swipeState.clickSuppressController === controller) {
+            swipeState.clickSuppressController = null
+            swipeState.suppressClickUntil = 0
+        }
+        try {
+            controller.abort()
+        } catch (error) {
+            // no-op
+        }
+    }
+
+    function armSwipeClickSuppression() {
+        clearSwipeClickSuppression()
+        const controller = new AbortController()
+        swipeState.clickSuppressController = controller
+        swipeState.suppressClickUntil = performance.now() + 420
+
+        document.addEventListener('click', (clickEvent) => {
+            if (performance.now() > swipeState.suppressClickUntil) return
+            clickEvent.preventDefault()
+            clickEvent.stopPropagation()
+            clickEvent.stopImmediatePropagation?.()
+            clearSwipeClickSuppression(controller)
+        }, { capture: true, signal: controller.signal })
+
+        swipeState.suppressClickTimer = window.setTimeout(() => {
+            clearSwipeClickSuppression(controller)
+        }, 420)
+    }
+
+    function resetSwipeState({ preserveClickSuppression = false } = {}) {
+        swipeState.activePointerId = null
+        swipeState.startX = 0
+        swipeState.startY = 0
+        swipeState.lastX = 0
+        swipeState.lastY = 0
+        swipeState.startTime = 0
+        swipeState.isTracking = false
+        swipeState.axisLocked = null
+        swipeState.isSwiping = false
+        swipeState.isSettling = false
+        swipeState.isCleaning = false
+        swipeState.didMove = false
+        swipeState.pendingDx = 0
+        swipeState.containerWidth = 0
+        swipeState.hostEl = null
+        swipeState.hostRole = ''
+        swipeState.currentViewId = getCurrentViewId()
+        swipeState.targetViewId = null
+        swipeState.direction = 0
+        swipeState.currentScrollTop = 0
+        swipeState.targetScrollTop = 0
+        swipeState.assistantShellWasOpen = false
+        swipeState.assistantPreviewActive = false
+        swipeState.renderedCurrentViewId = null
+        swipeState.renderedTargetViewId = null
+        if (!preserveClickSuppression) {
+            clearSwipeClickSuppression()
+        }
+    }
+
+    function cleanupSwipe(reason, { keepAssistantOpen = null, preserveClickSuppression = false } = {}) {
+        if (swipeState.isCleaning) return
+        swipeState.isCleaning = true
+        if (swipeState.rafId) {
+            cancelAnimationFrame(swipeState.rafId)
+            swipeState.rafId = 0
+        }
+        if (swipeState.settleTimer) {
+            clearTimeout(swipeState.settleTimer)
+            swipeState.settleTimer = 0
+        }
+        if (swipeState.hostEl && swipeState.activePointerId !== null) {
+            try {
+                if (swipeState.hostEl.hasPointerCapture?.(swipeState.activePointerId)) {
+                    swipeState.hostEl.releasePointerCapture(swipeState.activePointerId)
+                }
+            } catch (error) {
+                // no-op
+            }
+        }
+
+        mainEl?.classList.remove('is-swiping', 'is-settling')
+        cleanupSwipeScene()
+
+        const assistantShell = getAssistantShellApi()
+        const assistantElements = getAssistantPreviewElements()
+        const shouldKeepAssistantOpen = keepAssistantOpen ?? swipeState.assistantShellWasOpen
+        if (assistantElements?.shell) {
+            assistantElements.shell.style.transform = ''
+            assistantElements.shell.style.transition = ''
+            assistantElements.shell.style.removeProperty('--dm-ai-swipe-backdrop-opacity')
+            assistantElements.shell.classList.remove('dm-ai-shell--swipe-preview')
+            if (!shouldKeepAssistantOpen && !assistantShell?.state?.panelOpen) {
+                assistantElements.shell.classList.remove('is-open')
+                assistantElements.shell.setAttribute('aria-hidden', 'true')
+            }
+        }
+
+        resetSwipeState({ preserveClickSuppression })
+    }
+
+    function finalizeSwipe(commit) {
+        const committedTarget = swipeState.targetViewId
+        const previousView = swipeState.currentViewId
+        const direction = swipeState.direction
+        const keepAssistantOpen = commit
+            ? committedTarget === 'ia'
+            : previousView === 'ia'
+
+        if (commit && committedTarget) {
+            navigateToView(committedTarget, {
+                source: 'swipe',
+                direction,
+                historyMode: 'push'
+            })
+        }
+
+        cleanupSwipe(commit ? 'commit' : 'cancel', {
+            keepAssistantOpen,
+            preserveClickSuppression: swipeState.didMove
+        })
+    }
+
+    function settleSwipe(commit) {
+        const finalDx = commit
+            ? (swipeState.direction < 0 ? -swipeState.containerWidth : swipeState.containerWidth)
+            : 0
+        swipeState.isSettling = true
+        mainEl?.classList.add('is-settling')
+        setSlideTransition(swipeState.currentSlideEl, true)
+        setSlideTransition(swipeState.targetSlideEl, true)
+
+        const assistantElements = getAssistantPreviewElements()
+        if (assistantElements?.shell) {
+            assistantElements.shell.style.transition = `transform ${getSwipeSettleDuration()}ms ${SWIPE_EASING}`
+        }
+
+        swipeState.pendingDx = finalDx
+        applySwipeFrame(finalDx)
+
+        swipeState.settleTimer = window.setTimeout(() => {
+            finalizeSwipe(commit)
+        }, getSwipeSettleDuration() + 24)
+    }
+
+    function pointerStartsNearViewportEdge(event) {
+        const viewportWidth = window.visualViewport?.width || window.innerWidth || 0
+        return event.clientX <= SWIPE_EDGE_GUARD_PX
+            || event.clientX >= viewportWidth - SWIPE_EDGE_GUARD_PX
+    }
+
+    function isInteractivelyVisible(element) {
+        if (!element?.isConnected) return false
+        if (element.getAttribute('aria-hidden') === 'true') return false
+        if (!element.getClientRects().length) return false
+        const style = getComputedStyle(element)
+        if (style.display === 'none' || style.visibility === 'hidden') return false
+        if (style.pointerEvents === 'none') return false
+        if (parseFloat(style.opacity || '1') === 0 && !element.classList.contains('is-open')) return false
+        return true
+    }
+
+    function hasBlockingOverlay(hostRole) {
+        const chatOpen = document.getElementById('brisa-chat-root')?.classList.contains('brisa-chat-root--mobile-open')
+        if (chatOpen) return true
+
+        const assistantShell = getAssistantShellElements()?.shell || null
+        const candidates = [
+            document.querySelector('#dm-carousel-modal.is-open'),
+            document.querySelector('.dm-ai-selector.is-open'),
+            document.querySelector('dialog[open]'),
+            document.querySelector('[data-dm-ai-shell].is-open'),
+            document.querySelector('[role="dialog"][aria-modal="true"].is-open')
+        ].filter(Boolean)
+
+        return candidates.some((candidate) => {
+            if (hostRole === 'assistant' && assistantShell && (candidate === assistantShell || assistantShell.contains(candidate))) {
+                return false
+            }
+            return isInteractivelyVisible(candidate)
+        })
+    }
+
+    function shouldIgnoreSwipeStart(target, hostRole, event) {
+        if (!target) return true
+        if (!isSwipeRuntime()) return true
+        if (swipeState.activePointerId !== null) return true
+        if (event.pointerType === 'mouse' && event.button !== 0) return true
+        if (event.isPrimary === false) return true
+        if (hostRole !== 'assistant' && pointerStartsNearViewportEdge(event)) return true
+        if (document.querySelector('.brisa-chat-fab.is-dragging, .brisa-chat-bubble.is-dragging')) return true
+        if (hasBlockingOverlay(hostRole)) return true
+
+        const editable = target.closest('input, input[type="range"], textarea, select, [contenteditable="true"]')
+        if (editable) return true
+
+        if (hostRole === 'assistant') {
+            if (target.closest('button, input, input[type="range"], textarea, select, [contenteditable="true"]')) {
+                return true
+            }
+            return !target.closest('[data-dm-ai-header], [data-dm-ai-backdrop]')
+        }
+
+        return Boolean(target.closest(swipeExcludedSelector))
+    }
+
+    function resolveSwipeTargetFromDelta(dx) {
+        if (dx === 0) return swipeState.targetViewId
+        return dx < 0
+            ? getNextViewId(swipeState.currentViewId)
+            : getPrevViewId(swipeState.currentViewId)
+    }
+
+    function handleSwipePointerDown(event) {
+        const hostEl = event.currentTarget
+        const hostRole = hostEl?.dataset?.dmSwipeHost || 'main'
+        if (shouldIgnoreSwipeStart(event.target, hostRole, event)) return
+
+        swipeState.activePointerId = event.pointerId
+        swipeState.startX = event.clientX
+        swipeState.startY = event.clientY
+        swipeState.lastX = event.clientX
+        swipeState.lastY = event.clientY
+        swipeState.startTime = performance.now()
+        swipeState.isTracking = true
+        swipeState.axisLocked = null
+        swipeState.isSwiping = false
+        swipeState.isSettling = false
+        swipeState.didMove = false
+        swipeState.pendingDx = 0
+        swipeState.containerWidth = getSwipeViewportWidth()
+        swipeState.currentViewId = getCurrentViewId()
+        swipeState.targetViewId = null
+        swipeState.direction = 0
+        swipeState.hostEl = hostEl
+        swipeState.hostRole = hostRole
+        swipeState.currentScrollTop = getActiveScrollTop(swipeState.currentViewId)
+        swipeState.targetScrollTop = 0
+        swipeState.assistantShellWasOpen = Boolean(getAssistantShellApi()?.state?.panelOpen)
+    }
+
+    function handleSwipePointerMove(event) {
+        if (!swipeState.isTracking || event.pointerId !== swipeState.activePointerId || swipeState.isSettling || swipeState.isCleaning) return
+
+        const dx = event.clientX - swipeState.startX
+        const dy = event.clientY - swipeState.startY
+        swipeState.lastX = event.clientX
+        swipeState.lastY = event.clientY
+
+        if (!swipeState.axisLocked) {
+            if (Math.abs(dx) < SWIPE_DEADZONE_PX && Math.abs(dy) < SWIPE_DEADZONE_PX) return
+            if (Math.abs(dy) > Math.abs(dx)) {
+                cleanupSwipe('axis-y')
+                return
+            }
+            if (Math.abs(dx) <= Math.abs(dy)) return
+
+            const targetViewId = resolveSwipeTargetFromDelta(dx)
+            if ((targetViewId === 'ia' || swipeState.currentViewId === 'ia') && !getAssistantPreviewElements()) {
+                cleanupSwipe('assistant-unavailable')
+                return
+            }
+
+            swipeState.axisLocked = 'x'
+            swipeState.isSwiping = true
+            swipeState.targetViewId = targetViewId
+            swipeState.direction = dx < 0 ? -1 : 1
+            swipeState.targetScrollTop = getStoredScrollTop(targetViewId)
+
+            if (!prepareSwipeScene(targetViewId)) {
+                cleanupSwipe('stage-failed')
+                return
+            }
+
+            armSwipeClickSuppression()
+
+            try {
+                swipeState.hostEl?.setPointerCapture?.(event.pointerId)
+            } catch (error) {
+                // no-op
+            }
+        }
+
+        if (swipeState.axisLocked !== 'x') return
+
+        const nextDirection = dx === 0
+            ? swipeState.direction
+            : (dx < 0 ? -1 : 1)
+        if (dx !== 0 && nextDirection !== swipeState.direction) {
+            swipeState.direction = nextDirection
+            swipeState.targetViewId = resolveSwipeTargetFromDelta(dx)
+            if ((swipeState.targetViewId === 'ia' || swipeState.currentViewId === 'ia') && !getAssistantPreviewElements()) {
+                cleanupSwipe('assistant-unavailable-switch')
+                return
+            }
+            swipeState.targetScrollTop = getStoredScrollTop(swipeState.targetViewId)
+            if (!prepareSwipeScene(swipeState.targetViewId)) {
+                cleanupSwipe('stage-failed-switch')
+                return
+            }
+        }
+
+        swipeState.didMove = true
+        swipeState.pendingDx = dx
+        scheduleSwipeRender()
+    }
+
+    function handleSwipePointerUp(event) {
+        if (!swipeState.isTracking || event.pointerId !== swipeState.activePointerId || swipeState.isCleaning) return
+        if (swipeState.axisLocked !== 'x' || !swipeState.isSwiping) {
+            cleanupSwipe('pointerup-no-swipe')
+            return
+        }
+
+        const dx = event.clientX - swipeState.startX
+        const elapsed = Math.max(performance.now() - swipeState.startTime, 1)
+        const velocity = Math.abs(dx) / elapsed
+        const shouldCommit = Math.abs(dx) >= SWIPE_COMMIT_DISTANCE_PX
+            || Math.abs(dx) >= swipeState.containerWidth * SWIPE_COMMIT_RATIO
+            || velocity >= SWIPE_COMMIT_VELOCITY
+
+        settleSwipe(shouldCommit)
+    }
+
+    function handleSwipePointerCancel(event) {
+        if (event.pointerId !== swipeState.activePointerId || swipeState.isSettling || swipeState.isCleaning) return
+        cleanupSwipe('pointercancel')
+    }
+
+    function handleSwipeLostPointerCapture(event) {
+        if (event.pointerId !== swipeState.activePointerId || swipeState.isSettling || swipeState.isCleaning) return
+        cleanupSwipe('lostpointercapture')
+    }
+
+    function registerSwipeHost(hostEl, role) {
+        if (!hostEl || swipeHostControllers.has(hostEl)) return
+        const controller = new AbortController()
+        hostEl.dataset.dmSwipeHost = role
+        hostEl.addEventListener('pointerdown', handleSwipePointerDown, { signal: controller.signal })
+        hostEl.addEventListener('pointermove', handleSwipePointerMove, { signal: controller.signal })
+        hostEl.addEventListener('pointerup', handleSwipePointerUp, { signal: controller.signal })
+        hostEl.addEventListener('pointercancel', handleSwipePointerCancel, { signal: controller.signal })
+        hostEl.addEventListener('lostpointercapture', handleSwipeLostPointerCapture, { signal: controller.signal })
+        swipeHostControllers.set(hostEl, controller)
+    }
+
+    function unregisterSwipeHosts() {
+        swipeHostControllers.forEach((controller, hostEl) => {
+            controller.abort()
+            delete hostEl.dataset.dmSwipeHost
+        })
+        swipeHostControllers.clear()
+    }
+
+    function bindAssistantSwipeHosts() {
+        const elements = getAssistantShellElements()
+        if (!elements) return
+        registerSwipeHost(elements.backdrop, 'assistant')
+        registerSwipeHost(elements.header, 'assistant')
+    }
+
+    function syncSwipeController() {
+        const shouldEnable = isSwipeRuntime()
+        if (!shouldEnable) {
+            if (swipeState.enabled) {
+                cleanupSwipe('breakpoint-exit')
+                unregisterSwipeHosts()
+            }
+            swipeState.enabled = false
+            return
+        }
+
+        if (!swipeState.enabled) {
+            swipeState.enabled = true
+        }
+        registerSwipeHost(mainEl, 'main')
+        bindAssistantSwipeHosts()
+    }
+
+    window.addEventListener('blur', () => {
+        if (!swipeState.isTracking && !swipeState.isSettling) return
+        cleanupSwipe('blur')
+    })
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) return
+        if (!swipeState.isTracking && !swipeState.isSettling) return
+        cleanupSwipe('visibilitychange')
+    })
+    window.addEventListener('resize', () => {
+        if (!swipeState.isTracking && !swipeState.isSettling) return
+        cleanupSwipe('resize')
+    }, { passive: true })
+    window.addEventListener('orientationchange', () => {
+        if (!swipeState.isTracking && !swipeState.isSettling) return
+        cleanupSwipe('orientationchange')
+    }, { passive: true })
+    window.visualViewport?.addEventListener('resize', () => {
+        if (!swipeState.isTracking && !swipeState.isSettling) return
+        cleanupSwipe('visualViewport-resize')
+    }, { passive: true })
+    window.visualViewport?.addEventListener('scroll', () => {
+        if (!swipeState.isTracking && !swipeState.isSettling) return
+        cleanupSwipe('visualViewport-scroll')
+    }, { passive: true })
 
     /*==================== REFERENTES: DESKTOP OPEN ====================*/
     const referentesQuery = window.matchMedia('(min-width: 769px)')
@@ -306,7 +1255,7 @@ document.addEventListener('DOMContentLoaded', () => {
         })
     }
 
-    const mainScroller = document.querySelector("main.main");
+    const mainScroller = mainEl;
     const hoverClass = "disable-hover";
     let hoverTimer = 0;
     let hoverActive = false;
@@ -505,10 +1454,10 @@ document.addEventListener('DOMContentLoaded', () => {
     lastScrollY = getScrollY();
 
     // Re-bind when route changes or layout changes
-    window.addEventListener('hashchange', () => {
+    window.addEventListener('dm:viewchange', () => {
         bindMuroScrollListener();
         requestAnimationFrame(() => { lastScrollY = getScrollY(); });
-    }, { passive: true });
+    });
 
     window.addEventListener('resize', () => {
         bindMuroScrollListener();

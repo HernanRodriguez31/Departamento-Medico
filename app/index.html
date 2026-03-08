@@ -505,8 +505,8 @@
             pointer-events: auto;
             opacity: 0;
             touch-action: none;
+            -webkit-user-select: none;
             user-select: none;
-            -webkit-user-drag: none;
             transform: translateY(24px);
             animation: fab-float-up 0.6s ease-out 0.25s forwards;
             transition: all 300ms ease;
@@ -517,8 +517,8 @@
             height: 26px;
             color: #ffffff;
             pointer-events: none;
+            -webkit-user-select: none;
             user-select: none;
-            -webkit-user-drag: none;
         }
 
         .brisa-chat-badge {
@@ -2830,7 +2830,7 @@
     </a>
 
     <nav class="dm-bottom-nav" aria-label="Navegación principal">
-        <a class="dm-bottom-nav__item" href="#carrete" data-route="carrete">
+        <a class="dm-bottom-nav__item" href="#carrete" data-route="muro">
             <i data-lucide="image"></i>
             <span>Muro</span>
         </a>
@@ -2859,7 +2859,7 @@
             <span>Estructura</span>
         </a>
         <span class="dm-bottom-nav__spacer" aria-hidden="true"></span>
-        <button id="aiFab" class="dm-bottom-nav__fab" type="button" aria-label="Asistente IA">
+        <button id="aiFab" class="dm-bottom-nav__fab" type="button" data-route="ia" aria-label="Asistente IA">
             <img src="/asistente-ia/boti-brisa.jpg" alt="" aria-hidden="true">
         </button>
         <a class="dm-bottom-nav__item" href="#comites" data-route="comites">
@@ -3057,7 +3057,12 @@
         import { hydrateAvatars, resolveUidForAuthor } from "/assets/js/common/user-profiles.js";
         import { requireAuth, buildLoginRedirectUrl } from "/assets/js/shared/authGate.js";
 
-        const shouldInitForum = () => window.location.hash.startsWith("#foro");
+        const shouldInitForum = (viewId) => {
+            if (viewId) return viewId === "foro";
+            const shellView = window.__dmMobileShell?.getCurrentViewId?.();
+            if (shellView) return shellView === "foro";
+            return window.location.hash.startsWith("#foro");
+        };
         let forumInitialized = false;
 
         const initForum = async () => {
@@ -3731,13 +3736,15 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
 
         };
 
-        const scheduleForumInit = () => {
-            if (!shouldInitForum()) return;
+        const scheduleForumInit = (viewId) => {
+            if (!shouldInitForum(viewId)) return;
             initForum();
         };
 
-        window.addEventListener("hashchange", scheduleForumInit);
-        scheduleForumInit();
+        window.addEventListener("dm:viewchange", (event) => {
+            scheduleForumInit(event.detail?.viewId);
+        });
+        scheduleForumInit(window.__dmMobileShell?.getCurrentViewId?.());
     </script>
     <!-- Logout Overlay -->
     <div id="logout-overlay" class="session-overlay">

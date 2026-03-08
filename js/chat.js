@@ -285,8 +285,8 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         height: 100%;
         pointer-events: auto;
         touch-action: none;
+        -webkit-user-select: none;
         user-select: none;
-        -webkit-user-drag: none;
         -webkit-tap-highlight-color: transparent;
         cursor: grab;
         transform: translateZ(0);
@@ -298,8 +298,8 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       .brisa-chat-fab .brisa-chat-bubble svg,
       .brisa-chat-fab .brisa-chat-bubble img {
         pointer-events: none;
+        -webkit-user-select: none;
         user-select: none;
-        -webkit-user-drag: none;
       }
 
       .brisa-chat-fab .brisa-chat-panel {
@@ -1340,6 +1340,73 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         transform: translateY(-50%) scale(1);
       }
 
+      .dm-ai-shell.dm-ai-shell--swipe-preview {
+        pointer-events: none;
+      }
+
+      .dm-ai-shell.dm-ai-shell--swipe-preview .dm-ai-backdrop {
+        opacity: var(--dm-ai-swipe-backdrop-opacity, 0);
+        transition: none;
+      }
+
+      .dm-ai-shell.dm-ai-shell--swipe-preview .dm-ai-panel {
+        transform: translateY(0);
+        transition: none;
+      }
+
+      .dm-ai-shell .dm-ai-header {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px 16px 12px;
+        border-bottom: 1px solid #e2e8f0;
+        background: #ffffff;
+        touch-action: pan-y;
+      }
+
+      .dm-ai-shell .dm-ai-handle {
+        width: 44px;
+        height: 5px;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.5);
+        margin: 0 auto;
+      }
+
+      .dm-ai-shell .dm-ai-header-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .dm-ai-shell .dm-ai-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        color: #0f172a;
+      }
+
+      .dm-ai-shell .dm-ai-title__icon {
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        object-fit: cover;
+        border: 1px solid rgba(122, 184, 0, 0.4);
+      }
+
+      .dm-ai-shell .dm-ai-close {
+        width: 32px;
+        height: 32px;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        background: #f8fafc;
+        color: #0f172a;
+        font-size: 1.1rem;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
       .dm-ai-shell--desktop .dm-ai-body,
       .dm-ai-shell .dm-ai-body {
         flex: 1 1 auto;
@@ -1423,6 +1490,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
           background: rgba(15, 23, 42, 0.55);
           opacity: 0;
           transition: opacity 0.2s ease;
+          touch-action: pan-y;
         }
 
         .dm-ai-shell.is-open .dm-ai-backdrop {

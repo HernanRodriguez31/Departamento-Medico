@@ -82,7 +82,7 @@ const ensureAvatarModal = () => {
         <p class="dm-avatar-modal__subtitle">Arrastra y ajusta el zoom para encuadrar.</p>
       </div>
       <div class="dm-avatar-preview" data-dm-avatar-preview>
-        <img class="dm-avatar-preview__img" alt="Preview avatar" />
+        <img class="dm-avatar-preview__img" alt="Preview avatar" draggable="false" />
       </div>
       <label class="dm-avatar-zoom__label" for="dm-avatar-zoom">Zoom</label>
       <input id="dm-avatar-zoom" class="dm-avatar-zoom" type="range" min="1" max="3" step="0.01" value="1.2" />
@@ -95,6 +95,7 @@ const ensureAvatarModal = () => {
   document.body.appendChild(overlay);
   const preview = overlay.querySelector("[data-dm-avatar-preview]");
   const imgEl = overlay.querySelector(".dm-avatar-preview__img");
+  imgEl?.setAttribute("draggable", "false");
   const slider = overlay.querySelector(".dm-avatar-zoom");
   const btnCancel = overlay.querySelector("[data-dm-avatar-cancel]");
   const btnSave = overlay.querySelector("[data-dm-avatar-save]");

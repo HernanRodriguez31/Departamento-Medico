@@ -3339,8 +3339,8 @@ body.dm-modal-open .brisa-chat-panel {
   width: auto;
   height: auto;
   will-change: transform;
+  -webkit-user-select: none;
   user-select: none;
-  -webkit-user-drag: none;
 }
 
 .dm-avatar-zoom__label {

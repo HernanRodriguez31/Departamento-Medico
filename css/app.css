@@ -4025,15 +4025,49 @@ img {
     z-index: 2;
 }
 
+.dm-bottom-nav__fab.is-active {
+    box-shadow: 0 18px 34px rgba(15, 23, 42, 0.24);
+}
+
 .dm-bottom-nav__fab:focus-visible {
     outline: 2px solid #0f172a;
     outline-offset: 3px;
 }
 
+.dm-mobile-swipe-stage {
+    position: absolute;
+    inset: 0;
+    display: none;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 30;
+}
+
+.main.is-swiping .dm-mobile-swipe-stage,
+.main.is-settling .dm-mobile-swipe-stage {
+    display: block;
+}
+
+.dm-mobile-swipe-slide {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    transform: translate3d(0, 0, 0);
+    backface-visibility: hidden;
+}
+
+.main.is-swiping .dm-mobile-swipe-slide,
+.main.is-settling .dm-mobile-swipe-slide {
+    will-change: transform;
+}
+
+.dm-mobile-swipe-slide__content {
+    min-height: 100%;
+}
+
 @media (max-width: 768px), (display-mode: standalone) {
     html,
     body {
-        touch-action: pan-x pan-y;
         text-size-adjust: 100%;
     }
 
@@ -4167,6 +4201,7 @@ img {
     body[data-view] {
         height: 100vh;
         overflow: hidden;
+        overscroll-behavior-x: none;
         padding-bottom: 0;
     }
 
@@ -4187,10 +4222,16 @@ img {
         bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
         overflow-y: auto;
         overflow-x: hidden;
+        overscroll-behavior-x: none;
         overscroll-behavior-y: contain;
         touch-action: pan-y;
         padding-bottom: 16px;
         background: transparent;
+    }
+
+    body[data-view] .main.is-swiping,
+    body[data-view] .main.is-settling {
+        overflow: hidden;
     }
 
     /* Quitar Evidencia en móvil */
@@ -4215,9 +4256,12 @@ img {
     body[data-view="estructura"] #estructura-hero,
     body[data-view="estructura"] #estructura-funcional,
     body[data-view="comites"] #comites,
-    body[data-view="evidencia"] #investigacion,
     body[data-view="foro"] #foro {
         display: block;
+    }
+
+    body[data-view="ia"] #investigacion {
+        display: none;
     }
 
     body[data-view="comites"] #comites {
@@ -4292,6 +4336,73 @@ img {
     }
 
     body[data-view="foro"] #foro > .section-card > .bg-white.border-t::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 8px;
+        height: 1px;
+        background: var(--brisa, #7ab800);
+    }
+
+    .dm-mobile-swipe-slide[data-swipe-view="foro"] #foro {
+        margin-top: 0;
+        margin-bottom: 0;
+        padding-top: 8px;
+        padding-bottom: 0;
+        min-height: 100%;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+
+    .dm-mobile-swipe-slide[data-swipe-view="foro"] #foro > .section-card {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: auto;
+        overscroll-behavior: contain;
+    }
+
+    .dm-mobile-swipe-slide[data-swipe-view="foro"] #forum-messages-general {
+        flex: 0 0 auto;
+        min-height: 0;
+        height: auto;
+        max-height: none;
+        overflow: visible;
+    }
+
+    .dm-mobile-swipe-slide[data-swipe-view="foro"] #foro > .text-center {
+        padding-top: 6px;
+        margin-bottom: 6px;
+        padding-bottom: 14px;
+        border-bottom: 1px solid var(--brisa, #7ab800);
+    }
+
+    .dm-mobile-swipe-slide[data-swipe-view="foro"] #foro > .text-center p {
+        font-size: 0.86rem;
+        line-height: 1.35;
+    }
+
+    .dm-mobile-swipe-slide[data-swipe-view="foro"] #foro > .text-center h2 {
+        display: block;
+        text-align: center;
+    }
+
+    .dm-mobile-swipe-slide[data-swipe-view="foro"] #foro > .text-center h2 [data-lucide="message-square"] {
+        display: none !important;
+    }
+
+    .dm-mobile-swipe-slide[data-swipe-view="foro"] #foro > .section-card > .bg-white.border-t {
+        position: sticky;
+        bottom: 0;
+        z-index: 5;
+        background: #ffffff;
+        border-top: 0;
+    }
+
+    .dm-mobile-swipe-slide[data-swipe-view="foro"] #foro > .section-card > .bg-white.border-t::before {
         content: "";
         position: absolute;
         left: 0;
