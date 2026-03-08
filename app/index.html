@@ -2668,8 +2668,9 @@
         </section>
 
 <!-- Foro General del Departamento Médico -->
-        <div id="foro" class="mt-16 mb-8 max-w-5xl mx-auto w-full">
-            <div class="text-center mb-8">
+        <div id="foro" class="dm-foro-page max-w-5xl mx-auto w-full">
+            <div class="dm-foro-header text-center">
+                <span class="dm-foro-kicker">Foro médico</span>
                 <h2 class="section__title medium-title dm-title">
                     <i data-lucide="message-square" class="w-8 h-8 text-brisa"></i>
                     Foro General del Departamento Médico
@@ -2679,9 +2680,9 @@
                 </p>
             </div>
 
-            <div class="section-card bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col h-auto">
+            <div class="section-card dm-foro-panel bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col">
                 <!-- Header -->
-                <div class="bg-gray-50 p-4 border-b border-gray-200 flex items-center justify-between">
+                <div class="dm-foro-toolbar bg-gray-50 border-b border-gray-200 flex items-center justify-between gap-3">
                     <span class="text-sm font-semibold text-gray-700 flex items-center gap-2">
                         <i data-lucide="message-circle" class="w-4 h-4 text-brisa"></i> Actividad Reciente
                     </span>
@@ -2689,12 +2690,14 @@
                 </div>
 
                 <!-- Messages List -->
-                <div id="forum-messages-general" class="h-96 max-h-96 overflow-y-auto p-6 space-y-4 bg-gray-50/30">
-                    <!-- Mensajes renderizados por JS -->
+                <div class="dm-foro-thread">
+                    <div id="forum-messages-general" class="dm-foro-messages overflow-y-auto space-y-4 bg-gray-50/30">
+                        <!-- Mensajes renderizados por JS -->
+                    </div>
                 </div>
 
                 <!-- Input Area -->
-                <div class="px-4 py-3 bg-white border-t border-gray-200">
+                <div class="dm-foro-composer px-4 py-3 bg-white border-t border-gray-200">
                     <form id="form-send-msg-general" class="flex gap-3 items-end">
                         <div class="flex-1">
                             <div class="emoji-input-wrap">

@@ -141,6 +141,7 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
   const state = {
     pickerOpen: false,
     panelOpen: false,
+    presentationMode: "overlay",
     activeModel: normalizedModel,
     framesLoaded: {
       gemini: false,
@@ -160,6 +161,7 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
         detail: {
           panelOpen: state.panelOpen,
           pickerOpen: state.pickerOpen,
+          presentationMode: state.presentationMode,
           activeModel: state.activeModel,
           anchorContext: state.anchorContext,
           source
@@ -193,6 +195,8 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
 
   const isDesktop = () =>
     typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
+  const isEmbedded = () => state.presentationMode === "embedded";
+  const overlayHost = document.body;
 
   const clamp = (value, min, max) => {
     if (max < min) return min;
@@ -223,6 +227,20 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
   };
 
   const updateAnchoredState = () => {
+    if (isEmbedded()) {
+      shell.classList.remove("dm-ai-shell--anchored");
+      selector?.classList.remove("dm-ai-selector--anchored");
+      if (selector) {
+        selector.style.left = "";
+        selector.style.top = "";
+      }
+      if (panel) {
+        panel.style.left = "";
+        panel.style.top = "";
+        panel.style.right = "";
+      }
+      return false;
+    }
     const desktop = isDesktop();
     shell.classList.toggle("dm-ai-shell--anchored", desktop);
     selector?.classList.toggle("dm-ai-selector--anchored", desktop);
@@ -375,19 +393,28 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
     await ensureFrameLoaded(state.activeModel);
     setActiveFrame(state.activeModel);
     state.panelOpen = true;
-    document.body.classList.add("dm-ai-open");
     shell.classList.add("is-open");
     shell.setAttribute("aria-hidden", "false");
-    lockScroll();
+    if (!isEmbedded()) {
+      document.body.classList.add("dm-ai-open");
+      lockScroll();
+    }
     sendModelToIframe(state.activeModel);
     closePicker();
-    positionChat();
-    syncScrollLock();
-    if (isDesktop()) addPanelOutsideListener();
+    if (!isEmbedded()) {
+      positionChat();
+      syncScrollLock();
+      if (isDesktop()) addPanelOutsideListener();
+    }
     dispatchShellState("panel-open");
   };
 
   const closePanel = () => {
+    if (isEmbedded()) {
+      closePicker();
+      dispatchShellState("panel-close-embedded");
+      return;
+    }
     if (!state.panelOpen) return;
     state.panelOpen = false;
     state.anchorEl = null;
@@ -449,6 +476,7 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
   };
 
   const handleBackdropClick = () => {
+    if (isEmbedded()) return;
     if (state.panelOpen) {
       closePanel();
       return;
@@ -474,6 +502,7 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
 
   const handlePanelOutsidePointerDown = (event) => {
     if (!state.panelOpen) return;
+    if (isEmbedded()) return;
     if (!isDesktop()) return;
     const target = event.target;
     if (panel && panel.contains(target)) return;
@@ -528,6 +557,46 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
     ensureFrameLoaded("gpt");
   };
 
+  const setPresentationMode = (mode, { hostEl = null } = {}) => {
+    const nextMode = mode === "embedded" ? "embedded" : "overlay";
+    if (state.presentationMode === nextMode) {
+      if (nextMode === "embedded" && hostEl && shell.parentNode !== hostEl) {
+        hostEl.appendChild(shell);
+      }
+      return;
+    }
+
+    state.presentationMode = nextMode;
+    shell.dataset.presentationMode = nextMode;
+    shell.classList.toggle("dm-ai-shell--embedded", nextMode === "embedded");
+    shell.classList.toggle("dm-ai-shell--overlay", nextMode === "overlay");
+
+    if (nextMode === "embedded") {
+      if (hostEl && shell.parentNode !== hostEl) {
+        hostEl.appendChild(shell);
+      }
+      document.body.classList.remove("dm-ai-open");
+      shell.classList.add("is-open");
+      shell.setAttribute("aria-hidden", "false");
+      removePanelOutsideListener();
+      unlockScroll();
+    } else {
+      if (shell.parentNode !== overlayHost) {
+        overlayHost.appendChild(shell);
+      }
+      if (state.panelOpen) {
+        shell.classList.add("is-open");
+        shell.setAttribute("aria-hidden", "false");
+      } else {
+        shell.classList.remove("is-open");
+        shell.setAttribute("aria-hidden", "true");
+      }
+      handleViewportChange();
+    }
+
+    dispatchShellState("presentation-mode");
+  };
+
   if (typeof window !== "undefined") {
     if ("requestIdleCallback" in window) {
       window.requestIdleCallback(warmup, { timeout: 2000 });
@@ -556,10 +625,12 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
     togglePicker,
     openPicker,
     closePicker,
+    setPresentationMode,
     get state() {
       return {
         pickerOpen: state.pickerOpen,
         panelOpen: state.panelOpen,
+        presentationMode: state.presentationMode,
         activeModel: state.activeModel,
         anchorContext: state.anchorContext
       };

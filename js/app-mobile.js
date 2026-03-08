@@ -141,82 +141,45 @@ document.addEventListener('DOMContentLoaded', () => {
         comites: ['#comites'],
         foro: ['#foro']
     }
-    const SWIPE_EDGE_GUARD_PX = 12
-    const SWIPE_DEADZONE_PX = 7
-    const SWIPE_COMMIT_DISTANCE_PX = 44
-    const SWIPE_COMMIT_RATIO = 0.13
-    const SWIPE_COMMIT_VELOCITY = 0.26
-    const SWIPE_SETTLE_DURATION_MS = 280
-    const SWIPE_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)'
-    const swipeExcludedSelector = [
-        '.dm-bottom-nav',
-        '#aiFab',
-        '#brisa-chat-root',
-        '.brisa-chat-fab',
-        '.brisa-chat-panel',
-        '.brisa-chat-window',
-        '.brisa-chat-mobile-overlay',
-        '.dm-ai-selector.is-open',
-        '.dm-carousel-viewport',
-        '.dm-slide-nav',
-        '#dm-carousel-modal.is-open',
-        'iframe',
-        'video',
-        'canvas',
-        'map',
-        'input',
-        'input[type="range"]',
-        'textarea',
-        'select',
-        '[contenteditable="true"]',
-        '.emoji-panel',
-        '.dm-info-tooltip',
-        '[data-no-swipe]'
-    ].join(', ')
+    const PAGER_ORDER = [
+        { key: 'ghost-foro', viewId: 'foro', ghost: true },
+        { key: 'muro', viewId: 'muro', ghost: false },
+        { key: 'estructura', viewId: 'estructura', ghost: false },
+        { key: 'ia', viewId: 'ia', ghost: false },
+        { key: 'comites', viewId: 'comites', ghost: false },
+        { key: 'foro', viewId: 'foro', ghost: false },
+        { key: 'ghost-muro', viewId: 'muro', ghost: true }
+    ]
+    const PAGER_GHOST_REFRESH_DELAY_MS = 120
+    const PAGER_SETTLE_DEBOUNCE_MS = 96
 
     const rootStyle = document.documentElement.style
     let rafLayout = 0
     let currentViewId = 'muro'
     let lastNonIaViewId = 'muro'
     const scrollByView = new Map()
-
-    const swipeState = {
-        activePointerId: null,
-        startX: 0,
-        startY: 0,
-        lastX: 0,
-        lastY: 0,
-        startTime: 0,
-        isTracking: false,
-        axisLocked: null,
-        isSwiping: false,
-        isSettling: false,
-        isCleaning: false,
-        didMove: false,
-        rafId: 0,
-        settleTimer: 0,
-        currentViewId: 'muro',
-        targetViewId: null,
-        direction: 0,
-        pendingDx: 0,
-        containerWidth: 0,
-        hostEl: null,
-        hostRole: '',
-        currentScrollTop: 0,
-        targetScrollTop: 0,
-        stageEl: null,
-        currentSlideEl: null,
-        targetSlideEl: null,
-        renderedCurrentViewId: null,
-        renderedTargetViewId: null,
-        assistantShellWasOpen: false,
-        assistantPreviewActive: false,
-        suppressClickUntil: 0,
-        suppressClickTimer: 0,
-        clickSuppressController: null,
-        enabled: false
+    const pagerState = {
+        enabled: false,
+        shellEl: null,
+        viewportEl: null,
+        trackEl: null,
+        assistantHostEl: null,
+        pagesByKey: new Map(),
+        realPagesByView: new Map(),
+        scrollersByView: new Map(),
+        anchors: [],
+        stashedNodes: [],
+        mutationObservers: [],
+        ghostRefreshTimers: new Map(),
+        ghostViews: new Map(),
+        isProgrammaticPagerScroll: false,
+        programmaticTargetViewId: null,
+        isWrappingGhostJump: false,
+        pendingSettleTimer: 0,
+        settleRafId: 0,
+        lastSettledIndex: -1,
+        scrollEndController: null
     }
-    const swipeHostControllers = new Map()
 
     function syncAppShellVars() {
         if (!(appShellQuery.matches || displayModeQuery.matches)) return
@@ -292,6 +255,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const normalized = normalizeViewId(viewId)
         return normalized === 'muro' ? 'carrete' : normalized
     }
+    const getPagerRealIndex = (viewId) => {
+        const normalized = normalizeViewId(viewId)
+        return PAGER_ORDER.findIndex((entry) => !entry.ghost && entry.viewId === normalized)
+    }
+    const getViewIdFromPagerIndex = (index) => {
+        const entry = PAGER_ORDER[index] || PAGER_ORDER[getPagerRealIndex(currentViewId)]
+        return entry ? normalizeViewId(entry.viewId) : 'muro'
+    }
     const getViewNodes = (viewId) => {
         const selectors = VIEW_NODE_SELECTORS[normalizeViewId(viewId)] || []
         return selectors
@@ -310,14 +281,34 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    const getSwipeViewportWidth = () => {
+    const isPagerMode = () => pagerState.enabled && !!pagerState.trackEl?.isConnected
+
+    const getPagerPageWidth = () => {
+        const rectWidth = pagerState.viewportEl?.getBoundingClientRect?.().width || 0
         const viewportWidth = window.visualViewport?.width || window.innerWidth || 0
-        const rectWidth = mainEl?.getBoundingClientRect?.().width || 0
         return rectWidth || viewportWidth
     }
 
     const getViewScrollContainer = (viewId) => {
         const normalized = normalizeViewId(viewId)
+        if (isPagerMode()) {
+            if (normalized === 'ia') return null
+            if (normalized === 'muro') {
+                const pageScroller = pagerState.scrollersByView.get('muro') || null
+                const viewport = pagerState.realPagesByView.get('muro')
+                    ?.querySelector?.('#carrete .dm-carousel-viewport')
+                const section = pagerState.realPagesByView.get('muro')?.querySelector?.('#carrete')
+                if (section?.classList.contains('is-feed-mode') && viewport) return viewport
+                return pageScroller
+            }
+            if (normalized === 'foro') {
+                return pagerState.realPagesByView.get('foro')
+                    ?.querySelector?.('#forum-messages-general')
+                    || pagerState.scrollersByView.get('foro')
+                    || null
+            }
+            return pagerState.scrollersByView.get(normalized) || null
+        }
         if (normalized === 'ia') return null
         if (normalized === 'muro') {
             const viewport = document.querySelector('#carrete .dm-carousel-viewport')
@@ -427,6 +418,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const syncAssistantShellForView = (viewId) => {
         const assistantShell = getAssistantShellApi()
         if (!assistantShell) return
+        if (isPagerMode()) {
+            if (normalizeViewId(viewId) === 'ia') {
+                const model = assistantShell.state?.activeModel || 'gemini'
+                Promise.resolve(assistantShell.openChat(model, { context: 'app' })).catch(() => {})
+            } else if (assistantShell.state?.pickerOpen) {
+                assistantShell.closePicker()
+            }
+            return
+        }
         if (normalizeViewId(viewId) === 'ia') {
             const model = assistantShell.state?.activeModel || 'gemini'
             Promise.resolve(assistantShell.openChat(model, { context: 'app' })).catch(() => {})
@@ -493,6 +493,18 @@ document.addEventListener('DOMContentLoaded', () => {
             restoreScrollForView(normalizedTarget)
         }
 
+        if (
+            isPagerMode()
+            && source !== 'pager'
+            && source !== 'pager-wrap-jump'
+            && source !== 'pager-sync'
+        ) {
+            scrollPagerToView(normalizedTarget, {
+                behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+                source
+            })
+        }
+
         if (routeChanged || shouldCanonicalize || forceEmit) {
             emitViewChange({
                 viewId: normalizedTarget,
@@ -519,12 +531,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const handleShellChange = () => {
         syncViewFromLocation({ source: 'shell-breakpoint', allowCanonicalReplace: true, forceEmit: true })
-        syncSwipeController()
+        syncMobilePagerMode()
     }
 
     const handleAssistantShellState = (event) => {
         if (!isAppShell()) return
         const detail = event.detail || {}
+        if (detail.presentationMode === 'embedded') return
         if (detail.panelOpen) {
             if (getCurrentViewId() !== 'ia') {
                 navigateToView('ia', {
@@ -548,7 +561,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (getCurrentViewId() === 'ia') {
             syncAssistantShellForView('ia')
         }
-        syncSwipeController()
+        syncMobilePagerMode()
     }
 
     const handleBottomNavClick = (event) => {
@@ -573,14 +586,14 @@ document.addEventListener('DOMContentLoaded', () => {
         appShellQuery.addListener(handleShellChange)
     }
     if (swipeQuery.addEventListener) {
-        swipeQuery.addEventListener('change', syncSwipeController)
+        swipeQuery.addEventListener('change', syncMobilePagerMode)
     } else {
-        swipeQuery.addListener(syncSwipeController)
+        swipeQuery.addListener(syncMobilePagerMode)
     }
     if (coarsePointerQuery.addEventListener) {
-        coarsePointerQuery.addEventListener('change', syncSwipeController)
+        coarsePointerQuery.addEventListener('change', syncMobilePagerMode)
     } else {
-        coarsePointerQuery.addListener(syncSwipeController)
+        coarsePointerQuery.addListener(syncMobilePagerMode)
     }
     if (displayModeQuery.addEventListener) {
         displayModeQuery.addEventListener('change', handleShellChange)
@@ -606,612 +619,445 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     syncViewFromLocation({ source: 'init', allowCanonicalReplace: true, forceEmit: true })
-    syncSwipeController()
+    syncMobilePagerMode()
 
-    function ensureSwipeStage() {
-        if (!mainEl) return null
-        if (swipeState.stageEl?.isConnected) return swipeState.stageEl
-        const stage = document.createElement('div')
-        stage.className = 'dm-mobile-swipe-stage'
-        stage.setAttribute('aria-hidden', 'true')
-
-        const currentSlide = document.createElement('div')
-        currentSlide.className = 'dm-mobile-swipe-slide dm-mobile-swipe-slide--current'
-        currentSlide.innerHTML = '<div class="dm-mobile-swipe-slide__content"></div>'
-
-        const targetSlide = document.createElement('div')
-        targetSlide.className = 'dm-mobile-swipe-slide dm-mobile-swipe-slide--target'
-        targetSlide.innerHTML = '<div class="dm-mobile-swipe-slide__content"></div>'
-
-        stage.appendChild(currentSlide)
-        stage.appendChild(targetSlide)
-        mainEl.appendChild(stage)
-
-        swipeState.stageEl = stage
-        swipeState.currentSlideEl = currentSlide
-        swipeState.targetSlideEl = targetSlide
-        return stage
-    }
-
-    function resetSwipeSlide(slideEl) {
-        if (!slideEl) return
-        slideEl.style.transform = ''
-        slideEl.style.transition = ''
-        slideEl.removeAttribute('data-swipe-view')
-        const content = slideEl.querySelector('.dm-mobile-swipe-slide__content')
-        if (!content) return
-        content.style.transform = ''
-        content.style.transition = ''
-        content.innerHTML = ''
-    }
-
-    function cleanupSwipeScene() {
-        resetSwipeSlide(swipeState.currentSlideEl)
-        resetSwipeSlide(swipeState.targetSlideEl)
-        if (swipeState.stageEl) {
-            delete swipeState.stageEl.dataset.currentView
-            delete swipeState.stageEl.dataset.targetView
+    function clearPagerSettleTimer() {
+        if (pagerState.pendingSettleTimer) {
+            clearTimeout(pagerState.pendingSettleTimer)
+            pagerState.pendingSettleTimer = 0
         }
-        swipeState.renderedCurrentViewId = null
-        swipeState.renderedTargetViewId = null
     }
 
-    function renderViewCloneIntoSlide(viewId, slideEl, scrollTop) {
-        if (!slideEl) return false
-        resetSwipeSlide(slideEl)
-        if (viewId === 'ia') return true
-
-        const nodes = getViewNodes(viewId)
-        if (!nodes.length) return false
-
-        slideEl.dataset.swipeView = viewId
-        const content = slideEl.querySelector('.dm-mobile-swipe-slide__content')
-        if (!content) return false
-
-        const fragment = document.createDocumentFragment()
-        nodes.forEach((node) => {
-            const clone = node.cloneNode(true)
-            clone.setAttribute('aria-hidden', 'true')
-            fragment.appendChild(clone)
-        })
-        content.appendChild(fragment)
-
-        const normalizedViewId = normalizeViewId(viewId)
-        const scrollContainer = getViewScrollContainer(viewId)
-        if (scrollTop > 0 && scrollContainer === mainEl) {
-            content.style.transform = `translate3d(0, ${-scrollTop}px, 0)`
-            return true
+    function clearPagerRaf() {
+        if (pagerState.settleRafId) {
+            cancelAnimationFrame(pagerState.settleRafId)
+            pagerState.settleRafId = 0
         }
-        if (normalizedViewId === 'muro') {
-            const previewViewport = content.querySelector('.dm-carousel-viewport')
-            if (previewViewport) previewViewport.scrollTop = scrollTop
-            return true
+    }
+
+    function resetPagerSyncFlags() {
+        pagerState.isProgrammaticPagerScroll = false
+        pagerState.programmaticTargetViewId = null
+        pagerState.isWrappingGhostJump = false
+    }
+
+    function createPagerPage(entry) {
+        const page = document.createElement('section')
+        page.className = 'dm-mobile-page'
+        page.dataset.pageKey = entry.key
+        page.dataset.view = entry.viewId
+        if (entry.ghost) {
+            page.classList.add('dm-mobile-page--ghost')
+            page.setAttribute('aria-hidden', 'true')
         }
-        if (normalizedViewId === 'foro') {
-            const previewScroller = content.querySelector('#foro > .section-card')
-                || content.querySelector('.section-card')
-            if (previewScroller) previewScroller.scrollTop = scrollTop
+
+        const scroller = document.createElement('div')
+        scroller.className = 'dm-mobile-page__scroller'
+        scroller.dataset.view = entry.viewId
+        if (entry.viewId === 'muro') {
+            scroller.classList.add('dm-mobile-page__scroller--muro')
         }
-        return true
-    }
-
-    function getSwipeProgress(dx) {
-        if (!swipeState.containerWidth) return 0
-        return Math.min(Math.abs(dx) / swipeState.containerWidth, 1)
-    }
-
-    function getSwipeSettleDuration() {
-        return prefersReducedMotion() ? 160 : SWIPE_SETTLE_DURATION_MS
-    }
-
-    function setSlideTransition(slideEl, enabled) {
-        if (!slideEl) return
-        slideEl.style.transition = enabled
-            ? `transform ${getSwipeSettleDuration()}ms ${SWIPE_EASING}`
-            : 'none'
-    }
-
-    function getAssistantPreviewElements() {
-        const elements = getAssistantShellElements()
-        if (!elements) return null
-        const activeModel = getAssistantShellApi()?.state?.activeModel || 'gemini'
-        elements.shell.querySelectorAll('[data-dm-ai-frame]').forEach((frame) => {
-            const isActive = frame.dataset.dmAiFrame === activeModel
-            frame.classList.toggle('is-active', isActive)
-            frame.setAttribute('aria-hidden', isActive ? 'false' : 'true')
-        })
-        return elements
-    }
-
-    function setAssistantPreviewEnabled(enabled, progress = 0) {
-        const elements = getAssistantPreviewElements()
-        if (!elements) return
-        const { shell } = elements
-        swipeState.assistantPreviewActive = enabled
-        shell.classList.toggle('dm-ai-shell--swipe-preview', enabled)
-        if (!enabled) {
-            shell.style.transform = ''
-            shell.style.transition = ''
-            shell.style.removeProperty('--dm-ai-swipe-backdrop-opacity')
-            if (!getAssistantShellApi()?.state?.panelOpen) {
-                shell.setAttribute('aria-hidden', 'true')
+        if (entry.viewId === 'foro') {
+            scroller.classList.add('dm-mobile-page__scroller--foro')
+        }
+        if (entry.viewId === 'ia') {
+            scroller.classList.add('dm-mobile-page__scroller--ia')
+            const host = document.createElement('div')
+            host.className = 'dm-mobile-page__ai-host'
+            host.dataset.dmAiEmbeddedHost = 'true'
+            scroller.appendChild(host)
+            if (!entry.ghost) {
+                pagerState.assistantHostEl = host
             }
+        }
+
+        page.appendChild(scroller)
+        pagerState.pagesByKey.set(entry.key, page)
+        if (!entry.ghost) {
+            pagerState.realPagesByView.set(entry.viewId, page)
+            pagerState.scrollersByView.set(entry.viewId, scroller)
+        }
+        return page
+    }
+
+    function ensurePagerShell() {
+        if (!mainEl) return null
+        if (pagerState.shellEl?.isConnected && pagerState.trackEl?.isConnected) return pagerState.shellEl
+
+        const shell = document.createElement('div')
+        shell.className = 'dm-mobile-pager-shell'
+
+        const viewport = document.createElement('div')
+        viewport.className = 'dm-mobile-pager-viewport'
+
+        const track = document.createElement('div')
+        track.className = 'dm-mobile-pager-track'
+        track.dataset.dmPagerTrack = 'true'
+
+        PAGER_ORDER.forEach((entry) => {
+            track.appendChild(createPagerPage(entry))
+        })
+
+        viewport.appendChild(track)
+        shell.appendChild(viewport)
+        mainEl.appendChild(shell)
+
+        pagerState.shellEl = shell
+        pagerState.viewportEl = viewport
+        pagerState.trackEl = track
+        return shell
+    }
+
+    function sanitizeGhostClone(root) {
+        if (!root) return
+        const nodes = [root, ...root.querySelectorAll('*')]
+        nodes.forEach((node) => {
+            if (node.id) node.removeAttribute('id')
+            node.setAttribute('aria-hidden', 'true')
+            if (node.matches('a, button, input, textarea, select, iframe, video')) {
+                node.setAttribute('tabindex', '-1')
+            }
+        })
+    }
+
+    function moveViewNodesIntoPager(viewId) {
+        const scroller = pagerState.scrollersByView.get(viewId)
+        if (!scroller) return
+        const nodes = getViewNodes(viewId)
+        nodes.forEach((node) => {
+            if (!node?.parentNode || scroller.contains(node)) return
+            const anchor = document.createComment(`dm-mobile-pager-anchor:${node.id || viewId}`)
+            node.parentNode.insertBefore(anchor, node)
+            pagerState.anchors.push({ node, anchor })
+            scroller.appendChild(node)
+        })
+    }
+
+    function restoreMovedViewNodes() {
+        pagerState.anchors.forEach(({ node, anchor }) => {
+            if (!anchor?.parentNode) return
+            anchor.parentNode.insertBefore(node, anchor.nextSibling)
+            anchor.remove()
+        })
+        pagerState.anchors = []
+    }
+
+    function stashLegacyNodes() {
+        pagerState.stashedNodes = []
+        Array.from(mainEl?.children || []).forEach((child) => {
+            if (child === pagerState.shellEl) return
+            child.classList.add('dm-mobile-pager-stashed')
+            pagerState.stashedNodes.push(child)
+        })
+        document.querySelectorAll('.visitas-pill').forEach((node) => {
+            node.classList.add('dm-mobile-pager-stashed')
+            pagerState.stashedNodes.push(node)
+        })
+    }
+
+    function restoreStashedNodes() {
+        pagerState.stashedNodes.forEach((node) => node?.classList.remove('dm-mobile-pager-stashed'))
+        pagerState.stashedNodes = []
+    }
+
+    function getGhostPageKeyForView(viewId) {
+        const normalized = normalizeViewId(viewId)
+        if (normalized === 'foro') return 'ghost-foro'
+        if (normalized === 'muro') return 'ghost-muro'
+        return ''
+    }
+
+    function refreshGhostPage(viewId) {
+        const ghostKey = getGhostPageKeyForView(viewId)
+        if (!ghostKey) return
+        const page = pagerState.pagesByKey.get(ghostKey)
+        const scroller = page?.querySelector('.dm-mobile-page__scroller')
+        if (!scroller) return
+        scroller.innerHTML = ''
+        getViewNodes(viewId).forEach((node) => {
+            const clone = node.cloneNode(true)
+            sanitizeGhostClone(clone)
+            scroller.appendChild(clone)
+        })
+    }
+
+    function scheduleGhostRefresh(viewId) {
+        const normalized = normalizeViewId(viewId)
+        const existing = pagerState.ghostRefreshTimers.get(normalized)
+        if (existing) clearTimeout(existing)
+        const timer = window.setTimeout(() => {
+            pagerState.ghostRefreshTimers.delete(normalized)
+            if (!isPagerMode()) return
+            refreshGhostPage(normalized)
+        }, PAGER_GHOST_REFRESH_DELAY_MS)
+        pagerState.ghostRefreshTimers.set(normalized, timer)
+    }
+
+    function clearGhostRefreshTimers() {
+        pagerState.ghostRefreshTimers.forEach((timer) => clearTimeout(timer))
+        pagerState.ghostRefreshTimers.clear()
+    }
+
+    function bindGhostObservers() {
+        if (!window.MutationObserver) return
+        ;['muro', 'foro'].forEach((viewId) => {
+            getViewNodes(viewId).forEach((node) => {
+                const observer = new MutationObserver(() => {
+                    scheduleGhostRefresh(viewId)
+                })
+                observer.observe(node, {
+                    childList: true,
+                    subtree: true,
+                    characterData: true,
+                    attributes: true
+                })
+                pagerState.mutationObservers.push(observer)
+            })
+            refreshGhostPage(viewId)
+        })
+    }
+
+    function disconnectGhostObservers() {
+        pagerState.mutationObservers.forEach((observer) => observer.disconnect())
+        pagerState.mutationObservers = []
+        clearGhostRefreshTimers()
+    }
+
+    function syncAssistantPresentationMode() {
+        const assistantShell = getAssistantShellApi()
+        if (!assistantShell?.setPresentationMode) return
+        if (isPagerMode() && pagerState.assistantHostEl) {
+            assistantShell.setPresentationMode('embedded', { hostEl: pagerState.assistantHostEl })
             return
         }
-        shell.setAttribute('aria-hidden', 'false')
-        shell.style.setProperty('--dm-ai-swipe-backdrop-opacity', progress.toFixed(4))
+        assistantShell.setPresentationMode('overlay')
     }
 
-    function prepareSwipeScene(targetViewId) {
-        const stage = ensureSwipeStage()
-        if (!stage) return false
-
-        stage.dataset.currentView = swipeState.currentViewId
-        stage.dataset.targetView = targetViewId
-
-        if (swipeState.renderedCurrentViewId !== swipeState.currentViewId) {
-            if (!renderViewCloneIntoSlide(swipeState.currentViewId, swipeState.currentSlideEl, swipeState.currentScrollTop)) {
-                return false
-            }
-            swipeState.renderedCurrentViewId = swipeState.currentViewId
-        }
-
-        if (swipeState.renderedTargetViewId !== targetViewId) {
-            if (!renderViewCloneIntoSlide(targetViewId, swipeState.targetSlideEl, swipeState.targetScrollTop)) {
-                return false
-            }
-            swipeState.renderedTargetViewId = targetViewId
-        }
-
-        mainEl?.classList.add('is-swiping')
-        return true
+    function getPagerIndexLeft(index) {
+        return (getPagerPageWidth() || 0) * index
     }
 
-    function applySwipeFrame(dx) {
-        const direction = dx === 0
-            ? (swipeState.direction || 1)
-            : (dx < 0 ? -1 : 1)
-        const width = swipeState.containerWidth || getSwipeViewportWidth()
-        const targetOffset = direction < 0 ? dx + width : dx - width
-
-        if (swipeState.currentViewId !== 'ia' && swipeState.currentSlideEl) {
-            swipeState.currentSlideEl.style.transform = `translate3d(${dx}px, 0, 0)`
-        }
-        if (swipeState.targetViewId !== 'ia' && swipeState.targetSlideEl) {
-            swipeState.targetSlideEl.style.transform = `translate3d(${targetOffset}px, 0, 0)`
-        }
-
-        if (swipeState.currentViewId === 'ia' || swipeState.targetViewId === 'ia') {
-            const assistantElements = getAssistantPreviewElements()
-            if (assistantElements?.shell) {
-                const progress = getSwipeProgress(dx)
-                setAssistantPreviewEnabled(true, swipeState.currentViewId === 'ia' ? 1 : progress)
-                const shellOffset = swipeState.currentViewId === 'ia' ? dx : targetOffset
-                assistantElements.shell.style.transform = `translate3d(${shellOffset}px, 0, 0)`
-            }
-        } else {
-            setAssistantPreviewEnabled(false)
-        }
+    function getNearestPagerIndex() {
+        const width = getPagerPageWidth() || 1
+        return Math.round((pagerState.trackEl?.scrollLeft || 0) / width)
     }
 
-    function scheduleSwipeRender() {
-        if (swipeState.rafId) return
-        swipeState.rafId = requestAnimationFrame(() => {
-            swipeState.rafId = 0
-            applySwipeFrame(swipeState.pendingDx)
-        })
-    }
-
-    function clearSwipeClickSuppression(controller = swipeState.clickSuppressController) {
-        if (!controller) return
-        if (swipeState.suppressClickTimer) {
-            clearTimeout(swipeState.suppressClickTimer)
-            swipeState.suppressClickTimer = 0
-        }
-        if (swipeState.clickSuppressController === controller) {
-            swipeState.clickSuppressController = null
-            swipeState.suppressClickUntil = 0
-        }
-        try {
-            controller.abort()
-        } catch (error) {
-            // no-op
-        }
-    }
-
-    function armSwipeClickSuppression() {
-        clearSwipeClickSuppression()
-        const controller = new AbortController()
-        swipeState.clickSuppressController = controller
-        swipeState.suppressClickUntil = performance.now() + 420
-
-        document.addEventListener('click', (clickEvent) => {
-            if (performance.now() > swipeState.suppressClickUntil) return
-            clickEvent.preventDefault()
-            clickEvent.stopPropagation()
-            clickEvent.stopImmediatePropagation?.()
-            clearSwipeClickSuppression(controller)
-        }, { capture: true, signal: controller.signal })
-
-        swipeState.suppressClickTimer = window.setTimeout(() => {
-            clearSwipeClickSuppression(controller)
-        }, 420)
-    }
-
-    function resetSwipeState({ preserveClickSuppression = false } = {}) {
-        swipeState.activePointerId = null
-        swipeState.startX = 0
-        swipeState.startY = 0
-        swipeState.lastX = 0
-        swipeState.lastY = 0
-        swipeState.startTime = 0
-        swipeState.isTracking = false
-        swipeState.axisLocked = null
-        swipeState.isSwiping = false
-        swipeState.isSettling = false
-        swipeState.isCleaning = false
-        swipeState.didMove = false
-        swipeState.pendingDx = 0
-        swipeState.containerWidth = 0
-        swipeState.hostEl = null
-        swipeState.hostRole = ''
-        swipeState.currentViewId = getCurrentViewId()
-        swipeState.targetViewId = null
-        swipeState.direction = 0
-        swipeState.currentScrollTop = 0
-        swipeState.targetScrollTop = 0
-        swipeState.assistantShellWasOpen = false
-        swipeState.assistantPreviewActive = false
-        swipeState.renderedCurrentViewId = null
-        swipeState.renderedTargetViewId = null
-        if (!preserveClickSuppression) {
-            clearSwipeClickSuppression()
-        }
-    }
-
-    function cleanupSwipe(reason, { keepAssistantOpen = null, preserveClickSuppression = false } = {}) {
-        if (swipeState.isCleaning) return
-        swipeState.isCleaning = true
-        if (swipeState.rafId) {
-            cancelAnimationFrame(swipeState.rafId)
-            swipeState.rafId = 0
-        }
-        if (swipeState.settleTimer) {
-            clearTimeout(swipeState.settleTimer)
-            swipeState.settleTimer = 0
-        }
-        if (swipeState.hostEl && swipeState.activePointerId !== null) {
-            try {
-                if (swipeState.hostEl.hasPointerCapture?.(swipeState.activePointerId)) {
-                    swipeState.hostEl.releasePointerCapture(swipeState.activePointerId)
-                }
-            } catch (error) {
-                // no-op
-            }
-        }
-
-        mainEl?.classList.remove('is-swiping', 'is-settling')
-        cleanupSwipeScene()
-
-        const assistantShell = getAssistantShellApi()
-        const assistantElements = getAssistantPreviewElements()
-        const shouldKeepAssistantOpen = keepAssistantOpen ?? swipeState.assistantShellWasOpen
-        if (assistantElements?.shell) {
-            assistantElements.shell.style.transform = ''
-            assistantElements.shell.style.transition = ''
-            assistantElements.shell.style.removeProperty('--dm-ai-swipe-backdrop-opacity')
-            assistantElements.shell.classList.remove('dm-ai-shell--swipe-preview')
-            if (!shouldKeepAssistantOpen && !assistantShell?.state?.panelOpen) {
-                assistantElements.shell.classList.remove('is-open')
-                assistantElements.shell.setAttribute('aria-hidden', 'true')
-            }
-        }
-
-        resetSwipeState({ preserveClickSuppression })
-    }
-
-    function finalizeSwipe(commit) {
-        const committedTarget = swipeState.targetViewId
-        const previousView = swipeState.currentViewId
-        const direction = swipeState.direction
-        const keepAssistantOpen = commit
-            ? committedTarget === 'ia'
-            : previousView === 'ia'
-
-        if (commit && committedTarget) {
-            navigateToView(committedTarget, {
-                source: 'swipe',
-                direction,
-                historyMode: 'push'
+    function syncRouteFromPager(viewId, { historyMode = 'push', source = 'pager' } = {}) {
+        const normalized = normalizeViewId(viewId)
+        if (normalized !== getCurrentViewId() || historyMode !== 'none') {
+            navigateToView(normalized, {
+                source,
+                historyMode,
+                forceEmit: normalized !== getCurrentViewId()
             })
         }
-
-        cleanupSwipe(commit ? 'commit' : 'cancel', {
-            keepAssistantOpen,
-            preserveClickSuppression: swipeState.didMove
-        })
     }
 
-    function settleSwipe(commit) {
-        const finalDx = commit
-            ? (swipeState.direction < 0 ? -swipeState.containerWidth : swipeState.containerWidth)
-            : 0
-        swipeState.isSettling = true
-        mainEl?.classList.add('is-settling')
-        setSlideTransition(swipeState.currentSlideEl, true)
-        setSlideTransition(swipeState.targetSlideEl, true)
+    function handlePagerSettled(source = 'settle') {
+        if (!isPagerMode() || !pagerState.trackEl) return
+        clearPagerSettleTimer()
+        clearPagerRaf()
 
-        const assistantElements = getAssistantPreviewElements()
-        if (assistantElements?.shell) {
-            assistantElements.shell.style.transition = `transform ${getSwipeSettleDuration()}ms ${SWIPE_EASING}`
-        }
+        const nearestIndex = getNearestPagerIndex()
+        const entry = PAGER_ORDER[nearestIndex]
+        if (!entry) return
 
-        swipeState.pendingDx = finalDx
-        applySwipeFrame(finalDx)
+        pagerState.lastSettledIndex = nearestIndex
 
-        swipeState.settleTimer = window.setTimeout(() => {
-            finalizeSwipe(commit)
-        }, getSwipeSettleDuration() + 24)
-    }
-
-    function pointerStartsNearViewportEdge(event) {
-        const viewportWidth = window.visualViewport?.width || window.innerWidth || 0
-        return event.clientX <= SWIPE_EDGE_GUARD_PX
-            || event.clientX >= viewportWidth - SWIPE_EDGE_GUARD_PX
-    }
-
-    function isInteractivelyVisible(element) {
-        if (!element?.isConnected) return false
-        if (element.getAttribute('aria-hidden') === 'true') return false
-        if (!element.getClientRects().length) return false
-        const style = getComputedStyle(element)
-        if (style.display === 'none' || style.visibility === 'hidden') return false
-        if (style.pointerEvents === 'none') return false
-        if (parseFloat(style.opacity || '1') === 0 && !element.classList.contains('is-open')) return false
-        return true
-    }
-
-    function hasBlockingOverlay(hostRole) {
-        const chatOpen = document.getElementById('brisa-chat-root')?.classList.contains('brisa-chat-root--mobile-open')
-        if (chatOpen) return true
-
-        const assistantShell = getAssistantShellElements()?.shell || null
-        const candidates = [
-            document.querySelector('#dm-carousel-modal.is-open'),
-            document.querySelector('.dm-ai-selector.is-open'),
-            document.querySelector('dialog[open]'),
-            document.querySelector('[data-dm-ai-shell].is-open'),
-            document.querySelector('[role="dialog"][aria-modal="true"].is-open')
-        ].filter(Boolean)
-
-        return candidates.some((candidate) => {
-            if (hostRole === 'assistant' && assistantShell && (candidate === assistantShell || assistantShell.contains(candidate))) {
-                return false
-            }
-            return isInteractivelyVisible(candidate)
-        })
-    }
-
-    function shouldIgnoreSwipeStart(target, hostRole, event) {
-        if (!target) return true
-        if (!isSwipeRuntime()) return true
-        if (swipeState.activePointerId !== null) return true
-        if (event.pointerType === 'mouse' && event.button !== 0) return true
-        if (event.isPrimary === false) return true
-        if (hostRole !== 'assistant' && pointerStartsNearViewportEdge(event)) return true
-        if (document.querySelector('.brisa-chat-fab.is-dragging, .brisa-chat-bubble.is-dragging')) return true
-        if (hasBlockingOverlay(hostRole)) return true
-
-        const editable = target.closest('input, input[type="range"], textarea, select, [contenteditable="true"]')
-        if (editable) return true
-
-        if (hostRole === 'assistant') {
-            if (target.closest('button, input, input[type="range"], textarea, select, [contenteditable="true"]')) {
-                return true
-            }
-            return !target.closest('[data-dm-ai-header], [data-dm-ai-backdrop]')
-        }
-
-        return Boolean(target.closest(swipeExcludedSelector))
-    }
-
-    function resolveSwipeTargetFromDelta(dx) {
-        if (dx === 0) return swipeState.targetViewId
-        return dx < 0
-            ? getNextViewId(swipeState.currentViewId)
-            : getPrevViewId(swipeState.currentViewId)
-    }
-
-    function handleSwipePointerDown(event) {
-        const hostEl = event.currentTarget
-        const hostRole = hostEl?.dataset?.dmSwipeHost || 'main'
-        if (shouldIgnoreSwipeStart(event.target, hostRole, event)) return
-
-        swipeState.activePointerId = event.pointerId
-        swipeState.startX = event.clientX
-        swipeState.startY = event.clientY
-        swipeState.lastX = event.clientX
-        swipeState.lastY = event.clientY
-        swipeState.startTime = performance.now()
-        swipeState.isTracking = true
-        swipeState.axisLocked = null
-        swipeState.isSwiping = false
-        swipeState.isSettling = false
-        swipeState.didMove = false
-        swipeState.pendingDx = 0
-        swipeState.containerWidth = getSwipeViewportWidth()
-        swipeState.currentViewId = getCurrentViewId()
-        swipeState.targetViewId = null
-        swipeState.direction = 0
-        swipeState.hostEl = hostEl
-        swipeState.hostRole = hostRole
-        swipeState.currentScrollTop = getActiveScrollTop(swipeState.currentViewId)
-        swipeState.targetScrollTop = 0
-        swipeState.assistantShellWasOpen = Boolean(getAssistantShellApi()?.state?.panelOpen)
-    }
-
-    function handleSwipePointerMove(event) {
-        if (!swipeState.isTracking || event.pointerId !== swipeState.activePointerId || swipeState.isSettling || swipeState.isCleaning) return
-
-        const dx = event.clientX - swipeState.startX
-        const dy = event.clientY - swipeState.startY
-        swipeState.lastX = event.clientX
-        swipeState.lastY = event.clientY
-
-        if (!swipeState.axisLocked) {
-            if (Math.abs(dx) < SWIPE_DEADZONE_PX && Math.abs(dy) < SWIPE_DEADZONE_PX) return
-            if (Math.abs(dy) > Math.abs(dx)) {
-                cleanupSwipe('axis-y')
-                return
-            }
-            if (Math.abs(dx) <= Math.abs(dy)) return
-
-            const targetViewId = resolveSwipeTargetFromDelta(dx)
-            if ((targetViewId === 'ia' || swipeState.currentViewId === 'ia') && !getAssistantPreviewElements()) {
-                cleanupSwipe('assistant-unavailable')
-                return
-            }
-
-            swipeState.axisLocked = 'x'
-            swipeState.isSwiping = true
-            swipeState.targetViewId = targetViewId
-            swipeState.direction = dx < 0 ? -1 : 1
-            swipeState.targetScrollTop = getStoredScrollTop(targetViewId)
-
-            if (!prepareSwipeScene(targetViewId)) {
-                cleanupSwipe('stage-failed')
-                return
-            }
-
-            armSwipeClickSuppression()
-
-            try {
-                swipeState.hostEl?.setPointerCapture?.(event.pointerId)
-            } catch (error) {
-                // no-op
-            }
-        }
-
-        if (swipeState.axisLocked !== 'x') return
-
-        const nextDirection = dx === 0
-            ? swipeState.direction
-            : (dx < 0 ? -1 : 1)
-        if (dx !== 0 && nextDirection !== swipeState.direction) {
-            swipeState.direction = nextDirection
-            swipeState.targetViewId = resolveSwipeTargetFromDelta(dx)
-            if ((swipeState.targetViewId === 'ia' || swipeState.currentViewId === 'ia') && !getAssistantPreviewElements()) {
-                cleanupSwipe('assistant-unavailable-switch')
-                return
-            }
-            swipeState.targetScrollTop = getStoredScrollTop(swipeState.targetViewId)
-            if (!prepareSwipeScene(swipeState.targetViewId)) {
-                cleanupSwipe('stage-failed-switch')
-                return
-            }
-        }
-
-        swipeState.didMove = true
-        swipeState.pendingDx = dx
-        scheduleSwipeRender()
-    }
-
-    function handleSwipePointerUp(event) {
-        if (!swipeState.isTracking || event.pointerId !== swipeState.activePointerId || swipeState.isCleaning) return
-        if (swipeState.axisLocked !== 'x' || !swipeState.isSwiping) {
-            cleanupSwipe('pointerup-no-swipe')
+        if (pagerState.isWrappingGhostJump) {
+            resetPagerSyncFlags()
             return
         }
 
-        const dx = event.clientX - swipeState.startX
-        const elapsed = Math.max(performance.now() - swipeState.startTime, 1)
-        const velocity = Math.abs(dx) / elapsed
-        const shouldCommit = Math.abs(dx) >= SWIPE_COMMIT_DISTANCE_PX
-            || Math.abs(dx) >= swipeState.containerWidth * SWIPE_COMMIT_RATIO
-            || velocity >= SWIPE_COMMIT_VELOCITY
+        const viewId = normalizeViewId(entry.viewId)
+        if (entry.ghost) {
+            syncRouteFromPager(viewId, {
+                historyMode: pagerState.isProgrammaticPagerScroll ? 'none' : 'push',
+                source: 'pager'
+            })
+            const realIndex = getPagerRealIndex(viewId)
+            pagerState.isWrappingGhostJump = true
+            pagerState.isProgrammaticPagerScroll = true
+            pagerState.programmaticTargetViewId = viewId
+            pagerState.trackEl.scrollTo({
+                left: getPagerIndexLeft(realIndex),
+                behavior: 'auto'
+            })
+            requestAnimationFrame(() => {
+                pagerState.lastSettledIndex = realIndex
+                resetPagerSyncFlags()
+            })
+            return
+        }
 
-        settleSwipe(shouldCommit)
+        if (pagerState.isProgrammaticPagerScroll) {
+            resetPagerSyncFlags()
+            return
+        }
+
+        syncRouteFromPager(viewId, {
+            historyMode: viewId === getCurrentViewId() ? 'none' : 'push',
+            source
+        })
     }
 
-    function handleSwipePointerCancel(event) {
-        if (event.pointerId !== swipeState.activePointerId || swipeState.isSettling || swipeState.isCleaning) return
-        cleanupSwipe('pointercancel')
+    function handlePagerScroll() {
+        if (!isPagerMode()) return
+        clearPagerRaf()
+        pagerState.settleRafId = requestAnimationFrame(() => {
+            pagerState.settleRafId = 0
+            pagerState.lastSettledIndex = getNearestPagerIndex()
+        })
+        clearPagerSettleTimer()
+        pagerState.pendingSettleTimer = window.setTimeout(() => {
+            handlePagerSettled('scroll-debounce')
+        }, PAGER_SETTLE_DEBOUNCE_MS)
     }
 
-    function handleSwipeLostPointerCapture(event) {
-        if (event.pointerId !== swipeState.activePointerId || swipeState.isSettling || swipeState.isCleaning) return
-        cleanupSwipe('lostpointercapture')
+    function scrollPagerToView(viewId, { behavior = 'auto', source = 'route' } = {}) {
+        if (!isPagerMode() || !pagerState.trackEl) return
+        const realIndex = getPagerRealIndex(viewId)
+        if (realIndex < 0) return
+
+        const targetLeft = getPagerIndexLeft(realIndex)
+        pagerState.isProgrammaticPagerScroll = true
+        pagerState.programmaticTargetViewId = normalizeViewId(viewId)
+
+        if (Math.abs((pagerState.trackEl.scrollLeft || 0) - targetLeft) < 1) {
+            pagerState.trackEl.scrollLeft = targetLeft
+            pagerState.lastSettledIndex = realIndex
+            resetPagerSyncFlags()
+            return
+        }
+
+        pagerState.trackEl.scrollTo({
+            left: targetLeft,
+            behavior
+        })
+        handlePagerScroll()
     }
 
-    function registerSwipeHost(hostEl, role) {
-        if (!hostEl || swipeHostControllers.has(hostEl)) return
+    function syncPagerFromRoute({ behavior = 'auto', source = 'pager-sync' } = {}) {
+        if (!isPagerMode()) return
+        scrollPagerToView(getCurrentViewId(), { behavior, source })
+    }
+
+    function cleanupPagerListeners() {
+        clearPagerSettleTimer()
+        clearPagerRaf()
+        pagerState.scrollEndController?.abort?.()
+        pagerState.scrollEndController = null
+        resetPagerSyncFlags()
+    }
+
+    function bindPagerListeners() {
+        if (!pagerState.trackEl) return
+        cleanupPagerListeners()
         const controller = new AbortController()
-        hostEl.dataset.dmSwipeHost = role
-        hostEl.addEventListener('pointerdown', handleSwipePointerDown, { signal: controller.signal })
-        hostEl.addEventListener('pointermove', handleSwipePointerMove, { signal: controller.signal })
-        hostEl.addEventListener('pointerup', handleSwipePointerUp, { signal: controller.signal })
-        hostEl.addEventListener('pointercancel', handleSwipePointerCancel, { signal: controller.signal })
-        hostEl.addEventListener('lostpointercapture', handleSwipeLostPointerCapture, { signal: controller.signal })
-        swipeHostControllers.set(hostEl, controller)
-    }
-
-    function unregisterSwipeHosts() {
-        swipeHostControllers.forEach((controller, hostEl) => {
-            controller.abort()
-            delete hostEl.dataset.dmSwipeHost
+        pagerState.scrollEndController = controller
+        pagerState.trackEl.addEventListener('scroll', handlePagerScroll, {
+            passive: true,
+            signal: controller.signal
         })
-        swipeHostControllers.clear()
+        if ('onscrollend' in pagerState.trackEl) {
+            pagerState.trackEl.addEventListener('scrollend', () => {
+                handlePagerSettled('scrollend')
+            }, { signal: controller.signal })
+        }
     }
 
-    function bindAssistantSwipeHosts() {
-        const elements = getAssistantShellElements()
-        if (!elements) return
-        registerSwipeHost(elements.backdrop, 'assistant')
-        registerSwipeHost(elements.header, 'assistant')
+    function enterMobilePagerMode() {
+        if (isPagerMode() || !mainEl) return
+
+        ensurePagerShell()
+        ;['muro', 'estructura', 'comites', 'foro'].forEach((viewId) => {
+            moveViewNodesIntoPager(viewId)
+        })
+        stashLegacyNodes()
+        document.body.classList.add('dm-mobile-pager-mode')
+        pagerState.enabled = true
+        bindPagerListeners()
+        bindGhostObservers()
+        syncAssistantPresentationMode()
+        syncAssistantShellForView(getCurrentViewId())
+        syncMuroHeaderPlacement()
+        bindShellScrollListener()
+        bindMuroScrollListener()
+        syncPagerFromRoute({ behavior: 'auto', source: 'pager-enter' })
     }
 
-    function syncSwipeController() {
-        const shouldEnable = isSwipeRuntime()
+    function exitMobilePagerMode() {
+        if (!isPagerMode()) return
+
+        cleanupPagerListeners()
+        disconnectGhostObservers()
+        document.body.classList.remove('dm-mobile-pager-mode')
+        pagerState.enabled = false
+        syncAssistantPresentationMode()
+        restoreMovedViewNodes()
+        restoreStashedNodes()
+        pagerState.pagesByKey.clear()
+        pagerState.realPagesByView.clear()
+        pagerState.scrollersByView.clear()
+        pagerState.assistantHostEl = null
+        pagerState.shellEl?.remove()
+        pagerState.shellEl = null
+        pagerState.viewportEl = null
+        pagerState.trackEl = null
+        pagerState.lastSettledIndex = -1
+        syncMuroHeaderPlacement()
+        syncAssistantShellForView(getCurrentViewId())
+        bindShellScrollListener()
+        bindMuroScrollListener()
+    }
+
+    function syncMobilePagerMode() {
+        const shouldEnable = isSwipeRuntime() && !!mainEl
         if (!shouldEnable) {
-            if (swipeState.enabled) {
-                cleanupSwipe('breakpoint-exit')
-                unregisterSwipeHosts()
-            }
-            swipeState.enabled = false
+            exitMobilePagerMode()
             return
         }
-
-        if (!swipeState.enabled) {
-            swipeState.enabled = true
+        if (!isPagerMode()) {
+            enterMobilePagerMode()
+            return
         }
-        registerSwipeHost(mainEl, 'main')
-        bindAssistantSwipeHosts()
+        syncAssistantPresentationMode()
+        syncPagerFromRoute({ behavior: 'auto', source: 'pager-sync' })
     }
 
+    window.addEventListener('resize', () => {
+        if (!isPagerMode()) return
+        requestAnimationFrame(() => {
+            syncPagerFromRoute({ behavior: 'auto', source: 'resize' })
+        })
+    }, { passive: true })
     window.addEventListener('blur', () => {
-        if (!swipeState.isTracking && !swipeState.isSettling) return
-        cleanupSwipe('blur')
+        if (!isPagerMode()) return
+        clearPagerSettleTimer()
+        clearPagerRaf()
+        resetPagerSyncFlags()
     })
     document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) return
-        if (!swipeState.isTracking && !swipeState.isSettling) return
-        cleanupSwipe('visibilitychange')
+        if (!document.hidden || !isPagerMode()) return
+        clearPagerSettleTimer()
+        clearPagerRaf()
+        resetPagerSyncFlags()
     })
-    window.addEventListener('resize', () => {
-        if (!swipeState.isTracking && !swipeState.isSettling) return
-        cleanupSwipe('resize')
-    }, { passive: true })
     window.addEventListener('orientationchange', () => {
-        if (!swipeState.isTracking && !swipeState.isSettling) return
-        cleanupSwipe('orientationchange')
+        if (!isPagerMode()) return
+        requestAnimationFrame(() => {
+            syncPagerFromRoute({ behavior: 'auto', source: 'orientationchange' })
+        })
     }, { passive: true })
     window.visualViewport?.addEventListener('resize', () => {
-        if (!swipeState.isTracking && !swipeState.isSettling) return
-        cleanupSwipe('visualViewport-resize')
+        if (!isPagerMode()) return
+        requestAnimationFrame(() => {
+            syncPagerFromRoute({ behavior: 'auto', source: 'visualViewport-resize' })
+        })
     }, { passive: true })
     window.visualViewport?.addEventListener('scroll', () => {
-        if (!swipeState.isTracking && !swipeState.isSettling) return
-        cleanupSwipe('visualViewport-scroll')
+        if (!isPagerMode() || pagerState.isProgrammaticPagerScroll) return
+        handlePagerSettled('visualViewport-scroll')
     }, { passive: true })
 
     /*==================== REFERENTES: DESKTOP OPEN ====================*/
@@ -1261,6 +1107,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let hoverActive = false;
     let scrollUiTicking = false;
     let scrollUpVisible = null;
+    let shellScrollEl = null;
 
     const handleDisableHover = () => {
         if (!document.body) return;
@@ -1276,7 +1123,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const getScrollTop = () => {
-        if (document.body.dataset.view && mainScroller) return mainScroller.scrollTop;
+        if (document.body.dataset.view) {
+            const scrollEl = getViewScrollContainer(getCurrentViewId()) || mainScroller
+            if (scrollEl === window) return window.scrollY || 0
+            return scrollEl?.scrollTop || 0
+        }
         return window.scrollY || document.documentElement.scrollTop || 0;
     };
 
@@ -1291,7 +1142,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const scrollToTop = () => {
-        if (document.body.dataset.view && mainScroller) {
+        if (document.body.dataset.view) {
+            const scrollEl = getViewScrollContainer(getCurrentViewId()) || mainScroller
+            if (scrollEl && scrollEl !== window) {
+                scrollEl.scrollTo({ top: 0, behavior: "smooth" });
+                return;
+            }
+        }
+        if (mainScroller && document.body.dataset.view) {
             mainScroller.scrollTo({ top: 0, behavior: "smooth" });
             return;
         }
@@ -1324,11 +1182,29 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // Escuchar scroll en ambos: window (desktop) + mainScroller (mobile/PWA)
-    window.addEventListener("scroll", scheduleScrollUI, { passive: true });
-    if (mainScroller) {
-        mainScroller.addEventListener("scroll", scheduleScrollUI, { passive: true });
+    const bindShellScrollListener = () => {
+        const nextScrollEl = document.body.dataset.view
+            ? (getViewScrollContainer(getCurrentViewId()) || mainScroller || window)
+            : window
+
+        if (shellScrollEl === nextScrollEl) return
+
+        if (shellScrollEl === window) {
+            window.removeEventListener("scroll", scheduleScrollUI)
+        } else if (shellScrollEl) {
+            shellScrollEl.removeEventListener("scroll", scheduleScrollUI)
+        }
+
+        shellScrollEl = nextScrollEl
+
+        if (shellScrollEl === window) {
+            window.addEventListener("scroll", scheduleScrollUI, { passive: true })
+        } else if (shellScrollEl) {
+            shellScrollEl.addEventListener("scroll", scheduleScrollUI, { passive: true })
+        }
     }
+
+    bindShellScrollListener()
 
     scrollUp();
     scrollHeader();
@@ -1350,7 +1226,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const muroDeltaMin = 1;
 
     const getMuroScrollContainer = () => {
-        if (document.body?.dataset?.view) return mainScroller || window;
+        if (document.body?.dataset?.view) {
+            return getViewScrollContainer('muro') || mainScroller || window;
+        }
         return window;
     };
 
@@ -1455,11 +1333,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Re-bind when route changes or layout changes
     window.addEventListener('dm:viewchange', () => {
+        bindShellScrollListener();
         bindMuroScrollListener();
         requestAnimationFrame(() => { lastScrollY = getScrollY(); });
     });
 
     window.addEventListener('resize', () => {
+        bindShellScrollListener();
         bindMuroScrollListener();
         requestAnimationFrame(() => { lastScrollY = getScrollY(); });
     }, { passive: true });

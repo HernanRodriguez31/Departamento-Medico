@@ -1599,7 +1599,8 @@ html {
     - By making the feed viewport the scroll container (Facebook-style), scrolling
       stays reliable even if window scroll is not available.
   */
-  body[data-view="carrete"] #carrete.dm-carousel-section.is-feed-mode {
+  body[data-view="carrete"] #carrete.dm-carousel-section.is-feed-mode,
+  body.dm-mobile-pager-mode .dm-mobile-page[data-view="muro"] #carrete.dm-carousel-section.is-feed-mode {
     /*
       En el modo app, el contenedor principal (main) ya está dimensionado
       entre header y bottom nav. Usamos 100% para no exceder el alto útil
@@ -1611,84 +1612,45 @@ html {
     flex-direction: column;
   }
 
-  body[data-view="carrete"] #carrete.dm-carousel-section {
+  body[data-view="carrete"] #carrete.dm-carousel-section,
+  body.dm-mobile-pager-mode .dm-mobile-page[data-view="muro"] #carrete.dm-carousel-section {
     margin-top: 0.3rem;
     margin-bottom: 0;
     padding-bottom: 0;
   }
 
-  body[data-view="carrete"] #carrete .dm-carousel-header {
+  body[data-view="carrete"] #carrete .dm-carousel-header,
+  body.dm-mobile-pager-mode .dm-mobile-page[data-view="muro"] #carrete .dm-carousel-header {
     margin: 10px 0 6px;
   }
 
-  body[data-view="carrete"] #carrete .dm-carousel-title {
+  body[data-view="carrete"] #carrete .dm-carousel-title,
+  body.dm-mobile-pager-mode .dm-mobile-page[data-view="muro"] #carrete .dm-carousel-title {
     margin: 4px 0 0;
   }
 
-  body[data-view="carrete"] #carrete .dm-carousel-track {
+  body[data-view="carrete"] #carrete .dm-carousel-track,
+  body.dm-mobile-pager-mode .dm-mobile-page[data-view="muro"] #carrete .dm-carousel-track {
     padding-top: 0;
     padding-bottom: 0;
   }
 
-  body[data-view="carrete"] #carrete .dm-carousel-stage {
+  body[data-view="carrete"] #carrete .dm-carousel-stage,
+  body.dm-mobile-pager-mode .dm-mobile-page[data-view="muro"] #carrete .dm-carousel-stage {
     flex: 1 1 auto;
     min-height: 0;
     margin-bottom: 0;
   }
 
-  body[data-view="carrete"] #carrete .dm-carousel-left {
+  body[data-view="carrete"] #carrete .dm-carousel-left,
+  body.dm-mobile-pager-mode .dm-mobile-page[data-view="muro"] #carrete .dm-carousel-left {
     display: flex;
     flex-direction: column;
     min-height: 0;
   }
 
-  body[data-view="carrete"] #carrete .dm-carousel-viewport {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior-y: contain;
-  }
-
-  .dm-mobile-swipe-slide[data-swipe-view="muro"] #carrete.dm-carousel-section.is-feed-mode {
-    height: 100%;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .dm-mobile-swipe-slide[data-swipe-view="muro"] #carrete.dm-carousel-section {
-    margin-top: 0.3rem;
-    margin-bottom: 0;
-    padding-bottom: 0;
-  }
-
-  .dm-mobile-swipe-slide[data-swipe-view="muro"] #carrete .dm-carousel-header {
-    margin: 10px 0 6px;
-  }
-
-  .dm-mobile-swipe-slide[data-swipe-view="muro"] #carrete .dm-carousel-title {
-    margin: 4px 0 0;
-  }
-
-  .dm-mobile-swipe-slide[data-swipe-view="muro"] #carrete .dm-carousel-track {
-    padding-top: 0;
-    padding-bottom: 0;
-  }
-
-  .dm-mobile-swipe-slide[data-swipe-view="muro"] #carrete .dm-carousel-stage {
-    flex: 1 1 auto;
-    min-height: 0;
-    margin-bottom: 0;
-  }
-
-  .dm-mobile-swipe-slide[data-swipe-view="muro"] #carrete .dm-carousel-left {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-  }
-
-  .dm-mobile-swipe-slide[data-swipe-view="muro"] #carrete .dm-carousel-viewport {
+  body[data-view="carrete"] #carrete .dm-carousel-viewport,
+  body.dm-mobile-pager-mode .dm-mobile-page[data-view="muro"] #carrete .dm-carousel-viewport {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto !important;
@@ -4304,22 +4266,44 @@ body.dm-scroll-locked {
   transition: transform 0.25s ease;
 }
 
-.dm-ai-shell.dm-ai-shell--swipe-preview {
-  pointer-events: none;
-}
-
-.dm-ai-shell.dm-ai-shell--swipe-preview .dm-ai-backdrop {
-  opacity: var(--dm-ai-swipe-backdrop-opacity, 0);
-  transition: none;
-}
-
-.dm-ai-shell.dm-ai-shell--swipe-preview .dm-ai-panel {
-  transform: translateY(0);
-  transition: none;
-}
-
 .dm-ai-shell.is-open .dm-ai-panel {
   transform: translateY(0);
+}
+
+.dm-ai-shell.dm-ai-shell--embedded {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  height: 100%;
+  pointer-events: auto;
+  z-index: 1;
+  display: flex;
+}
+
+.dm-ai-shell.dm-ai-shell--embedded .dm-ai-backdrop {
+  display: none;
+}
+
+.dm-ai-shell.dm-ai-shell--embedded .dm-ai-panel {
+  position: relative;
+  inset: auto;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  height: 100%;
+  flex: 1 1 auto;
+  border-radius: 0;
+  box-shadow: none;
+  transform: none;
+  transition: none;
+}
+
+.dm-ai-shell.dm-ai-shell--embedded .dm-ai-body {
+  min-height: 0;
+}
+
+.dm-ai-shell.dm-ai-shell--embedded .dm-ai-close {
+  display: none;
 }
 
 .dm-ai-shell .dm-ai-header {
