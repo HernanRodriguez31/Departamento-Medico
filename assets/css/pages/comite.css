@@ -883,6 +883,14 @@ body.comite-variant-alt .project-stage-dot.is-inactive {
     border-radius: 18px 18px 0 0;
 }
 
+.brisa-chat-window-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
 .brisa-chat-window-title {
     font-size: 13px;
     font-weight: 600;
@@ -976,7 +984,7 @@ body.comite-variant-alt .project-stage-dot.is-inactive {
 
 .brisa-chat-msg {
     max-width: 80%;
-    border-radius: 14px;
+    border-radius: 18px;
     padding: 6px 8px;
     padding-right: 26px;
     font-size: 12px;
@@ -991,12 +999,14 @@ body.comite-variant-alt .project-stage-dot.is-inactive {
     margin-left: auto;
     background: linear-gradient(135deg, #7ab800, #5a8a00);
     color: #ffffff;
+    border-radius: 18px 18px 8px 18px;
 }
 
 .brisa-chat-msg--other {
     margin-right: auto;
     background: rgba(243, 244, 246, 0.96);
     color: #111827;
+    border-radius: 18px 18px 18px 8px;
 }
 
 .brisa-chat-msg-author {
@@ -1016,11 +1026,52 @@ body.comite-variant-alt .project-stage-dot.is-inactive {
     width: 100%;
 }
 
+.brisa-chat-msg--me .brisa-chat-msg-author,
+.brisa-chat-msg--me .brisa-chat-msg-time,
+.brisa-chat-msg--me .brisa-chat-status-icon,
+.brisa-chat-msg--me .brisa-chat-delete-btn {
+    color: #ffffff;
+}
+
+.brisa-chat-msg--me .brisa-chat-msg-author,
+.brisa-chat-msg--me .brisa-chat-msg-time {
+    opacity: 0.92;
+}
+
 .brisa-chat-window-footer {
     padding: 6px 8px 8px;
     border-top: 1px solid rgba(0, 0, 0, 0.04);
     display: flex;
     gap: 4px;
+}
+
+@media (max-width: 640px) {
+    .brisa-chat-window-actions {
+        margin-left: auto;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .brisa-chat-window-back {
+        display: inline-flex;
+        order: 0;
+    }
+
+    #brisa-chat-window-min {
+        display: none;
+    }
+
+    #brisa-chat-delete-conversation {
+        order: 1;
+    }
+
+    #brisa-chat-window-close {
+        order: 2;
+    }
+
+    .brisa-chat-window-footer {
+        padding-bottom: calc(8px + env(safe-area-inset-bottom));
+    }
 }
 
 .brisa-chat-input {
@@ -1092,21 +1143,21 @@ body.comite-variant-alt .project-stage-dot.is-inactive {
 
 .brisa-chat-status-icon--pending {
     color: #ffffff;
-    background: rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.18);
     padding: 1px 4px;
     border-radius: 10px;
 }
 
 .brisa-chat-status-icon--sent {
-    color: #e5e7eb;
+    color: #ffffff;
     background: rgba(255, 255, 255, 0.18);
     padding: 1px 4px;
     border-radius: 10px;
 }
 
 .brisa-chat-status-icon--read {
-    color: #0ea5e9;
-    background: rgba(14, 165, 233, 0.12);
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.18);
     padding: 1px 4px;
     border-radius: 10px;
     font-weight: 700;

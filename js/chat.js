@@ -1000,6 +1000,14 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         display: none;
       }
 
+      .brisa-chat-window-heading {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        flex: 1 1 auto;
+      }
+
       @media (max-width: 640px) {
         #brisa-chat-root.brisa-chat-root--mobile-open {
           pointer-events: auto;
@@ -1139,23 +1147,36 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         }
 
         .brisa-chat-window-footer {
-          padding: 14px 16px 16px;
+          padding: 14px 16px calc(16px + env(safe-area-inset-bottom));
           background: #ffffff;
         }
 
         .brisa-chat-window-actions {
           margin-left: auto;
           gap: 8px;
+          align-items: center;
         }
 
         .brisa-chat-window-title {
-          flex: 1 1 auto;
           min-width: 0;
         }
 
         .brisa-chat-window-back {
           display: inline-flex;
+          order: 0;
           flex: 0 0 auto;
+        }
+
+        #brisa-chat-window-min {
+          display: none;
+        }
+
+        #brisa-chat-delete-conversation {
+          order: 1;
+        }
+
+        #brisa-chat-window-close {
+          order: 2;
         }
 
         .brisa-chat-pill-btn {
@@ -1405,14 +1426,24 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
 
   function applySurfaceState(el, state, origin) {
     if (!el) return;
+    const isVisibleState =
+      state === CHAT_SURFACE_STATES.OPEN || state === CHAT_SURFACE_STATES.OPENING;
+    if (!isVisibleState) {
+      const active = document.activeElement;
+      if (
+        active &&
+        active !== document.body &&
+        el.contains(active) &&
+        typeof active.blur === 'function'
+      ) {
+        active.blur();
+      }
+    }
     el.dataset.chatState = state;
     el.dataset.chatOrigin = normalizeChatOrigin(origin, el.dataset.chatOrigin || 'bubble');
-    el.setAttribute(
-      'aria-hidden',
-      state === CHAT_SURFACE_STATES.OPEN || state === CHAT_SURFACE_STATES.OPENING ? 'false' : 'true'
-    );
+    el.setAttribute('aria-hidden', isVisibleState ? 'false' : 'true');
     if ('inert' in el) {
-      el.inert = !(state === CHAT_SURFACE_STATES.OPEN || state === CHAT_SURFACE_STATES.OPENING);
+      el.inert = !isVisibleState;
     }
   }
 
@@ -1607,10 +1638,24 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   }
 
   function restoreFocusAfterHubClose() {
+    const activeNavItem = document.querySelector(
+      '.dm-bottom-nav__item[aria-current="page"], .dm-bottom-nav__item.is-active'
+    );
     const bubble = document.getElementById('brisa-chat-bubble');
-    const panelClose = document.getElementById('brisa-chat-panel-close');
+    const fab = document.getElementById('brisa-chat-fab');
+    if (focusElementSafely(activeNavItem)) return;
+    if (bubble && !bubble.hasAttribute('tabindex')) {
+      bubble.setAttribute('tabindex', '-1');
+    }
     if (focusElementSafely(bubble)) return;
-    focusElementSafely(panelClose);
+    if (fab && !fab.hasAttribute('tabindex')) {
+      fab.setAttribute('tabindex', '-1');
+    }
+    if (focusElementSafely(fab)) return;
+    const active = document.activeElement;
+    if (active && active !== document.body && typeof active.blur === 'function') {
+      active.blur();
+    }
   }
 
   function triggerBubbleReaction(type = 'opening') {
@@ -1781,14 +1826,16 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
 
           <div class="brisa-chat-window" id="brisa-chat-window">
             <div class="brisa-chat-window-header">
-              <button class="brisa-chat-pill-btn brisa-chat-window-back" id="brisa-chat-window-back" type="button" aria-label="Volver a la lista">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                  <path d="m15 18-6-6 6-6" />
-                </svg>
-              </button>
-              <div class="brisa-chat-status-dot brisa-chat-status-dot--online"></div>
-              <div class="brisa-chat-window-title" id="brisa-chat-window-title">Chat</div>
+              <div class="brisa-chat-window-heading">
+                <div class="brisa-chat-status-dot brisa-chat-status-dot--online"></div>
+                <div class="brisa-chat-window-title" id="brisa-chat-window-title">Chat</div>
+              </div>
               <div class="brisa-chat-window-actions">
+                <button class="brisa-chat-pill-btn brisa-chat-window-back" id="brisa-chat-window-back" type="button" aria-label="Volver a la lista">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="m15 18-6-6 6-6" />
+                  </svg>
+                </button>
                 <button class="brisa-chat-pill-btn" id="brisa-chat-window-min" type="button" aria-label="Minimizar" data-tooltip="Minimizar">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
                     <path d="M5 12h14"/>
