@@ -114,6 +114,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
     const muroComposer = document.getElementById('dm-muro-composer')
     const mainEl = document.querySelector('main.main')
+    const appRootEl = document.getElementById('app')
+
+    if (typeof window.__DM_DEBUG_STANDALONE_SCROLL !== 'boolean') {
+        window.__DM_DEBUG_STANDALONE_SCROLL = false
+    }
 
     const MOBILE_VIEWS = ['muro', 'estructura', 'ia', 'comites', 'foro']
     const VIEW_HASH = {
@@ -182,8 +187,83 @@ document.addEventListener('DOMContentLoaded', () => {
         scrollEndController: null
     }
 
+    const isStandalonePwa = () =>
+        displayModeQuery.matches || window.navigator.standalone === true
+
+    const getElementDebugLabel = (el) => {
+        if (!el) return null
+        if (el === window) return 'window'
+        if (el === document.documentElement) return 'html'
+        if (el === document.body) return 'body'
+        const tag = String(el.tagName || '').toLowerCase()
+        const id = el.id ? `#${el.id}` : ''
+        const className = typeof el.className === 'string'
+            ? el.className.trim().split(/\s+/).filter(Boolean).slice(0, 3).join('.')
+            : ''
+        return `${tag}${id}${className ? `.${className}` : ''}`
+    }
+
+    const syncStandaloneRootState = () => {
+        const standalone = isStandalonePwa()
+        document.documentElement.classList.toggle('is-standalone-pwa', standalone)
+        if (document.body) {
+            document.body.classList.toggle('is-standalone-pwa', standalone)
+        }
+        return standalone
+    }
+
+    const syncStandaloneViewportVar = () => {
+        const viewportHeight = Math.round(
+            window.visualViewport?.height || window.innerHeight || document.documentElement.clientHeight || 0
+        )
+        if (viewportHeight > 0) {
+            rootStyle.setProperty('--dm-app-vh', `${viewportHeight}px`)
+        }
+    }
+
+    const debugStandaloneScrollState = (source = 'debug') => {
+        if (!window.__DM_DEBUG_STANDALONE_SCROLL) return
+        const activeScrollEl = document.body?.dataset?.view
+            ? getViewScrollContainer(getCurrentViewId())
+            : null
+        const visualViewport = window.visualViewport
+        const payload = {
+            source,
+            isStandalone: isStandalonePwa(),
+            navigatorStandalone: window.navigator.standalone === true,
+            currentViewId: document.body?.dataset?.view || getCurrentViewId(),
+            scrollingElement: getElementDebugLabel(document.scrollingElement),
+            htmlScrollTop: document.documentElement.scrollTop || 0,
+            bodyScrollTop: document.body?.scrollTop || 0,
+            appRoot: {
+                label: getElementDebugLabel(appRootEl),
+                scrollTop: appRootEl?.scrollTop || 0
+            },
+            main: {
+                label: getElementDebugLabel(mainEl),
+                scrollTop: mainEl?.scrollTop || 0
+            },
+            activeViewScroller: {
+                label: getElementDebugLabel(activeScrollEl),
+                scrollTop: activeScrollEl === window
+                    ? (window.scrollY || 0)
+                    : (activeScrollEl?.scrollTop || 0)
+            },
+            pagerTrack: {
+                label: getElementDebugLabel(pagerState.trackEl),
+                scrollLeft: pagerState.trackEl?.scrollLeft || 0
+            },
+            viewport: {
+                innerHeight: window.innerHeight,
+                visualHeight: visualViewport?.height || null,
+                visualOffsetTop: visualViewport?.offsetTop || 0
+            }
+        }
+        console.debug('[DM standalone scroll]', payload)
+    }
+
     function syncAppShellVars() {
-        if (!(appShellQuery.matches || displayModeQuery.matches)) return
+        if (!(appShellQuery.matches || isStandalonePwa())) return
 
         const headerEl = document.querySelector('.header')
         const headerH = headerEl ? Math.round(headerEl.getBoundingClientRect().height) : 0
@@ -207,11 +287,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (rafLayout) cancelAnimationFrame(rafLayout)
         rafLayout = requestAnimationFrame(() => {
             rafLayout = 0
+            syncStandaloneViewportVar()
             syncAppShellVars()
         })
     }
 
-    const isAppShell = () => appShellQuery.matches || displayModeQuery.matches
+    const isAppShell = () => appShellQuery.matches || isStandalonePwa()
     const isSwipeRuntime = () => isAppShell()
         && swipeQuery.matches
         && (coarsePointerQuery.matches || navigator.maxTouchPoints > 0)
@@ -374,6 +455,42 @@ document.addEventListener('DOMContentLoaded', () => {
         scheduleResetMuroOffset()
     }
 
+    const syncForoLayoutVars = () => {
+        const clearForoVars = () => {
+            document.querySelectorAll('#foro').forEach((el) => {
+                el.style.removeProperty('--dm-foro-header-block')
+            })
+        }
+
+        if (!isAppShell()) {
+            clearForoVars()
+            return
+        }
+
+        let foroRoot = null
+        if (isPagerMode()) {
+            const activeForoPage = [...document.querySelectorAll('.dm-mobile-page')].find((pageEl) => {
+                if (normalizeViewId(pageEl.dataset.view) !== 'foro') return false
+                const rect = pageEl.getBoundingClientRect()
+                return Math.round(rect.left) === 0 && rect.right > 0
+            })
+            foroRoot = activeForoPage?.querySelector('#foro') || null
+        } else if (getCurrentViewId() === 'foro' || String(document.body?.dataset?.view || '').trim().toLowerCase() === 'foro') {
+            foroRoot = document.getElementById('foro')
+        }
+
+        if (!foroRoot) {
+            clearForoVars()
+            return
+        }
+
+        const header = foroRoot.querySelector('.dm-foro-header')
+        if (!header) return
+        const headerHeight = Math.round(header.getBoundingClientRect().height || 0)
+        if (!headerHeight) return
+        foroRoot.style.setProperty('--dm-foro-header-block', `${headerHeight}px`)
+    }
+
     const updateNavState = (viewId) => {
         if (!bottomNavItems.length) return
         const activeViewId = normalizeViewId(viewId)
@@ -473,6 +590,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateNavState(normalizedTarget)
         scheduleSyncAppShellVars()
         syncMuroHeaderPlacement()
+        requestAnimationFrame(syncForoLayoutVars)
         if (normalizedTarget === 'muro') {
             scheduleResetMuroOffset()
         }
@@ -524,6 +642,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const handleShellChange = () => {
+        syncStandaloneRootState()
+        syncStandaloneViewportVar()
         syncViewFromLocation({ source: 'shell-breakpoint', allowCanonicalReplace: true, forceEmit: true })
         syncMobilePagerMode()
     }
@@ -581,11 +701,17 @@ document.addEventListener('DOMContentLoaded', () => {
         })
     }
 
+    syncStandaloneRootState()
+    syncStandaloneViewportVar()
     scheduleSyncAppShellVars()
     window.addEventListener('resize', scheduleSyncAppShellVars, { passive: true })
     window.addEventListener('orientationchange', scheduleSyncAppShellVars, { passive: true })
     window.addEventListener('resize', syncMuroHeaderPlacement, { passive: true })
     window.addEventListener('orientationchange', syncMuroHeaderPlacement, { passive: true })
+    window.addEventListener('resize', syncForoLayoutVars, { passive: true })
+    window.addEventListener('orientationchange', syncForoLayoutVars, { passive: true })
+    window.visualViewport?.addEventListener('resize', scheduleSyncAppShellVars, { passive: true })
+    window.visualViewport?.addEventListener('resize', syncForoLayoutVars, { passive: true })
 
     if (appShellQuery.addEventListener) {
         appShellQuery.addEventListener('change', handleShellChange)
@@ -908,6 +1034,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handlePagerScroll() {
         if (!isPagerMode()) return
+        debugStandaloneScrollState('pager-track-scroll')
         clearPagerRaf()
         pagerState.settleRafId = requestAnimationFrame(() => {
             pagerState.settleRafId = 0
@@ -1060,10 +1187,6 @@ document.addEventListener('DOMContentLoaded', () => {
             syncPagerFromRoute({ behavior: 'auto', source: 'visualViewport-resize' })
         })
     }, { passive: true })
-    window.visualViewport?.addEventListener('scroll', () => {
-        if (!isPagerMode() || pagerState.isProgrammaticPagerScroll) return
-        handlePagerSettled('visualViewport-scroll')
-    }, { passive: true })
 
     /*==================== REFERENTES: DESKTOP OPEN ====================*/
     const referentesQuery = window.matchMedia('(min-width: 769px)')
@@ -1184,10 +1307,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const y = getScrollTop();
             scrollUp(y);
             scrollHeader(y);
+            debugStandaloneScrollState('scroll-ui');
         });
     };
 
-    const bindShellScrollListener = () => {
+    function bindShellScrollListener() {
         const nextScrollEl = document.body.dataset.view
             ? (getViewScrollContainer(getCurrentViewId()) || mainScroller || window)
             : window
@@ -1230,21 +1354,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const muroToggleThreshold = 10;
     const muroDeltaMin = 1;
 
-    const getMuroScrollContainer = () => {
+    function getMuroScrollContainer() {
         if (document.body?.dataset?.view) {
             return getViewScrollContainer('muro') || mainScroller || window;
         }
         return window;
-    };
+    }
 
     let muroScrollEl = getMuroScrollContainer();
 
-    const getScrollY = () => {
+    function getScrollY() {
         if (muroScrollEl === window) return window.scrollY || 0;
         return muroScrollEl?.scrollTop || 0;
-    };
+    }
 
-    const toggleMuroComposer = (hide) => {
+    function toggleMuroComposer(hide) {
         if (!muroComposer) return;
         muroHidden = hide;
 
@@ -1261,11 +1385,11 @@ document.addEventListener('DOMContentLoaded', () => {
         muroComposer.style.removeProperty('transform');
         muroComposer.style.removeProperty('opacity');
         muroComposer.style.removeProperty('pointer-events');
-    };
+    }
 
     let muroTicking = false;
 
-    const handleMuroComposerScroll = () => {
+    function handleMuroComposerScroll() {
         const isCarreteView =
             !document.body?.dataset?.view || document.body?.dataset?.view === 'carrete';
         if (!muroComposer || !isCarreteView) return;
@@ -1298,18 +1422,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         lastScrollY = currentY;
-    };
+    }
 
-    const scheduleMuroComposerScroll = () => {
+    function scheduleMuroComposerScroll() {
         if (muroTicking) return;
         muroTicking = true;
         requestAnimationFrame(() => {
             muroTicking = false;
             handleMuroComposerScroll();
         });
-    };
+    }
 
-    const bindMuroScrollListener = () => {
+    function bindMuroScrollListener() {
         const next = getMuroScrollContainer();
         if (next === muroScrollEl) return;
 
@@ -1330,7 +1454,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (muroScrollEl) {
             muroScrollEl.addEventListener('scroll', scheduleMuroComposerScroll, { passive: true });
         }
-    };
+    }
 
     // Initial bind
     bindMuroScrollListener();
@@ -1340,12 +1464,14 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('dm:viewchange', () => {
         bindShellScrollListener();
         bindMuroScrollListener();
+        requestAnimationFrame(syncForoLayoutVars);
         requestAnimationFrame(() => { lastScrollY = getScrollY(); });
     });
 
     window.addEventListener('resize', () => {
         bindShellScrollListener();
         bindMuroScrollListener();
+        requestAnimationFrame(syncForoLayoutVars);
         requestAnimationFrame(() => { lastScrollY = getScrollY(); });
     }, { passive: true });
 
@@ -1360,6 +1486,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     syncViewFromLocation({ source: 'init', allowCanonicalReplace: true, forceEmit: true })
     syncMobilePagerMode()
+    requestAnimationFrame(syncForoLayoutVars)
     /*==================== DASHBOARD LOGIC ====================*/
     // State
     const PHASES = [

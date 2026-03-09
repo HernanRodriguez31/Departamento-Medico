@@ -4100,6 +4100,12 @@ img {
     overflow: hidden;
 }
 
+.dm-mobile-page__scroller--foro {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
 .dm-mobile-page__scroller--muro {
     overflow-y: auto;
     overflow-x: hidden;
@@ -4259,6 +4265,13 @@ img {
        - main.main becomes the only vertical scroller
        This fixes "no scroll" bugs caused by accidental scroll locks / fixed layers.
     */
+    html.is-standalone-pwa,
+    body.is-standalone-pwa {
+        height: 100%;
+        overflow: hidden;
+        overscroll-behavior: none;
+    }
+
     body[data-view] {
         height: 100vh;
         overflow: hidden;
@@ -4268,6 +4281,11 @@ img {
 
     @supports (height: 100dvh) {
         body[data-view] { height: 100dvh; }
+    }
+
+    body.is-standalone-pwa[data-view] {
+        height: var(--dm-app-vh, 100dvh);
+        min-height: var(--dm-app-vh, 100dvh);
     }
 
     body[data-view] .main {
@@ -4290,12 +4308,34 @@ img {
         background: transparent;
     }
 
+    body.is-standalone-pwa[data-view] .main {
+        height: calc(
+            var(--dm-app-vh, 100dvh) -
+            var(--app-header-h, 92px) -
+            var(--bottom-nav-h) -
+            env(safe-area-inset-bottom)
+        );
+        max-height: calc(
+            var(--dm-app-vh, 100dvh) -
+            var(--app-header-h, 92px) -
+            var(--bottom-nav-h) -
+            env(safe-area-inset-bottom)
+        );
+        min-height: 0;
+    }
+
     body.dm-mobile-pager-mode .main {
         overflow: hidden;
         padding-bottom: 0;
         touch-action: auto;
         overscroll-behavior-x: none;
         overscroll-behavior-y: none;
+    }
+
+    body.is-standalone-pwa #scroll-up,
+    body.is-standalone-pwa #brisa-chat-root,
+    body.is-standalone-pwa #brisa-chat-root .brisa-chat-fab {
+        position: fixed;
     }
 
     body.dm-mobile-pager-mode .dm-mobile-pager-shell {
@@ -4387,37 +4427,50 @@ img {
 
     body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] #foro,
     body[data-view="foro"] #foro {
+        --dm-foro-header-block: 72px;
+        --dm-foro-panel-gap: 12px;
+        --dm-foro-panel-bottom-gap: 8px;
         margin-top: 0;
         margin-bottom: 0;
-        padding-top: 0;
+        padding-top: 0.35rem;
         padding-bottom: 0;
-        padding-left: 0.75rem;
-        padding-right: 0.75rem;
-        min-height: 100%;
-        display: flex;
-        flex-direction: column;
+        padding-left: 0.62rem;
+        padding-right: 0.62rem;
+        min-height: 0;
+        display: grid;
+        grid-template-rows: max-content minmax(0, 1fr);
         height: 100%;
-        gap: 10px;
+        max-height: 100%;
+        gap: 0;
         max-width: 100%;
         margin-inline: 0;
+        align-content: stretch;
+        overflow: hidden;
+        flex: 1 1 auto;
     }
 
     body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] #foro > .section-card,
     body[data-view="foro"] #foro > .section-card {
         flex: 1 1 auto;
         min-height: 0;
-        display: flex;
-        flex-direction: column;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        height: calc(100% - var(--dm-foro-header-block, 72px) - var(--dm-foro-panel-gap, 12px) - var(--dm-foro-panel-bottom-gap, 8px));
+        max-height: none;
+        align-self: stretch;
         overflow: hidden;
         overscroll-behavior-y: contain;
         overscroll-behavior-x: auto;
+        min-block-size: 0;
+        block-size: calc(100% - var(--dm-foro-header-block, 72px) - var(--dm-foro-panel-gap, 12px) - var(--dm-foro-panel-bottom-gap, 8px));
+        margin-top: var(--dm-foro-panel-gap, 12px);
     }
 
     body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] #forum-messages-general,
     body[data-view="foro"] #forum-messages-general {
         flex: 1 1 auto;
         min-height: 0;
-        height: 100%;
+        height: auto;
         max-height: none;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
@@ -4454,11 +4507,17 @@ img {
     body[data-view="foro"] .dm-foro-panel {
         height: 100%;
         min-height: 0;
-        display: flex;
-        flex-direction: column;
+        max-height: 100%;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
         padding: 0;
-        border-color: rgba(122, 184, 0, 0.14);
-        box-shadow: 0 18px 36px rgba(15, 23, 42, 0.08);
+        border: 1.5px solid rgba(122, 184, 0, 0.34);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(247, 250, 247, 0.98));
+        box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05);
+        backdrop-filter: blur(14px);
+        min-block-size: 0;
+        align-self: stretch;
+        block-size: 100%;
     }
 
     body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-thread,
@@ -4466,18 +4525,21 @@ img {
         flex: 1 1 auto;
         min-height: 0;
         overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        padding-top: 0;
+        background: linear-gradient(180deg, rgba(248, 250, 252, 0.72), rgba(255, 255, 255, 0.4));
     }
 
     body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-composer,
     body[data-view="foro"] .dm-foro-composer {
-        position: sticky;
-        bottom: 0;
-        z-index: 5;
+        position: relative;
+        z-index: 2;
         background: rgba(255, 255, 255, 0.98);
         backdrop-filter: blur(10px);
-        padding-bottom: calc(14px + env(safe-area-inset-bottom));
-        border-top: 1px solid rgba(122, 184, 0, 0.18);
-        box-shadow: 0 -10px 24px rgba(15, 23, 42, 0.06);
+        padding: 0.18rem 0.3rem calc(0.18rem + env(safe-area-inset-bottom));
+        border-top: 1px solid rgba(122, 184, 0, 0.2);
+        box-shadow: 0 -6px 14px rgba(15, 23, 42, 0.04);
     }
 
     body[data-view="foro"] .main {
@@ -4492,22 +4554,16 @@ img {
 
     body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] #foro > .section-card > .bg-white.border-t,
     body[data-view="foro"] #foro > .section-card > .bg-white.border-t {
-        position: sticky;
-        bottom: 0;
-        z-index: 5;
-        background: #ffffff;
+        position: relative;
+        bottom: auto;
+        z-index: 2;
+        background: transparent;
         border-top: 0;
     }
 
     body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] #foro > .section-card > .bg-white.border-t::before,
     body[data-view="foro"] #foro > .section-card > .bg-white.border-t::before {
-        content: "";
-        position: absolute;
-        left: 0;
-        right: 0;
-        top: 8px;
-        height: 1px;
-        background: var(--brisa, #7ab800);
+        display: none;
     }
 
     body[data-view="estructura"] .estructura-calendar,
@@ -4519,79 +4575,256 @@ img {
     body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-header,
     body[data-view="foro"] .dm-foro-header {
         display: grid;
-        gap: 0.35rem;
+        justify-items: center;
+        gap: 0.12rem;
+        padding: 0.18rem 0 0.02rem;
+        margin-bottom: 0;
         text-align: center;
-        padding: 0.1rem 0 0;
-    }
-
-    body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-header h2,
-    body[data-view="foro"] .dm-foro-header h2 {
-        margin: 0;
-        font-size: 1.28rem;
-        line-height: 1.08;
-    }
-
-    body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-header p,
-    body[data-view="foro"] .dm-foro-header p {
-        margin: 0;
-        max-width: 28ch;
-        margin-inline: auto;
-        font-size: 0.84rem;
-        line-height: 1.32;
     }
 
     body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-kicker,
     body[data-view="foro"] .dm-foro-kicker {
-        font-size: 0.72rem;
-        font-weight: 700;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-        color: rgba(122, 184, 0, 0.86);
+        margin: 0;
+        color: #111827;
+        font-size: clamp(0.98rem, 4vw, 1.12rem);
+        font-weight: 760;
+        line-height: 1;
+        letter-spacing: -0.025em;
+    }
+
+    body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-header__surface,
+    body[data-view="foro"] .dm-foro-header__surface {
+        display: none !important;
+    }
+
+    body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-title,
+    body[data-view="foro"] .dm-foro-title {
+        margin: 0;
+        color: var(--first-color);
+        font-size: clamp(1.02rem, 4.15vw, 1.12rem);
+        font-weight: 760;
+        line-height: 1.05;
+        letter-spacing: -0.02em;
+        max-width: 14ch;
+        margin-inline: auto;
+    }
+
+    body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-header__microcopy,
+    body[data-view="foro"] .dm-foro-header__microcopy,
+    body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-header p,
+    body[data-view="foro"] .dm-foro-header p {
+        margin: 0.04rem auto 0;
+        max-width: 26ch;
+        color: #94a3b8;
+        font-size: 0.58rem;
+        line-height: 1.18;
+        font-weight: 500;
     }
 
     body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-toolbar,
     body[data-view="foro"] .dm-foro-toolbar {
-        padding: 0.7rem 0.9rem;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 0.36rem;
+        padding: 0.22rem 0.38rem 0.18rem;
+        background: linear-gradient(180deg, rgba(249, 251, 249, 0.98), rgba(244, 247, 242, 0.96));
+        border-bottom: 1px solid rgba(122, 184, 0, 0.12);
     }
 
     body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-messages,
     body[data-view="foro"] .dm-foro-messages {
-        padding: 0.9rem 0.95rem 8.75rem;
-        background: rgba(248, 250, 252, 0.8);
+        padding: 0.1rem 0.28rem 0.16rem;
+        background: transparent;
         scrollbar-gutter: stable;
     }
 
     body.dm-mobile-pager-mode[data-view="foro"] #brisa-chat-root,
     body.dm-mobile-pager-mode[data-view="foro"] #brisa-chat-root .brisa-chat-fab {
-        --brisa-chat-mobile-fab-bottom: calc(var(--bottom-nav-h, 0px) + 162px + env(safe-area-inset-bottom));
+        --brisa-chat-mobile-fab-bottom: calc(var(--bottom-nav-h, 0px) + 74px + env(safe-area-inset-bottom));
     }
 
     body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-composer__intro,
     body[data-view="foro"] .dm-foro-composer__intro {
-        display: grid;
-        gap: 2px;
-        margin-bottom: 10px;
+        display: none;
     }
 
     body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-composer__title,
     body[data-view="foro"] .dm-foro-composer__title {
-        font-size: 0.8rem;
+        font-size: 0.55rem;
         font-weight: 800;
-        letter-spacing: 0.02em;
+        letter-spacing: 0.03em;
         color: #0f172a;
     }
 
     body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-composer__hint,
     body[data-view="foro"] .dm-foro-composer__hint {
-        font-size: 0.72rem;
-        line-height: 1.35;
-        color: #64748b;
+        display: none;
     }
 
     body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-toolbar__meta,
     body[data-view="foro"] .dm-foro-toolbar__meta {
-        font-size: 0.72rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.14rem 0.42rem;
+        border-radius: 999px;
+        border: 1px solid rgba(122, 184, 0, 0.16);
+        background: rgba(122, 184, 0, 0.08);
+        font-size: 0.58rem;
+        color: #5f6f52;
+    }
+
+    body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-toolbar__title,
+    body[data-view="foro"] .dm-foro-toolbar__title {
+        min-width: 0;
+        color: #0f172a;
+        font-size: 0.64rem;
+        font-weight: 700;
+    }
+
+    body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-toolbar__title span,
+    body[data-view="foro"] .dm-foro-toolbar__title span {
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] #forum-messages-general > .flex,
+    body[data-view="foro"] #forum-messages-general > .flex {
+        gap: 0.16rem;
+        align-items: flex-start;
+    }
+
+    body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] #forum-messages-general > .flex > .flex-1,
+    body[data-view="foro"] #forum-messages-general > .flex > .flex-1 {
+        min-width: 0;
+    }
+
+    body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-avatar,
+    body[data-view="foro"] .dm-foro-avatar {
+        width: 2.06rem;
+        height: 2.06rem;
+        box-shadow: inset 0 0 0 1px rgba(122, 184, 0, 0.08);
+    }
+
+    body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] #forum-messages-general .rounded-2xl.rounded-tl-none,
+    body[data-view="foro"] #forum-messages-general .rounded-2xl.rounded-tl-none {
+        border-color: rgba(226, 232, 240, 0.95);
+        border-radius: 15px 15px 15px 8px;
+        box-shadow: 0 5px 12px rgba(15, 23, 42, 0.035);
+        padding: 0.22rem 0.36rem;
+    }
+
+    body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-form,
+    body[data-view="foro"] .dm-foro-form {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.2rem;
+        align-items: center;
+    }
+
+    body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-field,
+    body[data-view="foro"] .dm-foro-field {
+        min-width: 0;
+    }
+
+    body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-form .emoji-input-wrap,
+    body[data-view="foro"] .dm-foro-form .emoji-input-wrap {
+        border: 1px solid rgba(122, 184, 0, 0.22);
+        border-radius: 14px;
+        background: #ffffff;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 4px 10px rgba(15, 23, 42, 0.035);
+        padding-right: 1.68rem;
+    }
+
+    body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] #msg-text-general,
+    body[data-view="foro"] #msg-text-general {
+        min-height: 2.36rem;
+        line-height: 1.24rem;
+        padding: 0.48rem 1.72rem 0.44rem 0.52rem !important;
+        border: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        color: #111827;
+    }
+
+    body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] #msg-text-general::placeholder,
+    body[data-view="foro"] #msg-text-general::placeholder {
         color: #94a3b8;
+    }
+
+    body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-form .emoji-btn,
+    body[data-view="foro"] .dm-foro-form .emoji-btn {
+        top: auto;
+        right: 0.28rem;
+        bottom: 0.34rem;
+        transform: none;
+        color: #64748b;
+    }
+
+    body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-send-btn,
+    body[data-view="foro"] .dm-foro-send-btn {
+        min-width: 3.68rem;
+        height: 2.12rem;
+        padding-inline: 0.4rem;
+        border-radius: 11px;
+        box-shadow: 0 7px 14px rgba(122, 184, 0, 0.16);
+    }
+
+    body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-send-btn span,
+    body[data-view="foro"] .dm-foro-send-btn span {
+        white-space: nowrap;
+        font-size: 0.72rem;
+    }
+
+    body.dm-mobile-pager-mode[data-view="foro"] #scroll-up,
+    body[data-view="foro"] #scroll-up {
+        opacity: 0 !important;
+        pointer-events: none !important;
+        transform: translateY(18px) !important;
+    }
+
+    @media (max-height: 880px) {
+        body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-header__microcopy,
+        body[data-view="foro"] .dm-foro-header__microcopy {
+            display: none;
+        }
+
+        body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] #foro,
+        body[data-view="foro"] #foro {
+            padding-top: 0.32rem;
+            padding-bottom: 0;
+            gap: 0;
+            --dm-foro-panel-gap: 10px;
+            --dm-foro-panel-bottom-gap: 6px;
+        }
+
+        body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-kicker,
+        body[data-view="foro"] .dm-foro-kicker {
+            font-size: clamp(0.92rem, 4.2vw, 1.04rem);
+        }
+
+        body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-title,
+        body[data-view="foro"] .dm-foro-title {
+            font-size: clamp(0.96rem, 4vw, 1.04rem);
+        }
+
+        body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-toolbar,
+        body[data-view="foro"] .dm-foro-toolbar {
+            padding: 0.22rem 0.34rem 0.18rem;
+        }
+
+        body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-composer,
+        body[data-view="foro"] .dm-foro-composer {
+            padding: 0.14rem 0.24rem calc(0.14rem + env(safe-area-inset-bottom));
+        }
+
+        body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] #msg-text-general,
+        body[data-view="foro"] #msg-text-general {
+            min-height: 2.24rem;
+        }
     }
 
     body.dm-mobile-pager-mode .dm-mobile-page[data-view="estructura"] #estructura-hero {

@@ -3794,12 +3794,14 @@ body.dm-modal-open .brisa-chat-panel {
 /* PWA mobile: chat flotante por encima del tab-bar */
 .app-shell #brisa-chat-root {
   display: block !important;
+  --brisa-chat-mobile-fab-bottom: calc(var(--bottom-nav-h) + 36px + env(safe-area-inset-bottom));
+  --brisa-chat-fab-right: 8px;
 }
 
 .app-shell #brisa-chat-root .brisa-chat-fab {
-  bottom: calc(var(--bottom-nav-h) + 36px + env(safe-area-inset-bottom)) !important;
-  left: auto;
-  right: 8px;
+  bottom: var(--brisa-chat-mobile-fab-bottom, calc(var(--bottom-nav-h) + 36px + env(safe-area-inset-bottom)));
+  left: var(--brisa-chat-fab-left, auto);
+  right: var(--brisa-chat-fab-right, 8px);
 }
 
 .app-shell #brisa-chat-root .brisa-chat-panel {

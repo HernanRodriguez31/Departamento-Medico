@@ -186,11 +186,14 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   let lastBubblePulseAt = 0;
   let cancelBubbleDragSession = null;
   const BUBBLE_MARGIN = 8;
-  const BUBBLE_TOP_MIN = 80;
-  const BUBBLE_BOTTOM_GAP = 154;
+  const BUBBLE_TOP_MARGIN = 8;
+  const BUBBLE_BOTTOM_MARGIN = 8;
+  const BUBBLE_TOP_FALLBACK = 72;
+  const BUBBLE_BOTTOM_FALLBACK = 74;
+  const BUBBLE_FORO_EXTRA_CLEARANCE = 28;
   const BUBBLE_DEFAULT_SIDE = 'right';
   const BUBBLE_DEFAULT_Y_PCT = 1;
-  const BUBBLE_DRAG_THRESHOLD_PX = 5;
+  const BUBBLE_DRAG_THRESHOLD_PX = 8;
   const BUBBLE_SNAP_TRANSITION_MS = 180;
   const bubblePositionKey = () => `brisa_chat_bubble_pos_v2_${currentUser?.uid || auth?.currentUser?.uid || 'anon'}`;
 
@@ -1839,11 +1842,45 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     const offsetTop = visualViewport ? Math.round(visualViewport.offsetTop) : 0;
     const width = visualViewport ? Math.round(visualViewport.width) : window.innerWidth;
     const height = visualViewport ? Math.round(visualViewport.height) : window.innerHeight;
-    const rightInset = Math.max(
-      BUBBLE_MARGIN,
-      layoutWidth - offsetLeft - width + BUBBLE_MARGIN
+    return { layoutWidth, offsetLeft, offsetTop, width, height };
+  };
+
+  const readPxValue = (rawValue, fallback = 0) => {
+    const parsed = parseFloat(rawValue);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+
+  const getBubbleActiveView = () => String(document.body?.dataset?.view || '').trim().toLowerCase();
+
+  const getBubbleHeaderHeight = () => {
+    const cssHeaderHeight = readPxValue(
+      getComputedStyle(document.documentElement).getPropertyValue('--app-header-h'),
+      0
     );
-    return { layoutWidth, offsetLeft, offsetTop, width, height, rightInset };
+    const liveHeaderHeight = Math.round(document.querySelector('.header')?.getBoundingClientRect?.().height || 0);
+    return Math.max(cssHeaderHeight, liveHeaderHeight, BUBBLE_TOP_FALLBACK);
+  };
+
+  const getBubbleBottomNavHeight = () => {
+    const cssBottomNavHeight = readPxValue(
+      getComputedStyle(document.documentElement).getPropertyValue('--bottom-nav-h'),
+      0
+    );
+    const liveBottomNavHeight = Math.round(document.querySelector('.dm-bottom-nav')?.getBoundingClientRect?.().height || 0);
+    return Math.max(cssBottomNavHeight, liveBottomNavHeight, BUBBLE_BOTTOM_FALLBACK);
+  };
+
+  const getBubbleBottomReserve = () => {
+    const bottomNavHeight = getBubbleBottomNavHeight();
+    const activeView = getBubbleActiveView();
+    if (activeView !== 'foro') return bottomNavHeight + BUBBLE_BOTTOM_MARGIN;
+    const composerHeight = Math.round(
+      document.querySelector('#foro .dm-foro-composer')?.getBoundingClientRect?.().height || 0
+    );
+    const extraForoClearance = composerHeight > 0
+      ? Math.min(BUBBLE_FORO_EXTRA_CLEARANCE, Math.round(composerHeight * 0.3))
+      : Math.round(BUBBLE_FORO_EXTRA_CLEARANCE * 0.65);
+    return bottomNavHeight + BUBBLE_BOTTOM_MARGIN + extraForoClearance;
   };
 
   const getBubbleBounds = (bubble) => {
@@ -1851,23 +1888,23 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     const viewport = getViewportMetrics();
     const width = target?.offsetWidth || bubble?.offsetWidth || 58;
     const height = target?.offsetHeight || bubble?.offsetHeight || 58;
-    const topMin = viewport.offsetTop + BUBBLE_TOP_MIN;
+    const topMin = viewport.offsetTop + getBubbleHeaderHeight() + BUBBLE_TOP_MARGIN;
     const topMax = Math.max(
       topMin,
-      viewport.offsetTop + viewport.height - height - BUBBLE_BOTTOM_GAP
+      viewport.offsetTop + viewport.height - height - getBubbleBottomReserve()
     );
     const leftMin = viewport.offsetLeft + BUBBLE_MARGIN;
     const leftMax = Math.max(
       leftMin,
       viewport.offsetLeft + viewport.width - width - BUBBLE_MARGIN
     );
-    return { viewport, width, height, topMin, topMax, leftMin, leftMax, rightInset: viewport.rightInset };
+    return { viewport, width, height, topMin, topMax, leftMin, leftMax };
   };
 
   const applyBubblePosition = (bubble, { side, yPct } = {}) => {
     if (!bubble || !isMobileShell()) return;
     const target = document.getElementById('brisa-chat-fab') || bubble;
-    const { viewport, topMin, topMax, leftMin, rightInset } = getBubbleBounds(bubble);
+    const { viewport, topMin, topMax, leftMin, leftMax } = getBubbleBounds(bubble);
     const pct = Number.isFinite(yPct) ? clamp(yPct, 0, 1) : BUBBLE_DEFAULT_Y_PCT;
     const targetTop = clamp(
       Math.round(viewport.offsetTop + pct * viewport.height),
@@ -1877,13 +1914,8 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     const resolvedSide = side === 'left' ? 'left' : BUBBLE_DEFAULT_SIDE;
     target.style.top = `${targetTop}px`;
     target.style.bottom = 'auto';
-    if (resolvedSide === 'right') {
-      target.style.right = `${rightInset}px`;
-      target.style.left = 'auto';
-    } else {
-      target.style.left = `${leftMin}px`;
-      target.style.right = 'auto';
-    }
+    target.style.left = `${resolvedSide === 'right' ? leftMax : leftMin}px`;
+    target.style.right = 'auto';
     if (target?.dataset) target.dataset.side = resolvedSide;
   };
 
@@ -4211,6 +4243,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     let suppressClick = false;
     let activePointerId = null;
     let dragAbortController = null;
+    let dragAxisLock = null;
     let isDragging = false;
     let didMove = false;
     let dragStartX = 0;
@@ -4229,6 +4262,61 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     let snapFrameId = 0;
     let snapCleanupTimer = 0;
     let isSnapAnimating = false;
+
+    const getOverlayNodeLabel = (node) => {
+      if (!node) return null;
+      if (node === document.body) return 'body';
+      if (node === document.documentElement) return 'html';
+      const tag = String(node.tagName || '').toLowerCase();
+      const id = node.id ? `#${node.id}` : '';
+      const className = typeof node.className === 'string'
+        ? node.className.trim().split(/\s+/).filter(Boolean).slice(0, 3).join('.')
+        : '';
+      return `${tag}${id}${className ? `.${className}` : ''}`;
+    };
+
+    const getOverlayAncestors = (node) => {
+      const chain = [];
+      let current = node;
+      while (current && current.nodeType === 1) {
+        const styles = window.getComputedStyle(current);
+        chain.push({
+          label: getOverlayNodeLabel(current),
+          position: styles.position,
+          overflow: `${styles.overflow}/${styles.overflowX}/${styles.overflowY}`,
+          transform: styles.transform,
+          willChange: styles.willChange,
+          filter: styles.filter,
+          perspective: styles.perspective,
+          contain: styles.contain
+        });
+        current = current.parentElement;
+      }
+      return chain;
+    };
+
+    const debugStandaloneOverlayState = (source = 'chat-overlay') => {
+      if (window.__DM_DEBUG_STANDALONE_SCROLL !== true) return;
+      const scrollUp = document.getElementById('scroll-up');
+      console.debug('[DM standalone overlay]', {
+        source,
+        fab: {
+          label: getOverlayNodeLabel(fab),
+          parent: getOverlayNodeLabel(fab?.parentElement),
+          ancestors: getOverlayAncestors(fab)
+        },
+        bubble: {
+          label: getOverlayNodeLabel(bubble),
+          parent: getOverlayNodeLabel(bubble?.parentElement),
+          ancestors: getOverlayAncestors(bubble)
+        },
+        scrollUp: {
+          label: getOverlayNodeLabel(scrollUp),
+          parent: getOverlayNodeLabel(scrollUp?.parentElement),
+          ancestors: getOverlayAncestors(scrollUp)
+        }
+      });
+    };
 
     const resetPanelSearchState = () => {
       resetUserSearch();
@@ -4277,6 +4365,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       });
 
       restoreBubblePosition();
+      debugStandaloneOverlayState('attach');
       const handleResize = () => {
         if (activePointerId !== null) {
           queueDragFrame();
@@ -4284,11 +4373,11 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         }
         restoreBubblePosition();
         syncPanelViewportBounds();
+        debugStandaloneOverlayState('viewport-resize');
       };
       window.addEventListener('resize', handleResize, { passive: true });
       window.addEventListener('orientationchange', handleResize, { passive: true });
       window.visualViewport?.addEventListener('resize', handleResize, { passive: true });
-      window.visualViewport?.addEventListener('scroll', handleResize, { passive: true });
 
       const clearSnapAnimation = () => {
         if (snapCleanupTimer) {
@@ -4325,17 +4414,17 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       };
 
       const getDragBounds = (viewport = getViewportMetrics()) => {
-        const topMin = viewport.offsetTop + BUBBLE_TOP_MIN;
+        const topMin = viewport.offsetTop + getBubbleHeaderHeight() + BUBBLE_TOP_MARGIN;
         const topMax = Math.max(
           topMin,
-          viewport.offsetTop + viewport.height - dragHeight - BUBBLE_BOTTOM_GAP
+          viewport.offsetTop + viewport.height - dragHeight - getBubbleBottomReserve()
         );
         const leftMin = viewport.offsetLeft + BUBBLE_MARGIN;
         const leftMax = Math.max(
           leftMin,
           viewport.offsetLeft + viewport.width - dragWidth - BUBBLE_MARGIN
         );
-        return { viewport, topMin, topMax, leftMin, leftMax, rightInset: viewport.rightInset };
+        return { viewport, topMin, topMax, leftMin, leftMax };
       };
 
       const resolveSideFromLeft = (leftPx, viewport) =>
@@ -4344,9 +4433,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
           : 'left';
 
       const resolveCommittedLeft = (side, bounds) =>
-        side === 'right'
-          ? Math.max(bounds.leftMin, bounds.viewport.layoutWidth - bounds.rightInset - dragWidth)
-          : bounds.leftMin;
+        side === 'right' ? bounds.leftMax : bounds.leftMin;
 
       const resolvePendingDragPosition = () => {
         const bounds = getDragBounds();
@@ -4386,6 +4473,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         activePointerId = null;
         isDragging = false;
         didMove = false;
+        dragAxisLock = null;
         dragStartX = 0;
         dragStartY = 0;
         pendingClientX = 0;
@@ -4432,7 +4520,6 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
           );
           const finalSide = (currentSide || side) === 'left' ? 'left' : BUBBLE_DEFAULT_SIDE;
           const finalLeft = resolveCommittedLeft(finalSide, bounds);
-          const finalRight = bounds.rightInset;
           const fromLeft = Number.isFinite(currentLeftPx) ? currentLeftPx : nextLeft;
           const fromTop = Number.isFinite(currentTopPx) ? currentTopPx : nextTop;
 
@@ -4443,13 +4530,8 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
           dragTarget.style.willChange = 'transform';
           dragTarget.style.top = `${finalTop}px`;
           dragTarget.style.bottom = 'auto';
-          if (finalSide === 'right') {
-            dragTarget.style.right = `${finalRight}px`;
-            dragTarget.style.left = 'auto';
-          } else {
-            dragTarget.style.left = `${bounds.leftMin}px`;
-            dragTarget.style.right = 'auto';
-          }
+          dragTarget.style.left = `${finalLeft}px`;
+          dragTarget.style.right = 'auto';
           if (dragTarget?.dataset) dragTarget.dataset.side = finalSide;
           persistBubblePosition(finalSide, finalTop);
           dragTarget.style.transform = `translate3d(${fromLeft - finalLeft}px, ${fromTop - finalTop}px, 0)`;
@@ -4500,6 +4582,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         pendingClientX = event.clientX;
         pendingClientY = event.clientY;
         activePointerId = event.pointerId;
+        dragAxisLock = null;
         dragAbortController = new AbortController();
         window.addEventListener('blur', handleWindowBlur, {
           passive: true,
@@ -4508,22 +4591,28 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         document.addEventListener('visibilitychange', handleVisibilityChange, {
           signal: dragAbortController.signal
         });
-        try {
-          bubble.setPointerCapture(event.pointerId);
-        } catch (e) {}
       };
 
       const handlePointerMove = (event) => {
         if (event.pointerId !== activePointerId) return;
         pendingClientX = event.clientX;
         pendingClientY = event.clientY;
+        const movedX = Math.abs(event.clientX - dragStartX);
+        const movedY = Math.abs(event.clientY - dragStartY);
         if (!didMove) {
-          const movedX = Math.abs(event.clientX - dragStartX);
-          const movedY = Math.abs(event.clientY - dragStartY);
           if (
             movedX < BUBBLE_DRAG_THRESHOLD_PX &&
             movedY < BUBBLE_DRAG_THRESHOLD_PX
           ) {
+            return;
+          }
+          if (!dragAxisLock) {
+            dragAxisLock = movedY > movedX ? 'y' : 'x';
+          }
+          if (dragAxisLock === 'y') {
+            suppressClick = true;
+            resetSuppressClick();
+            cleanupDrag('vertical-scroll-intent');
             return;
           }
           didMove = true;
@@ -4533,6 +4622,9 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
           bubble.classList.add('is-dragging');
           document.body.style.userSelect = 'none';
           document.documentElement.style.userSelect = 'none';
+          try {
+            bubble.setPointerCapture(event.pointerId);
+          } catch (e) {}
         }
         queueDragFrame();
       };

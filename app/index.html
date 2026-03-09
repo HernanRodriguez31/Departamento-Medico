@@ -59,7 +59,7 @@
 
     <!-- Styles -->
     <link rel="stylesheet" href="/css/variables.css">
-    <link rel="stylesheet" href="/css/app.css">
+    <link rel="stylesheet" href="/css/app.css?v=20260309-foro-mobile-12">
     <link rel="stylesheet" href="/css/structure.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/assets/css/pages/app.css?v=20260307-chat-aladdin-1">
@@ -91,8 +91,8 @@
 
         /* Textarea del foro */
         .forum-textarea {
-            --forum-line-height: 1.4rem;
-            --forum-min-lines: 1.5;
+            --forum-line-height: 1.45rem;
+            --forum-min-lines: 1.45;
             --forum-max-lines: 5;
             line-height: var(--forum-line-height);
             min-height: calc(var(--forum-line-height) * var(--forum-min-lines));
@@ -2669,21 +2669,19 @@
 
         <!-- Foro General del Departamento Médico -->
         <div id="foro" class="dm-foro-page max-w-5xl mx-auto w-full">
-            <div class="dm-foro-header text-center">
-                <span class="dm-foro-kicker">Foro</span>
-                <h2 class="section__title medium-title dm-title">
-                    Conversaciones del equipo
-                </h2>
-                <p class="text-gray-500 font-medium">
-                    Mensajes y avisos del servicio.
+            <div class="dm-foro-header">
+                <span class="dm-foro-kicker">FORO</span>
+                <h2 class="dm-foro-title">Conversaciones del equipo</h2>
+                <p class="dm-foro-header__microcopy">
+                    Mensajes y avisos del servicio
                 </p>
             </div>
 
             <div class="section-card dm-foro-panel dm-mobile-window dm-mobile-window--foro bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col">
                 <!-- Header -->
                 <div class="dm-foro-toolbar bg-gray-50 border-b border-gray-200 flex items-center justify-between gap-3">
-                    <span class="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                        <i data-lucide="message-circle" class="w-4 h-4 text-brisa"></i> Actividad del equipo
+                    <span class="dm-foro-toolbar__title text-sm font-semibold text-gray-700 flex items-center gap-2">
+                        <i data-lucide="message-circle" class="w-4 h-4 text-brisa"></i> <span>Actividad del equipo</span>
                     </span>
                     <span class="dm-foro-toolbar__meta">Canal general</span>
                 </div>
@@ -2701,8 +2699,8 @@
                         <span class="dm-foro-composer__title">Nuevo mensaje</span>
                         <span class="dm-foro-composer__hint">Comparte novedades, consultas y avisos con el equipo.</span>
                     </div>
-                    <form id="form-send-msg-general" class="flex gap-3 items-end">
-                        <div class="flex-1">
+                    <form id="form-send-msg-general" class="dm-foro-form flex gap-3 items-end">
+                        <div class="dm-foro-field flex-1">
                             <div class="emoji-input-wrap">
                                 <textarea id="msg-text-general" placeholder="Escribe un mensaje para el equipo..."
                                     class="w-full px-4 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brisa focus:border-transparent transition-all resize-none forum-textarea"
@@ -2713,7 +2711,7 @@
                             </div>
                         </div>
                         <button type="submit"
-                            class="h-[42px] px-6 bg-brisa text-white rounded-lg hover:bg-brisa-dark disabled:opacity-50 transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-medium flex-shrink-0">
+                            class="dm-foro-send-btn h-[42px] px-6 bg-brisa text-white rounded-lg hover:bg-brisa-dark disabled:opacity-50 transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-medium flex-shrink-0">
                             <i data-lucide="send" class="w-4 h-4"></i> <span>Enviar</span>
                         </button>
                     </form>
