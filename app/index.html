@@ -59,7 +59,7 @@
 
     <!-- Styles -->
     <link rel="stylesheet" href="/css/variables.css">
-    <link rel="stylesheet" href="/css/app.css?v=20260309-foro-mobile-12">
+    <link rel="stylesheet" href="/css/app.css?v=20260309-foro-spacing-7">
     <link rel="stylesheet" href="/css/structure.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/assets/css/pages/app.css?v=20260307-chat-aladdin-1">
@@ -3570,27 +3570,27 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
                 </div>
               `;
                         return `
-        <div class="flex gap-4">
+        <div class="dm-foro-message flex gap-4">
           <div class="flex-shrink-0 w-10 h-10 rounded-full bg-brisa/10 flex items-center justify-center text-brisa font-bold text-sm border border-brisa/20 dm-foro-avatar"
                data-author-uid="${msg.authorUid || ""}" data-author-name="${msg.author || ""}">
             <img class="dm-foro-avatar__img" data-author-avatar src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="Avatar" hidden />
             <span class="dm-foro-avatar__fallback" data-avatar-fallback="initials">${initials}</span>
           </div>
-          <div class="flex-1 space-y-1">
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex flex-col">
-                <span class="font-bold text-gray-900 text-sm">${msg.author || ""}</span>
-                <span class="text-xs text-gray-500">
+          <div class="dm-foro-message-body flex-1 space-y-1">
+            <div class="dm-foro-message-head flex items-center justify-between gap-2">
+              <div class="dm-foro-message-identity flex flex-col">
+                <span class="dm-foro-author font-bold text-gray-900 text-sm">${msg.author || ""}</span>
+                <span class="dm-foro-meta text-xs text-gray-500">
                   ${msg.businessUnit || ""}${msg.managementUnit ? " · " + msg.managementUnit : ""}
                 </span>
               </div>
-              <div class="flex items-center gap-2">
-                <span class="text-[11px] text-gray-400">${dateStr}</span>
+              <div class="dm-foro-message-side flex items-center gap-2">
+                <span class="dm-foro-timestamp text-[11px] text-gray-400">${dateStr}</span>
                 ${likeControls}
                 ${messageActions}
               </div>
             </div>
-            <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm border border-gray-100 text-gray-700 text-sm leading-relaxed">
+            <div class="dm-foro-message-bubble bg-white p-3 rounded-2xl rounded-tl-none shadow-sm border border-gray-100 text-gray-700 text-sm leading-relaxed">
               ${msg.text || ""}
             </div>
           </div>

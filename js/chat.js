@@ -190,7 +190,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   const BUBBLE_BOTTOM_MARGIN = 8;
   const BUBBLE_TOP_FALLBACK = 72;
   const BUBBLE_BOTTOM_FALLBACK = 74;
-  const BUBBLE_FORO_EXTRA_CLEARANCE = 28;
+  const BUBBLE_FORO_EXTRA_CLEARANCE = 72;
   const BUBBLE_DEFAULT_SIDE = 'right';
   const BUBBLE_DEFAULT_Y_PCT = 1;
   const BUBBLE_DRAG_THRESHOLD_PX = 8;
@@ -1878,8 +1878,8 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       document.querySelector('#foro .dm-foro-composer')?.getBoundingClientRect?.().height || 0
     );
     const extraForoClearance = composerHeight > 0
-      ? Math.min(BUBBLE_FORO_EXTRA_CLEARANCE, Math.round(composerHeight * 0.3))
-      : Math.round(BUBBLE_FORO_EXTRA_CLEARANCE * 0.65);
+      ? composerHeight + 28
+      : BUBBLE_FORO_EXTRA_CLEARANCE;
     return bottomNavHeight + BUBBLE_BOTTOM_MARGIN + extraForoClearance;
   };
 
@@ -4375,9 +4375,18 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         syncPanelViewportBounds();
         debugStandaloneOverlayState('viewport-resize');
       };
+      const handleViewChange = () => {
+        if (activePointerId !== null) return;
+        requestAnimationFrame(() => {
+          restoreBubblePosition();
+          syncPanelViewportBounds();
+          debugStandaloneOverlayState('viewchange');
+        });
+      };
       window.addEventListener('resize', handleResize, { passive: true });
       window.addEventListener('orientationchange', handleResize, { passive: true });
       window.visualViewport?.addEventListener('resize', handleResize, { passive: true });
+      window.addEventListener('dm:viewchange', handleViewChange, { passive: true });
 
       const clearSnapAnimation = () => {
         if (snapCleanupTimer) {
