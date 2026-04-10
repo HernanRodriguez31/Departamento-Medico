@@ -10,6 +10,7 @@
     "serve": "firebase emulators:start --only functions",
     "shell": "firebase functions:shell",
     "start": "npm run serve",
+    "test": "node --test test/*.test.js",
     "deploy": "firebase deploy --only functions"
   },
   "dependencies": {

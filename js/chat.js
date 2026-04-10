@@ -21,6 +21,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getFirebase } from "../assets/js/common/firebaseClient.js";
 import { COLLECTIONS } from "../assets/js/common/collections.js";
+import { safeText } from "../assets/js/utils/safe-dom.js";
 import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate.js";
 
 (function () {
@@ -38,6 +39,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   const PRESENCE_STALE_MS = 3 * 60 * 60 * 1000;
   const PRESENCE_HEARTBEAT_MS = 60 * 1000;
   const USER_SEARCH_MIN_CHARS = 2;
+  const USER_DIRECTORY_TTL_MS = 5 * 60 * 1000;
   const ASSISTANT_MODEL_STORAGE_KEY = 'dm_ai_model';
   const ASSISTANT_DEFAULT_MODEL = 'gemini';
   const ASSISTANT_SHELL_MODULE_URL = '/assets/js/shared/assistant-shell.js?v=20260306-chat-desktop-layout-1';
@@ -99,6 +101,8 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   let onlineUsers = [];
   let allUsersCache = [];
   let allUsersPromise = null;
+  let allUsersCacheLoadedAt = 0;
+  let allUsersCacheOwnerUid = '';
   let assistantShellPromise = null;
   let activeSearchQuery = '';
   let isUserDirectoryLoading = false;
@@ -195,6 +199,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   const BUBBLE_DEFAULT_Y_PCT = 1;
   const BUBBLE_DRAG_THRESHOLD_PX = 8;
   const BUBBLE_SNAP_TRANSITION_MS = 180;
+  const CHAT_DESKTOP_BREAKPOINT = 1024;
   const bubblePositionKey = () => `brisa_chat_bubble_pos_v2_${currentUser?.uid || auth?.currentUser?.uid || 'anon'}`;
 
   const pulseChatBubble = () => {
@@ -1919,6 +1924,13 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     if (target?.dataset) target.dataset.side = resolvedSide;
   };
 
+  const isDesktopFloatingChatViewport = () => {
+    if (typeof window.matchMedia === 'function') {
+      return window.matchMedia(`(min-width: ${CHAT_DESKTOP_BREAKPOINT}px)`).matches;
+    }
+    return window.innerWidth >= CHAT_DESKTOP_BREAKPOINT;
+  };
+
   const readBubblePosition = () => {
     try {
       const raw = localStorage.getItem(bubblePositionKey());
@@ -1938,6 +1950,28 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     try {
       localStorage.setItem(bubblePositionKey(), JSON.stringify(pos));
     } catch (e) {}
+  };
+
+  const syncFabSideForViewport = () => {
+    const fab = document.getElementById('brisa-chat-fab');
+    if (!fab) return;
+    if (isDesktopFloatingChatViewport()) {
+      fab.dataset.side = 'left';
+      ['top', 'left', 'right', 'bottom'].forEach((prop) => {
+        fab.style.removeProperty(prop);
+      });
+      return;
+    }
+    const bubble = document.getElementById('brisa-chat-bubble');
+    if (bubble && isMobileShell()) {
+      applyBubblePosition(
+        bubble,
+        readBubblePosition() || {
+          side: BUBBLE_DEFAULT_SIDE,
+          yPct: BUBBLE_DEFAULT_Y_PCT
+        }
+      );
+    }
   };
 
   // ---------- UI ----------
@@ -2136,6 +2170,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     if (bubble) {
       bubble.dataset.chatReact = 'idle';
     }
+    syncFabSideForViewport();
     updateAssistantQuickRow();
   }
 
@@ -2808,21 +2843,52 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     setRowUnreadForPeer(uid, unread);
   }
 
+  function getUserDirectoryOwnerUid() {
+    return currentUser?.uid || auth?.currentUser?.uid || '';
+  }
+
+  function isUserDirectoryCacheFresh() {
+    const ownerUid = getUserDirectoryOwnerUid();
+    return Boolean(
+      ownerUid &&
+      allUsersCacheLoadedAt &&
+      allUsersCacheOwnerUid === ownerUid &&
+      Date.now() - allUsersCacheLoadedAt < USER_DIRECTORY_TTL_MS
+    );
+  }
+
+  function clearUserDirectoryCache({ resetSearch = false } = {}) {
+    allUsersCache = [];
+    allUsersPromise = null;
+    allUsersCacheLoadedAt = 0;
+    allUsersCacheOwnerUid = '';
+    isUserDirectoryLoading = false;
+    userDirectoryError = '';
+    if (resetSearch) {
+      activeSearchQuery = '';
+    }
+  }
+
   async function loadAllUsersDirectory() {
-    if (allUsersCache.length) return allUsersCache;
+    if (isUserDirectoryCacheFresh()) return allUsersCache;
     if (allUsersPromise) return allUsersPromise;
+    const ownerUid = getUserDirectoryOwnerUid();
+    if (!ownerUid) return [];
 
     allUsersPromise = (async () => {
+      // TODO: reemplazar esta lectura amplia por un indice de busqueda server-side o callable paginada.
       const snap = await getDocs(collection(db, 'usuarios'));
       const next = [];
       snap.forEach((docSnap) => {
         const uid = docSnap.id;
-        if (!uid || uid === currentUser?.uid) return;
+        if (!uid || uid === ownerUid) return;
         const entry = buildSearchDirectoryEntry(uid, docSnap.data() || {});
         if (!entry.searchKey) return;
         next.push(entry);
       });
       allUsersCache = next;
+      allUsersCacheOwnerUid = ownerUid;
+      allUsersCacheLoadedAt = Date.now();
       return allUsersCache;
     })();
 
@@ -3053,11 +3119,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     presenceRows.clear();
     currentProfile = null;
     onlineUsers = [];
-    allUsersCache = [];
-    allUsersPromise = null;
-    activeSearchQuery = '';
-    isUserDirectoryLoading = false;
-    userDirectoryError = '';
+    clearUserDirectoryCache({ resetSearch: true });
     unreadByConversation.clear();
     totalUnreadCount = 0;
     onlineCount = 0;
@@ -3634,7 +3696,8 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     const date = msg.createdAt?.toDate ? msg.createdAt.toDate() : new Date();
     const timeText = date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
 
-    let statusHTML = '';
+    let statusNode = null;
+    let deleteBtn = null;
     if (isMe) {
       const readBy = msg.readBy || [];
       const targetUid = activePeer?.uid;
@@ -3648,30 +3711,46 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
           <path d="M14 11v6" />
           <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
         </svg>`;
+      statusNode = document.createElement('span');
       if (isPending) {
-        statusHTML = `<span class="brisa-chat-status-icon brisa-chat-status-icon--pending">✓</span>`;
+        statusNode.className = 'brisa-chat-status-icon brisa-chat-status-icon--pending';
+        statusNode.textContent = '✓';
       } else if (isRead) {
-        statusHTML = `<span class="brisa-chat-status-icon brisa-chat-status-icon--read">✓✓</span>`;
+        statusNode.className = 'brisa-chat-status-icon brisa-chat-status-icon--read';
+        statusNode.textContent = '✓✓';
       } else {
-        statusHTML = `<span class="brisa-chat-status-icon brisa-chat-status-icon--sent">✓✓</span>`;
+        statusNode.className = 'brisa-chat-status-icon brisa-chat-status-icon--sent';
+        statusNode.textContent = '✓✓';
       }
       if (canDelete) {
-        statusHTML += `<button class="brisa-chat-delete-btn" data-id="${msg.id}" title="Borrar mensaje">${trashIcon}</button>`;
+        deleteBtn = document.createElement('button');
+        deleteBtn.className = 'brisa-chat-delete-btn';
+        deleteBtn.dataset.id = msg.id;
+        deleteBtn.title = 'Borrar mensaje';
+        deleteBtn.type = 'button';
+        deleteBtn.innerHTML = trashIcon;
       }
     }
 
-    item.innerHTML = `
-      <span class="brisa-chat-msg-author">${authorLabel}</span>
-      <span>${msg.text}</span>
-      <span class="brisa-chat-msg-time">
-        ${timeText}
-        ${statusHTML}
-      </span>
-    `;
+    const authorSpan = document.createElement('span');
+    authorSpan.className = 'brisa-chat-msg-author';
+    authorSpan.textContent = safeText(authorLabel);
+
+    const bodySpan = document.createElement('span');
+    bodySpan.textContent = safeText(msg.text);
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'brisa-chat-msg-time';
+    timeSpan.append(document.createTextNode(timeText));
+    if (statusNode) timeSpan.appendChild(statusNode);
+    if (deleteBtn) timeSpan.appendChild(deleteBtn);
+
+    item.appendChild(authorSpan);
+    item.appendChild(bodySpan);
+    item.appendChild(timeSpan);
     list.appendChild(item);
 
     if (isMe) {
-      const deleteBtn = item.querySelector('.brisa-chat-delete-btn');
       if (deleteBtn) {
         deleteBtn.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -4668,6 +4747,15 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       };
     }
 
+    const handleFloatingChatViewportChange = () => {
+      syncFabSideForViewport();
+      syncPanelViewportBounds();
+    };
+    window.addEventListener('resize', handleFloatingChatViewportChange, { passive: true });
+    window.addEventListener('orientationchange', handleFloatingChatViewportChange, { passive: true });
+    window.visualViewport?.addEventListener('resize', handleFloatingChatViewportChange, { passive: true });
+    handleFloatingChatViewportChange();
+
     const toggleMobileHubFromFab = (event) => {
       if (!(isCompactMobileChat() && !isEmbeddedMode())) return false;
       if (event?.target && (panel?.contains(event.target) || win?.contains(event.target))) return false;
@@ -4784,7 +4872,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
           return;
         }
 
-        if (allUsersCache.length) {
+        if (isUserDirectoryCacheFresh()) {
           renderUsersPanel();
           return;
         }
@@ -5035,7 +5123,12 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     }, { capture: true });
 
     auth.onAuthStateChanged(async user => {
+      const previousUid = currentUser?.uid || '';
       currentUser = user || null;
+      const nextUid = currentUser?.uid || '';
+      if (previousUid && previousUid !== nextUid) {
+        clearUserDirectoryCache({ resetSearch: true });
+      }
       if (!currentUser) {
         await handleSignedOutState();
         window.location.replace(buildLoginRedirectUrl());
@@ -5056,6 +5149,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         updateCountsUI();
       }
       adjustPanelForTray();
+      syncFabSideForViewport();
       syncPanelViewportBounds();
     });
   }

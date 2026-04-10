@@ -1,14 +1,543 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && uid == request.auth.uid;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && (
+          request.auth.token.admin == true
+          || exists(/databases/$(database)/documents/admin_whitelist/$(request.auth.uid))
+        );
+    }
+
+    function onlyKeys(keys) {
+      return request.resource.data.keys().hasOnly(keys);
+    }
+
+    function changedOnly(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+
+    function hasKey(data, key) {
+      return data.keys().hasAny([key]);
+    }
+
+    function hasAnyOwnerField(data) {
+      return hasKey(data, "authorUid") || hasKey(data, "createdByUid") || hasKey(data, "userUid");
+    }
+
+    function isOwnedByCurrentUser(data) {
+      return signedIn()
+        && (
+          (hasKey(data, "authorUid") && data.authorUid == request.auth.uid)
+          || (hasKey(data, "createdByUid") && data.createdByUid == request.auth.uid)
+          || (hasKey(data, "userUid") && data.userUid == request.auth.uid)
+        );
+    }
+
+    function ownsNotification() {
+      return signedIn() && resource.data.toUid == request.auth.uid;
+    }
+
+    function validPresenceUid(uid) {
+      return isOwner(uid)
+        && (!request.resource.data.keys().hasAny(["uid"]) || request.resource.data.uid == request.auth.uid);
+    }
+
+    function validPresenceValueTypes() {
+      return (!request.resource.data.keys().hasAny(["online"]) || request.resource.data.online is bool)
+        && (!request.resource.data.keys().hasAny(["updatedAt"]) || request.resource.data.updatedAt is timestamp);
+    }
+
+    function isSpecialConversationId(conversationId) {
+      return ["dm_group_chat", "dm_foro_general"].hasAny([conversationId]);
+    }
+
+    function isConversationBetween(conversationId, uidA, uidB) {
+      return uidA is string
+        && uidB is string
+        && (
+          conversationId == uidA + "__" + uidB
+          || conversationId == uidB + "__" + uidA
+        );
+    }
+
+    function conversationIdNamesCurrentUser(conversationId) {
+      return signedIn()
+        && (
+          conversationId.matches(request.auth.uid + "__.*")
+          || conversationId.matches(".*__" + request.auth.uid)
+        );
+    }
+
+    function isParticipant(participants) {
+      return signedIn()
+        && participants is list
+        && request.auth.uid in participants;
+    }
+
+    function validConversationDocumentId(conversationId, participants) {
+      return participants is list
+        && participants.size() == 2
+        && participants[0] is string
+        && participants[1] is string
+        && conversationId == participants[0] + "__" + participants[1];
+    }
+
+    function validConversationSummaryCreate(conversationId) {
+      return signedIn()
+        && onlyKeys([
+          "participants",
+          "lastMessageText",
+          "lastMessageAt",
+          "lastSenderUid",
+          "updatedAt",
+          "unreadCountByUid"
+        ])
+        && validConversationDocumentId(conversationId, request.resource.data.participants)
+        && isParticipant(request.resource.data.participants)
+        && (
+          request.resource.data.lastSenderUid == request.auth.uid
+          || (
+            request.resource.data.lastSenderUid == "virtual_doctor"
+            && "virtual_doctor" in request.resource.data.participants
+          )
+        );
+    }
+
+    function validConversationSummaryUpdate(conversationId) {
+      return signedIn()
+        && isParticipant(resource.data.participants)
+        && validConversationDocumentId(conversationId, resource.data.participants)
+        && request.resource.data.participants == resource.data.participants
+        && changedOnly([
+          "participants",
+          "lastMessageText",
+          "lastMessageAt",
+          "lastSenderUid",
+          "updatedAt",
+          "unreadCountByUid"
+        ])
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(["lastSenderUid"])
+          || request.resource.data.lastSenderUid == request.auth.uid
+          || (
+            request.resource.data.lastSenderUid == "virtual_doctor"
+            && "virtual_doctor" in request.resource.data.participants
+          )
+        );
+    }
+
+    function validChatMessageFields() {
+      return onlyKeys(["text", "from", "to", "createdAt", "readBy"])
+        && request.resource.data.text is string
+        && request.resource.data.from is string
+        && request.resource.data.to is string;
+    }
+
+    function validUserMessageCreate(conversationId) {
+      return signedIn()
+        && validChatMessageFields()
+        && request.resource.data.from == request.auth.uid
+        && (
+          (
+            isSpecialConversationId(conversationId)
+            && request.resource.data.to == conversationId
+          )
+          || (
+            !isSpecialConversationId(conversationId)
+            && isConversationBetween(conversationId, request.auth.uid, request.resource.data.to)
+          )
+        );
+    }
+
+    function validVirtualDoctorMessageCreate(conversationId) {
+      return signedIn()
+        && validChatMessageFields()
+        && request.resource.data.from == "virtual_doctor"
+        && request.resource.data.to == request.auth.uid
+        && isConversationBetween(conversationId, request.auth.uid, "virtual_doctor");
+    }
+
+    function isMessageParticipant(data) {
+      return signedIn()
+        && (
+          (hasKey(data, "from") && data.from == request.auth.uid)
+          || (hasKey(data, "to") && data.to == request.auth.uid)
+        );
+    }
+
+    function validChatMessageRead(conversationId, data) {
+      return signedIn()
+        && (
+          isSpecialConversationId(conversationId)
+          || (
+            isMessageParticipant(data)
+            && isConversationBetween(conversationId, data.from, data.to)
+          )
+        );
+    }
+
+    function validReadReceiptUpdate() {
+      return signedIn()
+        && changedOnly(["readBy", "readAt"])
+        && request.resource.data.readBy is list
+        && request.auth.uid in request.resource.data.readBy;
+    }
+
+    function validProfileCreate(uid) {
+      return isOwner(uid)
+        && onlyKeys([
+          "nombre",
+          "email",
+          "createdAt",
+          "updatedAt",
+          "avatarUrl",
+          "avatarUpdatedAt"
+        ]);
+    }
+
+    function validProfileUpdate(uid) {
+      return isOwner(uid)
+        && changedOnly(["avatarUrl", "avatarUpdatedAt", "updatedAt"]);
+    }
+
+    function validLegacyPostCreate() {
+      return signedIn()
+        && onlyKeys([
+          "type",
+          "title",
+          "text",
+          "imageUrl",
+          "imagePath",
+          "thumbUrl",
+          "authorName",
+          "authorUid",
+          "businessUnit",
+          "managementUnit",
+          "committeeId",
+          "unidadNegocio",
+          "unidadGestion",
+          "createdByName",
+          "createdByUid",
+          "createdAt",
+          "updatedAt",
+          "likesCount",
+          "likedBy",
+          "likedNames",
+          "likeCount",
+          "commentCount"
+        ])
+        && hasAnyOwnerField(request.resource.data)
+        && (!hasKey(request.resource.data, "authorUid") || request.resource.data.authorUid == request.auth.uid)
+        && (!hasKey(request.resource.data, "createdByUid") || request.resource.data.createdByUid == request.auth.uid);
+    }
+
+    function validLegacyLikeUpdate() {
+      return signedIn()
+        && changedOnly(["likedBy", "likedNames", "likesCount"])
+        && request.resource.data.likedBy is list
+        && request.resource.data.likedNames is list
+        && (
+          request.auth.uid in request.resource.data.likedBy
+          || request.auth.uid in resource.data.likedBy
+        );
+    }
+
+    function validPostCreate() {
+      return signedIn()
+        && onlyKeys([
+          "type",
+          "text",
+          "imageUrl",
+          "imagePath",
+          "authorUid",
+          "authorName",
+          "businessUnit",
+          "managementUnit",
+          "committeeId",
+          "createdAt",
+          "updatedAt",
+          "likeCount",
+          "commentCount"
+        ])
+        && request.resource.data.authorUid == request.auth.uid;
+    }
+
+    function validPostCounterUpdate() {
+      return signedIn()
+        && (
+          changedOnly(["likeCount", "updatedAt"])
+          || changedOnly(["commentCount", "updatedAt"])
+        );
+    }
+
+    function validCommentCreate() {
+      return signedIn()
+        && onlyKeys(["text", "authorUid", "authorName", "createdAt", "likedBy"])
+        && request.resource.data.authorUid == request.auth.uid;
+    }
+
+    function validCommentLikeUpdate() {
+      return signedIn()
+        && changedOnly(["likedBy"])
+        && request.resource.data.likedBy is map;
+    }
+
+    function validCommitteeMessageCreate() {
+      return signedIn()
+        && onlyKeys([
+          "text",
+          "author",
+          "businessUnit",
+          "managementUnit",
+          "committeeId",
+          "authorUid",
+          "authorName",
+          "createdAt",
+          "likedBy"
+        ])
+        && request.resource.data.authorUid == request.auth.uid;
+    }
+
+    function validCommitteeMessageUpdate() {
+      return isAdmin()
+        || (
+          isOwnedByCurrentUser(resource.data)
+          && (
+            changedOnly(["text"])
+            || changedOnly(["likedBy"])
+          )
+        )
+        || (
+          signedIn()
+          && changedOnly(["likedBy"])
+          && request.resource.data.likedBy is map
+        )
+        || (
+          // TODO: migrar mensajes legacy sin authorUid a una reparación backend; esta reclamación cliente conserva compatibilidad actual.
+          signedIn()
+          && !hasKey(resource.data, "authorUid")
+          && changedOnly(["authorUid", "authorName"])
+          && request.resource.data.authorUid == request.auth.uid
+        );
+    }
+
+    function validCommitteeMemberSelfJoin() {
+      return signedIn()
+        && onlyKeys([
+          "committeeId",
+          "userUid",
+          "name",
+          "businessUnit",
+          "managementUnit",
+          "isLeader",
+          "createdAt"
+        ])
+        && request.resource.data.userUid == request.auth.uid
+        && request.resource.data.isLeader == false;
+    }
+
     // CAMBIO AQUI: Solo permitimos LEER la configuración (el candado cerrado)
     match /configuracion/{document=**} {
       allow read: if true;
       allow write: if false;  // <--- Nadie puede modificar la clave desde la web ahora
     }
-    // El resto sigue igual (para que el chat funcione)
+
+    match /notifications/{notificationId} {
+      allow read: if ownsNotification();
+      allow create, delete: if false;
+      allow update: if ownsNotification()
+        && changedOnly(["read", "readAt"])
+        && request.resource.data.read == true
+        && request.resource.data.readAt is timestamp;
+    }
+
+    match /admin_whitelist/{uid} {
+      allow get: if signedIn() && uid == request.auth.uid;
+      allow list, create, update, delete: if false;
+    }
+
+    match /pushTokens/{uid} {
+      allow read, write: if false;
+    }
+
+    match /dm_presence/{uid} {
+      // TODO: migrar el roster online a una vista/endpoint owner-safe antes de hacer owner-only la lectura.
+      allow read: if signedIn();
+      allow create: if validPresenceUid(uid)
+        && onlyKeys(["uid", "displayName", "role", "businessUnit", "managementUnit", "online", "updatedAt"])
+        && validPresenceValueTypes();
+      allow update: if validPresenceUid(uid)
+        && changedOnly(["uid", "displayName", "role", "businessUnit", "managementUnit", "online", "updatedAt"])
+        && validPresenceValueTypes();
+      allow delete: if false;
+    }
+
+    match /dm_session_controls/{uid} {
+      allow get: if isOwner(uid);
+      allow list, create, update, delete: if false;
+    }
+
+    match /usuarios/{uid} {
+      allow get: if signedIn();
+      // TODO: reemplazar alias login por callable; con rules no se puede impedir enumeración por consultas limit(1) repetidas.
+      allow list: if signedIn() || (request.auth == null && request.query.limit != null && request.query.limit <= 1);
+      allow create: if validProfileCreate(uid);
+      allow update: if validProfileUpdate(uid);
+      allow delete: if false;
+    }
+
+    match /users/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /dm_conversations/{conversationId} {
+      allow read: if isParticipant(resource.data.participants)
+        && validConversationDocumentId(conversationId, resource.data.participants);
+      allow create: if validConversationSummaryCreate(conversationId);
+      allow update: if validConversationSummaryUpdate(conversationId);
+      allow delete: if false;
+    }
+
+    match /dm_chats/{conversationId} {
+      allow read, write: if false;
+
+      match /messages/{messageId} {
+        allow read: if isSpecialConversationId(conversationId)
+          || conversationIdNamesCurrentUser(conversationId);
+        allow create: if validUserMessageCreate(conversationId)
+          || validVirtualDoctorMessageCreate(conversationId);
+        allow update: if validChatMessageRead(conversationId, resource.data)
+          && validReadReceiptUpdate();
+        allow delete: if isOwnedByCurrentUser(resource.data) || isAdmin();
+      }
+    }
+
+    // Necesario para el collectionGroup("messages") del watcher de mensajes entrantes.
+    match /{path=**}/messages/{messageId} {
+      allow read: if signedIn()
+        && resource.data.to == request.auth.uid;
+    }
+
+    match /dm_carousel/{postId} {
+      allow read: if signedIn();
+      allow create: if validLegacyPostCreate();
+      allow update: if isOwnedByCurrentUser(resource.data)
+        || isAdmin()
+        || validLegacyLikeUpdate()
+        || validPostCounterUpdate();
+      allow delete: if isOwnedByCurrentUser(resource.data) || isAdmin();
+
+      match /comments/{commentId} {
+        allow read: if signedIn();
+        allow create: if validCommentCreate();
+        allow update: if validCommentLikeUpdate()
+          || (
+            isOwnedByCurrentUser(resource.data)
+            && changedOnly(["text", "updatedAt"])
+          )
+          || isAdmin();
+        allow delete: if isOwnedByCurrentUser(resource.data) || isAdmin();
+      }
+
+      match /likes/{uid} {
+        allow read: if signedIn();
+        allow create: if isOwner(uid)
+          && onlyKeys(["createdAt", "authorUid"])
+          && request.resource.data.authorUid == request.auth.uid;
+        allow update: if false;
+        allow delete: if isOwner(uid);
+      }
+    }
+
+    match /dm_posts/{postId} {
+      allow read: if signedIn();
+      allow create: if validPostCreate();
+      allow update: if isOwnedByCurrentUser(resource.data)
+        || isAdmin()
+        || validPostCounterUpdate();
+      allow delete: if isOwnedByCurrentUser(resource.data) || isAdmin();
+
+      match /comments/{commentId} {
+        allow read: if signedIn();
+        allow create: if validCommentCreate();
+        allow update: if validCommentLikeUpdate()
+          || (
+            isOwnedByCurrentUser(resource.data)
+            && changedOnly(["text", "updatedAt"])
+          )
+          || isAdmin();
+        allow delete: if isOwnedByCurrentUser(resource.data) || isAdmin();
+      }
+
+      match /likes/{uid} {
+        allow read: if signedIn();
+        allow create: if isOwner(uid)
+          && onlyKeys(["createdAt", "authorUid"])
+          && request.resource.data.authorUid == request.auth.uid;
+        allow update: if false;
+        allow delete: if isOwner(uid);
+      }
+    }
+
+    match /dm_meta/home_visits {
+      // TODO: mover el contador a backend si necesita integridad fuerte contra inflación.
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && onlyKeys(["count", "updatedAt"]);
+      allow update: if signedIn()
+        && changedOnly(["count", "updatedAt"]);
+      allow delete: if false;
+    }
+
+    match /artifacts/{appId}/public/data/committee_meta/{committeeId} {
+      allow read: if signedIn();
+      // TODO: sembrar metadata por backend/Admin SDK para cerrar también el bootstrap cliente.
+      allow create: if signedIn()
+        && onlyKeys(["committeeId", "title", "subtitle"])
+        && request.resource.data.committeeId == committeeId;
+      allow update: if isAdmin()
+        && changedOnly(["committeeId", "title", "subtitle"])
+        && request.resource.data.committeeId == committeeId;
+      allow delete: if isAdmin();
+    }
+
+    match /artifacts/{appId}/public/data/committee_members/{memberId} {
+      // TODO: las vistas actuales leen colecciones completas y filtran en cliente; migrar a queries por committeeId.
+      allow read: if signedIn();
+      allow create: if isAdmin() || validCommitteeMemberSelfJoin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin() || isOwnedByCurrentUser(resource.data);
+    }
+
+    match /artifacts/{appId}/public/data/committee_topics/{topicId} {
+      // TODO: las vistas actuales leen colecciones completas y filtran en cliente; migrar a queries por committeeId.
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /artifacts/{appId}/public/data/committee_messages/{messageId} {
+      // TODO: las vistas actuales leen colecciones completas y filtran en cliente; migrar a queries por committeeId.
+      allow read: if signedIn();
+      allow create: if validCommitteeMessageCreate();
+      allow update: if validCommitteeMessageUpdate();
+      allow delete: if isOwnedByCurrentUser(resource.data) || isAdmin();
+    }
+
+    match /artifacts/{document=**} {
+      allow read, write: if false;
+    }
+
     match /{document=**} {
-      allow read, write: if true; 
+      allow read, write: if false;
     }
   }
 }

@@ -11,10 +11,8 @@ import {
   onSnapshot,
   doc,
   updateDoc,
-  addDoc,
   serverTimestamp,
-  writeBatch,
-  setDoc
+  writeBatch
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirebase } from "./firebaseClient.js";
@@ -234,97 +232,9 @@ const markAllRead = async (ids = []) => {
   await markAllReadWithDb(dbRef, ids);
 };
 
-export const createNotification = async (payload = {}) => {
-  const app = ensureApp();
-  if (!app) return;
-  const db = getFirestore(app);
-  const auth = getAuth(app);
-  const user = auth.currentUser;
-  if (!user) return;
-  const {
-    toUid,
-    fromUid = user.uid,
-    fromName = user.displayName || user.email || "Usuario",
-    type,
-    entityId = "",
-    route = "",
-    title = "Notificación",
-    body = ""
-  } = payload;
-  if (!toUid || toUid === fromUid) return;
-  if (!["chat_dm", "chat_group", "foro", "galeria_comment", "galeria_like"].includes(type)) return;
-  try {
-    await addDoc(collection(db, "notifications"), {
-      toUid,
-      fromUid,
-      fromName,
-      type,
-      entityId,
-      route,
-      title,
-      body,
-      createdAt: serverTimestamp(),
-      read: false,
-      readAt: null
-    });
-  } catch (e) {
-    console.error("Error creando notificación", e);
-  }
-};
+export const createNotification = async () => null;
 
-const bodySnippet = (text = "") => {
-  if (!text) return "";
-  return text.length > 90 ? `${text.slice(0, 90)}…` : text;
-};
-
-export const upsertNotification = async (payload = {}) => {
-  const app = ensureApp();
-  if (!app) return;
-  const db = getFirestore(app);
-  const auth = getAuth(app);
-  const user = auth.currentUser;
-  if (!user) return;
-  const {
-    toUid,
-    fromUid = user.uid,
-    fromName = user.displayName || user.email || "Usuario",
-    type,
-    entityId = "",
-    route = "",
-    title = "Notificación",
-    body = "",
-    peerUid = "",
-    docId,
-    read,
-    readAt
-  } = payload;
-  if (!toUid || toUid === fromUid) return;
-  if (!["chat_dm", "chat_group", "foro", "galeria_comment", "galeria_like"].includes(type)) return;
-  const id = docId || `notif__${type}__${toUid}__${entityId || "generic"}`;
-  try {
-    await setDoc(
-      doc(db, "notifications", id),
-      {
-        toUid,
-        fromUid,
-        fromName,
-        type,
-        entityId,
-        route,
-        title,
-        body: bodySnippet(body),
-        peerUid,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        read: read === true,
-        readAt: read === true ? (readAt || serverTimestamp()) : null
-      },
-      { merge: true }
-    );
-  } catch (e) {
-    console.error("Error upsert notificación", e);
-  }
-};
+export const upsertNotification = async () => null;
 
 export function initNotificationsUI() {
   const app = ensureApp();

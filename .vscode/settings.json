@@ -1,3 +1,15 @@
 {
-    "liveServer.settings.port": 5502
+    "liveServer.settings.port": 5502,
+    "liveServer.settings.ignoreFiles": [
+        "**/node_modules/**",
+        ".git/**",
+        "firebase-debug*.log",
+        "firestore-debug.log",
+        "ui-debug.log",
+        "docs/**",
+        "tests/**",
+        "functions/**",
+        "package-lock.json",
+        "package.json"
+    ]
 }

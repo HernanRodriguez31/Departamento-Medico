@@ -5,9 +5,18 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const cors = require("cors")({ origin: true });
-const { onRequest } = require("firebase-functions/v2/https");
+const {
+  HttpsError,
+  onCall,
+  onRequest,
+} = require("firebase-functions/v2/https");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const {
+  getAuthenticatedUid,
+  isValidPushToken,
+  normalizePushToken,
+} = require("./push/registerPushTokenValidation");
 
 // Inicializacion
 admin.initializeApp();
@@ -15,22 +24,24 @@ const db = admin.firestore();
 setGlobalOptions({ region: "us-central1" });
 
 // A PARTIR DE AQUI VAN LOS EXPORTS (No tocar los exports existentes)
-let messaging;
-const getMessaging = () => (messaging ||= admin.messaging());
+const getMessagingClient = () => admin.messaging();
 const TIMEZONE = "America/Argentina/Buenos_Aires";
 const ALLOWED_START = 8;
 const ALLOWED_END = 22; // exclusive
 const POSTS_COLLECTION = "dm_posts";
 const NOTIFICATIONS_COLLECTION = "notifications";
+const PUSH_TOKENS_COLLECTION = "pushTokens";
 const USERS_COLLECTION = "usuarios";
 const LIKE_RATE_LIMIT_MINUTES = 10;
 const LIKE_RATE_LIMIT_MS = LIKE_RATE_LIMIT_MINUTES * 60 * 1000;
 const LIKE_META_COLLECTION = "_meta";
 const LIKE_META_DOC = "like_notification";
 const APP_FEED_ROUTE = "/app/#/feed";
-const NOTIF_BODY_LIMIT = 140;
 const AI_RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const AI_RATE_LIMIT_MAX = 20;
+const PUSH_MESSAGE_BODY = "Tienes un nuevo mensaje";
+const PUSH_ACTIVITY_BODY = "Hay nueva actividad en la aplicación";
+const PUSH_NOTIFICATION_BODY = "Tienes una nueva notificación";
 const aiRateLimitByUid = new Map();
 
 function extractTextFromContent(content) {
@@ -134,12 +145,16 @@ function getLocalHour() {
 }
 
 const cleanString = (value) => (typeof value === "string" ? value.trim() : "");
-
-const snippet = (value, max = NOTIF_BODY_LIMIT) => {
-  const text = cleanString(value);
-  if (!text) return "";
-  if (text.length <= max) return text;
-  return `${text.slice(0, Math.max(0, max - 3))}...`;
+const serializePushError = (error) => {
+  const code =
+    typeof error?.code === "string" && error.code.trim()
+      ? error.code.trim()
+      : "unknown";
+  const message =
+    typeof error?.message === "string" && error.message.trim()
+      ? error.message.replace(/\s+/g, " ").trim().slice(0, 200)
+      : "";
+  return message ? { code, message } : { code };
 };
 
 const resolveUserName = async (uid) => {
@@ -194,30 +209,129 @@ const createNotificationDoc = async (payload = {}) => {
   } catch (e) {
     functions.logger.error("Error creando notificacion", {
       toUid: payload.toUid,
-      error: e,
+      error: serializePushError(e),
     });
     return null;
   }
 };
 
-const sendPushToUid = async (uid, payload = {}) => {
+const upsertChatNotificationDoc = async ({
+  conversationId,
+  messageId,
+  fromUid,
+  toUid,
+} = {}) => {
+  if (!conversationId || !fromUid || !toUid || toUid === fromUid) return null;
+
+  if (conversationId === "dm_group_chat" || toUid === "dm_group_chat") {
+    functions.logger.info(
+      "TODO: notificacion de chat grupal requiere fuente server-side de miembros",
+      {
+        conversationId,
+        messageId,
+        trigger: "onChatMessageCreated_v2",
+      }
+    );
+    return null;
+  }
+
+  const expectedConversationId = [fromUid, toUid].sort().join("__");
+  if (conversationId !== expectedConversationId) {
+    functions.logger.warn("Se omite notificacion de chat con conversacion invalida", {
+      conversationId,
+      messageId,
+      trigger: "onChatMessageCreated_v2",
+    });
+    return null;
+  }
+
+  const docId = `notif__chat_dm__${toUid}__${conversationId}`;
+  const fromName = (await resolveUserName(fromUid)) || "Usuario";
+
+  try {
+    await db.doc(`${NOTIFICATIONS_COLLECTION}/${docId}`).set(
+      {
+        toUid,
+        fromUid,
+        fromName,
+        type: "chat_dm",
+        entityId: conversationId,
+        route: "#chat",
+        title: "Nuevo mensaje",
+        body: PUSH_MESSAGE_BODY,
+        peerUid: fromUid,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        read: false,
+        readAt: null,
+      },
+      { merge: true }
+    );
+    return docId;
+  } catch (e) {
+    functions.logger.error("Error creando notificacion de chat", {
+      conversationId,
+      messageId,
+      toUid,
+      error: serializePushError(e),
+    });
+    return null;
+  }
+};
+
+const loadPushTokens = async (uid) => {
+  if (!uid) return [];
+  const tokenSnap = await db.doc(`${PUSH_TOKENS_COLLECTION}/${uid}`).get();
+  const rawTokens = tokenSnap.exists ? tokenSnap.get("tokens") : [];
+  const source = Array.isArray(rawTokens) ? rawTokens : [];
+  return Array.from(
+    new Set(
+      source
+        .filter((token) => typeof token === "string" && token.trim().length > 0)
+        .map((token) => token.trim())
+    )
+  );
+};
+
+const removeInvalidPushTokens = async (uid, tokens = []) => {
+  const invalidTokens = Array.from(
+    new Set(
+      (Array.isArray(tokens) ? tokens : []).filter(
+        (token) => typeof token === "string" && token.trim().length > 0
+      )
+    )
+  );
+  if (!uid || !invalidTokens.length) return 0;
+  try {
+    await db.doc(`${PUSH_TOKENS_COLLECTION}/${uid}`).set(
+      {
+        tokens: admin.firestore.FieldValue.arrayRemove(...invalidTokens),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+    return invalidTokens.length;
+  } catch (e) {
+    functions.logger.warn("No se pudieron limpiar tokens FCM invalidos", {
+      uid,
+      invalidCount: invalidTokens.length,
+      error: serializePushError(e),
+    });
+    return 0;
+  }
+};
+
+const sendPushToUid = async (uid, payload = {}, context = {}) => {
   if (!uid) return null;
 
   let tokens = [];
   try {
-    const tokenSnap = await db.doc(`pushTokens/${uid}`).get();
-    const rawTokens = tokenSnap.exists ? tokenSnap.get("tokens") || [] : [];
-    tokens = Array.from(
-      new Set(
-        rawTokens
-          .filter((t) => typeof t === "string" && t.trim().length > 0)
-          .map((t) => t.trim())
-      )
-    );
+    tokens = await loadPushTokens(uid);
   } catch (e) {
     functions.logger.error("Error leyendo tokens de destino", {
       uid,
-      error: e,
+      ...context,
+      error: serializePushError(e),
     });
     return null;
   }
@@ -225,6 +339,7 @@ const sendPushToUid = async (uid, payload = {}) => {
   if (!tokens.length) {
     functions.logger.info("Sin tokens para el destinatario, se omite push", {
       uid,
+      ...context,
     });
     return null;
   }
@@ -239,18 +354,68 @@ const sendPushToUid = async (uid, payload = {}) => {
   }
 
   try {
-    const response = await messaging.sendEachForMulticast(multicast);
+    const response = await getMessagingClient().sendEachForMulticast(multicast);
+    const invalidTokens = [];
+    (response.responses || []).forEach((entry, index) => {
+      const code = entry?.error?.code || "";
+      if (
+        !entry?.success &&
+        (code === "messaging/registration-token-not-registered" ||
+          code === "messaging/invalid-registration-token")
+      ) {
+        invalidTokens.push(tokens[index]);
+      }
+    });
+    const removedInvalidCount = invalidTokens.length
+      ? await removeInvalidPushTokens(uid, invalidTokens)
+      : 0;
     functions.logger.info("Push enviado", {
       uid,
+      ...context,
       successCount: response.successCount,
       failureCount: response.failureCount,
+      removedInvalidCount,
     });
     return response;
   } catch (e) {
-    functions.logger.error("Error enviando push", { uid, error: e });
+    functions.logger.error("Error enviando push", {
+      uid,
+      ...context,
+      error: serializePushError(e),
+    });
     return null;
   }
 };
+
+exports.registerPushToken = onCall(async (request) => {
+  const uid = getAuthenticatedUid(request);
+  if (!uid) {
+    throw new HttpsError("unauthenticated", "auth_required");
+  }
+
+  const token = normalizePushToken(request.data?.token);
+  if (!isValidPushToken(token)) {
+    throw new HttpsError("invalid-argument", "invalid_token");
+  }
+
+  try {
+    await db.doc(`${PUSH_TOKENS_COLLECTION}/${uid}`).set(
+      {
+        tokens: admin.firestore.FieldValue.arrayUnion(token),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+    functions.logger.info("Push token registrado", { uid });
+    return { ok: true };
+  } catch (e) {
+    functions.logger.error("Error registrando push token", {
+      uid,
+      error: serializePushError(e),
+    });
+    throw new HttpsError("internal", "token_registration_failed");
+  }
+});
 
 const shouldNotifyPostLike = async ({ postId, toUid, fromUid }) => {
   if (!postId) return false;
@@ -290,6 +455,7 @@ exports.onChatMessageCreated_v2 = onDocumentCreated(
     const context = event;
     const data = snap.data() || {};
     const targetUid = data.to;
+    const fromUid = data.from ? String(data.from) : "";
     const conversationId = event.params.conversationId;
     const messageId = event.params.messageId;
 
@@ -300,6 +466,13 @@ exports.onChatMessageCreated_v2 = onDocumentCreated(
       });
       return;
     }
+
+    await upsertChatNotificationDoc({
+      conversationId,
+      messageId,
+      fromUid,
+      toUid: targetUid,
+    });
 
     const currentHour = getLocalHour();
     if (
@@ -315,71 +488,26 @@ exports.onChatMessageCreated_v2 = onDocumentCreated(
       return;
     }
 
-    let tokens = [];
-    try {
-      const tokenSnap = await db.doc(`pushTokens/${targetUid}`).get();
-      const rawTokens = tokenSnap.exists ? tokenSnap.get("tokens") || [] : [];
-      tokens = Array.from(
-        new Set(
-          rawTokens
-            .filter((t) => typeof t === "string" && t.trim().length > 0)
-            .map((t) => t.trim())
-        )
-      );
-    } catch (e) {
-      functions.logger.error("Error leyendo tokens de destino", {
-        targetUid,
-        conversationId,
-        messageId,
-        error: e,
-      });
-      return;
-    }
-
-    if (!tokens.length) {
-      functions.logger.info("Sin tokens para el destinatario, se omite push", {
-        targetUid,
-        conversationId,
-        messageId,
-      });
-      return;
-    }
-
-    const body =
-      typeof data.text === "string" && data.text.trim()
-        ? data.text.trim().slice(0, 120)
-        : "Tenés un mensaje nuevo";
-
-    const multicast = {
-      tokens,
+    await sendPushToUid(
+      targetUid,
+      {
       notification: {
         title: "Nuevo mensaje",
-        body,
+        body: PUSH_MESSAGE_BODY,
       },
       data: {
         conversationId: conversationId || "",
-        from: data.from ? String(data.from) : "",
+        from: fromUid,
         to: targetUid || "",
       },
-    };
-
-    try {
-      const response = await messaging.sendEachForMulticast(multicast);
-      functions.logger.info("Push enviado", {
+      },
+      {
         conversationId,
         messageId,
         targetUid,
-        successCount: response.successCount,
-        failureCount: response.failureCount,
-      });
-    } catch (e) {
-      functions.logger.error("Error enviando push", {
-        conversationId,
-        messageId,
-        targetUid,
-        error: e,
-      });
-    }
+        trigger: "onChatMessageCreated_v2",
+      }
+    );
   }
 );
 
@@ -437,9 +565,8 @@ exports.onPostCommentCreated_v2 = onDocumentCreated(
       cleanString(data.authorName) ||
       (await resolveUserName(fromUid)) ||
       "Usuario";
-    const commentSnippet = snippet(data.text, 120);
     const title = "Nuevo comentario";
-    const body = commentSnippet || "Comentaron tu publicacion";
+    const body = PUSH_ACTIVITY_BODY;
 
     await createNotificationDoc({
       toUid,
@@ -452,17 +579,10 @@ exports.onPostCommentCreated_v2 = onDocumentCreated(
       body,
     });
 
-    const pushBody = snippet(
-      commentSnippet
-        ? `${fromName}: ${commentSnippet}`
-        : `${fromName} comento tu publicacion`,
-      140
-    );
-
     await sendPushToUid(toUid, {
       notification: {
         title,
-        body: pushBody,
+        body,
       },
       data: {
         type: "post_comment",
@@ -471,6 +591,11 @@ exports.onPostCommentCreated_v2 = onDocumentCreated(
         route: APP_FEED_ROUTE,
         fromUid,
       },
+    }, {
+      postId,
+      commentId,
+      toUid,
+      trigger: "onPostCommentCreated_v2",
     });
   }
 );
@@ -547,7 +672,7 @@ exports.onPostLikeCreated_v2 = onDocumentCreated(
 
     const fromName = (await resolveUserName(fromUid)) || "Usuario";
     const title = "Nuevo like";
-    const body = `${fromName} le dio like a tu publicacion`;
+    const body = PUSH_NOTIFICATION_BODY;
 
     await createNotificationDoc({
       toUid,
@@ -571,6 +696,10 @@ exports.onPostLikeCreated_v2 = onDocumentCreated(
         route: APP_FEED_ROUTE,
         fromUid,
       },
+    }, {
+      postId,
+      toUid,
+      trigger: "onPostLikeCreated_v2",
     });
   }
 );

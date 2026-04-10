@@ -1,0 +1,14 @@
+{
+  "name": "departamento-medico-root-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:safe-dom": "node --test tests/safe-dom.test.mjs",
+    "test:rules": "firebase emulators:exec --only firestore --project departamento-medico-brisa \"node --test tests/firestore-rules.test.mjs\"",
+    "test": "npm run test:safe-dom && npm run test:rules"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "5.0.0",
+    "firebase": "12.12.0"
+  }
+}

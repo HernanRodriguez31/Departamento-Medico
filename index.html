@@ -110,7 +110,7 @@
     />
 
     <!-- Tailwind para foro -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
     <script>
       tailwind.config = {
         theme: {
@@ -1401,7 +1401,9 @@
         opacity: 0;
         visibility: hidden;
         pointer-events: none;
-        transition: opacity 300ms ease, visibility 300ms ease;
+        transition:
+          opacity 300ms ease,
+          visibility 300ms ease;
       }
 
       .brisa-chat-mobile-viewport {
@@ -1486,13 +1488,15 @@
           pointer-events: auto;
         }
 
-        #brisa-chat-root.brisa-chat-root--mobile-open .brisa-chat-mobile-overlay {
+        #brisa-chat-root.brisa-chat-root--mobile-open
+          .brisa-chat-mobile-overlay {
           opacity: 1;
           visibility: visible;
           pointer-events: auto;
         }
 
-        #brisa-chat-root.brisa-chat-root--mobile-open .brisa-chat-mobile-viewport {
+        #brisa-chat-root.brisa-chat-root--mobile-open
+          .brisa-chat-mobile-viewport {
           pointer-events: auto;
         }
 
@@ -1539,7 +1543,10 @@
           background: #ffffff;
           box-shadow: 0 20px 60px -15px rgba(0, 0, 0, 0.3);
           overflow: hidden;
-          transition: opacity 300ms ease, transform 300ms ease, visibility 300ms ease;
+          transition:
+            opacity 300ms ease,
+            transform 300ms ease,
+            visibility 300ms ease;
           animation: none !important;
           filter: none !important;
           clip-path: none !important;
@@ -2621,7 +2628,10 @@
         </section>
 
         <!-- REFERENTES -->
-        <section class="section hidden md:block reveal-on-scroll" id="referentes">
+        <section
+          class="section hidden md:block reveal-on-scroll"
+          id="referentes"
+        >
           <div class="container">
             <div class="section__header">
               <h2 class="section__title section-title--unified">Referentes</h2>
@@ -4299,11 +4309,11 @@
       </nav>
 
       <!-- SweetAlert2 -->
-      <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+      <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.26.24"></script>
       <script src="js/app.js"></script>
 
       <!-- Lucide para iconos del foro general -->
-      <script src="https://unpkg.com/lucide@latest"></script>
+      <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
       <script>
         lucide.createIcons();
       </script>
@@ -4738,17 +4748,9 @@
     </div>
     -->
       <script type="module">
-        import {
-          getFirebase,
-          getFirebaseConfig,
-        } from "/assets/js/common/firebaseClient.js";
+        import { installFirebaseGlobals } from "/assets/js/common/firebase-bootstrap.js";
 
-        const { app, auth, db, storage } = getFirebase();
-        window.__FIREBASE_CONFIG__ = getFirebaseConfig();
-        window.__FIREBASE_APP__ = app;
-        window.__FIREBASE_AUTH__ = auth;
-        window.__FIREBASE_DB__ = db;
-        window.__FIREBASE_STORAGE__ = storage;
+        installFirebaseGlobals();
       </script>
       <script type="module" src="assets/js/common/notifications.js"></script>
       <script type="module">
@@ -4778,6 +4780,10 @@
           hydrateAvatars,
           resolveUidForAuthor,
         } from "/assets/js/common/user-profiles.js";
+        import {
+          escapeAttribute,
+          escapeHTML,
+        } from "/assets/js/utils/safe-dom.js";
         import {
           requireAuth,
           buildLoginRedirectUrl,
@@ -5321,9 +5327,21 @@
                   ? "text-brisa"
                   : "text-gray-300 hover:text-brisa";
                 const likeCountClass = liked ? "text-brisa" : "text-gray-400";
+                const safeAuthorHtml = escapeHTML(msg.author || "");
+                const safeAuthorAttr = escapeAttribute(msg.author || "");
+                const safeAuthorUidAttr = escapeAttribute(msg.authorUid || "");
+                const safeBusinessUnitHtml = escapeHTML(msg.businessUnit || "");
+                const safeManagementUnitHtml = escapeHTML(
+                  msg.managementUnit || "",
+                );
+                const safeInitialsHtml = escapeHTML(initials);
+                const safeMessageHtml = escapeHTML(msg.text || "");
                 const likePopoverContent = likeNamesSorted.length
                   ? likeNamesSorted
-                      .map((name) => `<div class="dm-like-name">${name}</div>`)
+                      .map(
+                        (name) =>
+                          `<div class="dm-like-name">${escapeHTML(name)}</div>`,
+                      )
                       .join("")
                   : '<div class="dm-like-empty">Sin likes todavía.</div>';
                 const likeControls = `
@@ -5388,20 +5406,18 @@
                 return `
         <div class="flex gap-4">
           <div class="dm-avatar dm-foro-avatar"
-               data-dm-uid="${msg.authorUid || ""}"
-               data-dm-author="${msg.author || ""}">
+               data-dm-uid="${safeAuthorUidAttr}"
+               data-dm-author="${safeAuthorAttr}">
             <img class="dm-avatar__img" data-author-avatar src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="Avatar" hidden />
-            <span class="dm-initials" data-avatar-fallback="initials">${initials}</span>
+            <span class="dm-initials" data-avatar-fallback="initials">${safeInitialsHtml}</span>
           </div>
           <div class="flex-1 space-y-1">
             <div class="flex items-center justify-between gap-2">
               <div class="flex flex-col">
-                <span class="font-bold text-gray-900 text-sm">${
-                  msg.author || ""
-                }</span>
+                <span class="font-bold text-gray-900 text-sm">${safeAuthorHtml}</span>
                 <span class="text-xs text-gray-500">
-                  ${msg.businessUnit || ""}${
-                    msg.managementUnit ? " · " + msg.managementUnit : ""
+                  ${safeBusinessUnitHtml}${
+                    msg.managementUnit ? " · " + safeManagementUnitHtml : ""
                   }
                 </span>
               </div>
@@ -5412,7 +5428,7 @@
               </div>
             </div>
             <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm border border-gray-100 text-gray-700 text-sm leading-relaxed">
-              ${msg.text || ""}
+              ${safeMessageHtml}
             </div>
           </div>
         </div>
@@ -5911,7 +5927,7 @@
               if (perm === "granted") {
                 setPromptGranted(true);
                 setNotificationsPreference("granted");
-                window.enablePushNotifications("HRodriguez");
+                window.enablePushNotifications();
                 if (pushBanner) pushBanner.classList.add("hidden");
               } else {
                 showOrHideBanner(true, { triggeredByUser: true });
@@ -5933,7 +5949,7 @@
                 ? Notification.permission
                 : "unsupported";
             console.log("[PUSH] permission state", perm);
-            window.enablePushNotifications("HRodriguez");
+            window.enablePushNotifications();
             setPromptDismissed(false);
             setPromptGranted(perm === "granted");
             setNotificationsPreference(
@@ -5989,6 +6005,8 @@
       </script>
 
       <script type="module">
+        import { isChatHash } from "/assets/js/common/routes.js";
+
         (() => {
           let chatLoaded = false;
           let chatLoading = null;
@@ -6020,11 +6038,11 @@
             { once: true },
           );
           window.addEventListener("hashchange", () => {
-            if (window.location.hash.includes("chat")) {
+            if (isChatHash()) {
               loadChat();
             }
           });
-          if (window.location.hash.includes("chat")) {
+          if (isChatHash()) {
             loadChat();
           }
           if (document.readyState === "loading") {
@@ -6045,27 +6063,70 @@
           getToken,
           onMessage,
         } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
-        import {
-          doc,
-          setDoc,
-          serverTimestamp,
-          arrayUnion,
-        } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-        import {
-          getFirebase,
-          ensureMessaging,
-        } from "/assets/js/common/firebaseClient.js";
+        import { ensureMessaging } from "/assets/js/common/firebaseClient.js";
+        import { registerPushTokenForCurrentUser } from "/assets/js/services/push/PushRegistrationService.js";
 
-        const { db: pushDb } = getFirebase();
         let messaging = null;
+        const ROOT_SW_URL = "/service-worker.js";
+        const ROOT_SW_SCOPE = "/";
+
+        const sendFirebaseInitToRootWorker = (registration) => {
+          const payload = {
+            type: "INIT_FIREBASE",
+            config: window.__FIREBASE_CONFIG__,
+          };
+          const sendInit = (target) => target?.postMessage(payload);
+          if (registration?.active) {
+            sendInit(registration.active);
+            return;
+          }
+          navigator.serviceWorker.ready
+            .then((readyReg) => {
+              if (!registration || readyReg.scope === registration.scope) {
+                sendInit(readyReg.active);
+              }
+            })
+            .catch(() => {});
+        };
+
+        const ensureRootServiceWorkerRegistration = async () => {
+          if (!("serviceWorker" in navigator)) return null;
+          let registration =
+            await navigator.serviceWorker.getRegistration(ROOT_SW_SCOPE);
+          if (!registration) {
+            registration = await navigator.serviceWorker.register(ROOT_SW_URL, {
+              scope: ROOT_SW_SCOPE,
+            });
+          }
+          sendFirebaseInitToRootWorker(registration);
+          return registration;
+        };
+
+        if ("serviceWorker" in navigator) {
+          window.addEventListener(
+            "load",
+            () => {
+              ensureRootServiceWorkerRegistration().catch(() =>
+                console.debug("[PWA] Root Service Worker no registrado"),
+              );
+              navigator.serviceWorker.addEventListener("controllerchange", () => {
+                navigator.serviceWorker
+                  .getRegistration(ROOT_SW_SCOPE)
+                  .then(sendFirebaseInitToRootWorker)
+                  .catch(() => {});
+              });
+            },
+            { once: true },
+          );
+        }
 
         const messagingReady = (async () => {
           try {
             messaging = await ensureMessaging();
-            console.log("[PUSH] messaging instance:", messaging);
+            console.log("[PUSH] messaging disponible");
             if (messaging) {
-              onMessage(messaging, (payload) => {
-                console.debug("[PUSH] Mensaje en foreground", payload);
+              onMessage(messaging, () => {
+                console.debug("[PUSH] Mensaje en foreground");
               });
             }
           } catch (e) {
@@ -6077,7 +6138,7 @@
           }
         })();
 
-        async function enablePushNotifications(uid) {
+        async function enablePushNotifications(_legacyUid) {
           console.log("[PUSH] start enablePushNotifications");
           const permission = await Notification.requestPermission();
           console.log("[PUSH] permission:", permission);
@@ -6092,12 +6153,10 @@
           }
           let swReg = null;
           try {
-            swReg =
-              await navigator.serviceWorker.getRegistration(
-                "/service-worker.js",
-              );
+            swReg = await ensureRootServiceWorkerRegistration();
             if (!swReg) {
-              swReg = await navigator.serviceWorker.ready;
+              console.log("[PUSH] Service Worker no disponible");
+              return;
             }
           } catch (e) {
             console.log(
@@ -6116,23 +6175,23 @@
               console.log("[PUSH] No se pudo obtener token");
               return;
             }
-            console.log("[PUSH] token obtenido:", token);
-            await setDoc(
-              doc(pushDb, "pushTokens", uid),
-              {
-                tokens: arrayUnion(token),
-                updatedAt: serverTimestamp(),
-                userAgent: navigator.userAgent,
-              },
-              { merge: true },
-            );
+            console.log("[PUSH] token obtenido");
+            const registration = await registerPushTokenForCurrentUser(token);
+            if (!registration.ok) {
+              console.log(
+                "[PUSH] registro de token no completado",
+                registration.reason,
+              );
+              return;
+            }
+            console.log("[PUSH] token registrado");
           } catch (e) {
-            console.log("[PUSH] error: obteniendo token", e?.code, e?.message);
+            console.log("[PUSH] error: obteniendo token", e?.code);
           }
         }
 
-        window.enablePushNotifications = (uid = "HRodriguez") =>
-          enablePushNotifications(uid);
+        window.enablePushNotifications = (_legacyUid) =>
+          enablePushNotifications(_legacyUid);
         window.__resetPushPrompt = () => {
           try {
             localStorage.removeItem("pushPromptGranted");

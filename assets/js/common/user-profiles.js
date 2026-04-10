@@ -2,16 +2,28 @@ import {
   doc,
   getDoc,
   collection,
-  getDocs
+  getDocs,
+  query,
+  where,
+  limit
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getFirebase } from "./firebaseClient.js";
 import { logger, once as logOnce } from "./app-logger.js";
 
 const profileCache = new Map();
 const profileRequests = new Map();
+const AUTHOR_LOOKUP_TTL_MS = 5 * 60 * 1000;
+const AUTHOR_LOOKUP_FIELDS = [
+  "displayName",
+  "nombreCompleto",
+  "apellidoNombre",
+  "fullName",
+  "name",
+  "nombre"
+];
 let avatarEventBound = false;
-let nameIndex = null;
-let nameIndexPromise = null;
+const authorUidCache = new Map();
+const authorUidRequests = new Map();
 
 const warnOnce = (key, message, err) => {
   logOnce(key, () => {
@@ -101,58 +113,61 @@ const setUserProfileCache = (uid, profile) => {
   profileCache.set(uid, merged);
 };
 
-const buildNameIndex = async () => {
-  if (nameIndex) return nameIndex;
-  if (nameIndexPromise) return nameIndexPromise;
-  nameIndexPromise = (async () => {
-    const firebase = getFirebase();
-    const resolvedDb = firebase?.db;
-    if (!resolvedDb) {
-      nameIndex = new Map();
-      return nameIndex;
-    }
+const getCachedAuthorUid = (key) => {
+  const cached = authorUidCache.get(key);
+  if (!cached) return undefined;
+  if (Date.now() - cached.cachedAt > AUTHOR_LOOKUP_TTL_MS) {
+    authorUidCache.delete(key);
+    return undefined;
+  }
+  return cached.uid || null;
+};
+
+const setCachedAuthorUid = (key, uid) => {
+  if (!key) return;
+  authorUidCache.set(key, {
+    uid: uid || null,
+    cachedAt: Date.now()
+  });
+};
+
+const findUidByExactAuthorName = async (resolvedDb, authorName) => {
+  const rawName = normalizeName(String(authorName || "").split(" - ")[0]);
+  if (!resolvedDb || !rawName) return null;
+  const usersRef = collection(resolvedDb, "usuarios");
+  for (const field of AUTHOR_LOOKUP_FIELDS) {
     try {
-      const snap = await getDocs(collection(resolvedDb, "usuarios"));
-      const map = new Map();
-      snap.forEach((docSnap) => {
-        const data = docSnap.data() || {};
-        const candidates = new Set();
-        if (data.displayName) candidates.add(data.displayName);
-        if (data.nombreCompleto) candidates.add(data.nombreCompleto);
-        if (data.apellidoNombre) candidates.add(data.apellidoNombre);
-        if (data.fullName) candidates.add(data.fullName);
-        if (data.name) candidates.add(data.name);
-        if (data.nombre) candidates.add(data.nombre);
-        if (data.apellido && data.nombre) {
-          candidates.add(`${data.apellido} ${data.nombre}`.trim());
-        }
-        candidates.forEach((name) => {
-          const key = normalizeNameKey(name);
-          if (!key) return;
-          if (!map.has(key)) {
-            map.set(key, docSnap.id);
-          }
-        });
-      });
-      nameIndex = map;
-      return map;
+      const snap = await getDocs(query(usersRef, where(field, "==", rawName), limit(1)));
+      if (!snap.empty) return snap.docs[0].id;
     } catch (err) {
-      warnOnce("name-index", "No se pudo construir el indice de nombres.", err);
-      nameIndex = new Map();
-      return nameIndex;
-    } finally {
-      nameIndexPromise = null;
+      warnOnce(`author-lookup:${field}`, "No se pudo resolver autor por nombre.", err);
     }
-  })();
-  return nameIndexPromise;
+  }
+  // TODO: para resolver variantes con acentos/case sin enumerar usuarios, crear indice denormalizado o callable backend.
+  return null;
 };
 
 const resolveUidForAuthor = async ({ uid, authorName } = {}) => {
   if (uid) return uid;
   const key = normalizeNameKey(authorName);
   if (!key) return null;
-  const index = await buildNameIndex();
-  return index.get(key) || null;
+  const cached = getCachedAuthorUid(key);
+  if (cached !== undefined) return cached;
+  if (authorUidRequests.has(key)) return authorUidRequests.get(key);
+
+  const promise = (async () => {
+    const firebase = getFirebase();
+    const resolvedDb = firebase?.db;
+    if (!resolvedDb) return null;
+    const resolvedUid = await findUidByExactAuthorName(resolvedDb, authorName);
+    setCachedAuthorUid(key, resolvedUid);
+    return resolvedUid;
+  })().finally(() => {
+    authorUidRequests.delete(key);
+  });
+
+  authorUidRequests.set(key, promise);
+  return promise;
 };
 
 const getUserProfile = async (uid, { db, fallbackName } = {}) => {
@@ -250,16 +265,15 @@ const hydrateAvatars = async (root = document) => {
     unresolved.get(key).nodes.push(node);
   });
   if (unresolved.size) {
-    const index = await buildNameIndex();
-    unresolved.forEach((entry, key) => {
-      const resolvedUid = index.get(key);
+    await Promise.all(Array.from(unresolved.entries()).map(async ([key, entry]) => {
+      const resolvedUid = await resolveUidForAuthor({ authorName: entry.name });
       if (resolvedUid) {
         if (!grouped.has(resolvedUid)) grouped.set(resolvedUid, []);
         grouped.get(resolvedUid).push(...entry.nodes);
       } else {
         entry.nodes.forEach((node) => applyAvatarElement(node, buildProfileFromDoc({}, entry.name)));
       }
-    });
+    }));
   }
   const entries = Array.from(grouped.entries());
   await Promise.all(

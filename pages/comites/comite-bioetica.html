@@ -10,7 +10,7 @@
     <link rel="icon" type="image/png" href="../../assets/images/logo-identity.png">
 
     <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -46,14 +46,14 @@
         rel="stylesheet">
 
     <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
 
     <!-- Flatpickr (Custom Date Picker) -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
     
     <link rel="stylesheet" href="../../assets/css/pages/comite.css?v=20260307-chat-aladdin-1">
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-    <script src="https://npmcdn.com/flatpickr/dist/l10n/es.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/es.js"></script>
 <!-- Firebase SDKs -->
     <script type="module">
         import { getFirebase } from "/assets/js/common/firebaseClient.js";
@@ -81,10 +81,13 @@
             getDocUrl
         } from "../../js/committee-links.js";
         import { hydrateAvatars, resolveUidForAuthor } from "../../assets/js/common/user-profiles.js";
+        import { escapeHTML, escapeAttribute } from "../../assets/js/utils/safe-dom.js";
         import { initSessionGuard } from "../../assets/js/shared/sessionGuard.js?v=20260305-session-1";
 
         const appId = "departamento-medico-brisa";
         const COMMITTEE_ID = "comite_bioetica";
+
+        const safeInlineJsString = (value) => escapeAttribute(JSON.stringify(value == null ? "" : String(value)));
 
         let db = null;
         let auth = null;
@@ -466,7 +469,9 @@
         loadCommitteeMeta();
 
         function getMemberRoleDisplay(bu, mu, isLeader) {
-            let text = `${bu || ''} ${mu ? '· ' + mu : ''}`;
+            const safeBu = escapeHTML(bu || '');
+            const safeMu = escapeHTML(mu || '');
+            let text = `${safeBu} ${safeMu ? '· ' + safeMu : ''}`;
             if (isLeader) text = `<span class="text-blue-600 font-bold">Líder</span> · ` + text;
             return text;
         }
@@ -501,22 +506,22 @@
             container.innerHTML = activeTopics.map(topic => `
                 <div class="group project-card flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100 hover:bg-white hover:shadow-md transition-all">
                     <div class="flex items-center gap-4 flex-1 min-w-0">
-                        <div onclick="window.updateTopicStage('${topic.id}', ${topic.stage + 1})"
+                        <div onclick="window.updateTopicStage(${safeInlineJsString(topic.id)}, ${Number(topic.stage || 1) + 1})"
                              class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm cursor-pointer transition-all bg-white border-2 border-brisa text-brisa hover:bg-brisa hover:text-white shadow-sm"
                              title="Avanzar etapa">
                             <i data-lucide="scale" class="w-5 h-5"></i>
                         </div>
                         <div class="flex-1 min-w-0">
-                            <span class="block text-sm font-bold text-gray-800 truncate" title="${topic.title}">${topic.title}</span>
+                            <span class="block text-sm font-bold text-gray-800 truncate" title="${escapeAttribute(topic.title)}">${escapeHTML(topic.title)}</span>
                             <div class="flex items-center gap-2 mt-1">
                                 <span class="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Inicio: ${formatDate(topic.startDate)}</span>
                             </div>
                             <p class="text-xs text-gray-500 mt-1 flex items-center gap-1">
                                 <span class="font-semibold text-gray-600">Propuesto por:</span>
-                                ${topic.proposedBy || '—'}
+                                ${escapeHTML(topic.proposedBy || '—')}
                                 <button
                                     type="button"
-                                    onclick="window.editProject('${topic.id}')"
+                                    onclick="window.editProject(${safeInlineJsString(topic.id)})"
                                     class="text-[10px] text-gray-400 hover:text-blue-600 underline decoration-dotted ml-1"
                                     title="Editar proyecto">
                                     Editar
@@ -526,7 +531,7 @@
                             <div class="flex items-center gap-1 mt-3 mb-1">
                                 ${[1, 2, 3, 4, 5].map(s => `
                                     <button 
-                                        onclick="event.stopPropagation(); window.updateTopicStage('${topic.id}', ${s})"
+                                        onclick="event.stopPropagation(); window.updateTopicStage(${safeInlineJsString(topic.id)}, ${s})"
                                         class="project-stage-dot w-6 h-6 rounded-full flex items-center justify-center transition-all border ${s <= topic.stage
                     ? 'bg-brisa text-white border-brisa shadow-sm is-active'
                     : 'bg-white text-gray-300 border-gray-200 hover:border-gray-300 is-inactive'
@@ -548,15 +553,15 @@
                             </span>
                             <div class="next-meeting-control relative flex items-center gap-2">
                                 <input type="date"
-                                       onchange="window.updateTopicDate('${topic.id}', this.value)"
+                                       onchange="window.updateTopicDate(${safeInlineJsString(topic.id)}, this.value)"
                                        class="next-meeting-input text-[10px] bg-transparent border-none p-0 focus:ring-0 text-gray-600 w-24 cursor-pointer"
-                                       value="${topic.nextMeeting || ''}"
+                                       value="${escapeAttribute(topic.nextMeeting || '')}"
                                        title="Definir fecha">
                             </div>
                         </div>
                         
                         ${isAdmin ? `
-                        <button onclick="window.deleteTopic('${topic.id}')"
+                        <button onclick="window.deleteTopic(${safeInlineJsString(topic.id)})"
                                 class="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                                 title="Eliminar proyecto">
                             <i data-lucide="trash-2" class="w-4 h-4"></i>
@@ -584,14 +589,14 @@
                         <div class="w-6 h-6 rounded-full bg-teal-100 flex items-center justify-center text-teal-600 flex-shrink-0">
                             <i data-lucide="check" class="w-3.5 h-3.5"></i>
                         </div>
-                        <span class="text-sm font-semibold text-gray-700 whitespace-normal break-words leading-tight" title="${topic.title}">${topic.title}</span>
+                        <span class="text-sm font-semibold text-gray-700 whitespace-normal break-words leading-tight" title="${escapeAttribute(topic.title)}">${escapeHTML(topic.title)}</span>
                     </div>
                     <div class="flex items-center justify-end gap-1 flex-shrink-0">
-                        <button onclick="window.updateTopicStage('${topic.id}', 4)" class="text-gray-400 hover:text-teal-600 p-1 mr-1 bg-white rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110" title="Reabrir">
+                        <button onclick="window.updateTopicStage(${safeInlineJsString(topic.id)}, 4)" class="text-gray-400 hover:text-teal-600 p-1 mr-1 bg-white rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110" title="Reabrir">
                             <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
                         </button>
                         ${isAdmin ? `
-                        <button onclick="window.deleteTopic('${topic.id}')" class="text-gray-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity" title="Eliminar proyecto">
+                        <button onclick="window.deleteTopic(${safeInlineJsString(topic.id)})" class="text-gray-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity" title="Eliminar proyecto">
                             <i data-lucide="trash-2" class="w-4 h-4"></i>
                         </button>
                         ` : ''}
@@ -633,7 +638,7 @@
                                     </div>
                                     <div class="flex flex-col">
                                         <span class="text-sm font-bold text-gray-800 leading-tight group-hover/member:text-blue-700 transition-colors">
-                                            ${member.name}
+                                            ${escapeHTML(member.name)}
                                         </span>
                                         <span class="text-xs text-gray-500 leading-tight mt-0.5">
                                             ${getMemberRoleDisplay(member.businessUnit, member.managementUnit, member.isLeader)}
@@ -641,7 +646,7 @@
                                     </div>
                                 </div>
                                 ${isAdmin ? `
-                                <button onclick="window.deleteMember('${member.id}')" class="flex-shrink-0 text-gray-300 hover:text-red-500 opacity-0 group-hover/member:opacity-100 p-2 rounded-lg hover:bg-red-50 transition-all">
+                                <button onclick="window.deleteMember(${safeInlineJsString(member.id)})" class="flex-shrink-0 text-gray-300 hover:text-red-500 opacity-0 group-hover/member:opacity-100 p-2 rounded-lg hover:bg-red-50 transition-all">
                                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                                 </button>
                                 ` : ''}
@@ -935,7 +940,7 @@ async function joinCurrentCommittee() {
                                 </div>
                                 <i data-lucide="external-link" class="w-4 h-4 text-gray-300 group-hover:text-brisa transition-colors"></i>
                             </div>
-                            <h3 class="text-lg font-bold text-gray-800 mb-2 line-clamp-2 leading-tight">${topic.title}</h3>
+                            <h3 class="text-lg font-bold text-gray-800 mb-2 line-clamp-2 leading-tight">${escapeHTML(topic.title)}</h3>
                             <p class="text-xs text-gray-500 mb-4 font-medium">
                                 ${topic.stage === 5 ? `Finalizado el: ${formatDate(topic.finishedDate)}` : "Documento de trabajo colaborativo en Teams."}
                             </p>
@@ -945,13 +950,13 @@ async function joinCurrentCommittee() {
                         </div>
                         <div class="mt-auto">
                             <div class="doc-actions">
-                                <button type="button" class="doc-icon doc-icon-folder" data-topic-id="${topic.id}" data-doc-type="folder" title="Carpeta" ${hasFolder ? '' : 'disabled'}>
+                                <button type="button" class="doc-icon doc-icon-folder" data-topic-id="${escapeAttribute(topic.id)}" data-doc-type="folder" title="Carpeta" ${hasFolder ? '' : 'disabled'}>
                                     <i data-lucide="folder"></i>
                                 </button>
-                                <button type="button" class="doc-icon doc-icon-doc" data-topic-id="${topic.id}" data-doc-type="word" title="Documento" ${hasDoc ? '' : 'disabled'}>
+                                <button type="button" class="doc-icon doc-icon-doc" data-topic-id="${escapeAttribute(topic.id)}" data-doc-type="word" title="Documento" ${hasDoc ? '' : 'disabled'}>
                                     <i data-lucide="file-text"></i>
                                 </button>
-                                <button type="button" class="doc-icon doc-icon-ppt" data-topic-id="${topic.id}" data-doc-type="ppt" title="Presentación" ${hasPpt ? '' : 'disabled'}>
+                                <button type="button" class="doc-icon doc-icon-ppt" data-topic-id="${escapeAttribute(topic.id)}" data-doc-type="ppt" title="Presentación" ${hasPpt ? '' : 'disabled'}>
                                     <i data-lucide="presentation"></i>
                                 </button>
                             </div>
@@ -1007,7 +1012,7 @@ async function joinCurrentCommittee() {
 
                                 type="button"
 
-                                onclick="window.editForumMessage('${msg.id}')"
+                                onclick="window.editForumMessage(${safeInlineJsString(msg.id)})"
 
                                 class="text-gray-300 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-all"
 
@@ -1021,7 +1026,7 @@ async function joinCurrentCommittee() {
 
                                 type="button"
 
-                                onclick="window.deleteForumMessage('${msg.id}')"
+                                onclick="window.deleteForumMessage(${safeInlineJsString(msg.id)})"
 
                                 class="text-gray-300 hover:text-red-500 p-1 rounded-full hover:bg-red-50 transition-all"
 
@@ -1043,11 +1048,11 @@ async function joinCurrentCommittee() {
 
                         <div class="flex items-center gap-3">
 
-                            <div class="w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs border bg-brisa/10 text-brisa border-brisa/20 dm-foro-avatar" data-author-uid="${msg.authorUid || ''}" data-author-name="${authorName}">
+                            <div class="w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs border bg-brisa/10 text-brisa border-brisa/20 dm-foro-avatar" data-author-uid="${escapeAttribute(msg.authorUid || '')}" data-author-name="${escapeAttribute(authorName)}">
 
                                 <img class="w-full h-full object-cover rounded-full" data-author-avatar src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="Avatar" hidden />
 
-                                <span class="text-xs font-semibold" data-avatar-fallback="initials">${initials}</span>
+                                <span class="text-xs font-semibold" data-avatar-fallback="initials">${escapeHTML(initials)}</span>
 
                             </div>
 
@@ -1055,7 +1060,7 @@ async function joinCurrentCommittee() {
 
                                 <div class="flex items-baseline gap-2">
 
-                                    <span class="block text-sm font-bold text-gray-800 leading-none">${authorName}</span>
+                                    <span class="block text-sm font-bold text-gray-800 leading-none">${escapeHTML(authorName)}</span>
 
                                     <span class="text-[10px] text-gray-500 font-medium truncate">${roleLabel}</span>
 
@@ -1081,7 +1086,7 @@ async function joinCurrentCommittee() {
 
                     </div>
 
-                    <p class="text-sm text-gray-600 leading-relaxed pl-12">${msg.text}</p>
+                    <p class="text-sm text-gray-600 leading-relaxed pl-12">${escapeHTML(msg.text)}</p>
 
                 </div>
 
@@ -1883,7 +1888,7 @@ async function joinCurrentCommittee() {
 
     <script type="module" src="../../js/chat.js?v=20260307-chat-aladdin-1"></script>
     <!-- SweetAlert2 -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.26.24"></script>
     <script>
         // Mostrar el botón de scroll-up solo cuando se scrollea hacia abajo
         (() => {

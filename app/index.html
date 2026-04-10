@@ -37,7 +37,7 @@
         rel="stylesheet">
 
     <!-- Tailwind para foro -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -2877,11 +2877,11 @@
     </nav>
 
     <!-- SweetAlert2 -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.26.24"></script>
     <script src="/js/app-mobile.js"></script>
 
     <!-- Lucide para iconos del foro general -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
     <script>
         lucide.createIcons();
     </script>
@@ -3029,14 +3029,9 @@
     </div>
     -->
     <script type="module">
-        import { getFirebase, getFirebaseConfig } from "/assets/js/common/firebaseClient.js";
+        import { installFirebaseGlobals } from "/assets/js/common/firebase-bootstrap.js";
 
-        const { app, auth, db, storage } = getFirebase();
-        window.__FIREBASE_CONFIG__ = getFirebaseConfig();
-        window.__FIREBASE_APP__ = app;
-        window.__FIREBASE_AUTH__ = auth;
-        window.__FIREBASE_DB__ = db;
-        window.__FIREBASE_STORAGE__ = storage;
+        installFirebaseGlobals();
     </script>
     <script type="module" src="/assets/js/common/notifications.js"></script>
     <script type="module">
@@ -3059,13 +3054,15 @@
         } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
         import { getFirebase } from "/assets/js/common/firebaseClient.js";
         import { hydrateAvatars, resolveUidForAuthor } from "/assets/js/common/user-profiles.js";
+        import { escapeAttribute, escapeHTML } from "/assets/js/utils/safe-dom.js";
+        import { isForumHash } from "/assets/js/common/routes.js";
         import { requireAuth, buildLoginRedirectUrl } from "/assets/js/shared/authGate.js";
 
         const shouldInitForum = (viewId) => {
             if (viewId) return viewId === "foro";
             const shellView = window.__dmMobileShell?.getCurrentViewId?.();
             if (shellView) return shellView === "foro";
-            return window.location.hash.startsWith("#foro");
+            return isForumHash();
         };
         let forumInitialized = false;
 
@@ -3511,8 +3508,15 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
                         const liked = currentUser && likedBy[currentUser.uid];
                         const likeBtnClass = liked ? "text-brisa" : "text-gray-300 hover:text-brisa";
                         const likeCountClass = liked ? "text-brisa" : "text-gray-400";
+                        const safeAuthorHtml = escapeHTML(msg.author || "");
+                        const safeAuthorAttr = escapeAttribute(msg.author || "");
+                        const safeAuthorUidAttr = escapeAttribute(msg.authorUid || "");
+                        const safeBusinessUnitHtml = escapeHTML(msg.businessUnit || "");
+                        const safeManagementUnitHtml = escapeHTML(msg.managementUnit || "");
+                        const safeInitialsHtml = escapeHTML(initials);
+                        const safeMessageHtml = escapeHTML(msg.text || "");
                         const likePopoverContent = likeNamesSorted.length
-                            ? likeNamesSorted.map((name) => `<div class="dm-like-name">${name}</div>`).join("")
+                            ? likeNamesSorted.map((name) => `<div class="dm-like-name">${escapeHTML(name)}</div>`).join("")
                             : '<div class="dm-like-empty">Sin likes todavía.</div>';
                         const likeControls = `
                 <div class="relative flex items-center gap-1" data-like-wrap="${msg.id}">
@@ -3572,16 +3576,16 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
                         return `
         <div class="dm-foro-message flex gap-4">
           <div class="flex-shrink-0 w-10 h-10 rounded-full bg-brisa/10 flex items-center justify-center text-brisa font-bold text-sm border border-brisa/20 dm-foro-avatar"
-               data-author-uid="${msg.authorUid || ""}" data-author-name="${msg.author || ""}">
+               data-author-uid="${safeAuthorUidAttr}" data-author-name="${safeAuthorAttr}">
             <img class="dm-foro-avatar__img" data-author-avatar src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="Avatar" hidden />
-            <span class="dm-foro-avatar__fallback" data-avatar-fallback="initials">${initials}</span>
+            <span class="dm-foro-avatar__fallback" data-avatar-fallback="initials">${safeInitialsHtml}</span>
           </div>
           <div class="dm-foro-message-body flex-1 space-y-1">
             <div class="dm-foro-message-head flex items-center justify-between gap-2">
               <div class="dm-foro-message-identity flex flex-col">
-                <span class="dm-foro-author font-bold text-gray-900 text-sm">${msg.author || ""}</span>
+                <span class="dm-foro-author font-bold text-gray-900 text-sm">${safeAuthorHtml}</span>
                 <span class="dm-foro-meta text-xs text-gray-500">
-                  ${msg.businessUnit || ""}${msg.managementUnit ? " · " + msg.managementUnit : ""}
+                  ${safeBusinessUnitHtml}${msg.managementUnit ? " · " + safeManagementUnitHtml : ""}
                 </span>
               </div>
               <div class="dm-foro-message-side flex items-center gap-2">
@@ -3591,7 +3595,7 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
               </div>
             </div>
             <div class="dm-foro-message-bubble bg-white p-3 rounded-2xl rounded-tl-none shadow-sm border border-gray-100 text-gray-700 text-sm leading-relaxed">
-              ${msg.text || ""}
+              ${safeMessageHtml}
             </div>
           </div>
         </div>
@@ -3996,7 +4000,7 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
                     if (perm === 'granted') {
                         setPromptGranted(true);
                         setNotificationsPreference('granted');
-                        window.enablePushNotifications('HRodriguez');
+                        window.enablePushNotifications();
                         if (pushBanner) pushBanner.classList.add('hidden');
                     } else {
                         showOrHideBanner(true, { triggeredByUser: true });
@@ -4013,7 +4017,7 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
             pushBannerAllow.addEventListener('click', () => {
                 const perm = typeof Notification !== 'undefined' ? Notification.permission : 'unsupported';
                 logger.debug("[PUSH] permission state", perm);
-                window.enablePushNotifications('HRodriguez');
+                window.enablePushNotifications();
                 setPromptDismissed(false);
                 setPromptGranted(perm === 'granted');
                 setNotificationsPreference(perm === 'granted' ? 'granted' : 'unknown');
@@ -4059,6 +4063,8 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
 
     <script type="module" src="/js/chat.js?v=20260307-chat-aladdin-1"></script>
     <script type="module">
+        import { isChatHash } from "/assets/js/common/routes.js";
+
         (() => {
             let chatLoaded = false;
             let chatLoading = null;
@@ -4080,11 +4086,11 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
             msgIndicator?.addEventListener('click', () => loadChat());
 
             window.addEventListener('hashchange', () => {
-                if (window.location.hash.includes('chat')) {
+                if (isChatHash()) {
                     loadChat();
                 }
             });
-            if (window.location.hash.includes('chat')) {
+            if (isChatHash()) {
                 loadChat();
             }
         })();
@@ -4092,20 +4098,74 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
     <script type="module" src="/assets/js/pages/app.js?v=20260306-chat-desktop-layout-1"></script>
     <script type="module">
         import { getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
-        import { doc, setDoc, serverTimestamp, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
         import { logger } from "/assets/js/common/app-logger.js";
-        import { getFirebase, ensureMessaging } from "/assets/js/common/firebaseClient.js";
+        import { ensureMessaging } from "/assets/js/common/firebaseClient.js";
+        import { registerPushTokenForCurrentUser } from "/assets/js/services/push/PushRegistrationService.js";
 
-        const { db: pushDb } = getFirebase();
         let messaging = null;
+        const APP_SW_URL = "/app/service-worker.js";
+        const APP_SW_SCOPE = "/app/";
+        let appServiceWorkerControllerListenerInstalled = false;
+
+        const sendFirebaseInitToAppWorker = (registration) => {
+            const payload = {
+                type: "INIT_FIREBASE",
+                config: window.__FIREBASE_CONFIG__
+            };
+            const sendInit = (target) => target?.postMessage(payload);
+            if (registration?.active) {
+                sendInit(registration.active);
+                return;
+            }
+            navigator.serviceWorker.ready
+                .then((readyReg) => {
+                    if (!registration || readyReg.scope === registration.scope) {
+                        sendInit(readyReg.active);
+                    }
+                })
+                .catch(() => {});
+        };
+
+        const ensureAppServiceWorkerControllerListener = () => {
+            if (appServiceWorkerControllerListenerInstalled || !("serviceWorker" in navigator)) return;
+            appServiceWorkerControllerListenerInstalled = true;
+            navigator.serviceWorker.addEventListener("controllerchange", () => {
+                const payload = {
+                    type: "INIT_FIREBASE",
+                    config: window.__FIREBASE_CONFIG__
+                };
+                navigator.serviceWorker.controller?.postMessage(payload);
+            });
+        };
+
+        const ensureAppServiceWorkerRegistration = async () => {
+            if (!("serviceWorker" in navigator)) return null;
+            let registration = await navigator.serviceWorker.getRegistration(APP_SW_SCOPE);
+            if (!registration) {
+                registration = await navigator.serviceWorker.register(APP_SW_URL, { scope: APP_SW_SCOPE });
+            }
+            sendFirebaseInitToAppWorker(registration);
+            ensureAppServiceWorkerControllerListener();
+            return registration;
+        };
+
+        if ("serviceWorker" in navigator) {
+            window.addEventListener("load", () => {
+                ensureAppServiceWorkerRegistration()
+                    .then((registration) => {
+                        if (registration) logger.debug("[PWA] Service Worker registrado");
+                    })
+                    .catch(() => logger.debug("[PWA] Service Worker no registrado"));
+            });
+        }
 
         const messagingReady = (async () => {
             try {
                 messaging = await ensureMessaging();
-                logger.debug("[PUSH] messaging instance:", messaging);
+                logger.debug("[PUSH] messaging disponible");
                 if (messaging) {
-                    onMessage(messaging, (payload) => {
-                        logger.debug("[PUSH] Mensaje en foreground", payload);
+                    onMessage(messaging, () => {
+                        logger.debug("[PUSH] Mensaje en foreground");
                     });
                 }
             } catch (e) {
@@ -4113,7 +4173,7 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
             }
         })();
 
-        async function enablePushNotifications(uid) {
+        async function enablePushNotifications(_legacyUid) {
             logger.debug("[PUSH] start enablePushNotifications");
             const permission = await Notification.requestPermission();
             logger.debug("[PUSH] permission:", permission);
@@ -4128,9 +4188,10 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
             }
             let swReg = null;
             try {
-                swReg = await navigator.serviceWorker.getRegistration("/app/");
+                swReg = await ensureAppServiceWorkerRegistration();
                 if (!swReg) {
-                    swReg = await navigator.serviceWorker.ready;
+                    logger.warn("[PUSH] Service Worker no disponible");
+                    return;
                 }
             } catch (e) {
                 logger.warn("[PUSH] error: No se pudo obtener el SW de messaging", e?.code, e?.message);
@@ -4144,22 +4205,19 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
                     logger.warn("[PUSH] No se pudo obtener token");
                     return;
                 }
-                logger.debug("[PUSH] token obtenido:", token);
-                await setDoc(
-                    doc(pushDb, "pushTokens", uid),
-                    {
-                        tokens: arrayUnion(token),
-                        updatedAt: serverTimestamp(),
-                        userAgent: navigator.userAgent
-                    },
-                    { merge: true }
-                );
+                logger.debug("[PUSH] token obtenido");
+                const registration = await registerPushTokenForCurrentUser(token);
+                if (!registration.ok) {
+                    logger.debug("[PUSH] registro de token no completado", registration.reason);
+                    return;
+                }
+                logger.debug("[PUSH] token registrado");
             } catch (e) {
-                logger.warn("[PUSH] error: obteniendo token", e?.code, e?.message);
+                logger.warn("[PUSH] error: obteniendo token", e?.code);
             }
         }
 
-        window.enablePushNotifications = (uid = 'HRodriguez') => enablePushNotifications(uid);
+        window.enablePushNotifications = (_legacyUid) => enablePushNotifications(_legacyUid);
         window.__resetPushPrompt = () => {
             try {
                 localStorage.removeItem('pushPromptGranted');
@@ -4231,32 +4289,6 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
                 localStorage.removeItem('notificationsPreference');
             } catch (e) {}
         };
-    </script>
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/app/service-worker.js', { scope: '/app/' })
-                    .then((reg) => {
-                        console.debug('[PWA] Service Worker registrado');
-                        const payload = {
-                            type: 'INIT_FIREBASE',
-                            config: window.__FIREBASE_CONFIG__
-                        };
-                        const sendInit = (target) => target?.postMessage(payload);
-                        if (reg.active) {
-                            sendInit(reg.active);
-                        } else {
-                            navigator.serviceWorker.ready.then((readyReg) => {
-                                sendInit(readyReg.active);
-                            }).catch(() => {});
-                        }
-                        navigator.serviceWorker.addEventListener('controllerchange', () => {
-                            sendInit(navigator.serviceWorker.controller);
-                        });
-                    })
-                    .catch(() => console.debug('[PWA] Service Worker no registrado'));
-            });
-        }
     </script>
     <script>
         window.addEventListener('load', function() {
