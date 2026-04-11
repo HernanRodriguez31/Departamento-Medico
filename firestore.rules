@@ -251,6 +251,26 @@ service cloud.firestore {
         );
     }
 
+    function validLegacyPostContentUpdate() {
+      return isOwnedByCurrentUser(resource.data)
+        && changedOnly([
+          "type",
+          "title",
+          "text",
+          "imageUrl",
+          "imagePath",
+          "thumbUrl",
+          "authorName",
+          "businessUnit",
+          "managementUnit",
+          "committeeId",
+          "unidadNegocio",
+          "unidadGestion",
+          "createdByName",
+          "updatedAt"
+        ]);
+    }
+
     function validPostCreate() {
       return signedIn()
         && onlyKeys([
@@ -430,17 +450,14 @@ service cloud.firestore {
     match /dm_carousel/{postId} {
       allow read: if signedIn();
       allow create: if validLegacyPostCreate();
-      allow update: if isOwnedByCurrentUser(resource.data)
-        || isAdmin()
-        || validLegacyLikeUpdate()
-        || validPostCounterUpdate();
+      allow update: if validLegacyPostContentUpdate()
+        || isAdmin();
       allow delete: if isOwnedByCurrentUser(resource.data) || isAdmin();
 
       match /comments/{commentId} {
         allow read: if signedIn();
         allow create: if validCommentCreate();
-        allow update: if validCommentLikeUpdate()
-          || (
+        allow update: if (
             isOwnedByCurrentUser(resource.data)
             && changedOnly(["text", "updatedAt"])
           )
@@ -449,12 +466,10 @@ service cloud.firestore {
       }
 
       match /likes/{uid} {
-        allow read: if signedIn();
-        allow create: if isOwner(uid)
-          && onlyKeys(["createdAt", "authorUid"])
-          && request.resource.data.authorUid == request.auth.uid;
+        allow read: if false;
+        allow create: if false;
         allow update: if false;
-        allow delete: if isOwner(uid);
+        allow delete: if false;
       }
     }
 

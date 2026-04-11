@@ -434,6 +434,8 @@
             members: [],
             topics: [],
             messages: [],
+            membersReady: false,
+            topicsReady: false,
             loading: true,
             inputs: {
                 newMemberName: '',
@@ -513,6 +515,12 @@
         }
 
         function updateStats() {
+            if (!state.membersReady || !state.topicsReady) {
+                document.getElementById('stat-members').textContent = '—';
+                document.getElementById('stat-active').textContent = '—';
+                document.getElementById('stat-finished').textContent = '—';
+                return;
+            }
             document.getElementById('stat-members').textContent = state.members.length;
             document.getElementById('stat-active').textContent = state.topics.filter(t => t.stage < 5).length;
             document.getElementById('stat-finished').textContent = state.topics.filter(t => t.stage === 5).length;
@@ -855,19 +863,6 @@ async function joinCurrentCommittee() {
 
             const perfil = perfilSnap.data();
 
-            const duplicateCheck = await getDocs(
-                query(
-                    collection(db, "artifacts", appId, "public", "data", "committee_members"),
-                    where("committeeId", "==", COMMITTEE_ID),
-                    where("userUid", "==", user.uid)
-                )
-            );
-            if (!duplicateCheck.empty) {
-                alert("Ya sos integrante de este comité.");
-                updateJoinButtonState();
-                return;
-            }
-
             const name =
                 resolveValue(perfil, ["displayName", "nombreCompleto", "apellidoNombre", "fullName", "name", "nombre"], "") ||
                 `${resolveValue(perfil, ["apellido", "lastName"], "")} ${resolveValue(perfil, ["nombre"], "")}`.trim() ||
@@ -919,19 +914,17 @@ async function joinCurrentCommittee() {
             if (!confirm.isConfirmed) return;
 
             try {
-                const memberSnap = await getDocs(
-                    query(
-                        collection(db, "artifacts", appId, "public", "data", "committee_members"),
-                        where("committeeId", "==", COMMITTEE_ID),
-                        where("userUid", "==", user.uid)
-                    )
-                );
-                if (memberSnap.empty) {
+                const ownMembers = state.members.filter((member) => member.userUid === user.uid);
+                if (ownMembers.length === 0) {
                     alert("No sos integrante de este comité.");
                     updateJoinButtonState();
                     return;
                 }
-                await Promise.all(memberSnap.docs.map((docSnap) => deleteDoc(docSnap.ref)));
+                await Promise.all(
+                    ownMembers.map((member) =>
+                        deleteDoc(doc(db, "artifacts", appId, "public", "data", "committee_members", member.id))
+                    )
+                );
                 alert("Saliste del comité.");
                 updateJoinButtonState();
             } catch (e) {
@@ -1291,35 +1284,78 @@ async function joinCurrentCommittee() {
 
             render();
 
-            if (db) {
-                // Setup Listeners
-                const membersRef = query(collection(db, 'artifacts', appId, 'public', 'data', 'committee_members'), orderBy('createdAt', 'desc'));
-                onSnapshot(membersRef, (snap) => {
-                    state.members = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(m => m.committeeId === COMMITTEE_ID);
+            const committeeSubscriptions = [];
+            const clearCommitteeSubscriptions = () => {
+                while (committeeSubscriptions.length > 0) {
+                    const unsubscribe = committeeSubscriptions.pop();
+                    if (typeof unsubscribe === 'function') unsubscribe();
+                }
+                state.membersReady = false;
+                state.topicsReady = false;
+                updateStats();
+            };
+            const subscribeCommitteeData = () => {
+                if (!db) return;
+                clearCommitteeSubscriptions();
+                const getCreatedAtMillis = (value) => {
+                    if (value && typeof value.toMillis === 'function') return value.toMillis();
+                    if (typeof value?.seconds === 'number') {
+                        return value.seconds * 1000 + Math.floor((value.nanoseconds || 0) / 1000000);
+                    }
+                    if (value) {
+                        const parsed = new Date(value).getTime();
+                        if (Number.isFinite(parsed)) return parsed;
+                    }
+                    return Number.MAX_SAFE_INTEGER;
+                };
+
+                const membersRef = query(
+                    collection(db, 'artifacts', appId, 'public', 'data', 'committee_members'),
+                    where('committeeId', '==', COMMITTEE_ID)
+                );
+                committeeSubscriptions.push(onSnapshot(membersRef, (snap) => {
+                    state.members = snap.docs
+                        .map(d => ({ id: d.id, ...d.data() }))
+                        .sort((a, b) => getCreatedAtMillis(b.createdAt) - getCreatedAtMillis(a.createdAt));
+                    state.membersReady = true;
                     render();
                     updateJoinButtonState();
-                });
+                }, (error) => {
+                    console.error('Error suscribiendo integrantes del comité:', error);
+                }));
 
-                const topicsRef = query(collection(db, 'artifacts', appId, 'public', 'data', 'committee_topics'), orderBy('createdAt', 'desc'));
-                onSnapshot(topicsRef, (snap) => {
-                    const rawTopics = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => t.committeeId === COMMITTEE_ID);
+                const topicsRef = query(
+                    collection(db, 'artifacts', appId, 'public', 'data', 'committee_topics'),
+                    where('committeeId', '==', COMMITTEE_ID)
+                );
+                committeeSubscriptions.push(onSnapshot(topicsRef, (snap) => {
+                    const rawTopics = snap.docs
+                        .map(d => ({ id: d.id, ...d.data() }))
+                        .sort((a, b) => getCreatedAtMillis(b.createdAt) - getCreatedAtMillis(a.createdAt));
                     state.topics = assignProjectNumbers(rawTopics, COMMITTEE_ID);
+                    state.topicsReady = true;
                     render();
-                });
+                }, (error) => {
+                    console.error('Error suscribiendo proyectos del comité:', error);
+                }));
 
                 const msgsRef = query(
                     collection(db, 'artifacts', appId, 'public', 'data', 'committee_messages'),
-                    orderBy('createdAt', 'asc')
+                    where('committeeId', '==', COMMITTEE_ID)
                 );
 
-                onSnapshot(msgsRef, (snap) => {
+                committeeSubscriptions.push(onSnapshot(msgsRef, (snap) => {
                     state.messages = snap.docs
                         .map(d => ({ id: d.id, ...d.data() }))
-                        .filter(m => m.committeeId === 'comite_docencia_investigacion');
+                        .sort((a, b) => getCreatedAtMillis(a.createdAt) - getCreatedAtMillis(b.createdAt));
                     render();
                     syncLegacyForumMessages();
-                });
-            } else if (!hasLocal) {
+                }, (error) => {
+                    console.error('Error suscribiendo mensajes del comité:', error);
+                }));
+            };
+
+            if (!db && !hasLocal) {
                 // Mock Data para preview inicial si no hay memoria previa
                 state.members = [
                     { id: '1', name: 'Dr. Juan Pérez', businessUnit: 'Upstream', managementUnit: 'Golfo San Jorge', isLeader: true },
@@ -1329,17 +1365,20 @@ async function joinCurrentCommittee() {
                     { id: '1', title: 'Protocolo de Ergonomía', stage: 2, nextMeeting: '2025-12-10', startDate: '2025-11-01' },
                     { id: '2', title: 'Campaña de Vacunación', stage: 5, finishedDate: '2025-09-30', startDate: '2025-05-01' }
                 ];
+                state.membersReady = true;
+                state.topicsReady = true;
                 refreshAndPersist();
             }
             if (auth) {
                 onAuthStateChanged(auth, async (user) => {
+                    clearCommitteeSubscriptions();
                     if (!user) {
                         window.location.href = "../../login.html";
                     } else {
                         await refreshAdminState(user);
                         await getUserDisplayName(user);
+                        subscribeCommitteeData();
                         syncLegacyForumMessages();
-                        render();
                         updateJoinButtonState();
                     }
                 });
@@ -1348,6 +1387,13 @@ async function joinCurrentCommittee() {
             // Form Handlers
             document.getElementById('form-add-topic').addEventListener('submit', async (e) => {
                 e.preventDefault();
+                if (db) {
+                    const allowed = await ensureAdmin();
+                    if (!allowed) {
+                        Swal.fire('Acceso restringido', 'Solo administradores pueden agregar proyectos.', 'error');
+                        return;
+                    }
+                }
                 const title = document.getElementById('new-topic-title').value;
                 const date = document.getElementById('new-topic-date').value;
                 const proposedBy = document.getElementById('new-topic-proposedBy').value.trim();
@@ -1389,6 +1435,13 @@ async function joinCurrentCommittee() {
 
             document.getElementById('form-add-member').addEventListener('submit', async (e) => {
                 e.preventDefault();
+                if (db) {
+                    const allowed = await ensureAdmin();
+                    if (!allowed) {
+                        Swal.fire('Acceso restringido', 'Solo administradores pueden agregar integrantes.', 'error');
+                        return;
+                    }
+                }
                 const name = document.getElementById('new-member-name').value;
                 const bu = document.getElementById('new-member-bu').value;
                 const mu = document.getElementById('new-member-mu').value;
@@ -1631,7 +1684,7 @@ async function joinCurrentCommittee() {
             <div class="stat-card flex items-center justify-between p-6 h-full" style="--accent:#2563eb">
                 <div>
                     <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Integrantes</p>
-                    <p class="text-4xl font-extrabold text-gray-800" id="stat-members">0</p>
+                    <p class="text-4xl font-extrabold text-gray-800" id="stat-members">—</p>
                 </div>
                 <div class="stat-icon p-4 rounded-full transition-all duration-300">
                     <i data-lucide="users" class="w-8 h-8 text-blue-600"></i>
@@ -1641,7 +1694,7 @@ async function joinCurrentCommittee() {
             <div class="stat-card flex items-center justify-between p-6 h-full" style="--accent:#7ab800">
                 <div>
                     <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Proyectos en Proceso</p>
-                    <p class="text-4xl font-extrabold text-gray-800" id="stat-active">0</p>
+                    <p class="text-4xl font-extrabold text-gray-800" id="stat-active">—</p>
                 </div>
                 <div class="stat-icon p-4 rounded-full transition-all duration-300">
                     <i data-lucide="clipboard-list" class="w-8 h-8 text-brisa"></i>
@@ -1651,7 +1704,7 @@ async function joinCurrentCommittee() {
             <div class="stat-card flex items-center justify-between p-6 h-full" style="--accent:#0d9488">
                 <div>
                     <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Trabajos Finalizados</p>
-                    <p class="text-4xl font-extrabold text-gray-800" id="stat-finished">0</p>
+                    <p class="text-4xl font-extrabold text-gray-800" id="stat-finished">—</p>
                 </div>
                 <div class="stat-icon p-4 rounded-full transition-all duration-300">
                     <i data-lucide="award" class="w-8 h-8 text-teal-600"></i>

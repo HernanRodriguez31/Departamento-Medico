@@ -39,6 +39,10 @@ import { logger, once, throttle } from "../common/app-logger.js";
 import { initUserMenu } from "../common/user-menu.js?v=20260305-session-1";
 import { hydrateAvatars } from "../common/user-profiles.js";
 import { initSessionGuard } from "../shared/sessionGuard.js?v=20260305-session-1";
+import {
+  toggleCarouselCommentLikeForCurrentUser,
+  toggleCarouselLikeForCurrentUser,
+} from "../services/interactions/FeedInteractionService.js";
 
 function ensureFirebase() {
   return getFirebase();
@@ -307,7 +311,28 @@ async function initCarouselModule() {
 
   setupCalendarModeToggle();
 
-  const loadCommitteeStats = async () => {
+  let committeeMembersStatsUnsub = null;
+  let committeeTopicsStatsUnsub = null;
+  let committeeStatsSubscriptionSeq = 0;
+
+  const clearCommitteeStatsSubscriptions = () => {
+    committeeStatsSubscriptionSeq += 1;
+    const unsubscribeMembers = committeeMembersStatsUnsub;
+    const unsubscribeTopics = committeeTopicsStatsUnsub;
+    committeeMembersStatsUnsub = null;
+    committeeTopicsStatsUnsub = null;
+    if (typeof unsubscribeMembers === "function") unsubscribeMembers();
+    if (typeof unsubscribeTopics === "function") unsubscribeTopics();
+  };
+
+  const loadCommitteeStats = () => {
+    const committeeDataPath = (...segments) => [
+      "artifacts",
+      appIdMeta,
+      "public",
+      "data",
+      ...segments,
+    ];
     const kpiCommittees = document.getElementById("kpi-committees");
     const kpiMembers = document.getElementById("kpi-members");
     const kpiProjects = document.getElementById("kpi-projects");
@@ -316,63 +341,138 @@ async function initCarouselModule() {
       if (kpiMembers && kpiMembers.dataset.dynamic === "true") kpiMembers.textContent = String(members);
       if (kpiProjects) kpiProjects.textContent = String(projects);
     };
+    const cards = Array.from(document.querySelectorAll("#comites .comite__card"));
+    const committeeIds = cards
+      .map((card) => card.getAttribute("data-committee-id"))
+      .filter(Boolean);
+    const committeeIdSet = new Set(committeeIds);
+    const committeesTotal = committeeIds.length;
+    const cardStats = new Map();
+
+    cards.forEach((card) => {
+      const committeeId = card.getAttribute("data-committee-id");
+      const statsDiv = card.querySelector(".committee-stats");
+      if (!committeeId || !statsDiv) return;
+      cardStats.set(committeeId, statsDiv.querySelectorAll(".committee-stat-value"));
+    });
+
+    const setCardValues = (committeeId, members = "...", projects = "...") => {
+      const values = cardStats.get(committeeId);
+      if (!values) return;
+      if (values[0]) values[0].textContent = String(members);
+      if (values[1]) values[1].textContent = String(projects);
+    };
+    const setAllCardValues = (members = "...", projects = "...") => {
+      committeeIds.forEach((committeeId) => setCardValues(committeeId, members, projects));
+    };
+    const getNumericStage = (topic) => {
+      const rawStage = Number(topic?.stage);
+      return Number.isFinite(rawStage) && rawStage > 0 ? rawStage : 1;
+    };
 
     if (!db) {
-      setKpis("—", "—", "—");
+      setAllCardValues("...", "...");
+      setKpis(committeesTotal || "—", "—", "—");
       return;
     }
 
-    const cards = document.querySelectorAll("#comites .comite__card");
-    const committeesTotal = Array.from(cards).reduce((acc, card) => {
-      return card.getAttribute("data-committee-id") ? acc + 1 : acc;
-    }, 0);
-    let membersTotal = 0;
-    let projectsTotal = 0;
-    let hasError = false;
+    clearCommitteeStatsSubscriptions();
+    const subscriptionSeq = committeeStatsSubscriptionSeq;
+    const committeeStatsState = {
+      membersById: new Map(),
+      topicsById: new Map(),
+      membersReady: false,
+      topicsReady: false,
+    };
 
-    setKpis("—", "—", "—");
+    const renderCommitteeStats = () => {
+      if (subscriptionSeq !== committeeStatsSubscriptionSeq) return;
 
-    for (const card of Array.from(cards)) {
-      const committeeId = card.getAttribute("data-committee-id");
-      if (!committeeId) continue;
-      const statsDiv = card.querySelector(".committee-stats");
-      if (!statsDiv) continue;
-      const values = statsDiv.querySelectorAll(".committee-stat-value");
-      const setValues = (int = "-", proj = "-") => {
-        if (values[0]) values[0].textContent = String(int);
-        if (values[1]) values[1].textContent = String(proj);
-      };
-      try {
-        const membersRef = collection(db, "artifacts", appIdMeta, "public", "data", "committee_members");
-        const topicsRef = collection(db, "artifacts", appIdMeta, "public", "data", "committee_topics");
-        const membersSnap = await getCountFromServer(query(membersRef, where("committeeId", "==", committeeId)));
-        const topicsSnap = await getCountFromServer(query(topicsRef, where("committeeId", "==", committeeId)));
-        const memberCount = membersSnap.data().count || 0;
-        const projectCount = topicsSnap.data().count || 0;
-        setValues(memberCount, projectCount);
-        membersTotal += memberCount;
-        projectsTotal += projectCount;
-      } catch (err) {
-        if (isPermissionError(err)) {
-          handlePermissionDenied("committee-stats");
-        }
-        throttle(`committee-stats-${committeeId}`, 60000, () => {
-          logger.warn(`Error fetching stats for ${committeeId}:`, err);
-        });
-        hasError = true;
-        setValues("-", "-");
+      if (!committeeStatsState.membersReady || !committeeStatsState.topicsReady) {
+        setAllCardValues("...", "...");
+        setKpis(committeesTotal || "—", "—", "—");
+        return;
       }
-    }
 
-    if (hasError) {
-      setKpis("—", "—", "—");
-    } else {
-      setKpis(committeesTotal, membersTotal, projectsTotal);
-    }
+      let membersTotal = 0;
+      let activeProjectsTotal = 0;
 
-    if (window.lucide && typeof window.lucide.createIcons === "function") {
-      window.lucide.createIcons();
-    }
+      committeeIds.forEach((committeeId) => {
+        const memberCount = committeeStatsState.membersById.get(committeeId) || 0;
+        const topics = committeeStatsState.topicsById.get(committeeId) || [];
+        const projectCount = topics.length;
+        const activeProjectCount = topics.filter((topic) => getNumericStage(topic) < 5).length;
+
+        setCardValues(committeeId, memberCount, projectCount);
+        membersTotal += memberCount;
+        activeProjectsTotal += activeProjectCount;
+      });
+
+      setKpis(committeesTotal, membersTotal, activeProjectsTotal);
+
+      if (window.lucide && typeof window.lucide.createIcons === "function") {
+        window.lucide.createIcons();
+      }
+    };
+
+    setAllCardValues("...", "...");
+    setKpis(committeesTotal || "—", "—", "—");
+
+    const membersRef = collection(db, ...committeeDataPath("committee_members"));
+    committeeMembersStatsUnsub = onSnapshot(
+      membersRef,
+      (snap) => {
+        if (subscriptionSeq !== committeeStatsSubscriptionSeq) return;
+        const membersById = new Map();
+        snap.docs.forEach((docSnap) => {
+          const data = docSnap.data() || {};
+          const committeeId = data.committeeId;
+          if (!committeeIdSet.has(committeeId)) return;
+          membersById.set(committeeId, (membersById.get(committeeId) || 0) + 1);
+        });
+        committeeStatsState.membersById = membersById;
+        committeeStatsState.membersReady = true;
+        renderCommitteeStats();
+      },
+      (err) => {
+        if (subscriptionSeq !== committeeStatsSubscriptionSeq) return;
+        if (isPermissionError(err)) {
+          handlePermissionDenied("committee-members-stats");
+        }
+        throttle("committee-members-stats", 60000, () => {
+          logger.warn("Error fetching committee member stats:", err);
+        });
+      }
+    );
+
+    const topicsRef = collection(db, ...committeeDataPath("committee_topics"));
+    committeeTopicsStatsUnsub = onSnapshot(
+      topicsRef,
+      (snap) => {
+        if (subscriptionSeq !== committeeStatsSubscriptionSeq) return;
+        const topicsById = new Map();
+        snap.docs.forEach((docSnap) => {
+          const data = docSnap.data() || {};
+          const committeeId = data.committeeId;
+          if (!committeeIdSet.has(committeeId)) return;
+          const currentTopics = topicsById.get(committeeId) || [];
+          currentTopics.push({ id: docSnap.id, ...data });
+          topicsById.set(committeeId, currentTopics);
+        });
+        committeeStatsState.topicsById = topicsById;
+        committeeStatsState.topicsReady = true;
+        renderCommitteeStats();
+      },
+      (err) => {
+        if (subscriptionSeq !== committeeStatsSubscriptionSeq) return;
+        if (isPermissionError(err)) {
+          handlePermissionDenied("committee-topics-stats");
+        }
+        throttle("committee-topics-stats", 60000, () => {
+          logger.warn("Error fetching committee topic stats:", err);
+        });
+      }
+    );
   };
 
   const loadCommitteeMetaCards = async () => {
@@ -1853,19 +1953,16 @@ async function initCarouselModule() {
   };
 
   const toggleCommentLike = async (slideId, commentId, user) => {
-    const commentRef = doc(db, POSTS_COLLECTION, slideId, COMMENTS_COLLECTION, commentId);
-    await runTransaction(db, async (trx) => {
-      const snap = await trx.get(commentRef);
-      if (!snap.exists()) return;
-      const data = snap.data() || {};
-      const likedBy = data.likedBy && typeof data.likedBy === "object" ? { ...data.likedBy } : {};
-      if (likedBy[user.uid]) {
-        delete likedBy[user.uid];
-      } else {
-        likedBy[user.uid] = user.displayName || user.email || "Usuario";
-      }
-      trx.update(commentRef, { likedBy });
+    const result = await toggleCarouselCommentLikeForCurrentUser({
+      postId: slideId,
+      commentId,
     });
+    if (!result?.ok) {
+      if (result.reason === "auth_required") {
+        throw new Error("AUTH_REQUIRED");
+      }
+      throw new Error("COMMENT_LIKE_TOGGLE_FAILED");
+    }
     if (commentsList) hydrateAvatars(commentsList);
   };
 
@@ -2033,29 +2130,14 @@ async function initCarouselModule() {
     }
     const slide = getSlideById(postId);
     if (!slide) return;
-    const likedBy = slide.likedBy || [];
-    const alreadyLiked = likedBy.includes(user.uid);
-    const name = user.displayName || user.email || "Usuario";
     try {
-      if (alreadyLiked) {
-        await updateDoc(doc(currentDb, POSTS_COLLECTION, postId), {
-          likedBy: arrayRemove(user.uid),
-          likedNames: arrayRemove(name),
-          likesCount: increment(-1)
-        });
-        slide.likedBy = likedBy.filter((id) => id !== user.uid);
-        slide.likedNames = (slide.likedNames || []).filter((n) => n !== name);
-        slide.likesCount = Math.max(0, (slide.likesCount || 0) - 1);
-      } else {
-        await updateDoc(doc(currentDb, POSTS_COLLECTION, postId), {
-          likedBy: arrayUnion(user.uid),
-          likedNames: arrayUnion(name),
-          likesCount: increment(1)
-        });
-        slide.likedBy = [...likedBy, user.uid];
-        slide.likedNames = [...(slide.likedNames || []), name];
-        slide.likesCount = (slide.likesCount || 0) + 1;
+      const result = await toggleCarouselLikeForCurrentUser(postId);
+      if (!result?.ok) {
+        throw new Error(result?.reason || "LIKE_TOGGLE_FAILED");
       }
+      slide.likedBy = Array.isArray(result.likedBy) ? result.likedBy : [];
+      slide.likedNames = Array.isArray(result.likedNames) ? result.likedNames : [];
+      slide.likesCount = Number.isFinite(result.likesCount) ? result.likesCount : 0;
       updateFeedLikeUI(postEl, slide);
     } catch (e) {
       throttle("post-like", 30000, () => {
@@ -2487,29 +2569,14 @@ async function initCarouselModule() {
       Swal.fire("Sesión requerida", "Iniciá sesión para dar me gusta.", "warning");
       return;
     }
-    const likedBy = current.likedBy || [];
-    const alreadyLiked = likedBy.includes(user.uid);
-    const name = user.displayName || user.email || "Usuario";
     try {
-      if (alreadyLiked) {
-        await updateDoc(doc(db, POSTS_COLLECTION, current.id), {
-          likedBy: arrayRemove(user.uid),
-          likedNames: arrayRemove(name),
-          likesCount: increment(-1)
-        });
-        current.likedBy = likedBy.filter((id) => id !== user.uid);
-        current.likedNames = (current.likedNames || []).filter((n) => n !== name);
-        current.likesCount = Math.max(0, (current.likesCount || 0) - 1);
-      } else {
-        await updateDoc(doc(db, POSTS_COLLECTION, current.id), {
-          likedBy: arrayUnion(user.uid),
-          likedNames: arrayUnion(name),
-          likesCount: increment(1)
-        });
-        current.likedBy = [...likedBy, user.uid];
-        current.likedNames = [...(current.likedNames || []), name];
-        current.likesCount = (current.likesCount || 0) + 1;
+      const result = await toggleCarouselLikeForCurrentUser(current.id);
+      if (!result?.ok) {
+        throw new Error(result?.reason || "LIKE_TOGGLE_FAILED");
       }
+      current.likedBy = Array.isArray(result.likedBy) ? result.likedBy : [];
+      current.likedNames = Array.isArray(result.likedNames) ? result.likedNames : [];
+      current.likesCount = Number.isFinite(result.likesCount) ? result.likesCount : 0;
       refreshLikeUI();
     } catch (e) {
       throttle("carousel-like", 30000, () => {

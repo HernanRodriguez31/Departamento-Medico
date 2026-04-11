@@ -19,6 +19,9 @@ import {
   uploadBytesResumable,
   getDownloadURL
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+import {
+  toggleCarouselLikeForCurrentUser,
+} from "../../services/interactions/FeedInteractionService.js";
 import { COLLECTIONS } from "../../common/collections.js";
 
 const { POSTS: POSTS_COLLECTION, USERS: USERS_COLLECTION, COMMENTS: COMMENTS_COLLECTION } = COLLECTIONS;
@@ -295,30 +298,26 @@ export async function toggleLike({ postId }) {
   if (!user) throw new Error("AUTH_REQUIRED");
   if (!postId) throw new Error("MISSING_POST_ID");
 
-  const postRef = doc(db, POSTS_COLLECTION, postId);
-  const likeRef = doc(db, POSTS_COLLECTION, postId, "likes", user.uid);
-  let result = { liked: false, likeCount: 0 };
-
-  await runTransaction(db, async (trx) => {
-    const postSnap = await trx.get(postRef);
-    const likeSnap = await trx.get(likeRef);
-    const data = postSnap.data() || {};
-    const currentCount = Number.isFinite(data.likeCount) ? data.likeCount : 0;
-
-    if (likeSnap.exists()) {
-      trx.delete(likeRef);
-      const nextCount = Math.max(0, currentCount - 1);
-      trx.update(postRef, { likeCount: nextCount, updatedAt: serverTimestamp() });
-      result = { liked: false, likeCount: nextCount };
-    } else {
-      trx.set(likeRef, { createdAt: serverTimestamp(), authorUid: user.uid });
-      const nextCount = currentCount + 1;
-      trx.update(postRef, { likeCount: nextCount, updatedAt: serverTimestamp() });
-      result = { liked: true, likeCount: nextCount };
+  const backendResult = await toggleCarouselLikeForCurrentUser(postId);
+  if (!backendResult?.ok) {
+    if (backendResult?.reason === "auth_required") {
+      throw new Error("AUTH_REQUIRED");
     }
-  });
+    if (backendResult?.reason === "not_found") {
+      throw new Error("MISSING_POST_ID");
+    }
+    throw new Error("LIKE_TOGGLE_FAILED");
+  }
 
-  return result;
+  return {
+    liked: Boolean(backendResult.liked),
+    likeCount:
+      Number.isFinite(backendResult.likeCount) && backendResult.likeCount >= 0
+        ? backendResult.likeCount
+        : Number.isFinite(backendResult.likesCount) && backendResult.likesCount >= 0
+          ? backendResult.likesCount
+          : 0
+  };
 }
 
 export async function addComment({ postId, text }) {

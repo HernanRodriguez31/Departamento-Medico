@@ -11,12 +11,22 @@ const {
   onRequest,
 } = require("firebase-functions/v2/https");
 const { setGlobalOptions } = require("firebase-functions/v2");
-const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const {
+  onDocumentCreated,
+  onDocumentDeleted,
+} = require("firebase-functions/v2/firestore");
 const {
   getAuthenticatedUid,
   isValidPushToken,
   normalizePushToken,
 } = require("./push/registerPushTokenValidation");
+const {
+  buildCarouselLikeAggregate,
+  buildCarouselLikeAggregatePatch,
+  buildCarouselLikeToggleResult,
+  toggleCommentLikedByMap,
+  normalizeCounterValue,
+} = require("./feed/integrity");
 
 // Inicializacion
 admin.initializeApp();
@@ -28,6 +38,7 @@ const getMessagingClient = () => admin.messaging();
 const TIMEZONE = "America/Argentina/Buenos_Aires";
 const ALLOWED_START = 8;
 const ALLOWED_END = 22; // exclusive
+const CAROUSEL_COLLECTION = "dm_carousel";
 const POSTS_COLLECTION = "dm_posts";
 const NOTIFICATIONS_COLLECTION = "notifications";
 const PUSH_TOKENS_COLLECTION = "pushTokens";
@@ -193,6 +204,30 @@ const normalizePushData = (data = {}) => {
     normalized[key] = value === null ? "" : String(value);
   });
   return normalized;
+};
+
+const buildCarouselLikeRef = ({ postId, uid }) =>
+  db.doc(`${CAROUSEL_COLLECTION}/${postId}/likes/${uid}`);
+
+const buildCarouselCommentRef = ({ postId, commentId }) =>
+  db.doc(`${CAROUSEL_COLLECTION}/${postId}/comments/${commentId}`);
+
+const syncCarouselLikeAggregates = async (postId) => {
+  const normalizedPostId = cleanString(postId);
+  if (!normalizedPostId) return null;
+  const postRef = db.doc(`${CAROUSEL_COLLECTION}/${normalizedPostId}`);
+  const postSnap = await postRef.get();
+  if (!postSnap.exists) return null;
+
+  const likesSnap = await postRef.collection("likes").get();
+  const aggregates = buildCarouselLikeAggregatePatch(
+    buildCarouselLikeAggregate(likesSnap.docs)
+  );
+  await postRef.set(
+    { ...aggregates, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+    { merge: true }
+  );
+  return aggregates;
 };
 
 const createNotificationDoc = async (payload = {}) => {
@@ -447,6 +482,165 @@ const shouldNotifyPostLike = async ({ postId, toUid, fromUid }) => {
 
   return allow;
 };
+
+
+exports.toggleCarouselLike = onCall(async (request) => {
+  const uid = getAuthenticatedUid(request);
+  if (!uid) {
+    throw new HttpsError("unauthenticated", "auth_required");
+  }
+
+  const postId = cleanString(request.data?.postId);
+  if (!postId) {
+    throw new HttpsError("invalid-argument", "invalid_post_id");
+  }
+
+  const postRef = db.doc(`${CAROUSEL_COLLECTION}/${postId}`);
+  const likeRef = buildCarouselLikeRef({ postId, uid });
+  const actorName = (await resolveUserName(uid)) || "Usuario";
+  let result = null;
+
+  try {
+    await db.runTransaction(async (trx) => {
+      const postSnap = await trx.get(postRef);
+      const likesSnap = await trx.get(postRef.collection("likes"));
+
+      if (!postSnap.exists) {
+        throw new HttpsError("not-found", "post_not_found");
+      }
+
+      result = buildCarouselLikeToggleResult({
+        entries: likesSnap.docs,
+        actingUid: uid,
+        actingDisplayName: actorName,
+      });
+
+      if (result.liked) {
+        trx.set(likeRef, {
+          authorUid: uid,
+          authorName: result.actorName,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } else {
+        trx.delete(likeRef);
+      }
+
+      trx.set(
+        postRef,
+        {
+          ...buildCarouselLikeAggregatePatch(result),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    });
+  } catch (error) {
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+    functions.logger.error("Error alternando like de carrusel", {
+      postId,
+      uid,
+      error: serializePushError(error),
+    });
+    throw new HttpsError("internal", "carousel_like_toggle_failed");
+  }
+
+  return {
+    liked: Boolean(result?.liked),
+    likedBy: Array.isArray(result?.likedBy) ? result.likedBy : [],
+    likedNames: Array.isArray(result?.likedNames) ? result.likedNames : [],
+    likesCount: normalizeCounterValue(result?.likesCount),
+    likeCount: normalizeCounterValue(result?.likeCount),
+  };
+});
+
+exports.toggleCarouselCommentLike = onCall(async (request) => {
+  const uid = getAuthenticatedUid(request);
+  if (!uid) {
+    throw new HttpsError("unauthenticated", "auth_required");
+  }
+
+  const postId = cleanString(request.data?.postId);
+  const commentId = cleanString(request.data?.commentId);
+  if (!postId || !commentId) {
+    throw new HttpsError("invalid-argument", "invalid_comment_target");
+  }
+
+  const commentRef = buildCarouselCommentRef({ postId, commentId });
+  const actorName = (await resolveUserName(uid)) || "Usuario";
+  let result = null;
+
+  try {
+    await db.runTransaction(async (trx) => {
+      const commentSnap = await trx.get(commentRef);
+      if (!commentSnap.exists) {
+        throw new HttpsError("not-found", "comment_not_found");
+      }
+
+      result = toggleCommentLikedByMap({
+        likedBy: commentSnap.data()?.likedBy,
+        actingUid: uid,
+        actingDisplayName: actorName,
+      });
+
+      trx.update(commentRef, { likedBy: result.likedBy });
+    });
+  } catch (error) {
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+    functions.logger.error("Error alternando like de comentario de carrusel", {
+      postId,
+      commentId,
+      uid,
+      error: serializePushError(error),
+    });
+    throw new HttpsError("internal", "carousel_comment_like_toggle_failed");
+  }
+
+  return {
+    liked: Boolean(result?.liked),
+    likedBy: result?.likedBy || {},
+    likesCount: normalizeCounterValue(result?.likesCount),
+  };
+});
+
+exports.onCarouselLikeCreated_v2 = onDocumentCreated(
+  `${CAROUSEL_COLLECTION}/{postId}/likes/{uid}`,
+  async (event) => {
+    const postId = cleanString(event.params?.postId);
+    if (!postId) return;
+    try {
+      await syncCarouselLikeAggregates(postId);
+    } catch (error) {
+      functions.logger.error("Error sincronizando agregados de likes del carrusel", {
+        postId,
+        trigger: "onCarouselLikeCreated_v2",
+        error: serializePushError(error),
+      });
+      throw error;
+    }
+  }
+);
+
+exports.onCarouselLikeDeleted_v2 = onDocumentDeleted(
+  `${CAROUSEL_COLLECTION}/{postId}/likes/{uid}`,
+  async (event) => {
+    const postId = cleanString(event.params?.postId);
+    if (!postId) return;
+    try {
+      await syncCarouselLikeAggregates(postId);
+    } catch (error) {
+      functions.logger.error("Error sincronizando agregados de likes del carrusel", {
+        postId,
+        trigger: "onCarouselLikeDeleted_v2",
+        error: serializePushError(error),
+      });
+      throw error;
+    }
+  }
+);
 
 exports.onChatMessageCreated_v2 = onDocumentCreated(
   "dm_chats/{conversationId}/messages/{messageId}",

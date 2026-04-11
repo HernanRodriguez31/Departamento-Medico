@@ -5440,20 +5440,61 @@
             forumMessages.scrollTop = forumMessages.scrollHeight;
           }
 
-          if (forumAuth) {
-            onAuthStateChanged(forumAuth, async (user) => {
-              if (!user) {
-                window.location.replace(buildLoginRedirectUrl("#estructura"));
-                return;
+          let forumMessagesUnsubscribe = null;
+          let forumSubscriptionSeq = 0;
+          const clearForumMessagesSubscription = () => {
+            forumSubscriptionSeq += 1;
+            const unsubscribe = forumMessagesUnsubscribe;
+            forumMessagesUnsubscribe = null;
+            if (typeof unsubscribe === "function") {
+              try {
+                unsubscribe();
+              } catch (error) {
+                console.warn(
+                  "No se pudo limpiar la suscripción del foro general.",
+                  error,
+                );
               }
-              await refreshAdminState(user);
-              await getUserDisplayName(user);
-              syncLegacyForumMessages();
-              renderMessages();
-            });
-          }
+            }
+          };
 
-          if (db) {
+          const subscribeForumMessages = async (
+            user = forumAuth?.currentUser,
+            { retryOnPermissionDenied = true } = {},
+          ) => {
+            if (!db || !user) return;
+            clearForumMessagesSubscription();
+            const seq = forumSubscriptionSeq;
+            clearError();
+
+            try {
+              await user.getIdToken();
+            } catch (error) {
+              if (seq !== forumSubscriptionSeq) return;
+              console.warn(
+                "No se pudo preparar el token antes de abrir el foro general.",
+                error,
+              );
+            }
+            if (seq !== forumSubscriptionSeq) return;
+
+            const getCreatedAtMillis = (value) => {
+              if (value && typeof value.toMillis === "function") {
+                return value.toMillis();
+              }
+              if (typeof value?.seconds === "number") {
+                return (
+                  value.seconds * 1000 +
+                  Math.floor((value.nanoseconds || 0) / 1000000)
+                );
+              }
+              if (value) {
+                const parsed = new Date(value).getTime();
+                if (Number.isFinite(parsed)) return parsed;
+              }
+              return Number.MAX_SAFE_INTEGER;
+            };
+
             const msgsRef = query(
               collection(
                 db,
@@ -5463,16 +5504,24 @@
                 "data",
                 "committee_messages",
               ),
-              orderBy("createdAt", "asc"),
+              where("committeeId", "==", "foro_general"),
             );
 
-            onSnapshot(
+            forumMessagesUnsubscribe = onSnapshot(
               msgsRef,
               (snap) => {
-                const rawMessages = snap.docs.map((d) => ({
-                  id: d.id,
-                  ...d.data(),
-                }));
+                if (seq !== forumSubscriptionSeq) return;
+                clearError();
+                const rawMessages = snap.docs
+                  .map((d) => ({
+                    id: d.id,
+                    ...d.data(),
+                  }))
+                  .sort(
+                    (a, b) =>
+                      getCreatedAtMillis(a.createdAt) -
+                      getCreatedAtMillis(b.createdAt),
+                  );
                 const initialMessage = rawMessages.find(
                   (m) =>
                     m.isInitial === true && m.committeeId === "foro_general",
@@ -5493,15 +5542,32 @@
                     console.warn("No se pudo borrar el mensaje inicial.", err);
                   });
                 }
-                messages = rawMessages.filter(
-                  (m) => m.committeeId === "foro_general" && !m.isInitial,
-                );
+                messages = rawMessages.filter((m) => !m.isInitial);
                 syncLegacyForumMessages();
                 renderMessages();
               },
-              (error) => {
+              async (error) => {
+                if (seq !== forumSubscriptionSeq) return;
                 console.error("Error suscribiendo foro general:", error);
+                const currentUser = forumAuth?.currentUser;
+                const sameUser =
+                  Boolean(currentUser && user) && currentUser.uid === user.uid;
                 if (error?.code === "permission-denied") {
+                  if (retryOnPermissionDenied && sameUser) {
+                    try {
+                      await currentUser.getIdToken(true);
+                    } catch (tokenError) {
+                      console.warn(
+                        "No se pudo refrescar el token para reintentar el foro general.",
+                        tokenError,
+                      );
+                    }
+                    if (seq !== forumSubscriptionSeq) return;
+                    subscribeForumMessages(currentUser, {
+                      retryOnPermissionDenied: false,
+                    });
+                    return;
+                  }
                   setError("No tenés permisos para ver el foro.");
                 } else if (
                   error?.code === "failed-precondition" &&
@@ -5514,6 +5580,19 @@
                 }
               },
             );
+          };
+
+          if (forumAuth) {
+            onAuthStateChanged(forumAuth, async (user) => {
+              clearForumMessagesSubscription();
+              if (!user) {
+                window.location.replace(buildLoginRedirectUrl("#estructura"));
+                return;
+              }
+              await refreshAdminState(user);
+              await getUserDisplayName(user);
+              await subscribeForumMessages(user);
+            });
           }
 
           if (form) {
@@ -6109,12 +6188,15 @@
               ensureRootServiceWorkerRegistration().catch(() =>
                 console.debug("[PWA] Root Service Worker no registrado"),
               );
-              navigator.serviceWorker.addEventListener("controllerchange", () => {
-                navigator.serviceWorker
-                  .getRegistration(ROOT_SW_SCOPE)
-                  .then(sendFirebaseInitToRootWorker)
-                  .catch(() => {});
-              });
+              navigator.serviceWorker.addEventListener(
+                "controllerchange",
+                () => {
+                  navigator.serviceWorker
+                    .getRegistration(ROOT_SW_SCOPE)
+                    .then(sendFirebaseInitToRootWorker)
+                    .catch(() => {});
+                },
+              );
             },
             { once: true },
           );
