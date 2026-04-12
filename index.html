@@ -359,8 +359,38 @@
         transition: transform 0.32s ease;
       }
 
+      .referente-hero-photo--asset-framed {
+        background: transparent;
+        border: none;
+        box-shadow: 0 18px 32px rgba(15, 23, 42, 0.1);
+      }
+
+      .referente-hero-photo--asset-framed img {
+        object-fit: cover;
+        object-position: center;
+        transform: none;
+      }
+
+      .referente-hero-card--static-photo
+        .referente-hero-photo--asset-framed
+        img {
+        transform: none;
+        transition: none;
+        animation: none;
+        filter: none;
+      }
+
       .referente-hero-card:hover .referente-hero-photo img {
         transform: scale(1.04);
+      }
+
+      .referente-hero-card:hover .referente-hero-photo--asset-framed img {
+        transform: none;
+      }
+
+      .referente-hero-card--static-photo:hover .referente-hero-photo--asset-framed img {
+        transform: none;
+        filter: none;
       }
 
       .referente-hero-body {
@@ -428,6 +458,11 @@
           box-shadow:
             0 14px 26px rgba(15, 23, 42, 0.1),
             0 0 0 8px var(--ref-photo-ring);
+        }
+
+        .referente-hero-photo--asset-framed {
+          border: none;
+          box-shadow: 0 14px 26px rgba(15, 23, 42, 0.1);
         }
 
         .referente-hero-body {
@@ -2647,12 +2682,14 @@
                 <div class="dm-accordion__content">
                   <div class="referentes__row--top">
                     <div
-                      class="referente__card referente-hero-card reveal-on-scroll"
+                      class="referente__card referente-hero-card referente-hero-card--static-photo reveal-on-scroll"
                     >
                       <div class="referente-hero">
-                        <div class="referente-hero-photo">
+                        <div
+                          class="referente-hero-photo referente-hero-photo--asset-framed"
+                        >
                           <img
-                            src="assets/images/avatar-leila-final.png"
+                            src="assets/images/avatar-leila-cura-featured-tight-20260411.png"
                             alt="Dra. Leila Cura"
                             width="1000"
                             height="1000"
