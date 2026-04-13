@@ -1,4 +1,5 @@
 import { getFirebase } from "../../common/firebaseClient.js";
+import { buildCommitteeMemberWritePayload } from "../../common/committee-member-roles.js";
 import renderFeed from "./feed.view.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
@@ -108,15 +109,14 @@ const joinCommittee = async ({ db, auth, committeeId, button, setStatus }) => {
     const businessUnit = resolveValue(profile, ["businessUnit", "unidadNegocio", "bu", "business_unit"], "");
     const managementUnit = resolveValue(profile, ["managementUnit", "unidadGestion", "mu", "management_unit"], "");
 
-    await addDoc(membersRef, {
+    await addDoc(membersRef, buildCommitteeMemberWritePayload({
       committeeId,
       userUid: user.uid,
       name: displayName,
       businessUnit,
       managementUnit,
-      isLeader: false,
       createdAt: serverTimestamp()
-    });
+    }, "vocal"));
 
     setJoinButtonState(button, true);
     setStatus("Te sumaste al comite.", "success");

@@ -80,6 +80,10 @@
             getDocLinksForTopic,
             getDocUrl
         } from "../../js/committee-links.js";
+        import {
+            buildCommitteeMemberWritePayload,
+            groupCommitteeMembers
+        } from "../../assets/js/common/committee-member-roles.js";
         import { hydrateAvatars, resolveUidForAuthor } from "../../assets/js/common/user-profiles.js";
         import { escapeHTML, escapeAttribute } from "../../assets/js/utils/safe-dom.js";
         import { initSessionGuard } from "../../assets/js/shared/sessionGuard.js?v=20260305-session-1";
@@ -327,6 +331,30 @@
         };
         const STAGE_LABELS = PROJECT_STAGES.map((s) => s.label);
 
+        function getStageMeta(stage, options = {}) {
+            const { fallback = 1 } = options;
+            const numericStage = Number(stage);
+            const resolvedStage = Number.isInteger(numericStage) && numericStage >= 1 && numericStage <= 5
+                ? numericStage
+                : fallback;
+
+            if (!Number.isInteger(resolvedStage) || resolvedStage < 1 || resolvedStage > 5) {
+                return null;
+            }
+
+            return {
+                stage: resolvedStage,
+                label: STAGE_LABELS[resolvedStage - 1],
+                percent: resolvedStage * 20,
+                isFinished: resolvedStage === 5,
+                segments: [1, 2, 3, 4, 5].map((step) => ({
+                    step,
+                    active: step <= resolvedStage,
+                    current: step === resolvedStage
+                }))
+            };
+        }
+
         const metaRef = doc(db, "artifacts", appId, "public", "data", "committee_meta", COMMITTEE_ID);
         const metaTitleEl = document.getElementById('committee-title');
         const metaSubtitleEl = document.getElementById('committee-subtitle');
@@ -487,6 +515,222 @@
             return text;
         }
 
+        const COMMITTEE_MEMBER_GROUP_SUBTITLES = {
+            referentes: 'Conducción funcional del comité',
+            secretaria: 'Gestión operativa y seguimiento',
+            vocales: 'Equipo interdisciplinario del comité'
+        };
+
+        const COMMITTEE_MEMBER_GROUP_EMPTY_LABELS = {
+            referentes: 'Sin referentes',
+            secretaria: 'Sin secretaría',
+            vocales: 'Sin vocales'
+        };
+        const EDITABLE_COMMITTEE_ROLE_OPTIONS = [
+            { value: 'referente', label: 'Referente' },
+            { value: 'secretario', label: 'Secretaría' },
+            { value: 'vocal', label: 'Vocal' }
+        ];
+
+        function renderProjectActionCluster(topic) {
+            if (!isAdmin) return '';
+            return `
+                <div class="committee-project-card__actions">
+                    <button
+                        type="button"
+                        onclick="window.editProject(${safeInlineJsString(topic.id)})"
+                        class="committee-project-card__icon-button"
+                        title="Editar proyecto">
+                        <i data-lucide="pencil" class="w-4 h-4"></i>
+                    </button>
+                    <button
+                        type="button"
+                        onclick="window.deleteTopic(${safeInlineJsString(topic.id)})"
+                        class="committee-project-card__icon-button committee-project-card__icon-button--danger"
+                        title="Eliminar proyecto">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            `;
+        }
+
+        function renderProjectMeetingChip(topic) {
+            if (isAdmin) {
+                return `
+                    <label class="committee-project-card__meta-item committee-project-card__meta-item--date">
+                        <span class="committee-project-card__meta-label">Próxima reunión</span>
+                        <input
+                            type="date"
+                            onchange="window.updateTopicDate(${safeInlineJsString(topic.id)}, this.value)"
+                            class="committee-project-card__date-input"
+                            value="${escapeAttribute(topic.nextMeeting || '')}"
+                            title="Definir fecha">
+                    </label>
+                `;
+            }
+
+            if (topic.nextMeeting) {
+                return `
+                    <span class="committee-project-card__meta-item">
+                        <span class="committee-project-card__meta-label">Próxima reunión</span>
+                        <span class="committee-project-card__meta-value">${escapeHTML(formatDate(topic.nextMeeting))}</span>
+                    </span>
+                `;
+            }
+
+            return `
+                <span class="committee-project-card__meta-item committee-project-card__meta-item--muted">
+                    <span class="committee-project-card__meta-label">Próxima reunión</span>
+                    <span class="committee-project-card__meta-value">Sin fecha</span>
+                </span>
+            `;
+        }
+
+        function renderProjectSegments(topic, stageMeta) {
+            return `
+                <div class="committee-project-card__segments" role="group" aria-label="Progreso del proyecto ${escapeAttribute(topic.title || 'sin título')}">
+                    ${stageMeta.segments.map((segment) => {
+                const segmentClass = `committee-project-card__segment${segment.active ? ' is-active' : ''}${segment.current ? ' is-current' : ''}`;
+                if (!isAdmin) {
+                    return `<span class="${segmentClass}" aria-hidden="true"></span>`;
+                }
+                return `
+                            <button
+                                type="button"
+                                onclick="event.stopPropagation(); window.updateTopicStage(${safeInlineJsString(topic.id)}, ${segment.step})"
+                                class="${segmentClass}"
+                                title="Mover a ${STAGE_LABELS[segment.step - 1]}">
+                            </button>
+                        `;
+            }).join('')}
+                </div>
+            `;
+        }
+
+        function renderCommitteeRoleOptions(currentRole) {
+            return EDITABLE_COMMITTEE_ROLE_OPTIONS.map((option) => `
+                <option value="${option.value}"${option.value === currentRole ? ' selected' : ''}>${option.label}</option>
+            `).join('');
+        }
+
+        function renderCommitteeMemberMetadata(member) {
+            const parts = [member.businessUnit, member.managementUnit]
+                .filter(Boolean)
+                .map((value) => escapeHTML(value));
+            if (!parts.length) return '';
+            return `<p class="committee-member-card__meta">${parts.join('<span class="committee-member-card__meta-separator">•</span>')}</p>`;
+        }
+
+        function renderCommitteeMemberBadges(member) {
+            const badges = [
+                `<span class="pill committee-member-pill committee-member-pill--primary" data-committee-role="${escapeAttribute(member.committeeRole)}">${escapeHTML(member.committeeRoleLabel)}</span>`
+            ];
+
+            if (member.departmentRole && member.departmentRoleLabel) {
+                badges.push(
+                    `<span class="pill committee-member-pill committee-member-pill--secondary" data-department-role="${escapeAttribute(member.departmentRole)}">${escapeHTML(member.departmentRoleLabel)}</span>`
+                );
+            }
+
+            return badges.join('');
+        }
+
+        function renderCommitteeMemberRoleMenu(memberId, currentRole) {
+            return EDITABLE_COMMITTEE_ROLE_OPTIONS.map((option) => {
+                const isCurrent = option.value === currentRole;
+                return `
+                    <button
+                        type="button"
+                        class="committee-member-card__menu-item${isCurrent ? ' is-current' : ''}"
+                        role="menuitemradio"
+                        aria-checked="${isCurrent ? 'true' : 'false'}"
+                        ${isCurrent ? 'disabled aria-disabled="true"' : ''}
+                        data-member-role-action
+                        data-member-id="${escapeAttribute(memberId)}"
+                        data-next-role="${escapeAttribute(option.value)}">
+                        <span>${escapeHTML(option.label)}</span>
+                        ${isCurrent ? '<i data-lucide="check" class="w-3.5 h-3.5"></i>' : ''}
+                    </button>
+                `;
+            }).join('');
+        }
+
+        const memberRoleMenuState = {
+            menu: null,
+            trigger: null,
+            memberId: null,
+            currentRole: null
+        };
+
+        function ensureCommitteeMemberRoleMenuPortal() {
+            if (memberRoleMenuState.menu?.isConnected) return memberRoleMenuState.menu;
+
+            const menu = document.createElement('div');
+            menu.id = 'committee-member-role-menu-floating';
+            menu.className = 'committee-member-card__menu committee-member-card__menu--floating';
+            menu.setAttribute('role', 'menu');
+            menu.setAttribute('aria-hidden', 'true');
+            document.body.appendChild(menu);
+            memberRoleMenuState.menu = menu;
+            return menu;
+        }
+
+        function renderFloatingCommitteeMemberRoleMenu(memberId, currentRole) {
+            return `
+                ${renderCommitteeMemberRoleMenu(memberId, currentRole)}
+                <div class="committee-member-card__menu-separator" role="separator"></div>
+                <button
+                    type="button"
+                    class="committee-member-card__menu-item committee-member-card__menu-item--danger"
+                    role="menuitem"
+                    data-member-delete
+                    data-member-id="${escapeAttribute(memberId)}">
+                    <span>Eliminar integrante</span>
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+            `;
+        }
+
+        function renderCommitteeMemberCard(member) {
+            const resolvedRole = member.committeeRole || 'vocal';
+            const iconName = resolvedRole === 'referente' ? 'shield' : 'user';
+            return `
+                <article class="committee-member-card committee-member-card--lane group/member">
+                    <div class="committee-member-card__main">
+                        <div class="committee-member-card__identity">
+                            <div class="committee-member-card__avatar" data-committee-role="${escapeAttribute(resolvedRole)}">
+                                <i data-lucide="${iconName}" class="w-5 h-5"></i>
+                            </div>
+                            <div class="committee-member-card__details committee-member-card__copy">
+                                <h4 class="committee-member-card__name">${escapeHTML(member.name || 'Sin nombre')}</h4>
+                                ${renderCommitteeMemberMetadata(member)}
+                                <div class="committee-member-card__badges">
+                                    ${renderCommitteeMemberBadges(member)}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    ${isAdmin ? `
+                    <div class="committee-member-card__tools">
+                        <button
+                            type="button"
+                            class="committee-member-card__menu-trigger"
+                            data-member-menu-trigger
+                            data-member-id="${escapeAttribute(member.id)}"
+                            data-current-role="${escapeAttribute(resolvedRole)}"
+                            aria-haspopup="menu"
+                            aria-controls="committee-member-role-menu-floating"
+                            aria-expanded="false"
+                            title="Acciones del integrante">
+                            <span class="sr-only">Acciones del integrante</span>
+                            <i data-lucide="ellipsis" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                    ` : ''}
+                </article>
+            `;
+        }
+
         // --- Render Functions ---
 
         function render() {
@@ -514,82 +758,58 @@
 
         function renderProjects() {
             const container = document.getElementById('projects-list');
+            if (!state.topicsReady) {
+                container.innerHTML = '<div class="committee-projects-loading" aria-live="polite">Cargando proyectos…</div>';
+                return;
+            }
             const activeTopics = state.topics.filter(t => t.stage < 5);
 
             if (activeTopics.length === 0) {
-                container.innerHTML = '<div class="text-center py-8 text-gray-400 text-sm">No hay proyectos activos.</div>';
+                container.innerHTML = '<div class="committee-projects-empty">No hay proyectos activos.</div>';
                 return;
             }
 
-            container.innerHTML = activeTopics.map(topic => `
-                <div class="group project-card flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100 hover:bg-white hover:shadow-md transition-all">
-                    <div class="flex items-center gap-4 flex-1 min-w-0">
-                        <div onclick="window.updateTopicStage(${safeInlineJsString(topic.id)}, ${Number(topic.stage || 1) + 1})"
-                             class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm cursor-pointer transition-all bg-white border-2 border-brisa text-brisa hover:bg-brisa hover:text-white shadow-sm"
-                             title="Avanzar etapa">
-                            <i data-lucide="hard-hat" class="w-5 h-5"></i>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <span class="block text-sm font-bold text-gray-800 truncate" title="${escapeAttribute(topic.title)}">${escapeHTML(topic.title)}</span>
-                            <div class="flex items-center gap-2 mt-1">
-                                <span class="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Inicio: ${formatDate(topic.startDate)}</span>
-                            </div>
-                            <p class="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                                <span class="font-semibold text-gray-600">Propuesto por:</span>
-                                ${escapeHTML(topic.proposedBy || '—')}
-                                <button
-                                    type="button"
-                                    onclick="window.editProject(${safeInlineJsString(topic.id)})"
-                                    class="text-[10px] text-gray-400 hover:text-blue-600 underline decoration-dotted ml-1"
-                                    title="Editar proyecto">
-                                    Editar
-                                </button>
-                            </p>
-                            
-                            <div class="flex items-center gap-1 mt-3 mb-1">
-                                ${[1, 2, 3, 4, 5].map(s => `
-                                    <button 
-                                        onclick="event.stopPropagation(); window.updateTopicStage(${safeInlineJsString(topic.id)}, ${s})"
-                                        class="project-stage-dot w-6 h-6 rounded-full flex items-center justify-center transition-all border ${s <= topic.stage
-                    ? 'bg-brisa text-white border-brisa shadow-sm is-active'
-                    : 'bg-white text-gray-300 border-gray-200 hover-border-gray-300 is-inactive'
-                }">
-                                        ${s}
-                                    </button>
-                                `).join('')}
-                                <span class="project-stage-label font-medium">
-                                    ${STAGE_LABELS[(topic.stage || 1) - 1]}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="project-actions flex items-center gap-4 ml-4">
-                        <div class="next-meeting-chip flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200">
-                            <span class="next-meeting-label text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                                Próxima reunión
-                            </span>
-                            <div class="next-meeting-control relative flex items-center gap-2">
-                                <input type="date"
-                                       onchange="window.updateTopicDate(${safeInlineJsString(topic.id)}, this.value)"
-                                       class="next-meeting-input text-[10px] bg-transparent border-none p-0 focus:ring-0 text-gray-600 w-24 cursor-pointer"
-                                       value="${escapeAttribute(topic.nextMeeting || '')}"
-                                       title="Definir fecha">
-                            </div>
-                        </div>
-                        
-                        ${isAdmin ? `
-                        <button onclick="window.deleteTopic(${safeInlineJsString(topic.id)})"
-                                class="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                                title="Eliminar proyecto">
-                            <i data-lucide="trash-2" class="w-4 h-4"></i>
-                        </button>
-                        ` : ''}
-                    </div>
+            container.innerHTML = `
+                <div class="committee-projects-grid">
+                    ${activeTopics.map((topic) => {
+                const stageMeta = getStageMeta(topic.stage);
+                return `
+                            <article class="committee-project-card group">
+                                <div class="committee-project-card__header">
+                                    <div class="committee-project-card__title-block">
+                                        <h4 class="committee-project-card__title" title="${escapeAttribute(topic.title || '')}">${escapeHTML(topic.title || 'Sin título')}</h4>
+                                        <span class="committee-project-card__stage-badge" data-stage="${stageMeta.stage}">${stageMeta.label}</span>
+                                    </div>
+                                    ${renderProjectActionCluster(topic)}
+                                </div>
+                                <div class="committee-project-card__meta">
+                                    <div class="committee-project-card__meta-row committee-project-card__meta-row--lead">
+                                        <span class="committee-project-card__meta-item committee-project-card__meta-item--lead">
+                                            <span class="committee-project-card__meta-label">Propuesto por</span>
+                                            <span class="committee-project-card__meta-value" title="${escapeAttribute(topic.proposedBy || '—')}">${escapeHTML(topic.proposedBy || '—')}</span>
+                                        </span>
+                                    </div>
+                                    <div class="committee-project-card__meta-row committee-project-card__meta-row--dates">
+                                        <span class="committee-project-card__meta-item committee-project-card__meta-item--start">
+                                            <span class="committee-project-card__meta-label">Inicio</span>
+                                            <span class="committee-project-card__meta-value">${escapeHTML(formatDate(topic.startDate) || '—')}</span>
+                                        </span>
+                                        ${renderProjectMeetingChip(topic)}
+                                    </div>
+                                </div>
+                                <div class="committee-project-card__progress">
+                                    <div class="committee-project-card__progress-head">
+                                        <span class="committee-project-card__progress-label">Avance</span>
+                                        <span class="committee-project-card__progress-percent">${stageMeta.percent}%</span>
+                                    </div>
+                                    ${renderProjectSegments(topic, stageMeta)}
+                                </div>
+                            </article>
+                        `;
+            }).join('')}
                 </div>
-            `).join('');
+            `;
 
-            // Re-run icons
             if (window.lucide) window.lucide.createIcons();
         }
 
@@ -635,46 +855,64 @@
             const container = document.getElementById('members-list');
             const countBadge = document.getElementById('members-count');
 
+            if (!container) return;
+            window.closeMemberRoleMenus?.();
             if (countBadge) {
                 countBadge.textContent = state.members.length.toString();
             }
 
-            if (!container) return;
+            const groupedMembers = groupCommitteeMembers(state.members);
+            const groupsByKey = Object.fromEntries(groupedMembers.map((group) => [group.key, group]));
+            const hierarchyLevels = [
+                {
+                    key: 'referentes',
+                    title: groupsByKey.referentes?.title || 'Referentes',
+                    placeholder: COMMITTEE_MEMBER_GROUP_EMPTY_LABELS.referentes,
+                    layout: 'nodes'
+                },
+                {
+                    key: 'secretaria',
+                    title: groupsByKey.secretaria?.title || 'Secretaría',
+                    placeholder: COMMITTEE_MEMBER_GROUP_EMPTY_LABELS.secretaria,
+                    layout: 'nodes'
+                },
+                {
+                    key: 'vocales',
+                    title: groupsByKey.vocales?.title || 'Vocales',
+                    placeholder: COMMITTEE_MEMBER_GROUP_EMPTY_LABELS.vocales,
+                    layout: 'grid'
+                }
+            ];
 
-            if (state.members.length === 0) {
-                container.innerHTML = '<div class="text-center py-6 text-gray-400 text-sm">Sin integrantes.</div>';
-                return;
-            }
+            const renderHierarchyLevel = ({ key, title, placeholder, layout }) => {
+                const group = groupsByKey[key] || { members: [] };
+                const membersMarkup = group.members.length
+                    ? `<div class="${layout === 'grid' ? 'committee-members-level-row__grid' : 'committee-members-level-row__nodes'}">${group.members.map((member) => renderCommitteeMemberCard(member)).join('')}</div>`
+                    : `<div class="committee-members-level-row__placeholder">${placeholder}</div>`;
 
-            const gridClass = 'grid-cols-1 md:grid-cols-2 lg:grid-cols-2';
+                return `
+                    <section class="committee-members-level-row committee-members-level-row--${key}" data-member-group="${key}">
+                        <div class="committee-members-level-row__label">
+                            <span class="committee-members-level-row__marker" aria-hidden="true"></span>
+                            <div class="committee-members-level-row__heading">
+                                <h4 class="committee-members-level-row__title">${title}</h4>
+                                <span class="committee-members-level-row__count">${group.members.length}</span>
+                            </div>
+                        </div>
+                        <div class="committee-members-level-row__content">
+                            ${membersMarkup}
+                        </div>
+                    </section>
+                `;
+            };
 
             container.innerHTML = `
-                <ul class="grid gap-4 ${gridClass}">
-                    ${state.members.map(member => `
-                        <li class="flex flex-col p-4 bg-white rounded-xl border border-gray-100 hover:border-blue-200 hover:shadow-md transition-all group/member">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center gap-4">
-                                    <div class="w-10 h-10 rounded-full bg-blue-50 flex-shrink-0 flex items-center justify-center border border-blue-100 text-blue-600">
-                                        <i data-lucide="${member.isLeader ? 'shield' : 'user'}" class="w-5 h-5"></i>
-                                    </div>
-                                    <div class="flex flex-col">
-                                        <span class="text-sm font-bold text-gray-800 leading-tight group-hover/member:text-blue-700 transition-colors">
-                                            ${escapeHTML(member.name)}
-                                        </span>
-                                        <span class="text-xs text-gray-500 leading-tight mt-0.5">
-                                            ${getMemberRoleDisplay(member.businessUnit, member.managementUnit, member.isLeader)}
-                                        </span>
-                                    </div>
-                                </div>
-                                ${isAdmin ? `
-                                <button onclick="window.deleteMember(${safeInlineJsString(member.id)})" class="flex-shrink-0 text-gray-300 hover:text-red-500 opacity-0 group-hover/member:opacity-100 p-2 rounded-lg hover:bg-red-50 transition-all">
-                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
-                                </button>
-                                ` : ''}
-                            </div>
-                        </li>
-                    `).join('')}
-                </ul>
+                <div class="committee-members-hierarchy">
+                    <div class="committee-members-hierarchy__rail" aria-hidden="true"></div>
+                    <div class="committee-members-hierarchy__rows">
+                        ${hierarchyLevels.map((level) => renderHierarchyLevel(level)).join('')}
+                    </div>
+                </div>
             `;
 
             if (window.lucide) window.lucide.createIcons();
@@ -796,12 +1034,15 @@ function updateJoinButtonState() {
         joinBtn.disabled = false;
         joinBtn.dataset.action = "join";
         joinBtn.classList.remove("is-options");
-        joinBtn.innerHTML = '<span class="comite__join-icon">+</span> Unirme';
+        joinBtn.removeAttribute("aria-haspopup");
+        joinBtn.removeAttribute("aria-label");
+        joinBtn.innerHTML = '<span class="comite__join-icon">+</span><span>Unirme</span>';
         joinBtn.setAttribute("aria-expanded", "false");
         if (menu) {
             menu.classList.remove("is-open");
             menu.setAttribute("aria-hidden", "true");
         }
+        window.lucide?.createIcons();
         return;
     }
     const already = state.members.some((m) => m.userUid === user.uid);
@@ -809,18 +1050,23 @@ function updateJoinButtonState() {
         joinBtn.disabled = false;
         joinBtn.dataset.action = "options";
         joinBtn.classList.add("is-options");
-        joinBtn.innerHTML = "Opciones";
+        joinBtn.setAttribute("aria-haspopup", "menu");
+        joinBtn.setAttribute("aria-label", "Opciones del comité");
+        joinBtn.innerHTML = '<i data-lucide="ellipsis" class="w-4 h-4"></i><span class="sr-only">Opciones del comité</span>';
     } else {
         joinBtn.disabled = false;
         joinBtn.dataset.action = "join";
         joinBtn.classList.remove("is-options");
-        joinBtn.innerHTML = '<span class="comite__join-icon">+</span> Unirme';
+        joinBtn.removeAttribute("aria-haspopup");
+        joinBtn.removeAttribute("aria-label");
+        joinBtn.innerHTML = '<span class="comite__join-icon">+</span><span>Unirme</span>';
     }
     joinBtn.setAttribute("aria-expanded", "false");
     if (menu) {
         menu.classList.remove("is-open");
         menu.setAttribute("aria-hidden", "true");
     }
+    window.lucide?.createIcons();
 }
 
 async function joinCurrentCommittee() {
@@ -858,18 +1104,41 @@ async function joinCurrentCommittee() {
             const businessUnit = resolveValue(perfil, ["businessUnit", "unidadNegocio", "bu", "business_unit"], "");
             const managementUnit = resolveValue(perfil, ["managementUnit", "unidadGestion", "mu", "management_unit"], "");
 
+            let committeeRole = 'vocal';
+            if (isAdmin) {
+                const roleSelection = await Swal.fire({
+                    title: 'Rol inicial',
+                    input: 'select',
+                    inputValue: 'vocal',
+                    inputOptions: {
+                        vocal: 'Vocal',
+                        secretario: 'Secretaría',
+                        referente: 'Referente'
+                    },
+                    showCancelButton: true,
+                    confirmButtonText: 'Continuar',
+                    cancelButtonText: 'Cancelar',
+                    customClass: {
+                        input: 'swal2-select'
+                    },
+                    inputValidator: (value) => value ? undefined : 'Seleccioná un rol funcional.'
+                });
+
+                if (!roleSelection.isConfirmed) return;
+                committeeRole = roleSelection.value || 'vocal';
+            }
+
             try {
                 await addDoc(
                     collection(db, "artifacts", appId, "public", "data", "committee_members"),
-                    {
+                    buildCommitteeMemberWritePayload({
                         committeeId: COMMITTEE_ID,
                         userUid: user.uid,
                         name,
                         businessUnit,
                         managementUnit,
-                        isLeader: false,
                         createdAt: serverTimestamp()
-                    }
+                    }, committeeRole)
                 );
                 alert("Te uniste al comité.");
                 updateJoinButtonState();
@@ -1108,21 +1377,36 @@ async function joinCurrentCommittee() {
         }
 
         // --- Actions (Exposed to Window) ---
-        window.editProjectProposedBy = async (id) => {
+        window.editProject = async (id) => {
             if (!db) return;
             const current = state.topics.find(t => t.id === id);
-            const initial = current?.proposedBy || '';
-            const value = prompt('Indicar quién propuso este proyecto (uno o varios médicos, o equipo médico del comité):', initial);
-            if (value === null) return;
+            if (!current) return;
+
+            const currentTitle = current.title || '';
+            const currentStart = current.startDate || '';
+            const currentProposedBy = current.proposedBy || '';
+
+            const newTitle = prompt('Editar título del proyecto:', currentTitle);
+            if (newTitle === null) return;
+
+            const newStart = prompt('Editar fecha de inicio (YYYY-MM-DD):', currentStart);
+            if (newStart === null) return;
+
+            const newProposedBy = prompt('Indicar quién propuso este proyecto (uno o varios médicos, o equipo médico del comité):', currentProposedBy);
+            if (newProposedBy === null) return;
 
             try {
                 await updateDoc(
                     doc(db, 'artifacts', appId, 'public', 'data', 'committee_topics', id),
-                    { proposedBy: value }
+                    {
+                        title: newTitle.trim(),
+                        startDate: newStart.trim(),
+                        proposedBy: newProposedBy.trim()
+                    }
                 );
             } catch (e) {
-                console.error('Error actualizando "Propuesto por":', e);
-                alert('Ocurrió un error al guardar la información.');
+                console.error('Error actualizando proyecto:', e);
+                alert('Ocurrió un error al guardar los cambios del proyecto.');
             }
         };
 
@@ -1222,11 +1506,80 @@ async function joinCurrentCommittee() {
                         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'committee_members', id));
                         Swal.fire('Eliminado!', 'El integrante ha sido eliminado.', 'success');
                     } catch (e) { console.error(e); }
-                } else {
-                    // Mock Update
-                    state.members = state.members.filter(m => m.id !== id);
-                    refreshAndPersist();
-                    Swal.fire('Eliminado!', 'El integrante ha sido eliminado (Mock).', 'success');
+                }
+            }
+        };
+
+        window.updateMemberRole = async (id, nextRole, control) => {
+            const allowed = await ensureAdmin();
+            const member = state.members.find((item) => item.id === id);
+            if (!member) return;
+
+            const previousRole = member.committeeRole || (member.isLeader ? 'referente' : 'vocal');
+            const floatingMenu = document.getElementById('committee-member-role-menu-floating');
+            const usingFloatingMenu = Boolean(control?.closest?.('#committee-member-role-menu-floating'));
+            const trigger = memberRoleMenuState.trigger;
+            const menuItems = floatingMenu ? Array.from(floatingMenu.querySelectorAll('.committee-member-card__menu-item')) : [];
+            const restoreLegacyControl = () => {
+                if (control instanceof HTMLSelectElement) {
+                    control.value = previousRole;
+                }
+            };
+            const setMenuPending = (pending) => {
+                if (!usingFloatingMenu || !floatingMenu || memberRoleMenuState.memberId !== id) return;
+                trigger?.closest('.committee-member-card__tools')?.classList.toggle('is-pending', pending);
+                floatingMenu.classList.toggle('is-loading', pending);
+                if (trigger) {
+                    trigger.disabled = pending;
+                    if (pending) {
+                        trigger.setAttribute('aria-busy', 'true');
+                    } else {
+                        trigger.removeAttribute('aria-busy');
+                    }
+                }
+                menuItems.forEach((item) => {
+                    item.disabled = pending || item.classList.contains('is-current');
+                });
+            };
+
+            if (!allowed) {
+                restoreLegacyControl();
+                window.closeMemberRoleMenus?.();
+                Swal.fire('Acceso restringido', 'Solo administradores pueden editar roles funcionales.', 'error');
+                return;
+            }
+
+            if (!nextRole || nextRole === previousRole || !db) {
+                restoreLegacyControl();
+                window.closeMemberRoleMenus?.();
+                return;
+            }
+
+            if (usingFloatingMenu) {
+                setMenuPending(true);
+            } else if (control) {
+                control.disabled = true;
+                control.classList.add('is-loading');
+            }
+
+            try {
+                await updateDoc(
+                    doc(db, 'artifacts', appId, 'public', 'data', 'committee_members', id),
+                    buildCommitteeMemberWritePayload({}, nextRole)
+                );
+                window.closeMemberRoleMenus?.();
+            } catch (e) {
+                console.error('Error actualizando rol del integrante:', e);
+                restoreLegacyControl();
+                window.closeMemberRoleMenus?.();
+                Swal.fire('Error', 'No se pudo actualizar el rol del integrante.', 'error');
+            } finally {
+                if (!usingFloatingMenu && control) {
+                    control.disabled = false;
+                    control.classList.remove('is-loading');
+                    if (control instanceof HTMLSelectElement) {
+                        control.dataset.currentRole = control.value;
+                    }
                 }
             }
         };
@@ -1248,7 +1601,7 @@ async function joinCurrentCommittee() {
                 });
             });
 
-            render();
+            if (hasLocal) render();
 
             const committeeSubscriptions = [];
             const clearCommitteeSubscriptions = () => {
@@ -1324,8 +1677,8 @@ async function joinCurrentCommittee() {
             if (!db && !hasLocal) {
                 // Mock Data para preview inicial si no hay memoria previa
                 state.members = [
-                    { id: '1', name: 'Dr. Juan Pérez', businessUnit: 'Upstream', managementUnit: 'Golfo San Jorge', isLeader: true },
-                    { id: '2', name: 'Dra. María González', businessUnit: 'Downstream', managementUnit: 'Refinería Campana', isLeader: false }
+                    buildCommitteeMemberWritePayload({ id: '1', name: 'Dr. Juan Pérez', businessUnit: 'Upstream', managementUnit: 'Golfo San Jorge' }, 'referente'),
+                    buildCommitteeMemberWritePayload({ id: '2', name: 'Dra. María González', businessUnit: 'Downstream', managementUnit: 'Refinería Campana' }, 'vocal')
                 ];
                 state.topics = [
                     { id: '1', title: 'Protocolo de Ergonomía', stage: 2, nextMeeting: '2025-12-10', startDate: '2025-11-01' },
@@ -1386,6 +1739,7 @@ async function joinCurrentCommittee() {
                         id: Date.now().toString(),
                         title,
                         startDate: date, // Keep as string for mock
+                        proposedBy,
                         committeeId: COMMITTEE_ID,
                         projectNumber: getNextProjectSlot(state.topics, COMMITTEE_ID),
                         stage: 1,
@@ -1397,6 +1751,7 @@ async function joinCurrentCommittee() {
                 }
                 document.getElementById('new-topic-title').value = '';
                 document.getElementById('new-topic-date').value = '';
+                document.getElementById('new-topic-proposedBy').value = '';
             });
 
             document.getElementById('form-add-member').addEventListener('submit', async (e) => {
@@ -1411,35 +1766,41 @@ async function joinCurrentCommittee() {
                 const name = document.getElementById('new-member-name').value;
                 const bu = document.getElementById('new-member-bu').value;
                 const mu = document.getElementById('new-member-mu').value;
-                const isLeader = document.getElementById('new-member-leader').checked;
+                const committeeRole = document.getElementById('new-member-role').value || 'vocal';
 
                 if (!name) return;
 
                 if (db) {
                     try {
-                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'committee_members'), {
-                            name, businessUnit: bu, managementUnit: mu, isLeader, committeeId: 'comite_salud_ocupacional', createdAt: serverTimestamp()
-                        });
+                        await addDoc(
+                            collection(db, 'artifacts', appId, 'public', 'data', 'committee_members'),
+                            buildCommitteeMemberWritePayload({
+                                name,
+                                businessUnit: bu,
+                                managementUnit: mu,
+                                committeeId: 'comite_salud_ocupacional',
+                                createdAt: serverTimestamp()
+                            }, committeeRole)
+                        );
                     } catch (e) { console.error(e); }
                 } else {
                     // Mock Update
-                    const newMember = {
+                    const newMember = buildCommitteeMemberWritePayload({
                         id: Date.now().toString(),
                         name,
                         businessUnit: bu,
                         managementUnit: mu,
-                        isLeader,
                         committeeId: 'comite_salud_ocupacional',
                         createdAt: new Date(),
                         createdBy: 'mock-user'
-                    };
+                    }, committeeRole);
                     state.members = [newMember, ...state.members];
                     refreshAndPersist();
                 }
                 document.getElementById('new-member-name').value = '';
                 document.getElementById('new-member-bu').value = '';
                 document.getElementById('new-member-mu').value = '';
-                document.getElementById('new-member-leader').checked = false;
+                document.getElementById('new-member-role').value = 'vocal';
             });
 
             document.getElementById('form-send-msg').addEventListener('submit', async (e) => {
@@ -1530,6 +1891,8 @@ async function joinCurrentCommittee() {
             const joinBtn = document.getElementById("btn-join-committee");
             const optionsMenu = document.getElementById("committee-options-menu");
             const leaveBtn = document.getElementById("btn-leave-committee");
+            const membersList = document.getElementById("members-list");
+            const memberRoleMenu = ensureCommitteeMemberRoleMenuPortal();
 
             const closeOptionsMenu = () => {
                 if (!optionsMenu) return;
@@ -1537,6 +1900,82 @@ async function joinCurrentCommittee() {
                 optionsMenu.setAttribute("aria-hidden", "true");
                 if (joinBtn) joinBtn.setAttribute("aria-expanded", "false");
             };
+
+            const closeMemberRoleMenus = () => {
+                const trigger = memberRoleMenuState.trigger;
+                trigger?.closest('.committee-member-card__tools')?.classList.remove('is-open', 'is-pending');
+                if (trigger) {
+                    trigger.disabled = false;
+                    trigger.setAttribute('aria-expanded', 'false');
+                    trigger.removeAttribute('aria-busy');
+                }
+                if (memberRoleMenu) {
+                    memberRoleMenu.classList.remove('is-open', 'is-loading');
+                    memberRoleMenu.setAttribute('aria-hidden', 'true');
+                    memberRoleMenu.removeAttribute('data-placement');
+                    memberRoleMenu.style.removeProperty('top');
+                    memberRoleMenu.style.removeProperty('left');
+                    memberRoleMenu.style.visibility = '';
+                    memberRoleMenu.innerHTML = '';
+                }
+                memberRoleMenuState.trigger = null;
+                memberRoleMenuState.memberId = null;
+                memberRoleMenuState.currentRole = null;
+            };
+
+            const positionMemberRoleMenu = () => {
+                if (!memberRoleMenuState.trigger || !memberRoleMenu) return;
+
+                const triggerRect = memberRoleMenuState.trigger.getBoundingClientRect();
+                const viewportPadding = 12;
+                const offset = 8;
+
+                memberRoleMenu.style.top = '0px';
+                memberRoleMenu.style.left = '0px';
+                memberRoleMenu.style.visibility = 'hidden';
+
+                const menuRect = memberRoleMenu.getBoundingClientRect();
+                const fitsBelow = triggerRect.bottom + offset + menuRect.height <= window.innerHeight - viewportPadding;
+                const top = fitsBelow
+                    ? Math.max(viewportPadding, triggerRect.bottom + offset)
+                    : Math.max(viewportPadding, triggerRect.top - menuRect.height - offset);
+                const left = Math.min(
+                    Math.max(viewportPadding, triggerRect.right - menuRect.width),
+                    window.innerWidth - viewportPadding - menuRect.width
+                );
+
+                memberRoleMenu.dataset.placement = fitsBelow ? 'bottom' : 'top';
+                memberRoleMenu.style.top = `${top}px`;
+                memberRoleMenu.style.left = `${left}px`;
+                memberRoleMenu.style.visibility = 'visible';
+            };
+
+            const openMemberRoleMenu = (trigger) => {
+                if (!trigger) return;
+
+                const willOpen = memberRoleMenuState.trigger !== trigger || !memberRoleMenu.classList.contains('is-open');
+                closeMemberRoleMenus();
+                if (!willOpen) return;
+
+                closeOptionsMenu();
+                memberRoleMenuState.trigger = trigger;
+                memberRoleMenuState.memberId = trigger.dataset.memberId || null;
+                memberRoleMenuState.currentRole = trigger.dataset.currentRole || 'vocal';
+
+                trigger.closest('.committee-member-card__tools')?.classList.add('is-open');
+                trigger.setAttribute('aria-expanded', 'true');
+
+                memberRoleMenu.innerHTML = renderFloatingCommitteeMemberRoleMenu(
+                    memberRoleMenuState.memberId,
+                    memberRoleMenuState.currentRole
+                );
+                memberRoleMenu.classList.add('is-open');
+                memberRoleMenu.setAttribute('aria-hidden', 'false');
+                window.lucide?.createIcons();
+                positionMemberRoleMenu();
+            };
+
+            window.closeMemberRoleMenus = closeMemberRoleMenus;
 
             const toggleOptionsMenu = () => {
                 if (!optionsMenu) return;
@@ -1550,10 +1989,12 @@ async function joinCurrentCommittee() {
                 joinBtn.addEventListener("click", (event) => {
                     if (joinBtn.dataset.action === "options") {
                         event.stopPropagation();
+                        closeMemberRoleMenus();
                         toggleOptionsMenu();
                         return;
                     }
                     closeOptionsMenu();
+                    closeMemberRoleMenus();
                     joinCurrentCommittee();
                 });
             }
@@ -1566,11 +2007,59 @@ async function joinCurrentCommittee() {
                 });
             }
 
+            if (membersList) {
+                membersList.addEventListener('click', (event) => {
+                    const menuTrigger = event.target.closest('.committee-member-card__menu-trigger');
+                    if (menuTrigger) {
+                        event.stopPropagation();
+                        openMemberRoleMenu(menuTrigger);
+                    }
+                });
+            }
+
+            memberRoleMenu.addEventListener('click', async (event) => {
+                const roleAction = event.target.closest('[data-member-role-action]');
+                if (roleAction) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (roleAction.disabled) return;
+                    await window.updateMemberRole(
+                        roleAction.dataset.memberId,
+                        roleAction.dataset.nextRole,
+                        roleAction
+                    );
+                    return;
+                }
+
+                const deleteAction = event.target.closest('[data-member-delete]');
+                if (deleteAction) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    closeMemberRoleMenus();
+                    await window.deleteMember(deleteAction.dataset.memberId);
+                }
+            });
+
             document.addEventListener("click", (event) => {
                 if (!optionsMenu || !optionsMenu.classList.contains("is-open")) return;
                 if (optionsMenu.contains(event.target) || joinBtn?.contains(event.target)) return;
                 closeOptionsMenu();
             });
+
+            document.addEventListener('click', (event) => {
+                if (event.target.closest('.committee-member-card__menu-trigger')) return;
+                if (memberRoleMenu.contains(event.target)) return;
+                closeMemberRoleMenus();
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    closeMemberRoleMenus();
+                }
+            });
+
+            window.addEventListener('resize', closeMemberRoleMenus);
+            window.addEventListener('scroll', closeMemberRoleMenus, true);
             // Initialize Flatpickr for New Project Form
             flatpickr("#new-topic-date", {
                 locale: "es",
@@ -1582,7 +2071,7 @@ async function joinCurrentCommittee() {
     </script>
 </head>
 
-<body class="bg-gray-50/50 font-sans text-gray-800 flex flex-col min-h-screen">
+<body class="bg-gray-50/50 font-sans text-gray-800 flex flex-col min-h-screen comite-detail-premium-v2">
 
     <!-- Header -->
     <header
@@ -1694,8 +2183,8 @@ async function joinCurrentCommittee() {
             <!-- Section 1: Proyectos en Proceso -->
             <div
                 id="proyectos"
-                class="section-card card-accent bg-white rounded-2xl p-8 flex flex-col relative overflow-hidden w-full comite-tab-section">
-                <div class="flex items-center gap-3 mb-6 pb-4 border-b border-gray-50">
+                class="section-card committee-projects-section card-accent bg-white rounded-2xl p-8 flex flex-col relative overflow-hidden w-full comite-tab-section">
+                <div class="committee-projects-section__header flex items-center gap-3 mb-6 pb-4 border-b border-gray-50">
                     <div class="p-2.5 bg-brisa/10 rounded-lg">
                         <i data-lucide="clipboard-list" class="w-6 h-6 text-brisa"></i>
                     </div>
@@ -1710,7 +2199,7 @@ async function joinCurrentCommittee() {
                 </div>
 
                 <div
-                    class="mt-6 pt-3 border-t border-gray-100 text-[10px] text-gray-400 flex flex-wrap gap-2 justify-center font-medium">
+                    class="committee-projects-section__legend mt-6 pt-3 border-t border-gray-100 text-[10px] text-gray-400 flex flex-wrap gap-2 justify-center font-medium">
                     <span class="px-1.5 py-0.5 bg-gray-50 rounded stage-pill" data-stage="1"
                         data-tooltip="etapa">1. Planificación</span>
                     <span class="px-1.5 py-0.5 bg-gray-50 rounded stage-pill" data-stage="2"
@@ -1723,7 +2212,7 @@ async function joinCurrentCommittee() {
                         data-tooltip="etapa">5. Finalizado</span>
                 </div>
 
-                <div class="dm-accordion">
+                <div class="dm-accordion committee-projects-section__composer">
                     <button class="dm-accordion-toggle" type="button">
                         <span>Agregar nuevo proyecto</span>
                         <span class="dm-accordion-chevron">⌄</span>
@@ -1788,14 +2277,14 @@ async function joinCurrentCommittee() {
                         <div class="p-2.5 bg-blue-50 rounded-lg">
                             <i data-lucide="users" class="w-6 h-6 text-blue-600"></i>
                         </div>
-                        <div>
-                            <h3 class="text-xl font-bold text-gray-800">Integrantes</h3>
+                        <div class="comite__members-heading">
+                            <div class="comite__members-title-line">
+                                <h3 class="text-xl font-bold text-gray-800">Integrantes</h3>
+                                <span id="members-count"
+                                    class="comite__members-count bg-blue-100 text-blue-700 text-xs px-2.5 py-1 rounded-full font-bold shadow-sm">0</span>
+                            </div>
                             <p class="text-xs text-gray-400">Equipo médico</p>
                         </div>
-                    </div>
-                    <div class="comite__members-count-wrap">
-                        <span id="members-count"
-                            class="comite__members-count bg-blue-100 text-blue-700 text-xs px-2.5 py-1 rounded-full font-bold shadow-sm">0</span>
                     </div>
                     <div class="comite__members-actions">
                         <div class="comite__join-actions">
@@ -1803,9 +2292,8 @@ async function joinCurrentCommittee() {
                                 id="btn-join-committee"
                                 type="button"
                                 class="comite__join-btn"
-                                aria-haspopup="menu"
                                 aria-expanded="false">
-                                <span class="comite__join-icon">+</span> Unirme
+                                <span class="comite__join-icon">+</span><span>Unirme</span>
                             </button>
                             <div id="committee-options-menu" class="comite__join-menu" role="menu" aria-hidden="true">
                                 <button type="button" id="btn-leave-committee" class="comite__join-menu-item">Salir del comité</button>
@@ -1842,13 +2330,12 @@ async function joinCurrentCommittee() {
                                     <option value="">Seleccionar Unidad de Gestión...</option>
                                 </select>
 
-                                <div class="flex items-center gap-2 px-1">
-                                    <input type="checkbox" id="new-member-leader"
-                                        class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500">
-                                    <label for="new-member-leader"
-                                        class="text-xs text-gray-600 cursor-pointer select-none">Es
-                                        Líder</label>
-                                </div>
+                                <select id="new-member-role"
+                                    class="w-full px-4 py-2 text-xs bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-gray-600 cursor-pointer">
+                                    <option value="vocal" selected>Vocal</option>
+                                    <option value="secretario">Secretario/a</option>
+                                    <option value="referente">Referente</option>
+                                </select>
 
                                 <button type="submit"
                                     class="w-full bg-white text-blue-600 border-2 border-blue-600 py-2.5 rounded-lg hover:bg-blue-600 hover:text-white text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-all duration-300 hover:scale-[1.02]">

@@ -239,6 +239,42 @@ test("authenticated user can self-join committee_members when userUid matches au
         name: "Dr. Usuario B",
         businessUnit: "Upstream",
         managementUnit: "GSJ",
+        committeeRole: "vocal",
+        isLeader: false,
+        createdAt: Timestamp.now()
+      }
+    )
+  );
+});
+
+test("authenticated user legacy self-join still works without committeeRole", async () => {
+  await assertSucceeds(
+    setDoc(
+      doc(authedDb("user-c"), "artifacts", APP_ID, "public", "data", "committee_members", "self-join-c"),
+      {
+        committeeId: "comite_bioetica",
+        userUid: "user-c",
+        name: "Dra. Usuario C",
+        businessUnit: "Downstream",
+        managementUnit: "CORS",
+        isLeader: false,
+        createdAt: Timestamp.now()
+      }
+    )
+  );
+});
+
+test("authenticated user cannot self-join committee_members as referente", async () => {
+  await assertFails(
+    setDoc(
+      doc(authedDb("user-d"), "artifacts", APP_ID, "public", "data", "committee_members", "self-join-d"),
+      {
+        committeeId: "comite_bioetica",
+        userUid: "user-d",
+        name: "Dr. Usuario D",
+        businessUnit: "Upstream",
+        managementUnit: "GSJ",
+        committeeRole: "referente",
         isLeader: false,
         createdAt: Timestamp.now()
       }
@@ -304,6 +340,7 @@ test("unauthenticated user cannot read or write source committee routes", async 
         name: "Invitado",
         businessUnit: "Upstream",
         managementUnit: "GSJ",
+        committeeRole: "vocal",
         isLeader: false,
         createdAt: Timestamp.now()
       }

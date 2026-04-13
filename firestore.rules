@@ -358,10 +358,15 @@ service cloud.firestore {
           "name",
           "businessUnit",
           "managementUnit",
+          "committeeRole",
           "isLeader",
           "createdAt"
         ])
         && request.resource.data.userUid == request.auth.uid
+        && (
+          !request.resource.data.keys().hasAny(["committeeRole"])
+          || request.resource.data.committeeRole == "vocal"
+        )
         && request.resource.data.isLeader == false;
     }
 

@@ -31,6 +31,7 @@ import {
   getDownloadURL
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { getFirebase } from "../common/firebaseClient.js";
+import { buildCommitteeMemberWritePayload } from "../common/committee-member-roles.js";
 import { COLLECTIONS } from "../common/collections.js";
 import { requireAuth, buildLoginRedirectUrl } from "../shared/authGate.js";
 import { handleFirebaseError } from "../shared/errors.js";
@@ -565,15 +566,14 @@ async function initCarouselModule() {
           const managementUnit = resolveValue(data, ["managementUnit", "unidadGestion", "mu", "management_unit"], "");
           await addDoc(
             collection(db, "artifacts", appIdMeta, "public", "data", "committee_members"),
-            {
+            buildCommitteeMemberWritePayload({
               committeeId,
               userUid: user.uid,
               name: displayName,
               businessUnit,
               managementUnit,
-              isLeader: false,
               createdAt: serverTimestamp()
-            }
+            }, "vocal")
           );
           Swal.fire({
             icon: "success",
