@@ -3102,9 +3102,13 @@
             >
               <!-- Button 1: Documento Estructural -->
               <a
-                href="https://panamericanenergy.sharepoint.com/:w:/t/DepartamentoMdico/IQCn9k1SWqvHQ7LwvVmqlXc7Ab3PcoOW1hEzfo1loMO35fk?e=ZOxDy9"
+                href="/assets/docs/documento-base-departamento-medico-brisa.pdf"
                 target="_blank"
                 rel="noopener noreferrer"
+                data-pdf-viewer-trigger
+                data-pdf-title="Documento Estructural"
+                data-pdf-src="/assets/docs/documento-base-departamento-medico-brisa.pdf"
+                data-pdf-download="documento-base-departamento-medico-brisa.pdf"
                 class="flex-1 group relative flex items-center justify-center gap-3 px-6 py-5 bg-white border border-gray-200 rounded-xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] hover:shadow-[0_8px_30px_-4px_rgba(37,99,235,0.2)] hover:border-blue-200 hover:-translate-y-1 transition-all duration-300"
               >
                 <div
@@ -3126,9 +3130,13 @@
 
               <!-- Button 2: Documento de Conformación -->
               <a
-                href="https://panamericanenergy.sharepoint.com/:w:/t/DepartamentoMdico/IQDGM2EdNEL1Tb8NrYRdkc_MATLevPm_etGV-klGCdtGrCI?e=luZdoc"
+                href="/assets/docs/procedimiento-conformacion-comites-medicos.pdf"
                 target="_blank"
                 rel="noopener noreferrer"
+                data-pdf-viewer-trigger
+                data-pdf-title="Conformación de Comités"
+                data-pdf-src="/assets/docs/procedimiento-conformacion-comites-medicos.pdf"
+                data-pdf-download="procedimiento-conformacion-comites-medicos.pdf"
                 class="flex-1 group relative flex items-center justify-center gap-3 px-6 py-5 bg-white border border-gray-200 rounded-xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] hover:shadow-[0_8px_30px_-4px_rgba(122,184,0,0.25)] hover:border-brisa hover:-translate-y-1 transition-all duration-300"
               >
                 <div
@@ -4098,6 +4106,90 @@
               class="dm-carousel-error is-hidden"
               role="alert"
             ></div>
+          </div>
+        </div>
+        <div
+          id="dm-pdf-viewer-modal"
+          class="dm-pdf-viewer"
+          aria-hidden="true"
+          hidden
+        >
+          <div
+            class="dm-pdf-viewer__dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="dm-pdf-viewer-title"
+            tabindex="-1"
+          >
+            <div class="dm-pdf-viewer__header">
+              <h3 id="dm-pdf-viewer-title" class="dm-pdf-viewer__title">
+                Documento
+              </h3>
+              <div class="dm-pdf-viewer__actions">
+                <a
+                  id="dm-pdf-viewer-open"
+                  class="dm-pdf-viewer__btn"
+                  href="#"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Abrir en nueva pestaña
+                </a>
+                <a
+                  id="dm-pdf-viewer-download"
+                  class="dm-pdf-viewer__btn"
+                  href="#"
+                  download
+                >
+                  Descargar
+                </a>
+                <button
+                  id="dm-pdf-viewer-close"
+                  class="dm-pdf-viewer__btn dm-pdf-viewer__btn--close"
+                  type="button"
+                  aria-label="Cerrar visor PDF"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+            <div class="dm-pdf-viewer__body">
+              <iframe
+                id="dm-pdf-viewer-frame"
+                class="dm-pdf-viewer__frame"
+                title="Visualizador PDF"
+                loading="lazy"
+              ></iframe>
+              <div
+                id="dm-pdf-viewer-fallback"
+                class="dm-pdf-viewer__fallback"
+                hidden
+              >
+                <p class="dm-pdf-viewer__fallback-copy">
+                  Si tu navegador no puede mostrar el PDF embebido, abrilo en
+                  una pestaña nueva o descargalo.
+                </p>
+                <div class="dm-pdf-viewer__fallback-actions">
+                  <a
+                    class="dm-pdf-viewer__btn"
+                    data-pdf-viewer-open-link
+                    href="#"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Abrir en nueva pestaña
+                  </a>
+                  <a
+                    class="dm-pdf-viewer__btn"
+                    data-pdf-viewer-download-link
+                    href="#"
+                    download
+                  >
+                    Descargar
+                  </a>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

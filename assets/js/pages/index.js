@@ -39,6 +39,7 @@ import { initAssistantShell } from "../shared/assistant-shell.js?v=20260306-chat
 import { initUserMenu } from "../common/user-menu.js?v=20260305-session-1";
 import { hydrateAvatars } from "../common/user-profiles.js";
 import { initSessionGuard } from "../shared/sessionGuard.js?v=20260305-session-1";
+import { initPdfViewer } from "../common/pdf-viewer.js";
 import {
   toggleCarouselCommentLikeForCurrentUser,
   toggleCarouselLikeForCurrentUser,
@@ -2873,6 +2874,7 @@ const boot = () => {
   initRevealAnimations();
   initProgressiveMedia();
   initCalendarProgressive();
+  initPdfViewer();
   initUserMenu({ variant: "desktop" });
   const assistantShell = initAssistantShell({ variant: "desktop" });
   initDesktopQuickSidebar({ assistantShell });
