@@ -2745,21 +2745,12 @@
                                             <i data-lucide="calendar" class="w-8 h-8 text-brisa"></i>
                                             Calendario – Cronograma de Actividades
                                         </h2>
-                                    </div>
-                                    <div class="calendar-controls">
-                                        <div class="calendar-toggle-group" role="group" aria-label="Vista del calendario">
-                                            <button type="button" class="calendar-toggle is-active" data-calendar-mode="MONTH" aria-pressed="true">Mes</button>
-                                            <button type="button" class="calendar-toggle" data-calendar-mode="AGENDA" aria-pressed="false">Agenda</button>
-                                        </div>
+                                        <p class="calendar-header__subtitle">
+                                            Seguimiento mensual, agenda compartida y notas operativas del equipo.
+                                        </p>
                                     </div>
                                     <div class="calendar-container">
-                                        <a class="calendar-edit-btn calendar-edit-btn--floating"
-                                            href="https://calendar.google.com/calendar/u/0/r?cid=aca87c4282b359a629e92fa3a0fcf15d043c5647e3eb7a081f74f9d4365bd559@group.calendar.google.com"
-                                            target="_blank" rel="noreferrer">Editar Calendario</a>
-                                        <iframe id="calendar-iframe"
-                                            src="https://calendar.google.com/calendar/embed?src=aca87c4282b359a629e92fa3a0fcf15d043c5647e3eb7a081f74f9d4365bd559%40group.calendar.google.com&ctz=America%2FArgentina%2FBuenos_Aires&mode=MONTH"
-                                            frameborder="0" scrolling="no" allowfullscreen>
-                                        </iframe>
+                                        <div id="department-calendar-root" data-department-calendar></div>
                                     </div>
                                 </div>
             </div>

@@ -40,6 +40,7 @@ import { initUserMenu } from "../common/user-menu.js?v=20260305-session-1";
 import { hydrateAvatars } from "../common/user-profiles.js";
 import { initSessionGuard } from "../shared/sessionGuard.js?v=20260305-session-1";
 import { initPdfViewer } from "../common/pdf-viewer.js";
+import { initDepartmentCalendar } from "../common/department-calendar.js";
 import {
   toggleCarouselCommentLikeForCurrentUser,
   toggleCarouselLikeForCurrentUser,
@@ -48,6 +49,8 @@ import {
 function ensureFirebase() {
   return getFirebase();
 }
+
+const APP_ID = window.__APP_ID__ || "departamento-medico-brisa";
 
 const { POSTS: POSTS_COLLECTION, COMMENTS: COMMENTS_COLLECTION, USERS: USERS_COLLECTION } = COLLECTIONS;
 
@@ -185,71 +188,6 @@ async function initCarouselModule() {
     return next;
   };
   applyAdminUi();
-
-  const setupCalendarModeToggle = () => {
-    const iframe = document.getElementById("calendar-iframe");
-    const buttons = document.querySelectorAll("[data-calendar-mode]");
-    if (!iframe || buttons.length === 0) return;
-
-    const storageKey = "dm-calendar-mode";
-    const normalizeMode = (mode) => (mode === "AGENDA" ? "AGENDA" : "MONTH");
-    const getModeFromSrc = () => {
-      try {
-        const url = new URL(iframe.src, window.location.href);
-        return normalizeMode(url.searchParams.get("mode"));
-      } catch (e) {
-        return "MONTH";
-      }
-    };
-    const updateButtons = (mode) => {
-      buttons.forEach((btn) => {
-        const isActive = btn.dataset.calendarMode === mode;
-        btn.classList.toggle("is-active", isActive);
-        btn.setAttribute("aria-pressed", isActive ? "true" : "false");
-      });
-    };
-    const updateIframe = (mode) => {
-      try {
-        const url = new URL(iframe.src, window.location.href);
-        if (url.searchParams.get("mode") === mode) return;
-        url.searchParams.set("mode", mode);
-        iframe.src = url.toString();
-      } catch (e) {
-        console.warn("No se pudo actualizar el calendario:", e);
-      }
-    };
-
-    let currentMode = getModeFromSrc();
-    try {
-      const stored = localStorage.getItem(storageKey);
-      if (stored) currentMode = normalizeMode(stored);
-    } catch (e) {
-      // Ignore storage errors.
-    }
-
-    updateButtons(currentMode);
-    updateIframe(currentMode);
-
-    buttons.forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const nextMode = normalizeMode(btn.dataset.calendarMode);
-        if (nextMode === currentMode) {
-          updateButtons(currentMode);
-          return;
-        }
-        currentMode = nextMode;
-        updateButtons(currentMode);
-        updateIframe(currentMode);
-        try {
-          localStorage.setItem(storageKey, currentMode);
-        } catch (e) {
-          // Ignore storage errors.
-        }
-      });
-    });
-  };
-
-  setupCalendarModeToggle();
 
   let committeeMembersStatsUnsub = null;
   let committeeTopicsStatsUnsub = null;
@@ -2842,38 +2780,18 @@ const initProgressiveMedia = () => {
   });
 };
 
-const initCalendarProgressive = () => {
-  const container = document.querySelector(".calendar-container");
-  if (!container) return;
-  const frame = container.querySelector("iframe");
-  if (!frame) return;
-
-  frame.classList.add("dm-calendar-frame");
-  if (!frame.hasAttribute("loading")) frame.setAttribute("loading", "lazy");
-  if (!frame.getAttribute("title")) frame.setAttribute("title", "Calendario de actividades");
-
-  container.classList.add("is-loading");
-  const fallbackTimer = window.setTimeout(() => {
-    if (!container.classList.contains("is-loaded")) {
-      container.classList.remove("is-loading");
-    }
-  }, 4000);
-
-  const markLoaded = () => {
-    window.clearTimeout(fallbackTimer);
-    container.classList.add("is-loaded");
-    container.classList.remove("is-loading");
-  };
-
-  frame.addEventListener("load", markLoaded, { once: true });
-};
-
 const boot = () => {
   const { auth, db } = ensureFirebase();
   initSessionGuard({ auth, db, fallbackHash: "#estructura" });
   initRevealAnimations();
   initProgressiveMedia();
-  initCalendarProgressive();
+  initDepartmentCalendar({
+    auth,
+    db,
+    appId: APP_ID,
+    rootSelector: "#department-calendar-root",
+    pageVariant: "index",
+  });
   initPdfViewer();
   initUserMenu({ variant: "desktop" });
   const assistantShell = initAssistantShell({ variant: "desktop" });

@@ -116,6 +116,21 @@ beforeEach(async () => {
         likedBy: {}
       }
     );
+    await setDoc(
+      doc(db, "artifacts", APP_ID, "public", "data", "calendar_events", "event-a"),
+      {
+        title: "Reunión de seguimiento",
+        note: "Revisión del cronograma mensual.",
+        dateKey: "2026-04-13",
+        allDay: false,
+        startMinutes: 540,
+        endMinutes: 600,
+        createdByUid: "user-a",
+        createdByName: "Dr. Usuario A",
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      }
+    );
   });
 });
 
@@ -226,6 +241,300 @@ test("authenticated user can create valid foro_general source message", async ()
         likedBy: {}
       }
     )
+  );
+});
+
+test("authenticated users can read calendar_events and unauthenticated users cannot", async () => {
+  await assertSucceeds(
+    getDoc(doc(authedDb("user-a"), "artifacts", APP_ID, "public", "data", "calendar_events", "event-a"))
+  );
+  await assertSucceeds(
+    getDocs(query(collection(authedDb("user-b"), "artifacts", APP_ID, "public", "data", "calendar_events"), limit(10)))
+  );
+  await assertFails(
+    getDoc(doc(unauthedDb(), "artifacts", APP_ID, "public", "data", "calendar_events", "event-a"))
+  );
+});
+
+test("authenticated user can create valid own calendar event", async () => {
+  await assertSucceeds(
+    setDoc(
+      doc(authedDb("user-b"), "artifacts", APP_ID, "public", "data", "calendar_events", "event-b"),
+      {
+        title: "Nota del equipo",
+        note: "Actividad del día.",
+        dateKey: "2026-06-05",
+        startDateKey: "2026-06-05",
+        endDateKey: "2026-06-05",
+        allDay: false,
+        startMinutes: 600,
+        endMinutes: 660,
+        colorKey: "blue",
+        createdByUid: "user-b",
+        createdByName: "Dr. Usuario B",
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      }
+    )
+  );
+});
+
+test("authenticated user can create valid own multi-day calendar event", async () => {
+  await assertSucceeds(
+    setDoc(
+      doc(authedDb("user-b"), "artifacts", APP_ID, "public", "data", "calendar_events", "event-multiday"),
+      {
+        title: "Campaña anual",
+        note: "Cobertura de varios días.",
+        dateKey: "2026-06-10",
+        startDateKey: "2026-06-10",
+        endDateKey: "2026-06-12",
+        allDay: true,
+        colorKey: "violet",
+        createdByUid: "user-b",
+        createdByName: "Dr. Usuario B",
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      }
+    )
+  );
+});
+
+test("authenticated user can create multiple calendar events on the same day without collisions", async () => {
+  const sameDayPayload = {
+    dateKey: "2026-06-18",
+    startDateKey: "2026-06-18",
+    endDateKey: "2026-06-18",
+    allDay: false,
+    colorKey: "green",
+    createdByUid: "user-b",
+    createdByName: "Dr. Usuario B",
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now()
+  };
+
+  await assertSucceeds(
+    setDoc(
+      doc(authedDb("user-b"), "artifacts", APP_ID, "public", "data", "calendar_events", "same-day-a"),
+      {
+        ...sameDayPayload,
+        title: "Control de botiquín",
+        note: "Primera actividad del día.",
+        startMinutes: 480,
+        endMinutes: 540
+      }
+    )
+  );
+
+  await assertSucceeds(
+    setDoc(
+      doc(authedDb("user-b"), "artifacts", APP_ID, "public", "data", "calendar_events", "same-day-b"),
+      {
+        ...sameDayPayload,
+        title: "Reunión operativa",
+        note: "Segunda actividad del día.",
+        startMinutes: 600,
+        endMinutes: 660
+      }
+    )
+  );
+});
+
+test("unauthenticated user cannot create calendar_events", async () => {
+  await assertFails(
+    setDoc(
+      doc(unauthedDb(), "artifacts", APP_ID, "public", "data", "calendar_events", "event-unauth"),
+      {
+        title: "Intento sin sesión",
+        note: "No debería persistirse.",
+        dateKey: "2026-06-14",
+        startDateKey: "2026-06-14",
+        endDateKey: "2026-06-14",
+        allDay: true,
+        colorKey: "green",
+        createdByUid: "user-b",
+        createdByName: "Dr. Usuario B",
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      }
+    )
+  );
+});
+
+test("calendar_events blocks forged owner, invalid ranges, invalid colors and invalid minute windows", async () => {
+  await assertFails(
+    setDoc(
+      doc(authedDb("user-b"), "artifacts", APP_ID, "public", "data", "calendar_events", "forged-owner"),
+      {
+        title: "Evento inválido",
+        note: "Intento con owner ajeno.",
+        dateKey: "2026-06-05",
+        startDateKey: "2026-06-05",
+        endDateKey: "2026-06-05",
+        allDay: true,
+        colorKey: "green",
+        createdByUid: "user-a",
+        createdByName: "Dr. Usuario A",
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      }
+    )
+  );
+  await assertFails(
+    setDoc(
+      doc(authedDb("user-b"), "artifacts", APP_ID, "public", "data", "calendar_events", "out-of-range"),
+      {
+        title: "Evento fuera de rango",
+        note: "Fecha inválida.",
+        dateKey: "2028-01-05",
+        startDateKey: "2028-01-05",
+        endDateKey: "2028-01-05",
+        allDay: true,
+        colorKey: "green",
+        createdByUid: "user-b",
+        createdByName: "Dr. Usuario B",
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      }
+    )
+  );
+  await assertFails(
+    setDoc(
+      doc(authedDb("user-b"), "artifacts", APP_ID, "public", "data", "calendar_events", "invalid-minutes"),
+      {
+        title: "Ventana inválida",
+        note: "Fin menor que inicio.",
+        dateKey: "2026-06-05",
+        startDateKey: "2026-06-05",
+        endDateKey: "2026-06-05",
+        allDay: false,
+        startMinutes: 600,
+        endMinutes: 540,
+        colorKey: "green",
+        createdByUid: "user-b",
+        createdByName: "Dr. Usuario B",
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      }
+    )
+  );
+  await assertFails(
+    setDoc(
+      doc(authedDb("user-b"), "artifacts", APP_ID, "public", "data", "calendar_events", "invalid-range"),
+      {
+        title: "Rango inválido",
+        note: "Hasta anterior a desde.",
+        dateKey: "2026-06-12",
+        startDateKey: "2026-06-12",
+        endDateKey: "2026-06-10",
+        allDay: true,
+        colorKey: "green",
+        createdByUid: "user-b",
+        createdByName: "Dr. Usuario B",
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      }
+    )
+  );
+  await assertFails(
+    setDoc(
+      doc(authedDb("user-b"), "artifacts", APP_ID, "public", "data", "calendar_events", "invalid-color"),
+      {
+        title: "Color inválido",
+        note: "Palette incorrecta.",
+        dateKey: "2026-06-05",
+        startDateKey: "2026-06-05",
+        endDateKey: "2026-06-05",
+        allDay: true,
+        colorKey: "pink",
+        createdByUid: "user-b",
+        createdByName: "Dr. Usuario B",
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      }
+    )
+  );
+  await assertFails(
+    setDoc(
+      doc(authedDb("user-b"), "artifacts", APP_ID, "public", "data", "calendar_events", "multiday-with-time"),
+      {
+        title: "Multiday con horario",
+        note: "No debería pasar.",
+        dateKey: "2026-06-10",
+        startDateKey: "2026-06-10",
+        endDateKey: "2026-06-12",
+        allDay: false,
+        startMinutes: 600,
+        endMinutes: 660,
+        colorKey: "amber",
+        createdByUid: "user-b",
+        createdByName: "Dr. Usuario B",
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      }
+    )
+  );
+});
+
+test("calendar_events owner and admin can update/delete while foreign non-admin cannot", async () => {
+  const ownerDb = authedDb("user-a");
+  const otherDb = authedDb("user-b");
+  const adminDb = authedAdminDb("admin-a");
+  const ownerRef = doc(ownerDb, "artifacts", APP_ID, "public", "data", "calendar_events", "event-a");
+
+  await assertSucceeds(
+    updateDoc(ownerRef, {
+      dateKey: "2026-04-13",
+      startDateKey: "2026-04-13",
+      endDateKey: "2026-04-13",
+      colorKey: "green",
+      note: "Revisión del cronograma actualizada.",
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertFails(
+    updateDoc(doc(otherDb, "artifacts", APP_ID, "public", "data", "calendar_events", "event-a"), {
+      dateKey: "2026-04-13",
+      startDateKey: "2026-04-13",
+      endDateKey: "2026-04-13",
+      colorKey: "green",
+      note: "Cambio ajeno",
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertSucceeds(
+    updateDoc(doc(adminDb, "artifacts", APP_ID, "public", "data", "calendar_events", "event-a"), {
+      dateKey: "2026-04-13",
+      startDateKey: "2026-04-13",
+      endDateKey: "2026-04-13",
+      colorKey: "slate",
+      title: "Reunión administrada",
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertFails(
+    deleteDoc(doc(otherDb, "artifacts", APP_ID, "public", "data", "calendar_events", "event-a"))
+  );
+  await assertSucceeds(
+    setDoc(doc(ownerDb, "artifacts", APP_ID, "public", "data", "calendar_events", "event-owner-delete"), {
+      title: "Evento borrable",
+      note: "El owner debe poder eliminarlo.",
+      dateKey: "2026-07-12",
+      startDateKey: "2026-07-12",
+      endDateKey: "2026-07-12",
+      allDay: true,
+      colorKey: "red",
+      createdByUid: "user-a",
+      createdByName: "Dr. Usuario A",
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertSucceeds(
+    deleteDoc(doc(ownerDb, "artifacts", APP_ID, "public", "data", "calendar_events", "event-owner-delete"))
+  );
+  await assertSucceeds(
+    deleteDoc(doc(adminDb, "artifacts", APP_ID, "public", "data", "calendar_events", "event-a"))
   );
 });
 

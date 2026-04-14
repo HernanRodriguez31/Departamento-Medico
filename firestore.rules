@@ -370,6 +370,165 @@ service cloud.firestore {
         && request.resource.data.isLeader == false;
     }
 
+    function validCalendarDateKey(dateKey) {
+      return dateKey is string
+        && dateKey.matches("^20(26|27)-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$");
+    }
+
+    function validCalendarTitle(data) {
+      return data.title is string
+        && data.title.size() > 0
+        && data.title.size() <= 140;
+    }
+
+    function validCalendarNote(data) {
+      return data.note is string
+        && data.note.size() <= 4000;
+    }
+
+    function validCalendarColorKey(data) {
+      return data.colorKey is string
+        && (
+          data.colorKey == "green"
+          || data.colorKey == "blue"
+          || data.colorKey == "amber"
+          || data.colorKey == "red"
+          || data.colorKey == "violet"
+          || data.colorKey == "slate"
+        );
+    }
+
+    function validCalendarDateWindow(data) {
+      return validCalendarDateKey(data.dateKey)
+        && validCalendarDateKey(data.startDateKey)
+        && validCalendarDateKey(data.endDateKey)
+        && data.dateKey == data.startDateKey
+        && data.endDateKey >= data.startDateKey;
+    }
+
+    function validCalendarMinutes(data) {
+      return data.allDay is bool
+        && (
+          data.endDateKey > data.startDateKey
+          ? (
+            data.allDay
+            && !hasKey(data, "startMinutes")
+            && !hasKey(data, "endMinutes")
+          )
+          : (
+            (
+              !hasKey(data, "startMinutes")
+              && !hasKey(data, "endMinutes")
+            )
+            || (
+              hasKey(data, "startMinutes")
+              && data.startMinutes is int
+              && data.startMinutes >= 0
+              && data.startMinutes <= 1439
+              && (
+                !hasKey(data, "endMinutes")
+                || (
+                  data.endMinutes is int
+                  && data.endMinutes >= 1
+                  && data.endMinutes <= 1440
+                  && data.endMinutes > data.startMinutes
+                )
+              )
+            )
+          )
+        )
+        && (
+          !data.allDay
+          || (
+            !hasKey(data, "startMinutes")
+            && !hasKey(data, "endMinutes")
+          )
+        );
+    }
+
+    function validCalendarEventCreate() {
+      return signedIn()
+        && request.resource.data.keys().hasOnly([
+          "title",
+          "note",
+          "dateKey",
+          "startDateKey",
+          "endDateKey",
+          "allDay",
+          "startMinutes",
+          "endMinutes",
+          "colorKey",
+          "createdByUid",
+          "createdByName",
+          "createdAt",
+          "updatedAt"
+        ])
+        && request.resource.data.keys().hasAll([
+          "title",
+          "note",
+          "dateKey",
+          "startDateKey",
+          "endDateKey",
+          "allDay",
+          "colorKey",
+          "createdByUid",
+          "createdByName",
+          "createdAt",
+          "updatedAt"
+        ])
+        && request.resource.data.createdByUid == request.auth.uid
+        && request.resource.data.createdByName is string
+        && request.resource.data.createdByName.size() > 0
+        && request.resource.data.createdByName.size() <= 140
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp
+        && validCalendarTitle(request.resource.data)
+        && validCalendarNote(request.resource.data)
+        && validCalendarDateWindow(request.resource.data)
+        && validCalendarColorKey(request.resource.data)
+        && validCalendarMinutes(request.resource.data);
+    }
+
+    function validCalendarEventUpdate() {
+      return (isOwnedByCurrentUser(resource.data) || isAdmin())
+        && request.resource.data.keys().hasOnly([
+          "title",
+          "note",
+          "dateKey",
+          "startDateKey",
+          "endDateKey",
+          "allDay",
+          "startMinutes",
+          "endMinutes",
+          "colorKey",
+          "createdByUid",
+          "createdByName",
+          "createdAt",
+          "updatedAt"
+        ])
+        && changedOnly([
+          "title",
+          "note",
+          "dateKey",
+          "startDateKey",
+          "endDateKey",
+          "allDay",
+          "startMinutes",
+          "endMinutes",
+          "colorKey",
+          "updatedAt"
+        ])
+        && request.resource.data.createdByUid == resource.data.createdByUid
+        && request.resource.data.createdByName == resource.data.createdByName
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedAt is timestamp
+        && validCalendarTitle(request.resource.data)
+        && validCalendarNote(request.resource.data)
+        && validCalendarDateWindow(request.resource.data)
+        && validCalendarColorKey(request.resource.data)
+        && validCalendarMinutes(request.resource.data);
+    }
+
     // CAMBIO AQUI: Solo permitimos LEER la configuración (el candado cerrado)
     match /configuracion/{document=**} {
       allow read: if true;
@@ -549,6 +708,13 @@ service cloud.firestore {
       allow read: if signedIn();
       allow create: if validCommitteeMessageCreate();
       allow update: if validCommitteeMessageUpdate();
+      allow delete: if isOwnedByCurrentUser(resource.data) || isAdmin();
+    }
+
+    match /artifacts/{appId}/public/data/calendar_events/{eventId} {
+      allow read: if signedIn();
+      allow create: if validCalendarEventCreate();
+      allow update: if validCalendarEventUpdate();
       allow delete: if isOwnedByCurrentUser(resource.data) || isAdmin();
     }
 

@@ -3863,9 +3863,8 @@ img {
 
 /* Calendario corporativo */
 .calendar-header{
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    display: grid;
+    justify-items: center;
     gap: 12px;
     margin-bottom: 16px;
     text-align: center;
@@ -3885,16 +3884,16 @@ img {
     background-color: #6aa000;
 }
 .calendar-edit-btn--floating{
-    position: absolute;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-10%);
-    z-index: 5;
-    box-shadow: 0 10px 24px rgba(0,0,0,0.12);
+    position: static;
+    top: auto;
+    left: auto;
+    transform: none;
+    z-index: auto;
+    box-shadow: none;
 }
 @media (max-width: 768px){
     .calendar-header{
-        flex-direction: column;
+        justify-items: center;
     }
     .calendar-edit-btn--floating{
         position: static;
@@ -4025,14 +4024,13 @@ img {
 
 .calendar-container {
     width: 100%;
-    max-width: 900px;
+    max-width: none;
     margin: 0 auto;
     position: relative;
-    --calendar-mask-height: 120px;
-    padding-bottom: 54%;
-    /* Tuned to reduce excess bottom space */
-    height: 0;
-    overflow: hidden;
+    --calendar-mask-height: 0px;
+    padding-bottom: 0;
+    height: auto;
+    overflow: visible;
 }
 
 .calendar-container iframe {
@@ -4045,20 +4043,7 @@ img {
 }
 
 .calendar-container::after{
-    content: "";
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: var(--calendar-mask-height);
-    background-color: var(--body-color);
-    background-image: var(--dm-page-bg);
-    background-attachment: scroll;
-    background-position: center top;
-    background-repeat: no-repeat;
-    pointer-events: none;
-    z-index: 2;
-    border-radius: 12px;
+    display: none;
 }
 .calendar-container::before{
     content: none;
@@ -4071,13 +4056,12 @@ img {
     }
 
     .calendario-section .calendar-container {
-        padding-bottom: 50%;
-        --calendar-mask-height: 80px;
+        padding-bottom: 0;
+        --calendar-mask-height: 0px;
     }
 
     .calendario-section .calendar-container::after {
-        bottom: 0;
-        background-attachment: fixed;
+        display: none;
     }
 
     .calendario-section .visitas-wrap {
