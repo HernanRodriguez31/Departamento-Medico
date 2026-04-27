@@ -7,6 +7,7 @@ const QA_PASSWORD = process.env.MOBILE_QA_PASSWORD || "MobileQa!12345";
 const CAPTURE_PHASE = process.env.MOBILE_QA_CAPTURE_PHASE || "after";
 const SHOULD_ASSERT = CAPTURE_PHASE !== "before";
 const PROFILE_AVATAR_VERSION = "20260426-profile-avatars-1";
+const PROFILE_AVATAR_JS_VERSION = "20260427-profile-avatar-priority-1";
 const DEFAULT_AVATAR_EXPECTATIONS = [
   { uid: "HRodriguez", name: "Hernan Rodriguez", file: "coord-rodriguez-new.png" },
   { uid: "LCura", name: "Dra. Leila Cura", file: "avatar-leila-cura-featured-tight-20260411.png" },
@@ -214,8 +215,8 @@ const checkCommitteeImages = async (page, testInfo, label) => {
 
 const checkDefaultProfileAvatars = async (page, testInfo, label) => {
   const payload = await page.evaluate(
-    async ({ users, version }) => {
-      const profiles = await import(`/assets/js/common/user-profiles.js?v=${version}`);
+    async ({ users, assetVersion, jsVersion }) => {
+      const profiles = await import(`/assets/js/common/user-profiles.js?v=${jsVersion}`);
       const root = document.createElement("div");
       root.setAttribute("data-mobile-qa-avatar-root", "1");
       root.style.cssText = "position:fixed;left:-9999px;top:0;width:1px;height:1px;overflow:hidden;";
@@ -260,11 +261,15 @@ const checkDefaultProfileAvatars = async (page, testInfo, label) => {
       });
       root.remove();
 
-      const overrideProfile = profiles.buildProfileFromDoc(
+      const userSelectedProfile = profiles.buildProfileFromDoc(
         {
           nombre: "Hernan Rodriguez",
           avatarUrl: "/custom/avatar.jpg",
-          avatarUpdatedAt: 123
+          avatarUpdatedAt: 123,
+          defaultAvatarUrl: "/assets/images/coord-rodriguez-new.png?v=firestore-default",
+          defaultAvatarUpdatedAt: 456,
+          profilePhotoUrl: "/legacy/profile.jpg",
+          photoURL: "/legacy/auth.jpg"
         },
         "",
         { uid: "HRodriguez", email: "HRodriguez@pan-energy.com" }
@@ -273,24 +278,60 @@ const checkDefaultProfileAvatars = async (page, testInfo, label) => {
         {
           nombre: "Hernan Rodriguez",
           defaultAvatarUrl: "/assets/images/coord-rodriguez-new.png?v=firestore-default",
-          defaultAvatarUpdatedAt: 456
+          defaultAvatarUpdatedAt: 456,
+          profilePhotoUrl: "/legacy/profile.jpg",
+          photoURL: "/legacy/auth.jpg"
         },
         "",
         { uid: "HRodriguez", email: "HRodriguez@pan-energy.com" }
+      );
+      const localDefaultProfile = profiles.buildProfileFromDoc(
+        {
+          nombre: "Hernan Rodriguez",
+          profilePhotoUrl: "/legacy/profile.jpg",
+          photoURL: "/legacy/auth.jpg"
+        },
+        "",
+        { uid: "HRodriguez", email: "HRodriguez@pan-energy.com" }
+      );
+      const legacyProfile = profiles.buildProfileFromDoc(
+        {
+          nombre: "Usuario Legacy",
+          profilePhotoUrl: "/legacy/profile.jpg",
+          photoURL: "/legacy/auth.jpg"
+        },
+        "",
+        { uid: "UnknownUser", email: "unknown@example.com" }
+      );
+      const authLegacyProfile = profiles.buildProfileFromDoc(
+        {
+          nombre: "Usuario Legacy",
+          photoURL: "/legacy/auth.jpg"
+        },
+        "",
+        { uid: "UnknownUser2", email: "unknown2@example.com" }
       );
       const input = document.querySelector("[data-dm-user-avatar-input]");
 
       return {
         resolved,
-        overrideProfile,
+        assetVersion,
+        userSelectedProfile,
         firestoreDefaultProfile,
+        localDefaultProfile,
+        legacyProfile,
+        authLegacyProfile,
         input: {
           found: Boolean(input),
           accept: input?.getAttribute("accept") || ""
         }
       };
     },
-    { users: DEFAULT_AVATAR_EXPECTATIONS, version: PROFILE_AVATAR_VERSION }
+    {
+      users: DEFAULT_AVATAR_EXPECTATIONS,
+      assetVersion: PROFILE_AVATAR_VERSION,
+      jsVersion: PROFILE_AVATAR_JS_VERSION
+    }
   );
 
   const pass =
@@ -304,10 +345,15 @@ const checkDefaultProfileAvatars = async (page, testInfo, label) => {
         item.src.includes(item.file) &&
         item.src.includes(PROFILE_AVATAR_VERSION)
     ) &&
-    payload.overrideProfile.avatarUrl === "/custom/avatar.jpg" &&
-    payload.overrideProfile.avatarUpdatedAt === 123 &&
+    payload.userSelectedProfile.avatarUrl === "/custom/avatar.jpg" &&
+    payload.userSelectedProfile.avatarUpdatedAt === 123 &&
     payload.firestoreDefaultProfile.avatarUrl.includes("firestore-default") &&
     payload.firestoreDefaultProfile.avatarUpdatedAt === 456 &&
+    payload.localDefaultProfile.avatarUrl.includes("coord-rodriguez-new.png") &&
+    payload.localDefaultProfile.avatarUrl.includes(PROFILE_AVATAR_VERSION) &&
+    !payload.localDefaultProfile.avatarUrl.includes("/legacy/") &&
+    payload.legacyProfile.avatarUrl === "/legacy/profile.jpg" &&
+    payload.authLegacyProfile.avatarUrl === "/legacy/auth.jpg" &&
     payload.input.found &&
     payload.input.accept === "image/*";
 

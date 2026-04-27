@@ -92,18 +92,43 @@ test("splitMinutesToTimeParts supports round-trip editing without losing minutes
 
 test("default profile avatars resolve by uid, email, and display name", () => {
   const version = `?v=${PROFILE_AVATAR_VERSION}`;
-  assert.equal(
-    resolveDefaultAvatarUrl({ uid: "HRodriguez" }),
-    `/assets/images/coord-rodriguez-new.png${version}`,
-  );
-  assert.equal(
-    resolveDefaultAvatarUrl({ email: "hrodriguez@pan-energy.com" }),
-    `/assets/images/coord-rodriguez-new.png${version}`,
-  );
-  assert.equal(
-    resolveDefaultAvatarUrl({ name: "Dra. Leila Cura" }),
-    `/assets/images/avatar-leila-cura-featured-tight-20260411.png${version}`,
-  );
+  const cases = [
+    [{ uid: "HRodriguez" }, "coord-rodriguez-new.png"],
+    [{ email: "HRodriguez@pan-energy.com" }, "coord-rodriguez-new.png"],
+    [{ email: "hrodriguez@pan-energy.com" }, "coord-rodriguez-new.png"],
+    [{ name: "Hernan Rodriguez" }, "coord-rodriguez-new.png"],
+    [{ name: "Hernán Rodríguez" }, "coord-rodriguez-new.png"],
+    [{ uid: "LCura" }, "avatar-leila-cura-featured-tight-20260411.png"],
+    [{ email: "LCura@pan-energy.com" }, "avatar-leila-cura-featured-tight-20260411.png"],
+    [{ name: "Leila Cura" }, "avatar-leila-cura-featured-tight-20260411.png"],
+    [{ name: "Dra. Leila Cura" }, "avatar-leila-cura-featured-tight-20260411.png"],
+    [{ uid: "GSilva" }, "avatar-silva-new.png"],
+    [{ email: "GSilva@pan-energy.com" }, "avatar-silva-new.png"],
+    [{ name: "Gustavo Silva" }, "avatar-silva-new.png"],
+    [{ uid: "JAzcarate" }, "avatar-azcarate-new.png"],
+    [{ email: "JAzcarate@pan-energy.com" }, "avatar-azcarate-new.png"],
+    [{ name: "Juan Martin Azcarate" }, "avatar-azcarate-new.png"],
+    [{ name: "Juan Martín Azcárate" }, "avatar-azcarate-new.png"],
+    [{ uid: "MBianchi" }, "coord-bianchi-new.png"],
+    [{ email: "MBianchi@pan-energy.com" }, "coord-bianchi-new.png"],
+    [{ name: "Mario Bianchi" }, "coord-bianchi-new.png"],
+    [{ uid: "JMaurino" }, "coord-maurino-new.png"],
+    [{ email: "JMaurino@pan-energy.com" }, "coord-maurino-new.png"],
+    [{ name: "Juan Maurino" }, "coord-maurino-new.png"],
+    [{ uid: "SAciar" }, "coord-aciar-new.png"],
+    [{ email: "SAciar@pan-energy.com" }, "coord-aciar-new.png"],
+    [{ name: "Sergio Aciar" }, "coord-aciar-new.png"],
+    [{ uid: "RSabha" }, "coord-sabha-new.png"],
+    [{ email: "RSabha@pan-energy.com" }, "coord-sabha-new.png"],
+    [{ name: "Roberto Sabha" }, "coord-sabha-new.png"],
+  ];
+
+  cases.forEach(([identity, file]) => {
+    assert.equal(
+      resolveDefaultAvatarUrl(identity),
+      `/assets/images/${file}${version}`,
+    );
+  });
   assert.equal(resolveDefaultAvatarUrl({ uid: "unknown-user" }), "");
 });
 

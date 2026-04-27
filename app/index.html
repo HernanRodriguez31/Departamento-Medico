@@ -3134,7 +3134,7 @@
             runTransaction
         } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
         import { getFirebase } from "/assets/js/common/firebaseClient.js";
-        import { hydrateAvatars, resolveUidForAuthor } from "/assets/js/common/user-profiles.js?v=20260426-profile-avatars-1";
+        import { hydrateAvatars, resolveUidForAuthor } from "/assets/js/common/user-profiles.js?v=20260427-profile-avatar-priority-1";
         import { escapeAttribute, escapeHTML } from "/assets/js/utils/safe-dom.js";
         import { isForumHash } from "/assets/js/common/routes.js";
         import { requireAuth, buildLoginRedirectUrl } from "/assets/js/shared/authGate.js";
@@ -4271,7 +4271,7 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
             }
         })();
     </script>
-    <script type="module" src="/assets/js/pages/app.js?v=20260426-profile-avatars-1"></script>
+    <script type="module" src="/assets/js/pages/app.js?v=20260427-profile-avatar-priority-1"></script>
     <script type="module">
         import { getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
         import { logger } from "/assets/js/common/app-logger.js";

@@ -9,7 +9,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getFirebase } from "./firebaseClient.js";
 import { logger, once as logOnce } from "./app-logger.js";
-import { resolveDefaultAvatarUrl } from "./default-avatars.js?v=20260426-profile-avatars-1";
+import { resolveDefaultAvatarUrl } from "./default-avatars.js?v=20260427-profile-avatar-priority-1";
 
 const profileCache = new Map();
 const profileRequests = new Map();
@@ -73,14 +73,14 @@ const resolveAvatarUrlFromDoc = (data = {}, identity = {}) => {
   const displayName = identity.name || resolveNameFromDoc(data);
   return (
     data.avatarUrl ||
-    data.profilePhotoUrl ||
-    data.photoURL ||
     data.defaultAvatarUrl ||
     resolveDefaultAvatarUrl({
       uid: identity.uid || data.uid || data.id || "",
       email: identity.email || data.email || data.correo || data.mail || "",
       name: displayName
     }) ||
+    data.profilePhotoUrl ||
+    data.photoURL ||
     ""
   );
 };
