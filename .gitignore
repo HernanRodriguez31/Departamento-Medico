@@ -16,6 +16,8 @@ ui-debug.log
 **/serviceAccountKey.local.json
 
 coverage/
+test-results/
+playwright-report/
 dist/
 build/
 .cache/

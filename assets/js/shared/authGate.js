@@ -18,8 +18,14 @@ export const resolveNextHash = (fallbackHash = "") => {
 
 export const buildLoginRedirectUrl = (fallbackHash = "") => {
   const nextHash = resolveNextHash(fallbackHash);
-  const query = nextHash ? `?next=${encodeURIComponent(nextHash)}` : "";
-  return `/login.html${query}`;
+  const params = new URLSearchParams();
+  if (nextHash) params.set("next", nextHash);
+  const currentParams = new URLSearchParams(window.location.search || "");
+  if (currentParams.get("dmEmulators") === "1") {
+    params.set("dmEmulators", "1");
+  }
+  const query = params.toString();
+  return `/login.html${query ? `?${query}` : ""}`;
 };
 
 export const waitForAuth = (auth = sharedAuth) =>

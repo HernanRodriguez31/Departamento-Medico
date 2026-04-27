@@ -7,6 +7,11 @@ import {
   parseTimeParts,
   splitMinutesToTimeParts,
 } from "../assets/js/common/calendar-time.js";
+import {
+  PROFILE_AVATAR_VERSION,
+  getDefaultAvatarMigrationRows,
+  resolveDefaultAvatarUrl,
+} from "../assets/js/common/default-avatars.js";
 import { escapeAttribute, escapeHTML, safeText } from "../assets/js/utils/safe-dom.js";
 
 test("safeText normalizes nullish values", () => {
@@ -82,5 +87,32 @@ test("splitMinutesToTimeParts supports round-trip editing without losing minutes
   assert.deepEqual(splitMinutesToTimeParts(null), {
     hours: "",
     minutes: "",
+  });
+});
+
+test("default profile avatars resolve by uid, email, and display name", () => {
+  const version = `?v=${PROFILE_AVATAR_VERSION}`;
+  assert.equal(
+    resolveDefaultAvatarUrl({ uid: "HRodriguez" }),
+    `/assets/images/coord-rodriguez-new.png${version}`,
+  );
+  assert.equal(
+    resolveDefaultAvatarUrl({ email: "hrodriguez@pan-energy.com" }),
+    `/assets/images/coord-rodriguez-new.png${version}`,
+  );
+  assert.equal(
+    resolveDefaultAvatarUrl({ name: "Dra. Leila Cura" }),
+    `/assets/images/avatar-leila-cura-featured-tight-20260411.png${version}`,
+  );
+  assert.equal(resolveDefaultAvatarUrl({ uid: "unknown-user" }), "");
+});
+
+test("default avatar migration rows never write user-selected avatarUrl", () => {
+  const rows = getDefaultAvatarMigrationRows();
+  assert.equal(rows.length, 8);
+  assert.equal(new Set(rows.map((row) => row.uid)).size, rows.length);
+  rows.forEach((row) => {
+    assert.ok(row.defaultAvatarUrl.includes(PROFILE_AVATAR_VERSION));
+    assert.equal(Object.hasOwn(row, "avatarUrl"), false);
   });
 });

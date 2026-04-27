@@ -72,7 +72,9 @@ document.addEventListener('DOMContentLoaded', () => {
         )
     }
 
-    disableZoomGestures()
+    if (window.__DM_ENABLE_LEGACY_ZOOM_GUARD__ === true) {
+        disableZoomGestures()
+    }
 
     /*==================== SHOW MENU ====================*/
     const navMenu = document.getElementById('nav-menu'),
@@ -156,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
         { key: 'foro', viewId: 'foro', ghost: false },
         { key: 'ghost-muro', viewId: 'muro', ghost: true }
     ]
-    const PAGER_GHOST_REFRESH_DELAY_MS = 120
+    const PAGER_GHOST_REFRESH_DELAY_MS = 260
     const PAGER_SETTLE_DEBOUNCE_MS = 96
 
     const rootStyle = document.documentElement.style
@@ -366,9 +368,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const isPagerMode = () => pagerState.enabled && !!pagerState.trackEl?.isConnected
 
     const getPagerPageWidth = () => {
+        const firstPageWidth =
+            pagerState.trackEl?.querySelector?.('.dm-mobile-page')
+                ?.getBoundingClientRect?.().width || 0
+        const trackWidth =
+            pagerState.trackEl?.getBoundingClientRect?.().width ||
+            pagerState.trackEl?.clientWidth ||
+            0
         const rectWidth = pagerState.viewportEl?.getBoundingClientRect?.().width || 0
         const viewportWidth = window.visualViewport?.width || window.innerWidth || 0
-        return rectWidth || viewportWidth
+        return Math.max(firstPageWidth, trackWidth, rectWidth, viewportWidth)
     }
 
     const getViewScrollContainer = (viewId) => {
@@ -392,7 +401,9 @@ document.addEventListener('DOMContentLoaded', () => {
             return mainEl
         }
         if (normalized === 'foro') {
-            return document.querySelector('#foro > .section-card') || mainEl
+            return document.querySelector('#forum-messages-general')
+                || document.querySelector('#foro > .section-card')
+                || mainEl
         }
         return mainEl
     }
@@ -842,11 +853,28 @@ document.addEventListener('DOMContentLoaded', () => {
     function sanitizeGhostClone(root) {
         if (!root) return
         const nodes = [root, ...root.querySelectorAll('*')]
+        root.setAttribute('inert', '')
+        root.style.pointerEvents = 'none'
         nodes.forEach((node) => {
             if (node.id) node.removeAttribute('id')
             node.setAttribute('aria-hidden', 'true')
-            if (node.matches('a, button, input, textarea, select, iframe, video')) {
+            if (typeof node.getAttributeNames === 'function') {
+                node.getAttributeNames().forEach((attrName) => {
+                    if (/^on/i.test(attrName)) node.removeAttribute(attrName)
+                })
+            }
+            if (node.matches('a, button, input, textarea, select, iframe, video, audio, [tabindex]')) {
                 node.setAttribute('tabindex', '-1')
+            }
+            if (node.matches('iframe, video, audio')) {
+                node.removeAttribute('src')
+                node.removeAttribute('srcset')
+                node.removeAttribute('autoplay')
+                node.removeAttribute('controls')
+            }
+            if (node.matches('img')) {
+                node.setAttribute('loading', 'lazy')
+                node.setAttribute('decoding', 'async')
             }
         })
     }
@@ -940,7 +968,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     childList: true,
                     subtree: true,
                     characterData: true,
-                    attributes: true
+                    attributes: false
                 })
                 pagerState.mutationObservers.push(observer)
             })

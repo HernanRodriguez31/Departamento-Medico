@@ -9,6 +9,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getFirebase } from "./firebaseClient.js";
 import { logger, once as logOnce } from "./app-logger.js";
+import { resolveDefaultAvatarUrl } from "./default-avatars.js?v=20260426-profile-avatars-1";
 
 const profileCache = new Map();
 const profileRequests = new Map();
@@ -68,8 +69,20 @@ const buildInitials = (name) => {
   return letters.join("").toUpperCase();
 };
 
-const resolveAvatarUrlFromDoc = (data = {}) => {
-  return data.avatarUrl || data.profilePhotoUrl || data.photoURL || "";
+const resolveAvatarUrlFromDoc = (data = {}, identity = {}) => {
+  const displayName = identity.name || resolveNameFromDoc(data);
+  return (
+    data.avatarUrl ||
+    data.profilePhotoUrl ||
+    data.photoURL ||
+    data.defaultAvatarUrl ||
+    resolveDefaultAvatarUrl({
+      uid: identity.uid || data.uid || data.id || "",
+      email: identity.email || data.email || data.correo || data.mail || "",
+      name: displayName
+    }) ||
+    ""
+  );
 };
 
 const normalizeUpdatedAt = (value) => {
@@ -88,10 +101,28 @@ const buildAvatarSrc = (url, updatedAt, forceBust = false) => {
   return `${url}${separator}v=${stamp}`;
 };
 
-const buildProfileFromDoc = (data = {}, fallbackName = "") => {
+const resolveAvatarUpdatedAtFromDoc = (data = {}, avatarUrl = "") => {
+  if (!avatarUrl) return 0;
+  if (data.avatarUrl && avatarUrl === data.avatarUrl) return normalizeUpdatedAt(data.avatarUpdatedAt);
+  if (data.profilePhotoUrl && avatarUrl === data.profilePhotoUrl) {
+    return normalizeUpdatedAt(data.profilePhotoUpdatedAt || data.avatarUpdatedAt);
+  }
+  if (data.photoURL && avatarUrl === data.photoURL) {
+    return normalizeUpdatedAt(data.photoUpdatedAt || data.avatarUpdatedAt);
+  }
+  if (data.defaultAvatarUrl && avatarUrl === data.defaultAvatarUrl) {
+    return normalizeUpdatedAt(data.defaultAvatarUpdatedAt);
+  }
+  return 0;
+};
+
+const buildProfileFromDoc = (data = {}, fallbackName = "", identity = {}) => {
   const displayName = normalizeName(resolveNameFromDoc(data)) || fallbackName || "Usuario";
-  const avatarUrl = resolveAvatarUrlFromDoc(data);
-  const avatarUpdatedAt = normalizeUpdatedAt(data.avatarUpdatedAt);
+  const avatarUrl = resolveAvatarUrlFromDoc(data, {
+    ...identity,
+    name: identity.name || displayName
+  });
+  const avatarUpdatedAt = resolveAvatarUpdatedAtFromDoc(data, avatarUrl);
   return {
     displayName,
     avatarUrl,
@@ -177,16 +208,16 @@ const getUserProfile = async (uid, { db, fallbackName } = {}) => {
   const promise = (async () => {
     const firebase = getFirebase();
     const resolvedDb = db || firebase?.db;
-    if (!resolvedDb) return buildProfileFromDoc({}, fallbackName);
+    if (!resolvedDb) return buildProfileFromDoc({}, fallbackName, { uid });
     try {
       const snap = await getDoc(doc(resolvedDb, "usuarios", uid));
       const data = snap.exists() ? snap.data() || {} : {};
-      const profile = buildProfileFromDoc(data, fallbackName);
+      const profile = buildProfileFromDoc(data, fallbackName, { uid });
       profileCache.set(uid, profile);
       return profile;
     } catch (err) {
       warnOnce(`profile:${uid}`, "No se pudo leer el perfil del usuario.", err);
-      return buildProfileFromDoc({}, fallbackName);
+      return buildProfileFromDoc({}, fallbackName, { uid });
     } finally {
       profileRequests.delete(uid);
     }
@@ -313,6 +344,7 @@ export {
   normalizeNameKey,
   resolveNameFromDoc,
   resolveAvatarUrlFromDoc,
+  resolveAvatarUpdatedAtFromDoc,
   normalizeUpdatedAt,
   buildAvatarSrc,
   buildProfileFromDoc,

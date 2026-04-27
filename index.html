@@ -147,7 +147,7 @@
     />
     <link
       rel="stylesheet"
-      href="assets/css/pages/index.css?v=20260307-sidebar-cubes-1"
+      href="assets/css/pages/index.css?v=20260426-committee-graphic-3"
     />
     <link
       rel="stylesheet"
@@ -520,7 +520,9 @@
         transform: none;
       }
 
-      .referente-hero-card--static-photo:hover .referente-hero-photo--asset-framed img {
+      .referente-hero-card--static-photo:hover
+        .referente-hero-photo--asset-framed
+        img {
         transform: none;
         filter: none;
       }
@@ -2832,7 +2834,7 @@
                           class="referente-hero-photo referente-hero-photo--asset-framed"
                         >
                           <img
-                            src="assets/images/avatar-leila-cura-featured-tight-20260411.png"
+                            src="assets/images/avatar-leila-cura-featured-tight-20260411.png?v=20260426-profile-avatars-1"
                             alt="Dra. Leila Cura"
                             width="1000"
                             height="1000"
@@ -2875,7 +2877,7 @@
                     >
                       <div class="referente__img-wrapper">
                         <img
-                          src="assets/images/avatar-silva-new.png"
+                          src="assets/images/avatar-silva-new.png?v=20260426-profile-avatars-1"
                           alt="Gustavo Silva"
                           class="referente__img"
                           width="1000"
@@ -2909,7 +2911,7 @@
                     >
                       <div class="referente__img-wrapper">
                         <img
-                          src="assets/images/avatar-azcarate-new.png"
+                          src="assets/images/avatar-azcarate-new.png?v=20260426-profile-avatars-1"
                           alt="Juan Martín Azcárate"
                           class="referente__img"
                           width="1000"
@@ -2986,7 +2988,7 @@
                     >
                       <div class="coordinator__img-wrapper">
                         <img
-                          src="assets/images/coord-maurino-new.png"
+                          src="assets/images/coord-maurino-new.png?v=20260426-profile-avatars-1"
                           alt="Juan Maurino"
                           class="coordinator__img"
                           width="1000"
@@ -3005,7 +3007,7 @@
                     >
                       <div class="coordinator__img-wrapper">
                         <img
-                          src="assets/images/coord-bianchi-new.png"
+                          src="assets/images/coord-bianchi-new.png?v=20260426-profile-avatars-1"
                           alt="Mario Bianchi"
                           class="coordinator__img"
                           width="1000"
@@ -3024,7 +3026,7 @@
                     >
                       <div class="coordinator__img-wrapper">
                         <img
-                          src="assets/images/coord-aciar-new.png"
+                          src="assets/images/coord-aciar-new.png?v=20260426-profile-avatars-1"
                           alt="Sergio Aciar"
                           class="coordinator__img"
                           width="1000"
@@ -3043,7 +3045,7 @@
                     >
                       <div class="coordinator__img-wrapper">
                         <img
-                          src="assets/images/coord-rodriguez-new.png"
+                          src="assets/images/coord-rodriguez-new.png?v=20260426-profile-avatars-1"
                           alt="Hernán Rodríguez"
                           class="coordinator__img"
                           width="1000"
@@ -3062,7 +3064,7 @@
                     >
                       <div class="coordinator__img-wrapper">
                         <img
-                          src="assets/images/coord-sabha-new.png"
+                          src="assets/images/coord-sabha-new.png?v=20260426-profile-avatars-1"
                           alt="Roberto Sabha"
                           class="coordinator__img"
                           width="1000"
@@ -3338,9 +3340,14 @@
                 class="comite__card reveal-on-scroll delay-100"
                 data-committee-id="comite_ejecutivo_emergencias"
                 data-link="pages/comites/comite-ejecutivo-emergencias.html"
-              >
-                <div>
-                  <header class="comite__card-header">
+                aria-label="Comité Ejecutivo de Emergencias"
+                role="link"
+                tabindex="0">
+                <div class="comite__content">
+                  <div class="comite__image-wrap">
+                    <img class="comite__image" src="assets/images/committees/committee-emergencias.png?v=20260426-committee-graphic-3" width="1254" height="1254" alt="Comité Ejecutivo de Emergencias. Protocolos y gestión de respuesta ante emergencias médicas." loading="lazy" decoding="async">
+                  </div>
+                  <header class="comite__card-header comite__card-header--sr">
                     <div class="comite__kicker">
                       <span class="comite__icon-badge" aria-hidden="true"
                         ><i data-lucide="alert-triangle"></i
@@ -3362,35 +3369,7 @@
                       médicas.
                     </p>
                   </header>
-                  <div class="committee-stats">
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Integrantes</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
-                    <div class="stats-divider"></div>
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Proyectos</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
-                  </div>
                 </div>
-                <footer class="comite__card-footer">
-                  <div class="comite__actions">
-                    <button
-                      class="comite__join-btn comite__join-trigger"
-                      data-committee-id="comite_ejecutivo_emergencias"
-                      type="button"
-                    >
-                      <span class="icon">+</span>
-                      <span>Unirme</span>
-                    </button>
-                    <a
-                      href="pages/comites/comite-ejecutivo-emergencias.html"
-                      class="comite__btn-secondary"
-                      >Ingresar al comité</a
-                    >
-                  </div>
-                </footer>
               </article>
 
               <!-- Comité 2 -->
@@ -3398,9 +3377,14 @@
                 class="comite__card reveal-on-scroll delay-200"
                 data-committee-id="comite_salud_ocupacional"
                 data-link="pages/comites/salud-ocupacional.html"
-              >
-                <div>
-                  <header class="comite__card-header">
+                aria-label="Comité de Salud Ocupacional"
+                role="link"
+                tabindex="0">
+                <div class="comite__content">
+                  <div class="comite__image-wrap">
+                    <img class="comite__image" src="assets/images/committees/committee-salud-ocupacional.png?v=20260426-committee-graphic-3" width="1254" height="1254" alt="Comité de Salud Ocupacional. Seguridad, higiene y medicina del trabajo." loading="lazy" decoding="async">
+                  </div>
+                  <header class="comite__card-header comite__card-header--sr">
                     <div class="comite__kicker">
                       <span class="comite__icon-badge" aria-hidden="true"
                         ><i data-lucide="shield"></i
@@ -3421,35 +3405,7 @@
                       Seguridad, higiene y medicina del trabajo.
                     </p>
                   </header>
-                  <div class="committee-stats">
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Integrantes</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
-                    <div class="stats-divider"></div>
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Proyectos</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
-                  </div>
                 </div>
-                <footer class="comite__card-footer">
-                  <div class="comite__actions">
-                    <button
-                      class="comite__join-btn comite__join-trigger"
-                      data-committee-id="comite_salud_ocupacional"
-                      type="button"
-                    >
-                      <span class="icon">+</span>
-                      <span>Unirme</span>
-                    </button>
-                    <a
-                      href="pages/comites/salud-ocupacional.html"
-                      class="comite__btn-secondary"
-                      >Ingresar al comité</a
-                    >
-                  </div>
-                </footer>
               </article>
 
               <!-- Comité 3 -->
@@ -3457,9 +3413,14 @@
                 class="comite__card reveal-on-scroll delay-300"
                 data-committee-id="comite_calidad_seguridad"
                 data-link="pages/comites/comite-calidad-seguridad.html"
-              >
-                <div>
-                  <header class="comite__card-header">
+                aria-label="Comité de Calidad y Seguridad"
+                role="link"
+                tabindex="0">
+                <div class="comite__content">
+                  <div class="comite__image-wrap">
+                    <img class="comite__image" src="assets/images/committees/committee-calidad-seguridad.png?v=20260426-committee-graphic-3" width="1254" height="1254" alt="Comité de Calidad y Seguridad. Estándares de calidad y seguridad del paciente." loading="lazy" decoding="async">
+                  </div>
+                  <header class="comite__card-header comite__card-header--sr">
                     <div class="comite__kicker">
                       <span class="comite__icon-badge" aria-hidden="true"
                         ><i data-lucide="check-circle"></i
@@ -3480,35 +3441,7 @@
                       Estándares de calidad y seguridad del paciente.
                     </p>
                   </header>
-                  <div class="committee-stats">
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Integrantes</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
-                    <div class="stats-divider"></div>
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Proyectos</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
-                  </div>
                 </div>
-                <footer class="comite__card-footer">
-                  <div class="comite__actions">
-                    <button
-                      class="comite__join-btn comite__join-trigger"
-                      data-committee-id="comite_calidad_seguridad"
-                      type="button"
-                    >
-                      <span class="icon">+</span>
-                      <span>Unirme</span>
-                    </button>
-                    <a
-                      href="pages/comites/comite-calidad-seguridad.html"
-                      class="comite__btn-secondary"
-                      >Ingresar al comité</a
-                    >
-                  </div>
-                </footer>
               </article>
 
               <!-- Comité 4 -->
@@ -3516,9 +3449,14 @@
                 class="comite__card reveal-on-scroll delay-100"
                 data-committee-id="comite_salud_digital"
                 data-link="pages/comites/comite-salud-digital.html"
-              >
-                <div>
-                  <header class="comite__card-header">
+                aria-label="Comité de Salud Digital e Innovación"
+                role="link"
+                tabindex="0">
+                <div class="comite__content">
+                  <div class="comite__image-wrap">
+                    <img class="comite__image" src="assets/images/committees/committee-salud-digital-innovacion.png?v=20260426-committee-graphic-3" width="1254" height="1254" alt="Comité de Salud Digital e Innovación. Transformación e innovación digital en salud." loading="lazy" decoding="async">
+                  </div>
+                  <header class="comite__card-header comite__card-header--sr">
                     <div class="comite__kicker">
                       <span class="comite__icon-badge" aria-hidden="true"
                         ><i data-lucide="laptop"></i
@@ -3539,35 +3477,7 @@
                       Transformación e innovación digital en salud.
                     </p>
                   </header>
-                  <div class="committee-stats">
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Integrantes</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
-                    <div class="stats-divider"></div>
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Proyectos</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
-                  </div>
                 </div>
-                <footer class="comite__card-footer">
-                  <div class="comite__actions">
-                    <button
-                      class="comite__join-btn comite__join-trigger"
-                      data-committee-id="comite_salud_digital"
-                      type="button"
-                    >
-                      <span class="icon">+</span>
-                      <span>Unirme</span>
-                    </button>
-                    <a
-                      href="pages/comites/comite-salud-digital.html"
-                      class="comite__btn-secondary"
-                      >Ingresar al comité</a
-                    >
-                  </div>
-                </footer>
               </article>
 
               <!-- Comité 5 -->
@@ -3575,9 +3485,14 @@
                 class="comite__card reveal-on-scroll delay-200"
                 data-committee-id="comite_docencia_investigacion"
                 data-link="pages/comites/comite-docencia-investigacion.html"
-              >
-                <div>
-                  <header class="comite__card-header">
+                aria-label="Comité de Docencia e Investigación"
+                role="link"
+                tabindex="0">
+                <div class="comite__content">
+                  <div class="comite__image-wrap">
+                    <img class="comite__image" src="assets/images/committees/committee-docencia-investigacion.png?v=20260426-committee-graphic-3" width="1254" height="1254" alt="Comité de Docencia e Investigación. Formación continua y desarrollo científico." loading="lazy" decoding="async">
+                  </div>
+                  <header class="comite__card-header comite__card-header--sr">
                     <div class="comite__kicker">
                       <span class="comite__icon-badge" aria-hidden="true"
                         ><i data-lucide="graduation-cap"></i
@@ -3598,35 +3513,7 @@
                       Formación continua y desarrollo científico.
                     </p>
                   </header>
-                  <div class="committee-stats">
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Integrantes</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
-                    <div class="stats-divider"></div>
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Proyectos</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
-                  </div>
                 </div>
-                <footer class="comite__card-footer">
-                  <div class="comite__actions">
-                    <button
-                      class="comite__join-btn comite__join-trigger"
-                      data-committee-id="comite_docencia_investigacion"
-                      type="button"
-                    >
-                      <span class="icon">+</span>
-                      <span>Unirme</span>
-                    </button>
-                    <a
-                      href="pages/comites/comite-docencia-investigacion.html"
-                      class="comite__btn-secondary"
-                      >Ingresar al comité</a
-                    >
-                  </div>
-                </footer>
               </article>
 
               <!-- Comité 6 -->
@@ -3634,9 +3521,14 @@
                 class="comite__card reveal-on-scroll delay-300"
                 data-committee-id="comite_farmacia_terapeutica"
                 data-link="pages/comites/comite-farmacia-terapeutica.html"
-              >
-                <div>
-                  <header class="comite__card-header">
+                aria-label="Comité de Farmacia y Terapéutica"
+                role="link"
+                tabindex="0">
+                <div class="comite__content">
+                  <div class="comite__image-wrap">
+                    <img class="comite__image" src="assets/images/committees/committee-farmacia-terapeutica.png?v=20260426-committee-graphic-3" width="1254" height="1254" alt="Comité de Farmacia y Terapéutica. Gestión de medicamentos y tratamientos." loading="lazy" decoding="async">
+                  </div>
+                  <header class="comite__card-header comite__card-header--sr">
                     <div class="comite__kicker">
                       <span class="comite__icon-badge" aria-hidden="true"
                         ><i data-lucide="pill"></i
@@ -3657,35 +3549,7 @@
                       Gestión de medicamentos y tratamientos.
                     </p>
                   </header>
-                  <div class="committee-stats">
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Integrantes</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
-                    <div class="stats-divider"></div>
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Proyectos</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
-                  </div>
                 </div>
-                <footer class="comite__card-footer">
-                  <div class="comite__actions">
-                    <button
-                      class="comite__join-btn comite__join-trigger"
-                      data-committee-id="comite_farmacia_terapeutica"
-                      type="button"
-                    >
-                      <span class="icon">+</span>
-                      <span>Unirme</span>
-                    </button>
-                    <a
-                      href="pages/comites/comite-farmacia-terapeutica.html"
-                      class="comite__btn-secondary"
-                      >Ingresar al comité</a
-                    >
-                  </div>
-                </footer>
               </article>
 
               <!-- Comité 7 -->
@@ -3693,9 +3557,14 @@
                 class="comite__card reveal-on-scroll delay-100"
                 data-committee-id="comite_bioetica"
                 data-link="pages/comites/comite-bioetica.html"
-              >
-                <div>
-                  <header class="comite__card-header">
+                aria-label="Comité de Bioética"
+                role="link"
+                tabindex="0">
+                <div class="comite__content">
+                  <div class="comite__image-wrap">
+                    <img class="comite__image" src="assets/images/committees/committee-bioetica.png?v=20260426-committee-graphic-3" width="1254" height="1254" alt="Comité de Bioética. Análisis ético de la práctica médica." loading="lazy" decoding="async">
+                  </div>
+                  <header class="comite__card-header comite__card-header--sr">
                     <div class="comite__kicker">
                       <span class="comite__icon-badge" aria-hidden="true"
                         ><i data-lucide="scale"></i
@@ -3716,35 +3585,7 @@
                       Análisis ético de la práctica médica.
                     </p>
                   </header>
-                  <div class="committee-stats">
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Integrantes</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
-                    <div class="stats-divider"></div>
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Proyectos</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
-                  </div>
                 </div>
-                <footer class="comite__card-footer">
-                  <div class="comite__actions">
-                    <button
-                      class="comite__join-btn comite__join-trigger"
-                      data-committee-id="comite_bioetica"
-                      type="button"
-                    >
-                      <span class="icon">+</span>
-                      <span>Unirme</span>
-                    </button>
-                    <a
-                      href="pages/comites/comite-bioetica.html"
-                      class="comite__btn-secondary"
-                      >Ingresar al comité</a
-                    >
-                  </div>
-                </footer>
               </article>
             </div>
           </div>
@@ -5027,7 +4868,7 @@
         import {
           hydrateAvatars,
           resolveUidForAuthor,
-        } from "/assets/js/common/user-profiles.js";
+        } from "/assets/js/common/user-profiles.js?v=20260426-profile-avatars-1";
         import {
           escapeAttribute,
           escapeHTML,
@@ -6383,7 +6224,7 @@
       </script>
       <script
         type="module"
-        src="assets/js/pages/index.js?v=20260306-chat-desktop-layout-1"
+        src="assets/js/pages/index.js?v=20260426-profile-avatars-1"
       ></script>
       <script type="module">
         import {

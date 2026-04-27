@@ -8,11 +8,11 @@ import {
   buildInitials,
   resolveNameFromDoc,
   resolveAvatarUrlFromDoc,
-  normalizeUpdatedAt,
+  resolveAvatarUpdatedAtFromDoc,
   buildAvatarSrc,
   applyAvatarElement,
   setUserProfileCache
-} from "./user-profiles.js";
+} from "./user-profiles.js?v=20260426-profile-avatars-1";
 
 const warnOnce = (() => {
   const seen = new Set();
@@ -256,9 +256,21 @@ const resolveDisplayName = (user, docData) => {
   return normalizeName(user?.email) || "Invitado";
 };
 
-const resolveAvatarUrl = (user, docData) => {
-  return resolveAvatarUrlFromDoc(docData) || user?.photoURL || "";
+const resolveAvatarUrl = (user, docData, displayName) => {
+  return resolveAvatarUrlFromDoc(
+    {
+      ...(docData || {}),
+      photoURL: docData?.photoURL || user?.photoURL || ""
+    },
+    {
+      uid: user?.uid || "",
+      email: user?.email || docData?.email || "",
+      name: displayName || ""
+    }
+  );
 };
+
+const resolveAvatarUpdatedAt = (docData, avatarUrl) => resolveAvatarUpdatedAtFromDoc(docData || {}, avatarUrl);
 
 const applyAvatarUI = (menu, url, name, updatedAt = 0, forceBust = false) => {
   const initials = buildInitials(name);
@@ -285,8 +297,6 @@ const applyAvatarUI = (menu, url, name, updatedAt = 0, forceBust = false) => {
     }
   });
 };
-
-const resolveAvatarUpdatedAt = (docData) => normalizeUpdatedAt(docData?.avatarUpdatedAt);
 
 const updateCurrentAvatarSlots = (profile, displayName) => {
   const nodes = Array.from(document.querySelectorAll("[data-dm-avatar-current]"));
@@ -449,10 +459,17 @@ const initMenuInstance = (container, { auth, db, storage }) => {
     updateText(menu.fullname, displayName);
     const avatarProfile = {
       displayName,
-      avatarUrl: resolveAvatarUrl(user, docData),
-      avatarUpdatedAt: resolveAvatarUpdatedAt(docData),
+      avatarUrl: resolveAvatarUrl(user, docData, displayName),
+      avatarUpdatedAt: 0,
       initials: buildInitials(displayName)
     };
+    avatarProfile.avatarUpdatedAt = resolveAvatarUpdatedAt(
+      {
+        ...(docData || {}),
+        photoURL: docData?.photoURL || user?.photoURL || ""
+      },
+      avatarProfile.avatarUrl
+    );
     if (user?.uid) setUserProfileCache(user.uid, avatarProfile);
     applyAvatarUI(menu, avatarProfile.avatarUrl, displayName, avatarProfile.avatarUpdatedAt);
     updateCurrentAvatarSlots(avatarProfile, displayName);

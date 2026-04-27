@@ -23,7 +23,18 @@
       "carga-usuarios/**",
       "carga - usuarios/**",
       "tools/**",
-      "docs/**"
+      "docs/**",
+      "scripts/**",
+      "tests/**",
+      "test-results/**",
+      "coverage/**",
+      "playwright.config.mjs",
+      "package.json",
+      "package-lock.json",
+      "firebase-debug.log",
+      "firestore-debug.log",
+      "ui-debug.log",
+      "assets/images/Comit*.png"
     ],
     "rewrites": [
       {
