@@ -1221,15 +1221,16 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         }
 
         #brisa-chat-window-min {
-          display: none;
-        }
-
-        #brisa-chat-delete-conversation {
+          display: inline-flex;
           order: 1;
         }
 
-        #brisa-chat-window-close {
+        #brisa-chat-delete-conversation {
           order: 2;
+        }
+
+        #brisa-chat-window-close {
+          order: 3;
         }
 
         .brisa-chat-pill-btn {
@@ -2259,28 +2260,41 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     html.style.touchAction = '';
   }
 
+  function dispatchMobileScrollRelease(source = 'chat') {
+    try {
+      window.dispatchEvent(new CustomEvent('dm:mobile-scroll-release', {
+        detail: { source }
+      }));
+    } catch (e) {}
+  }
+
   function setDocumentScrollLocked(locked) {
     const body = document.body;
     const html = document.documentElement;
     if (!body || !html) return;
     if (locked) {
-      if (!body.dataset.brisaChatOverflow) {
+      if (body.dataset.brisaChatScrollLocked !== '1') {
+        body.dataset.brisaChatScrollLocked = '1';
         body.dataset.brisaChatOverflow = body.style.overflow || '';
         body.dataset.brisaChatTouchAction = body.style.touchAction || '';
         html.dataset.brisaChatOverflow = html.style.overflow || '';
+        html.dataset.brisaChatTouchAction = html.style.touchAction || '';
       }
       body.style.overflow = 'hidden';
       body.style.touchAction = 'none';
       html.style.overflow = 'hidden';
       return;
     }
-    if (body.dataset.brisaChatOverflow !== undefined) {
+    if (body.dataset.brisaChatScrollLocked === '1') {
       body.style.overflow = body.dataset.brisaChatOverflow;
       body.style.touchAction = body.dataset.brisaChatTouchAction || '';
       html.style.overflow = html.dataset.brisaChatOverflow || '';
+      html.style.touchAction = html.dataset.brisaChatTouchAction || '';
+      delete body.dataset.brisaChatScrollLocked;
       delete body.dataset.brisaChatOverflow;
       delete body.dataset.brisaChatTouchAction;
       delete html.dataset.brisaChatOverflow;
+      delete html.dataset.brisaChatTouchAction;
     }
     forceReleaseDocumentScrollState();
   }
@@ -2343,7 +2357,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     return true;
   }
 
-  function closeMobileHub() {
+  function closeMobileHub({ preserveConversation = false, minimized = false, source = 'chat' } = {}) {
     if (!isCompactMobileChat()) return false;
     const root = getChatRoot();
     const overlay = document.getElementById('brisa-chat-mobile-overlay');
@@ -2351,6 +2365,8 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     const panel = document.getElementById('brisa-chat-panel');
     const win = document.getElementById('brisa-chat-window');
     if (!root || !overlay || !viewport || !panel || !win) return false;
+    const preservedConversationId = activeConversationId;
+    const preservedPeer = activePeer;
 
     root.classList.remove('brisa-chat-root--mobile-detail', 'brisa-chat-root--mobile-open');
     root.style.pointerEvents = '';
@@ -2367,18 +2383,21 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     syncMobileModalPlacement(false);
     moveFocusOutsideMobileChat();
     restoreFocusAfterHubClose();
-    activeConversationId = null;
-    activePeer = null;
+    if (!preserveConversation) {
+      activeConversationId = null;
+      activePeer = null;
+    }
     requestAnimationFrame(() => {
       moveFocusOutsideMobileChat();
       restoreFocusAfterHubClose();
     });
     setChatState({
-      isChatOpen: false,
-      isMinimized: false,
-      activeConversationId: null,
-      activePeerUid: null
+      isChatOpen: preserveConversation,
+      isMinimized: Boolean(minimized),
+      activeConversationId: preserveConversation ? preservedConversationId : null,
+      activePeerUid: preserveConversation ? preservedPeer?.uid || null : null
     });
+    dispatchMobileScrollRelease(source);
     return true;
   }
 
@@ -4134,7 +4153,20 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     if (isEmbeddedMode()) return;
     if (!activeConversationId || !activePeer) return;
     if (isCompactMobileChat()) {
-      closeMobileDetail();
+      const conversationId = activeConversationId;
+      const peerUid = activePeer.uid;
+      stopBlink(conversationId);
+      closeMobileHub({
+        preserveConversation: true,
+        minimized: true,
+        source: 'chat-minimize'
+      });
+      setChatState({
+        isChatOpen: true,
+        isMinimized: true,
+        activeConversationId: conversationId,
+        activePeerUid: peerUid
+      });
       return;
     }
     const conversationId = activeConversationId;
@@ -4926,7 +4958,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     if (winMin && win) {
       winMin.addEventListener('click', () => {
         if (isCompactMobileChat() && !isEmbeddedMode()) {
-          closeMobileDetail();
+          minimizeActiveConversation();
           return;
         }
         minimizeActiveConversation();

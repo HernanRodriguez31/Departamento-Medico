@@ -4044,7 +4044,8 @@ img {
     overflow-x: auto;
     overflow-y: hidden;
     scroll-snap-type: x mandatory;
-    scroll-snap-stop: always;
+    scroll-snap-stop: normal;
+    touch-action: pan-x pan-y;
     overscroll-behavior-x: contain;
     overscroll-behavior-y: none;
     -webkit-overflow-scrolling: touch;
@@ -4065,7 +4066,7 @@ img {
     min-height: 0;
     overflow: hidden;
     scroll-snap-align: start;
-    scroll-snap-stop: always;
+    scroll-snap-stop: normal;
     box-sizing: border-box;
 }
 
@@ -4081,8 +4082,10 @@ img {
     min-width: 0;
     overflow-y: auto;
     overflow-x: hidden;
+    touch-action: pan-x pan-y;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-y: contain;
+    overscroll-behavior-x: none;
     box-sizing: border-box;
 }
 
@@ -4370,7 +4373,7 @@ img {
     body[data-view="foro"] .dm-foro-panel,
     body[data-view="foro"] .dm-foro-thread,
     body[data-view="foro"] #forum-messages-general {
-        touch-action: auto;
+        touch-action: pan-x pan-y;
     }
 
     /* Quitar Evidencia en móvil */

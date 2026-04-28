@@ -6181,7 +6181,7 @@
           const loadChat = () => {
             if (chatLoaded) return Promise.resolve();
             if (chatLoading) return chatLoading;
-            chatLoading = import("/js/chat.js?v=20260307-chat-aladdin-1")
+            chatLoading = import("/js/chat.js?v=20260427-mobile-scroll-recovery-1")
               .then(() => {
                 chatLoaded = true;
               })

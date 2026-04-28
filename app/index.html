@@ -59,7 +59,7 @@
 
     <!-- Styles -->
     <link rel="stylesheet" href="/css/variables.css">
-    <link rel="stylesheet" href="/css/app.css?v=20260426-mobile-qa-1">
+    <link rel="stylesheet" href="/css/app.css?v=20260427-mobile-scroll-recovery-1">
     <link rel="stylesheet" href="/css/structure.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/assets/css/pages/app.css?v=20260426-committee-graphic-3">
@@ -2959,7 +2959,7 @@
 
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.26.24"></script>
-    <script src="/js/app-mobile.js?v=20260426-mobile-qa-1"></script>
+    <script src="/js/app-mobile.js?v=20260427-mobile-scroll-recovery-1"></script>
 
     <!-- Lucide para iconos del foro general -->
     <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
@@ -4237,7 +4237,7 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
 
     </script>
 
-    <script type="module" src="/js/chat.js?v=20260307-chat-aladdin-1"></script>
+    <script type="module" src="/js/chat.js?v=20260427-mobile-scroll-recovery-1"></script>
     <script type="module">
         import { isChatHash } from "/assets/js/common/routes.js";
 
@@ -4247,7 +4247,7 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
             const loadChat = () => {
                 if (chatLoaded) return Promise.resolve();
                 if (chatLoading) return chatLoading;
-                chatLoading = import('/js/chat.js?v=20260307-chat-aladdin-1')
+                chatLoading = import('/js/chat.js?v=20260427-mobile-scroll-recovery-1')
                     .then(() => {
                         chatLoaded = true;
                     })

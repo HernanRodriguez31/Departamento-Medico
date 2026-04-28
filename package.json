@@ -5,6 +5,7 @@
   "scripts": {
     "test:safe-dom": "node --test tests/safe-dom.test.mjs",
     "test:e2e:mobile": "firebase emulators:exec --only hosting,auth,firestore,storage --project departamento-medico-brisa \"node tests/e2e/seed-emulators.mjs && playwright test tests/e2e/mobile-ui.spec.mjs --project iphone-13 --project android-412\"",
+    "test:e2e:mobile:scroll": "firebase emulators:exec --only hosting,auth,firestore,storage --project departamento-medico-brisa \"node tests/e2e/seed-emulators.mjs && playwright test tests/e2e/mobile-scroll.spec.mjs --project iphone-13 --project android-412\"",
     "test:e2e:committees:desktop": "firebase emulators:exec --only hosting,auth,firestore,storage --project departamento-medico-brisa \"node tests/e2e/seed-emulators.mjs && playwright test tests/e2e/committees-desktop.spec.mjs --project desktop-1440\"",
     "qa:mobile": "MOBILE_QA_CAPTURE_PHASE=after npm run test:e2e:mobile",
     "test:rules": "firebase emulators:exec --only firestore --project departamento-medico-brisa \"node --test tests/firestore-rules.test.mjs\"",

@@ -1,18 +1,18 @@
 const CACHE_PREFIX = "brisa-app-";
 // Bump this whenever we change precached assets (CSS/JS) to ensure clients
 // receive the updated files instead of an older cached copy.
-const CACHE_VERSION = "v28";
+const CACHE_VERSION = "v29";
 const CACHE = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const APP_SHELL_URL = "/app/index.html";
 const OFFLINE_URL = "/offline.html";
 const PRECACHE_URLS = [
   APP_SHELL_URL,
   OFFLINE_URL,
-  "/css/app.css?v=20260426-mobile-qa-1",
+  "/css/app.css?v=20260427-mobile-scroll-recovery-1",
   "/assets/css/pages/app.css?v=20260426-committee-graphic-3",
   "/assets/js/pages/app.js?v=20260427-profile-avatar-priority-1",
-  "/js/chat.js?v=20260307-chat-aladdin-1",
-  "/js/app-mobile.js?v=20260426-mobile-qa-1"
+  "/js/chat.js?v=20260427-mobile-scroll-recovery-1",
+  "/js/app-mobile.js?v=20260427-mobile-scroll-recovery-1"
 ];
 
 importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js");
