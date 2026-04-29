@@ -115,6 +115,8 @@ async function initCarouselModule() {
   const overlayPrev = document.getElementById("dm-overlay-prev");
   const overlayNext = document.getElementById("dm-overlay-next");
   const visitsBadge = document.getElementById("contador-visitas");
+  const VISITS_COUNTER_DOC_ID = "home_visits";
+  const VISITS_RESET_BASELINE = 6046;
   const addBtn = document.getElementById("dm-carousel-add") || btnAddImage;
   const infoReference = document.getElementById("dm-carousel-reference");
   const infoAuthor = document.getElementById("dm-carousel-author");
@@ -799,13 +801,14 @@ async function initCarouselModule() {
 
   const subscribeVisits = () => {
     if (!db || !visitsBadge || visitsSubscribed) return;
-    const visitsRef = doc(db, "dm_meta", "home_visits");
+    updateVisitsUI(0);
+    const visitsRef = doc(db, "dm_meta", VISITS_COUNTER_DOC_ID);
     onSnapshot(
       visitsRef,
       (snap) => {
         const data = snap.data();
         const safeCount = Number.isFinite(data?.count) ? data.count : 0;
-        updateVisitsUI(safeCount);
+        updateVisitsUI(Math.max(0, safeCount - VISITS_RESET_BASELINE));
       },
       (err) => {
         console.error("[Visitas] Error leyendo contador", err);

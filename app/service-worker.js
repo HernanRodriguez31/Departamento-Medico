@@ -1,18 +1,25 @@
 const CACHE_PREFIX = "brisa-app-";
 // Bump this whenever we change precached assets (CSS/JS) to ensure clients
 // receive the updated files instead of an older cached copy.
-const CACHE_VERSION = "v29";
+const CACHE_VERSION = "v55";
 const CACHE = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const APP_SHELL_URL = "/app/index.html";
 const OFFLINE_URL = "/offline.html";
 const PRECACHE_URLS = [
   APP_SHELL_URL,
   OFFLINE_URL,
-  "/css/app.css?v=20260427-mobile-scroll-recovery-1",
-  "/assets/css/pages/app.css?v=20260426-committee-graphic-3",
-  "/assets/js/pages/app.js?v=20260427-profile-avatar-priority-1",
-  "/js/chat.js?v=20260427-mobile-scroll-recovery-1",
-  "/js/app-mobile.js?v=20260427-mobile-scroll-recovery-1"
+  "/css/app.css?v=20260428-mobile-ai-interactions-1",
+  "/assets/css/pages/app.css?v=20260428-mobile-muro-composer-width-1",
+  "/assets/js/pages/app.js?v=20260428-mobile-ai-endpoint-recovery-1",
+  "/js/chat.js?v=20260428-chat-read-receipts-1",
+  "/js/app-mobile.js?v=20260428-mobile-ai-interactions-1",
+  "/assets/images/committees/committee-emergencias.png?v=20260428-committee-icons-cache-1",
+  "/assets/images/committees/committee-salud-ocupacional.png?v=20260428-committee-icons-cache-1",
+  "/assets/images/committees/committee-calidad-seguridad.png?v=20260428-committee-icons-cache-1",
+  "/assets/images/committees/committee-salud-digital-innovacion.png?v=20260428-committee-icons-cache-1",
+  "/assets/images/committees/committee-docencia-investigacion.png?v=20260428-committee-icons-cache-1",
+  "/assets/images/committees/committee-farmacia-terapeutica.png?v=20260428-committee-icons-cache-1",
+  "/assets/images/committees/committee-bioetica.png?v=20260428-committee-icons-cache-1"
 ];
 
 importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js");

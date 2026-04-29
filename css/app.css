@@ -479,6 +479,10 @@ img {
     text-overflow: ellipsis;
 }
 
+.header__title-line--mobile {
+    display: none;
+}
+
 /* SCROLL HEADER STATE */
 .scroll-header {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
@@ -1981,6 +1985,7 @@ img {
 .show-scroll {
     bottom: var(--dm-fab-bottom);
     opacity: 1;
+    pointer-events: auto;
     transform: translateY(0);
 }
 
@@ -4027,6 +4032,7 @@ img {
     display: none;
     min-height: 0;
     z-index: 20;
+    touch-action: pan-y;
 }
 
 .dm-mobile-pager-viewport {
@@ -4037,24 +4043,37 @@ img {
 }
 
 .dm-mobile-pager-track {
-    display: flex;
     width: 100%;
     height: 100%;
     min-height: 0;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scroll-snap-type: x mandatory;
-    scroll-snap-stop: normal;
-    touch-action: pan-x pan-y;
-    overscroll-behavior-x: contain;
-    overscroll-behavior-y: none;
-    -webkit-overflow-scrolling: touch;
+    overflow: hidden;
+    touch-action: pan-y;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: auto;
+    scroll-behavior: auto;
     scrollbar-width: none;
     -ms-overflow-style: none;
 }
 
 .dm-mobile-pager-track::-webkit-scrollbar {
     display: none;
+}
+
+.dm-mobile-pager-track-inner {
+    --dm-mobile-page-index: 0;
+    --dm-mobile-page-x: 0%;
+    --dm-mobile-drag-x: 0px;
+    display: flex;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    transform: translate3d(calc(var(--dm-mobile-page-x, 0%) + var(--dm-mobile-drag-x, 0px)), 0, 0);
+    transition: transform 220ms cubic-bezier(.22, .61, .36, 1);
+    will-change: transform;
+}
+
+.dm-mobile-pager-track-inner.is-dragging {
+    transition: none;
 }
 
 .dm-mobile-page {
@@ -4065,13 +4084,7 @@ img {
     height: 100%;
     min-height: 0;
     overflow: hidden;
-    scroll-snap-align: start;
-    scroll-snap-stop: normal;
     box-sizing: border-box;
-}
-
-.dm-mobile-page--ghost {
-    pointer-events: none !important;
 }
 
 .dm-mobile-page__scroller {
@@ -4082,10 +4095,11 @@ img {
     min-width: 0;
     overflow-y: auto;
     overflow-x: hidden;
-    touch-action: pan-x pan-y;
+    touch-action: pan-y;
     -webkit-overflow-scrolling: touch;
-    overscroll-behavior-y: contain;
-    overscroll-behavior-x: none;
+    overscroll-behavior-y: auto;
+    overscroll-behavior-x: auto;
+    scroll-behavior: auto;
     box-sizing: border-box;
 }
 
@@ -4103,19 +4117,54 @@ img {
 .dm-mobile-page__scroller--muro {
     overflow-y: auto;
     overflow-x: hidden;
+    overscroll-behavior-y: auto;
 }
 
 .dm-mobile-page__scroller--ia {
     display: flex;
+    position: relative;
     padding: 0.65rem 0.75rem 0.75rem;
 }
 
 .dm-mobile-page__ai-host {
+    position: relative;
+    z-index: 7;
     width: 100%;
     height: 100%;
     min-height: 0;
     display: flex;
     flex: 1 1 auto;
+    pointer-events: auto;
+}
+
+.dm-mobile-page__scroller--ia .dm-mobile-page__swipe-edge {
+    display: none;
+    pointer-events: none;
+}
+
+.dm-mobile-page__scroller--ia .dm-ai-shell,
+.dm-mobile-page__scroller--ia .dm-ai-panel,
+.dm-mobile-page__scroller--ia .dm-ai-body,
+.dm-mobile-page__scroller--ia .dm-ai-iframe.is-active {
+    pointer-events: auto;
+}
+
+.dm-mobile-page__swipe-edge {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 6;
+    width: 2.75rem;
+    background: transparent;
+    touch-action: pan-y;
+}
+
+.dm-mobile-page__swipe-edge--start {
+    left: 0;
+}
+
+.dm-mobile-page__swipe-edge--end {
+    right: 0;
 }
 
 .dm-mobile-window {
@@ -4158,8 +4207,8 @@ img {
         display: flex;
         grid-column: 1;
         justify-self: start;
-        align-self: end;
-        transform: translateY(14px);
+        align-self: center;
+        transform: none;
     }
 
     .header__left .logo-heart {
@@ -4167,7 +4216,44 @@ img {
     }
 
     .header__center {
+        display: flex;
+        grid-column: 2;
+        justify-self: center;
+        align-self: center;
+        min-width: 0;
+        max-width: min(44vw, 180px);
+        overflow: hidden;
+        transform: none;
+    }
+
+    .header__title-center {
+        display: block !important;
+        opacity: 1;
+        visibility: visible;
+        transform: none;
+        pointer-events: auto;
+        max-width: 100%;
+        color: var(--first-color, #7AB800);
+        font-size: clamp(0.82rem, 3.4vw, 1.08rem);
+        font-weight: 800;
+        line-height: 1;
+        letter-spacing: 0;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        transition: none;
+    }
+
+    .header__title-line--desktop {
         display: none;
+    }
+
+    .header__title-line--mobile {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .header__right {
@@ -4180,40 +4266,48 @@ img {
     }
 
     .header__actions {
-        display: contents;
+        display: inline-flex;
+        grid-column: 3;
+        justify-self: end;
+        align-self: center;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.35rem;
+        min-width: 0;
     }
 
     .nav-notifications {
-        grid-column: 3;
-        justify-self: end;
-        align-self: end;
-        transform: translateY(10px);
+        order: 1;
+        justify-self: auto;
+        align-self: center;
+        transform: none;
+        position: relative;
     }
 
     .user-panel {
-        position: absolute;
-        left: 50%;
-        top: 50%;
-        grid-column: 2;
-        justify-self: center;
-        max-width: min(62vw, 240px);
-        width: 100%;
+        order: 2;
+        position: static;
+        max-width: none;
+        width: auto;
         display: flex;
-        justify-content: center;
+        justify-content: flex-end;
         align-self: center;
-        transform: translate(-46%, -148%);
+        transform: none;
+        flex: 0 0 auto;
     }
 
     .header .user-panel-trigger {
         min-width: 44px;
         min-height: 44px;
-        width: 100%;
-        max-width: 100%;
+        width: 44px;
+        max-width: 44px;
         justify-content: center;
         text-align: center;
-        padding: 0.25rem 0.5rem;
+        padding: 0;
         line-height: 1.05;
-        gap: 6px;
+        gap: 0;
+        border: 0;
+        background: transparent;
     }
 
     .header .user-panel-trigger .user-name {
@@ -4223,14 +4317,16 @@ img {
 
     .header .user-panel-icon {
         display: inline-flex;
-        width: 22px;
-        height: 22px;
+        width: 38px;
+        height: 38px;
         border-radius: 999px;
-        border: 1.5px solid var(--brisa);
+        border: 1px solid rgba(122, 184, 0, 0.6);
+        background: rgba(122, 184, 0, 0.12);
         color: var(--brisa);
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
+        overflow: hidden;
     }
 
     .header .user-panel-icon svg {
@@ -4244,6 +4340,37 @@ img {
 
     .nav-notifications .dm-msg-indicator{
         display: inline-flex;
+        position: absolute;
+        right: -5px;
+        bottom: -4px;
+        min-width: 20px;
+        height: 20px;
+        margin: 0;
+        padding: 0 5px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        background: var(--first-color, #7AB800);
+        border: 2px solid #ffffff;
+        box-shadow: 0 4px 10px rgba(80, 120, 0, 0.22);
+        color: #ffffff;
+        font-size: 10px;
+        font-weight: 900;
+        line-height: 1;
+        z-index: 2;
+        pointer-events: none;
+    }
+
+    .nav-notifications .dm-msg-badge {
+        min-width: 0;
+        height: auto;
+        padding: 0;
+        border-radius: 0;
+        background: transparent;
+        color: inherit;
+        font-size: inherit;
+        font-weight: inherit;
+        line-height: 1;
     }
 
     .dm-notif-btn {
@@ -4346,7 +4473,7 @@ img {
     body.dm-mobile-pager-mode .main {
         overflow: hidden;
         padding-bottom: 0;
-        touch-action: auto;
+        touch-action: pan-y;
         overscroll-behavior-x: none;
         overscroll-behavior-y: none;
     }
@@ -4373,7 +4500,7 @@ img {
     body[data-view="foro"] .dm-foro-panel,
     body[data-view="foro"] .dm-foro-thread,
     body[data-view="foro"] #forum-messages-general {
-        touch-action: pan-x pan-y;
+        touch-action: pan-y;
     }
 
     /* Quitar Evidencia en móvil */

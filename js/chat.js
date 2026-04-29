@@ -3731,16 +3731,21 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
           <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
         </svg>`;
       statusNode = document.createElement('span');
+      let statusLabel = 'Entregado';
       if (isPending) {
         statusNode.className = 'brisa-chat-status-icon brisa-chat-status-icon--pending';
         statusNode.textContent = '✓';
+        statusLabel = 'Enviando';
       } else if (isRead) {
         statusNode.className = 'brisa-chat-status-icon brisa-chat-status-icon--read';
         statusNode.textContent = '✓✓';
+        statusLabel = 'Leído';
       } else {
         statusNode.className = 'brisa-chat-status-icon brisa-chat-status-icon--sent';
         statusNode.textContent = '✓✓';
       }
+      statusNode.title = statusLabel;
+      statusNode.setAttribute('aria-label', statusLabel);
       if (canDelete) {
         deleteBtn = document.createElement('button');
         deleteBtn.className = 'brisa-chat-delete-btn';

@@ -315,6 +315,7 @@
             const messagesEndRef = useRef(null);
             const textareaRef = useRef(null);
             const aiEndpointRef = useRef(null);
+            const aiEndpointForcedRef = useRef(false);
             const aiLoggedRef = useRef(false);
             const embeddedSwipeRef = useRef({
                 pointerId: null,
@@ -355,20 +356,36 @@
                 }
             }, [selectedModel, messagesByModel]);
 
-            const getAllParams = () =>
-                new URLSearchParams(
-                    (window.parent && window.parent !== window
-                        ? window.parent.location.search
-                        : window.location.search) || ""
-                );
+            const getAllParams = () => {
+                const params = new URLSearchParams(window.location.search || "");
+                try {
+                    if (window.parent && window.parent !== window) {
+                        const parentParams = new URLSearchParams(window.parent.location.search || "");
+                        parentParams.forEach((value, key) => params.set(key, value));
+                    }
+                } catch (error) {
+                    // no-op
+                }
+                return params;
+            };
             const isDebugAi = getAllParams().get("debugAi") === "1";
             const DEFAULT_AI_ENDPOINT = "/api/ai";
+            const CLOUD_AI_ENDPOINT = "https://us-central1-departamento-medico-brisa.cloudfunctions.net/aiChat";
             const ATTACHMENTS_DISABLED_MESSAGE = "Los archivos adjuntos no estan habilitados en este momento. Envia la consulta solo en texto.";
+            const isLocalStaticHost = () => {
+                const { hostname, port } = window.location;
+                return (hostname === "127.0.0.1" || hostname === "localhost") && port === "5502";
+            };
             const resolveAiEndpoint = () => {
                 const params = getAllParams();
                 const forcedEndpoint = params.get("aiEndpoint");
 
-                if (forcedEndpoint) return forcedEndpoint;
+                if (forcedEndpoint) {
+                    aiEndpointForcedRef.current = true;
+                    return forcedEndpoint;
+                }
+                aiEndpointForcedRef.current = false;
+                if (isLocalStaticHost()) return CLOUD_AI_ENDPOINT;
                 return DEFAULT_AI_ENDPOINT;
             };
             if (!aiEndpointRef.current) {
@@ -384,10 +401,33 @@
                 const detail = data?.error || "unknown";
                 return `AI error HTTP ${status}: ${detail}`;
             };
-            const handleAiFailure = (provider, status, data, fallbackMessage) => {
+            const handleAiFailure = (provider, status, data, fallbackMessage, endpoint = AI_ENDPOINT) => {
                 if (!isDebugAi) return fallbackMessage;
-                console.info({ endpoint: AI_ENDPOINT, provider, status, data });
+                console.info({ endpoint, provider, status, data });
                 return buildAiErrorMessage(status, data);
+            };
+            const shouldRetryWithCloudEndpoint = (endpoint, response) => {
+                if (aiEndpointForcedRef.current) return false;
+                if (!isLocalStaticHost()) return false;
+                if (!response || ![404, 405, 501].includes(response.status)) return false;
+                try {
+                    const url = new URL(endpoint, window.location.href);
+                    return url.origin === window.location.origin && url.pathname === DEFAULT_AI_ENDPOINT;
+                } catch (error) {
+                    return endpoint === DEFAULT_AI_ENDPOINT;
+                }
+            };
+            const postAiRequest = async (requestOptions) => {
+                const readResponse = async (endpoint) => {
+                    const response = await fetch(endpoint, requestOptions);
+                    const data = await response.json().catch(() => ({}));
+                    return { response, data, endpoint };
+                };
+                const first = await readResponse(AI_ENDPOINT);
+                if (!shouldRetryWithCloudEndpoint(AI_ENDPOINT, first.response)) {
+                    return first;
+                }
+                return readResponse(CLOUD_AI_ENDPOINT);
             };
             const getAuthToken = async () => {
                 try {
@@ -498,16 +538,16 @@
                         })
                     };
 
-                    const response = await fetch(AI_ENDPOINT, requestOptions);
+                    const { response, data, endpoint } = await postAiRequest(requestOptions);
 
-                    const data = await response.json().catch(() => ({}));
                     if (!response.ok || !data?.ok) {
                         historialParaEnvio.pop();
                         return handleAiFailure(
                             "gemini",
                             response.status,
                             data,
-                            "Error de conexi�n. Intente refrescar la p�gina."
+                            "Error de conexi�n. Intente refrescar la p�gina.",
+                            endpoint
                         );
                     }
                     const respuestaBot =
@@ -571,7 +611,7 @@
                         })
                         .filter(Boolean);
 
-                    const response = await fetch(AI_ENDPOINT, {
+                    const { response, data, endpoint } = await postAiRequest({
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json",
@@ -584,13 +624,13 @@
                         })
                     });
 
-                    const data = await response.json().catch(() => ({}));
                     if (!response.ok || !data?.ok) {
                         return handleAiFailure(
                             "openai",
                             response.status,
                             data,
-                            data?.error || "aiChat failed"
+                            data?.error || "aiChat failed",
+                            endpoint
                         );
                     }
                     return data.text || "Sin respuesta clinica.";

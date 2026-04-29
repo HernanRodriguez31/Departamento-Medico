@@ -2,6 +2,9 @@ import { expect, test } from "@playwright/test";
 
 const QA_EMAIL = process.env.MOBILE_QA_EMAIL || "mobile.qa@departamento-medico.test";
 const QA_PASSWORD = process.env.MOBILE_QA_PASSWORD || "MobileQa!12345";
+const MOBILE_BASE_URL = (process.env.MOBILE_BASE_URL || "").replace(/\/+$/, "");
+const LIVE_EMAIL = process.env.MOBILE_LIVE_EMAIL || QA_EMAIL;
+const LIVE_PASSWORD = process.env.MOBILE_LIVE_PASSWORD || QA_PASSWORD;
 
 const ignoredConsolePattern =
   /favicon|net::ERR_ABORTED|ResizeObserver loop|Could not reach Cloud Firestore backend|Tailwind CDN|Notification permission|messaging\/permission-blocked/i;
@@ -17,7 +20,30 @@ const collectConsoleErrors = (page) => {
   return consoleErrors;
 };
 
+const liveAppUrl = (hash = "carrete") => `${MOBILE_BASE_URL}/app/index.html#${hash}`;
+
+const waitForMobileAppReady = async (page) => {
+  await expect(page.locator(".dm-bottom-nav")).toBeVisible({ timeout: 30_000 });
+  await page.waitForFunction(() => Boolean(window.__dmMobileShell?.getPagerState) && document.body?.dataset?.view);
+  await page.locator("#app-splash").waitFor({ state: "detached", timeout: 6_000 }).catch(() => {});
+  await waitForPagerStable(page);
+};
+
 const loginToMobileApp = async (page, hash = "carrete") => {
+  if (MOBILE_BASE_URL) {
+    await page.goto(liveAppUrl(hash), { waitUntil: "domcontentloaded" });
+    const loginForm = page.locator("#login-form");
+    await page.waitForTimeout(900);
+    if (page.url().includes("/login.html") || (await loginForm.isVisible({ timeout: 3_000 }).catch(() => false))) {
+      await page.locator("#email").fill(LIVE_EMAIL);
+      await page.locator("#password").fill(LIVE_PASSWORD);
+      await loginForm.evaluate((form) => form.requestSubmit());
+      await page.waitForURL(new RegExp(`/app/index\\.html(?:\\?[^#]*)?#${hash}$`), { timeout: 35_000 });
+    }
+    await waitForMobileAppReady(page);
+    return;
+  }
+
   const targetPattern = new RegExp(`/app/index\\.html\\?dmEmulators=1#${hash}$`);
   let lastError = null;
   for (let attempt = 1; attempt <= 2; attempt += 1) {
@@ -40,19 +66,17 @@ const loginToMobileApp = async (page, hash = "carrete") => {
     }
   }
   if (lastError) throw lastError;
-  await expect(page.locator(".dm-bottom-nav")).toBeVisible({ timeout: 30_000 });
-  await page.waitForFunction(() => Boolean(window.__dmMobileShell?.getPagerState) && document.body?.dataset?.view);
-  await page.locator("#app-splash").waitFor({ state: "detached", timeout: 6_000 }).catch(() => {});
-  await waitForPagerStable(page);
+  await waitForMobileAppReady(page);
 };
 
 const getScrollDiagnostics = async (page) =>
   page.evaluate(() => {
     const shellState = window.__dmMobileShell?.debugScrollState?.() || {};
+    const verticalState = window.__dmMobileShell?.getVerticalScrollDiagnostics?.() || {};
     const pagerState = window.__dmMobileShell?.getPagerState?.() || shellState.pagerState || {};
     const track = document.querySelector(".dm-mobile-pager-track");
     const activeView = window.__dmMobileShell?.getCurrentViewId?.() || "muro";
-    const activePage = document.querySelector(`.dm-mobile-page[data-view="${activeView}"]:not(.dm-mobile-page--ghost)`);
+    const activePage = document.querySelector(`.dm-mobile-page[data-view="${activeView}"]`);
     const scroller =
       activeView === "foro"
         ? document.querySelector("#forum-messages-general")
@@ -63,10 +87,11 @@ const getScrollDiagnostics = async (page) =>
     const overlayStyle = overlay ? getComputedStyle(overlay) : null;
     const bodyStyle = getComputedStyle(document.body);
     const htmlStyle = getComputedStyle(document.documentElement);
-    const width = track?.clientWidth || 1;
-    const pagePosition = (track?.scrollLeft || 0) / width;
+    const pagerIndex = Number.isFinite(pagerState.pageIndex) ? pagerState.pageIndex : 0;
+    const pagerDragX = Number.isFinite(pagerState.dragX) ? pagerState.dragX : 0;
     return {
       ...shellState,
+      ...verticalState,
       activeView,
       bodyInlineOverflow: document.body.style.overflow || "",
       bodyInlineTouchAction: document.body.style.touchAction || "",
@@ -77,10 +102,13 @@ const getScrollDiagnostics = async (page) =>
       htmlComputedOverflow: htmlStyle.overflow || "",
       htmlComputedTouchAction: htmlStyle.touchAction || "",
       pagerState,
+      pagerIndex,
+      pagerDragX,
       pagerScrollLeft: Math.round(track?.scrollLeft || 0),
       pagerClientWidth: track?.clientWidth || 0,
       pagerScrollWidth: track?.scrollWidth || 0,
-      pagerAligned: Math.abs(pagePosition - Math.round(pagePosition)) < 0.03,
+      pagerTransform: pagerState.track?.transform || "",
+      pagerAligned: Math.abs(pagerDragX) < 1 && Number.isInteger(pagerIndex),
       scrollerFound: Boolean(scroller),
       scrollerScrollTop: scroller?.scrollTop || 0,
       scrollerClientHeight: scroller?.clientHeight || 0,
@@ -128,17 +156,32 @@ const dragTouch = async (page, { startX, startY, endX, endY, steps = 8, delay = 
 
 const waitForPagerStable = async (page) => {
   await page.waitForFunction(() => {
-    const track = document.querySelector(".dm-mobile-pager-track");
     const state = window.__dmMobileShell?.getPagerState?.();
-    if (!track || !state) return false;
-    const width = track.clientWidth || window.innerWidth || 1;
-    const position = track.scrollLeft / width;
+    if (!state) return false;
+    const pageIndex = Number.isFinite(state.pageIndex) ? state.pageIndex : -1;
+    const dragX = Number.isFinite(state.dragX) ? state.dragX : 0;
     return (
       !state.activeUserGesture &&
       !state.isProgrammaticPagerScroll &&
-      Math.abs(position - Math.round(position)) < 0.03
+      Number.isInteger(pageIndex) &&
+      Math.abs(dragX) < 1
     );
   }, null, { timeout: 6_000 });
+};
+
+const swipeHorizontal = async (page, direction = "next") => {
+  const width = page.viewportSize().width;
+  const y = Math.round(page.viewportSize().height * 0.48);
+  const isNext = direction === "next";
+  await dragTouch(page, {
+    startX: isNext ? width - 28 : 32,
+    startY: y,
+    endX: isNext ? 32 : width - 28,
+    endY: y,
+    steps: 12,
+    delay: 12
+  });
+  await waitForPagerStable(page);
 };
 
 const assertNoCriticalConsoleErrors = (consoleErrors) => {
@@ -184,6 +227,28 @@ const assertCanScrollActiveViewVertically = async (page, minDelta = 160) => {
   return { before, after };
 };
 
+const assertCanScrollActiveViewVerticallyBothWays = async (page, minDelta = 250) => {
+  const down = await assertCanScrollActiveViewVertically(page, minDelta);
+  const beforeReverse = await getScrollDiagnostics(page);
+  await dragTouch(page, {
+    startX: Math.round(page.viewportSize().width / 2),
+    startY: Math.round(page.viewportSize().height * 0.28),
+    endX: Math.round(page.viewportSize().width / 2),
+    endY: Math.round(page.viewportSize().height * 0.74),
+    steps: 10,
+    delay: 12
+  });
+  await page.waitForTimeout(180);
+  const afterReverse = await getScrollDiagnostics(page);
+  expect(afterReverse.activeView, "reverse vertical drag keeps active page").toBe(beforeReverse.activeView);
+  expect(
+    beforeReverse.scrollerScrollTop - afterReverse.scrollerScrollTop > Math.min(140, beforeReverse.scrollerScrollTop) ||
+      beforeReverse.scrollerScrollTop <= 2,
+    "active view scrollTop decreases after immediate reverse drag"
+  ).toBe(true);
+  return { down, beforeReverse, afterReverse };
+};
+
 const openChatHub = async (page) => {
   await page.locator("#brisa-chat-bubble").waitFor({ state: "visible", timeout: 15_000 });
   await page.locator("#brisa-chat-bubble").click();
@@ -196,79 +261,51 @@ const openChatDetail = async (page) => {
   await expect(page.locator("#brisa-chat-window[data-chat-state='open']")).toBeVisible({ timeout: 10_000 });
 };
 
-test("pager allows immediate reverse horizontal gesture during momentum", async ({ page }) => {
+test("Muro vertical scroll is natural and stays on Muro", async ({ page }) => {
   const consoleErrors = collectConsoleErrors(page);
   await loginToMobileApp(page, "carrete");
 
-  await dragTouch(page, {
-    startX: page.viewportSize().width - 28,
-    startY: Math.round(page.viewportSize().height * 0.48),
-    endX: 34,
-    endY: Math.round(page.viewportSize().height * 0.49),
-    steps: 5,
-    delay: 10
-  });
-  await page.waitForTimeout(45);
-  await dragTouch(page, {
-    startX: 34,
-    startY: Math.round(page.viewportSize().height * 0.48),
-    endX: page.viewportSize().width - 28,
-    endY: Math.round(page.viewportSize().height * 0.49),
-    steps: 5,
-    delay: 10
-  });
-
-  await waitForPagerStable(page);
-  const diagnostics = await getScrollDiagnostics(page);
-  expect(["muro", "estructura", "ia", "comites", "foro"]).toContain(diagnostics.activeView);
-  expect(diagnostics.pagerAligned, "pager aligned to a real page").toBe(true);
-  expect(diagnostics.pagerState.isProgrammaticPagerScroll, "programmatic flag released").toBe(false);
-  expect(diagnostics.pagerState.activeUserGesture, "gesture flag released").toBe(false);
-  expect(diagnostics.documentOverflowOk && diagnostics.bodyOverflowOk, "no horizontal overflow").toBe(true);
+  const result = await assertCanScrollActiveViewVerticallyBothWays(page, 250);
+  expect(result.down.after.activeView, "vertical drag keeps Muro active").toBe("muro");
+  expect(result.afterReverse.activeView, "reverse vertical drag keeps Muro active").toBe("muro");
+  expect(result.down.after.documentOverflowOk && result.down.after.bodyOverflowOk, "no horizontal overflow").toBe(true);
   assertNoCriticalConsoleErrors(consoleErrors);
 });
 
-test("vertical feed scroll remains primary and horizontal swipe still changes views", async ({ page }) => {
+test("horizontal swipe moves through mobile sections and back", async ({ page }) => {
   const consoleErrors = collectConsoleErrors(page);
   await loginToMobileApp(page, "carrete");
 
-  const verticalResult = await assertCanScrollActiveViewVertically(page, 140);
-  expect(verticalResult.after.activeView, "vertical drag keeps Muro active").toBe("muro");
-  await page.waitForTimeout(450);
-  await page.evaluate(() => window.__dmMobileShell?.refreshScrollState?.("qa-before-horizontal-swipe"));
+  for (const expected of ["estructura", "ia", "comites", "foro"]) {
+    await swipeHorizontal(page, "next");
+    const diagnostics = await getScrollDiagnostics(page);
+    expect(diagnostics.activeView, `swipe next reaches ${expected}`).toBe(expected);
+    expect(diagnostics.pagerAligned, "pager aligned to a real page").toBe(true);
+  }
 
-  await dragTouch(page, {
-    startX: page.viewportSize().width - 28,
-    startY: Math.round(page.viewportSize().height * 0.46),
-    endX: 32,
-    endY: Math.round(page.viewportSize().height * 0.46),
-    steps: 10,
-    delay: 10
-  });
-  await waitForPagerStable(page);
-  const afterHorizontal = await getScrollDiagnostics(page);
-  expect(afterHorizontal.activeView, "clear horizontal swipe changes view").not.toBe("muro");
+  for (const expected of ["comites", "ia", "estructura", "muro"]) {
+    await swipeHorizontal(page, "prev");
+    const diagnostics = await getScrollDiagnostics(page);
+    expect(diagnostics.activeView, `swipe prev reaches ${expected}`).toBe(expected);
+    expect(diagnostics.pagerAligned, "pager aligned to a real page").toBe(true);
+  }
 
-  await page.locator('[data-route="muro"]').click();
-  await waitForPagerStable(page);
-  const backToMuro = await getScrollDiagnostics(page);
-  expect(backToMuro.activeView).toBe("muro");
   assertNoCriticalConsoleErrors(consoleErrors);
 });
 
-test("minimizing chat releases scroll and active feed remains scrollable", async ({ page }) => {
+test("vertical drag does not trigger horizontal navigation", async ({ page }) => {
   const consoleErrors = collectConsoleErrors(page);
   await loginToMobileApp(page, "carrete");
 
-  await openChatDetail(page);
-  await page.locator("#brisa-chat-window-min").click();
-  await page.waitForFunction(() => !document.getElementById("brisa-chat-root")?.classList.contains("brisa-chat-root--mobile-open"));
-  await assertNoMobileScrollLock(page);
-  await assertCanScrollActiveViewVertically(page, 180);
+  const before = await getScrollDiagnostics(page);
+  expect(before.activeView).toBe("muro");
+  const result = await assertCanScrollActiveViewVertically(page, 250);
+  expect(result.after.activeView, "vertical drag keeps the active page").toBe("muro");
+  expect(result.after.scrollerScrollTop, "feed scrollTop changes").toBeGreaterThan(before.scrollerScrollTop);
   assertNoCriticalConsoleErrors(consoleErrors);
 });
 
-test("chat overlay close paths do not leave invisible interceptors", async ({ page }) => {
+test("chat close and minimize do not leave scroll locks or invisible overlays", async ({ page }) => {
   const consoleErrors = collectConsoleErrors(page);
   await loginToMobileApp(page, "carrete");
 
@@ -286,6 +323,9 @@ test("chat overlay close paths do not leave invisible interceptors", async ({ pa
   await page.locator("#brisa-chat-window-min").click();
   await page.waitForTimeout(150);
   await assertNoMobileScrollLock(page);
-  await assertCanScrollActiveViewVertically(page, 160);
+  await assertCanScrollActiveViewVertically(page, 220);
+  await swipeHorizontal(page, "next");
+  const afterSwipe = await getScrollDiagnostics(page);
+  expect(afterSwipe.activeView, "horizontal swipe still works after chat").toBe("estructura");
   assertNoCriticalConsoleErrors(consoleErrors);
 });

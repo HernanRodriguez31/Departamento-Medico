@@ -59,10 +59,10 @@
 
     <!-- Styles -->
     <link rel="stylesheet" href="/css/variables.css">
-    <link rel="stylesheet" href="/css/app.css?v=20260427-mobile-scroll-recovery-1">
+    <link rel="stylesheet" href="/css/app.css?v=20260428-mobile-ai-interactions-1">
     <link rel="stylesheet" href="/css/structure.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="/assets/css/pages/app.css?v=20260426-committee-graphic-3">
+    <link rel="stylesheet" href="/assets/css/pages/app.css?v=20260428-mobile-muro-composer-width-1">
     <link rel="stylesheet" href="/assets/css/core-contrast.css">
     <link rel="manifest" href="/app/manifest.json">
 
@@ -1172,11 +1172,19 @@
         }
 
         .brisa-chat-status-icon--read {
-            color: #ffffff;
-            background: rgba(255, 255, 255, 0.18);
+            color: #0ea5e9;
+            background: rgba(255, 255, 255, 0.9);
             padding: 1px 4px;
             border-radius: 10px;
+            border: 1px solid rgba(14, 165, 233, 0.24);
             font-weight: 700;
+        }
+
+        .brisa-chat-msg--me .brisa-chat-status-icon.brisa-chat-status-icon--read {
+            color: #0ea5e9;
+            background: rgba(255, 255, 255, 0.92);
+            border-color: rgba(14, 165, 233, 0.28);
+            text-shadow: none;
         }
 
         .brisa-chat-delete-btn {
@@ -1860,46 +1868,18 @@
 </head>
 
 <body>
-    <div id="app-splash"
-        style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #ffffff; z-index: 9999999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.4s ease-out;">
-        <img src="../assets/images/logo-dpto-medico-large.png" class="splash-logo" alt="Departamento Médico">
-        <div
-            style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #4ade80; border-radius: 50%; animation: spin 0.8s linear infinite; margin-top: 20px;">
+    <div id="app-splash" class="app-splash" aria-live="polite" aria-busy="true">
+        <div class="app-splash__content">
+            <img src="../assets/images/logo-dpto-medico-large.png" class="splash-logo app-splash__logo"
+                alt="Departamento Médico" width="1024" height="1024" decoding="async">
+            <div class="app-splash__loader">
+                <div class="dm-brisa-loader dm-brisa-loader--splash" aria-hidden="true">
+                    <span class="dm-brisa-loader__ring"></span>
+                    <span class="dm-brisa-loader__brand">BRISA</span>
+                </div>
+                <p class="app-splash__loader-text">Cargando…</p>
+            </div>
         </div>
-        <style>
-            @keyframes spin {
-                0% {
-                    transform: rotate(0deg);
-                }
-                100% {
-                    transform: rotate(360deg);
-                }
-            }
-
-            @keyframes pulse {
-                0% {
-                    transform: scale(1);
-                }
-                50% {
-                    transform: scale(1.03);
-                }
-                100% {
-                    transform: scale(1);
-                }
-            }
-
-            .splash-logo {
-                width: 280px;
-                height: auto;
-                animation: pulse 2s infinite;
-            }
-
-            @media (min-width: 1024px) {
-                .splash-logo {
-                    width: 450px;
-                }
-            }
-        </style>
     </div>
     <header class="header" id="header">
         <div class="container header__container">
@@ -1918,8 +1898,9 @@
 
             <div class="header__center">
                 <div class="header__title-center">
-                    <span class="header__title-line">Departamento</span>
-                    <span class="header__title-line">Médico</span>
+                    <span class="header__title-line header__title-line--desktop">Departamento</span>
+                    <span class="header__title-line header__title-line--desktop">Médico</span>
+                    <span class="header__title-line header__title-line--mobile">Departamento Médico</span>
                 </div>
             </div>
 
@@ -2402,7 +2383,8 @@
                         role="link" tabindex="0">
                         <div class="comite__content">
                             <div class="comite__image-wrap">
-                              <img class="comite__image" src="/assets/images/committees/committee-emergencias.png?v=20260426-committee-graphic-3" width="1254" height="1254" alt="Comité Ejecutivo de Emergencias. Protocolos y gestión de respuesta ante emergencias médicas." loading="lazy" decoding="async">
+                              <img class="comite__image" src="/assets/images/committees/committee-emergencias.png?v=20260428-committee-icons-cache-1" width="1254" height="1254" alt="Comité Ejecutivo de Emergencias. Protocolos y gestión de respuesta ante emergencias médicas." loading="lazy" decoding="async" onload="this.closest('.comite__image-wrap')?.classList.toggle('is-image-failed', !this.naturalWidth)" onerror="this.closest('.comite__image-wrap')?.classList.add('is-image-failed')">
+                              <span class="comite__image-fallback" aria-hidden="true"><i data-lucide="alert-triangle"></i></span>
                             </div>
                             <header class="comite__card-header comite__card-header--sr">
                                 <div class="comite__kicker">
@@ -2423,7 +2405,8 @@
                         role="link" tabindex="0">
                         <div class="comite__content">
                             <div class="comite__image-wrap">
-                              <img class="comite__image" src="/assets/images/committees/committee-salud-ocupacional.png?v=20260426-committee-graphic-3" width="1254" height="1254" alt="Comité de Salud Ocupacional. Seguridad, higiene y medicina del trabajo." loading="lazy" decoding="async">
+                              <img class="comite__image" src="/assets/images/committees/committee-salud-ocupacional.png?v=20260428-committee-icons-cache-1" width="1254" height="1254" alt="Comité de Salud Ocupacional. Seguridad, higiene y medicina del trabajo." loading="lazy" decoding="async" onload="this.closest('.comite__image-wrap')?.classList.toggle('is-image-failed', !this.naturalWidth)" onerror="this.closest('.comite__image-wrap')?.classList.add('is-image-failed')">
+                              <span class="comite__image-fallback" aria-hidden="true"><i data-lucide="shield"></i></span>
                             </div>
                             <header class="comite__card-header comite__card-header--sr">
                                 <div class="comite__kicker">
@@ -2444,7 +2427,8 @@
                         role="link" tabindex="0">
                         <div class="comite__content">
                             <div class="comite__image-wrap">
-                              <img class="comite__image" src="/assets/images/committees/committee-calidad-seguridad.png?v=20260426-committee-graphic-3" width="1254" height="1254" alt="Comité de Calidad y Seguridad. Estándares de calidad y seguridad del paciente." loading="lazy" decoding="async">
+                              <img class="comite__image" src="/assets/images/committees/committee-calidad-seguridad.png?v=20260428-committee-icons-cache-1" width="1254" height="1254" alt="Comité de Calidad y Seguridad. Estándares de calidad y seguridad del paciente." loading="lazy" decoding="async" onload="this.closest('.comite__image-wrap')?.classList.toggle('is-image-failed', !this.naturalWidth)" onerror="this.closest('.comite__image-wrap')?.classList.add('is-image-failed')">
+                              <span class="comite__image-fallback" aria-hidden="true"><i data-lucide="check-circle"></i></span>
                             </div>
                             <header class="comite__card-header comite__card-header--sr">
                                 <div class="comite__kicker">
@@ -2465,7 +2449,8 @@
                         role="link" tabindex="0">
                         <div class="comite__content">
                             <div class="comite__image-wrap">
-                              <img class="comite__image" src="/assets/images/committees/committee-salud-digital-innovacion.png?v=20260426-committee-graphic-3" width="1254" height="1254" alt="Comité de Salud Digital e Innovación. Transformación e innovación digital en salud." loading="lazy" decoding="async">
+                              <img class="comite__image" src="/assets/images/committees/committee-salud-digital-innovacion.png?v=20260428-committee-icons-cache-1" width="1254" height="1254" alt="Comité de Salud Digital e Innovación. Transformación e innovación digital en salud." loading="lazy" decoding="async" onload="this.closest('.comite__image-wrap')?.classList.toggle('is-image-failed', !this.naturalWidth)" onerror="this.closest('.comite__image-wrap')?.classList.add('is-image-failed')">
+                              <span class="comite__image-fallback" aria-hidden="true"><i data-lucide="laptop"></i></span>
                             </div>
                             <header class="comite__card-header comite__card-header--sr">
                                 <div class="comite__kicker">
@@ -2486,7 +2471,8 @@
                         role="link" tabindex="0">
                         <div class="comite__content">
                             <div class="comite__image-wrap">
-                              <img class="comite__image" src="/assets/images/committees/committee-docencia-investigacion.png?v=20260426-committee-graphic-3" width="1254" height="1254" alt="Comité de Docencia e Investigación. Formación continua y desarrollo científico." loading="lazy" decoding="async">
+                              <img class="comite__image" src="/assets/images/committees/committee-docencia-investigacion.png?v=20260428-committee-icons-cache-1" width="1254" height="1254" alt="Comité de Docencia e Investigación. Formación continua y desarrollo científico." loading="lazy" decoding="async" onload="this.closest('.comite__image-wrap')?.classList.toggle('is-image-failed', !this.naturalWidth)" onerror="this.closest('.comite__image-wrap')?.classList.add('is-image-failed')">
+                              <span class="comite__image-fallback" aria-hidden="true"><i data-lucide="graduation-cap"></i></span>
                             </div>
                             <header class="comite__card-header comite__card-header--sr">
                                 <div class="comite__kicker">
@@ -2507,7 +2493,8 @@
                         role="link" tabindex="0">
                         <div class="comite__content">
                             <div class="comite__image-wrap">
-                              <img class="comite__image" src="/assets/images/committees/committee-farmacia-terapeutica.png?v=20260426-committee-graphic-3" width="1254" height="1254" alt="Comité de Farmacia y Terapéutica. Gestión de medicamentos y tratamientos." loading="lazy" decoding="async">
+                              <img class="comite__image" src="/assets/images/committees/committee-farmacia-terapeutica.png?v=20260428-committee-icons-cache-1" width="1254" height="1254" alt="Comité de Farmacia y Terapéutica. Gestión de medicamentos y tratamientos." loading="lazy" decoding="async" onload="this.closest('.comite__image-wrap')?.classList.toggle('is-image-failed', !this.naturalWidth)" onerror="this.closest('.comite__image-wrap')?.classList.add('is-image-failed')">
+                              <span class="comite__image-fallback" aria-hidden="true"><i data-lucide="pill"></i></span>
                             </div>
                             <header class="comite__card-header comite__card-header--sr">
                                 <div class="comite__kicker">
@@ -2528,7 +2515,8 @@
                         role="link" tabindex="0">
                         <div class="comite__content">
                             <div class="comite__image-wrap">
-                              <img class="comite__image" src="/assets/images/committees/committee-bioetica.png?v=20260426-committee-graphic-3" width="1254" height="1254" alt="Comité de Bioética. Análisis ético de la práctica médica." loading="lazy" decoding="async">
+                              <img class="comite__image" src="/assets/images/committees/committee-bioetica.png?v=20260428-committee-icons-cache-1" width="1254" height="1254" alt="Comité de Bioética. Análisis ético de la práctica médica." loading="lazy" decoding="async" onload="this.closest('.comite__image-wrap')?.classList.toggle('is-image-failed', !this.naturalWidth)" onerror="this.closest('.comite__image-wrap')?.classList.add('is-image-failed')">
+                              <span class="comite__image-fallback" aria-hidden="true"><i data-lucide="scale"></i></span>
                             </div>
                             <header class="comite__card-header comite__card-header--sr">
                                 <div class="comite__kicker">
@@ -2651,13 +2639,13 @@
                             data-form-type="other" />
                     </div>
                     <div class="dm-muro-actions">
+                        <button id="dm-muro-send" type="button" class="dm-muro-send dm-send-btn" data-dm-send-post aria-label="Publicar" disabled hidden>
+                            <i data-lucide="send"></i>
+                        </button>
                         <button id="dm-muro-photo" type="button" class="dm-muro-action" aria-label="Agregar foto">
                             <i data-lucide="image"></i>
                         </button>
                     </div>
-                    <button id="dm-muro-send" type="button" class="dm-muro-send dm-send-btn" data-dm-send-post aria-label="Publicar">
-                        <i data-lucide="send"></i>
-                    </button>
                 </div>
             </div>
             <div class="dm-carousel-header">
@@ -2826,6 +2814,13 @@
                         <span>Imagen</span>
                         <input id="dm-carousel-file-input" type="file" accept="image/*" required />
                     </label>
+                    <div id="dm-carousel-file-preview" class="dm-carousel-file-preview" hidden>
+                        <img id="dm-carousel-file-preview-img" class="dm-carousel-file-preview__img" alt="" />
+                        <div class="dm-carousel-file-preview__body">
+                            <strong>Imagen lista</strong>
+                            <span id="dm-carousel-file-preview-name">Archivo seleccionado</span>
+                        </div>
+                    </div>
                     <label class="dm-carousel-field">
                         <span>Unidad de negocio</span>
                         <select id="dm-carousel-bu" required>
@@ -2847,6 +2842,14 @@
                     </div>
                 </form>
                 <div id="dm-carousel-error" class="dm-carousel-error" role="alert" style="display:none;"></div>
+                <div id="dm-carousel-upload-status" class="dm-carousel-upload-status" role="status"
+                    aria-live="polite" aria-atomic="true" hidden>
+                    <div class="dm-brisa-loader dm-brisa-loader--upload" aria-hidden="true">
+                        <span class="dm-brisa-loader__ring"></span>
+                        <span class="dm-brisa-loader__brand">BRISA</span>
+                    </div>
+                    <p id="dm-carousel-upload-status-text">Subiendo imagen…</p>
+                </div>
             </div>
         </div>
         <div id="dm-pdf-viewer-modal" class="dm-pdf-viewer" aria-hidden="true" hidden>
@@ -2959,7 +2962,7 @@
 
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.26.24"></script>
-    <script src="/js/app-mobile.js?v=20260427-mobile-scroll-recovery-1"></script>
+    <script src="/js/app-mobile.js?v=20260428-mobile-ai-interactions-1"></script>
 
     <!-- Lucide para iconos del foro general -->
     <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
@@ -4237,7 +4240,7 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
 
     </script>
 
-    <script type="module" src="/js/chat.js?v=20260427-mobile-scroll-recovery-1"></script>
+    <script type="module" src="/js/chat.js?v=20260428-chat-read-receipts-1"></script>
     <script type="module">
         import { isChatHash } from "/assets/js/common/routes.js";
 
@@ -4247,7 +4250,7 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
             const loadChat = () => {
                 if (chatLoaded) return Promise.resolve();
                 if (chatLoading) return chatLoading;
-                chatLoading = import('/js/chat.js?v=20260427-mobile-scroll-recovery-1')
+                chatLoading = import('/js/chat.js?v=20260428-chat-read-receipts-1')
                     .then(() => {
                         chatLoaded = true;
                     })
@@ -4271,7 +4274,7 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
             }
         })();
     </script>
-    <script type="module" src="/assets/js/pages/app.js?v=20260427-profile-avatar-priority-1"></script>
+    <script type="module" src="/assets/js/pages/app.js?v=20260428-mobile-ai-endpoint-recovery-1"></script>
     <script type="module">
         import { getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
         import { logger } from "/assets/js/common/app-logger.js";
@@ -4320,6 +4323,7 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
             if (!registration) {
                 registration = await navigator.serviceWorker.register(APP_SW_URL, { scope: APP_SW_SCOPE });
             }
+            registration.update().catch(() => {});
             sendFirebaseInitToAppWorker(registration);
             ensureAppServiceWorkerControllerListener();
             return registration;

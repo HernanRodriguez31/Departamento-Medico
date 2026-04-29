@@ -35,7 +35,7 @@ import { buildCommitteeMemberWritePayload } from "../common/committee-member-rol
 import { COLLECTIONS } from "../common/collections.js";
 import { requireAuth, buildLoginRedirectUrl } from "../shared/authGate.js";
 import { handleFirebaseError } from "../shared/errors.js";
-import { initAssistantShell } from "../shared/assistant-shell.js?v=20260306-chat-desktop-layout-1";
+import { initAssistantShell } from "../shared/assistant-shell.js?v=20260428-mobile-ai-endpoint-recovery-1";
 import { logger, once, throttle } from "../common/app-logger.js";
 import { initUserMenu } from "../common/user-menu.js?v=20260427-profile-avatar-priority-1";
 import { hydrateAvatars } from "../common/user-profiles.js?v=20260427-profile-avatar-priority-1";
@@ -181,6 +181,11 @@ async function initCarouselModule() {
     (modal && modal.querySelector("form")) ||
     document.getElementById("dm-carousel-form");
   const fileInput = document.getElementById("dm-carousel-file-input");
+  const filePreview = document.getElementById("dm-carousel-file-preview");
+  const filePreviewImage = document.getElementById("dm-carousel-file-preview-img");
+  const filePreviewName = document.getElementById("dm-carousel-file-preview-name");
+  const uploadStatus = document.getElementById("dm-carousel-upload-status");
+  const uploadStatusText = document.getElementById("dm-carousel-upload-status-text");
   const titleInput = document.getElementById("dm-carousel-title-input");
   const buSelect = document.getElementById("dm-carousel-bu");
   const muSelect = document.getElementById("dm-carousel-mu");
@@ -192,7 +197,7 @@ async function initCarouselModule() {
     // Keep the modal outside transformed sections so it overlays the viewport.
     document.body.appendChild(modal);
   }
-  const loader = document.getElementById("dm-loading");
+  modal?.classList.remove("dm-mobile-pager-stashed");
   const speedDownBtn = document.getElementById("dm-slower");
   const speedUpBtn = document.getElementById("dm-faster");
   const speedInput = document.getElementById("dm-speed-input");
@@ -1104,6 +1109,21 @@ async function initCarouselModule() {
     }
   };
 
+  const prependUploadedPost = (post) => {
+    if (!post?.id) return;
+    const existing = postsById.get(post.id) || {};
+    const merged = { ...existing, ...post };
+    postsById.set(post.id, merged);
+    feedPosts = [merged, ...feedPosts.filter((item) => item.id !== merged.id)];
+    slides = feedPosts.filter((s) => s.imageUrl);
+    if (feedMode) {
+      appendFeedPosts([merged], { position: "start", preserveScroll: false });
+      syncFeedIndices();
+    } else {
+      renderSlides();
+    }
+  };
+
   const updateFeedPostElement = (post) => {
     if (!track || !post) return;
     const postEl = track.querySelector(`.dm-post[data-id="${post.id}"]`);
@@ -1227,7 +1247,7 @@ async function initCarouselModule() {
   };
 
   // Firestore pagination uses limit/startAfter for the feed.
-  const loadPostsPage = async ({ reset = false } = {}) => {
+  const loadPostsPage = async ({ reset = false, silent = false } = {}) => {
     if (!db || isLoadingPosts || appState.permissionDenied) return;
     if (!hasMorePosts && !reset) return;
     isLoadingPosts = true;
@@ -1236,7 +1256,9 @@ async function initCarouselModule() {
       lastPostDoc = null;
       hasMorePosts = true;
       isInitialLoading = true;
-      renderFeedSkeleton();
+      if (!silent) {
+        renderFeedSkeleton();
+      }
     } else {
       updateFeedSentinel({ loading: true, hasMore: hasMorePosts, errorMessage: "" });
     }
@@ -1248,7 +1270,12 @@ async function initCarouselModule() {
       }
       const snap = await getDocs(q);
       const incoming = snap.docs.map(mapPostDoc).filter((s) => s.imageUrl || s.text || s.title);
-      mergePosts(incoming, { reset });
+      const incomingIds = new Set(incoming.map((post) => post.id));
+      const preservedOptimistic =
+        reset && silent
+          ? feedPosts.filter((post) => post?._optimistic && !incomingIds.has(post.id))
+          : [];
+      mergePosts([...preservedOptimistic, ...incoming], { reset });
       if (snap.docs.length > 0) {
         lastPostDoc = snap.docs[snap.docs.length - 1];
       }
@@ -2587,18 +2614,99 @@ async function initCarouselModule() {
     }
   });
 
-  const openModal = () => {
+  let uploadPreviewUrl = "";
+  let uploadBusy = false;
+
+  const getUploadControls = () =>
+    [
+      saveBtn,
+      modalCancel,
+      modalClose,
+      fileInput,
+      titleInput,
+      buSelect,
+      muSelect,
+      ...(form ? Array.from(form.querySelectorAll(".emoji-trigger")) : [])
+    ].filter(Boolean);
+
+  const setUploadBusy = (isBusy, message = "Subiendo imagen…") => {
+    uploadBusy = Boolean(isBusy);
+    if (uploadStatusText) {
+      uploadStatusText.textContent = message;
+    }
+    if (uploadBusy) {
+      uploadStatus?.removeAttribute("hidden");
+      modal?.classList.add("is-uploading");
+      modal?.setAttribute("aria-busy", "true");
+    } else {
+      uploadStatus?.setAttribute("hidden", "true");
+      modal?.classList.remove("is-uploading");
+      modal?.removeAttribute("aria-busy");
+    }
+    getUploadControls().forEach((control) => {
+      if (uploadBusy) {
+        control.dataset.dmUploadWasDisabled = control.disabled ? "true" : "false";
+        control.disabled = true;
+        control.setAttribute("aria-disabled", "true");
+        return;
+      }
+      if (Object.prototype.hasOwnProperty.call(control.dataset, "dmUploadWasDisabled")) {
+        control.disabled = control.dataset.dmUploadWasDisabled === "true";
+      }
+      control.removeAttribute("aria-disabled");
+      delete control.dataset.dmUploadWasDisabled;
+    });
+  };
+
+  const resetUploadPreview = () => {
+    if (uploadPreviewUrl) {
+      URL.revokeObjectURL(uploadPreviewUrl);
+      uploadPreviewUrl = "";
+    }
+    if (filePreviewImage) {
+      filePreviewImage.removeAttribute("src");
+      filePreviewImage.alt = "";
+    }
+    if (filePreviewName) {
+      filePreviewName.textContent = "Archivo seleccionado";
+    }
+    filePreview?.setAttribute("hidden", "true");
+  };
+
+  const syncUploadPreview = () => {
+    resetUploadPreview();
+    const file = fileInput?.files?.[0];
+    if (!file) return;
+    uploadPreviewUrl = URL.createObjectURL(file);
+    if (filePreviewImage) {
+      filePreviewImage.src = uploadPreviewUrl;
+      filePreviewImage.alt = `Vista previa de ${file.name || "imagen seleccionada"}`;
+    }
+    if (filePreviewName) {
+      filePreviewName.textContent = file.name || "Imagen seleccionada";
+    }
+    filePreview?.removeAttribute("hidden");
+  };
+
+  const openModal = ({ focusFile = false, selectFile = false } = {}) => {
+    modal?.classList.remove("dm-mobile-pager-stashed");
     modal?.classList.add("is-open");
     modal?.setAttribute("aria-hidden", "false");
     if (errorBox) {
       errorBox.style.display = "none";
     }
     populateUnidadGestionSelect();
+    if (focusFile && fileInput) {
+      fileInput.focus({ preventScroll: true });
+      if (selectFile) fileInput.click();
+    }
   };
   const closeModal = () => {
+    if (uploadBusy) return;
     modal?.classList.remove("is-open");
     modal?.setAttribute("aria-hidden", "true");
     form?.reset();
+    resetUploadPreview();
     if (errorBox) {
       errorBox.style.display = "none";
     }
@@ -2608,8 +2716,9 @@ async function initCarouselModule() {
   modalClose?.addEventListener("click", closeModal);
   modalCancel?.addEventListener("click", closeModal);
   modal?.addEventListener("click", (e) => {
-    if (e.target === modal) closeModal();
+    if (e.target === modal && !uploadBusy) closeModal();
   });
+  fileInput?.addEventListener("change", syncUploadPreview);
 
   const THUMB_WIDTH = 480;
   const THUMB_QUALITY = 0.6;
@@ -2662,6 +2771,7 @@ async function initCarouselModule() {
   };
 
   const handleUpload = async (user) => {
+    if (uploadBusy) return;
     if (!form || !fileInput || !titleInput || !buSelect || !muSelect) return;
     if (errorBox) {
       errorBox.style.display = "none";
@@ -2677,7 +2787,7 @@ async function initCarouselModule() {
       }
       return;
     }
-    if (loader) loader.classList.remove("dm-loading-hidden");
+    setUploadBusy(true, "Subiendo imagen…");
     try {
       const { db, storage } = ensureFirebase();
       if (!db || !storage) {
@@ -2708,8 +2818,9 @@ async function initCarouselModule() {
           });
         }
       }
-      await addDoc(collection(db, POSTS_COLLECTION), {
+      const docRef = await addDoc(collection(db, POSTS_COLLECTION), {
         title,
+        type: "image",
         imageUrl: downloadURL,
         thumbUrl,
         unidadNegocio,
@@ -2721,16 +2832,37 @@ async function initCarouselModule() {
         likedBy: [],
         likedNames: []
       });
-      loadPostsPage({ reset: true });
+      prependUploadedPost({
+        id: docRef.id,
+        title,
+        text: title,
+        type: "image",
+        imageUrl: downloadURL,
+        thumbUrl,
+        unidadNegocio,
+        unidadGestion,
+        createdByUid: user.uid,
+        authorUid: user.uid,
+        createdByName: user.displayName || user.email || "Usuario",
+        createdAt: new Date(),
+        likesCount: 0,
+        likedBy: [],
+        likedNames: [],
+        _optimistic: true
+      });
+      loadPostsPage({ reset: true, silent: true });
       titleInput.value = "";
       fileInput.value = "";
+      resetUploadPreview();
       buSelect.value = "";
       muSelect.innerHTML = '<option value="">Seleccionar</option>';
       if (errorBox) {
         errorBox.style.display = "none";
       }
+      setUploadBusy(false);
       closeModal();
     } catch (e) {
+      setUploadBusy(false);
       if (isPermissionError(e)) {
         once("perm:upload-image", () => {
           logger.warn("[Muro] Sin permisos para subir imagen.", e);
@@ -2749,7 +2881,18 @@ async function initCarouselModule() {
         errorBox.style.display = "block";
       }
     } finally {
-      if (loader) loader.classList.add("dm-loading-hidden");
+      setUploadBusy(false);
+    }
+  };
+
+  const syncMuroComposerState = () => {
+    if (!muroInput || !muroSendBtn) return;
+    const hasText = Boolean(muroInput.value.trim());
+    muroSendBtn.hidden = !hasText;
+    if (hasText) {
+      muroSendBtn.removeAttribute("disabled");
+    } else {
+      muroSendBtn.setAttribute("disabled", "true");
     }
   };
 
@@ -2785,6 +2928,7 @@ async function initCarouselModule() {
       });
       loadPostsPage({ reset: true });
       muroInput.value = "";
+      syncMuroComposerState();
     } catch (err) {
       if (isPermissionError(err)) {
         once("perm:text-post", () => {
@@ -2798,7 +2942,7 @@ async function initCarouselModule() {
       });
       Swal?.fire?.("Error", "No se pudo publicar el texto.", "error") || alert("No se pudo publicar el texto.");
     } finally {
-      muroSendBtn?.removeAttribute("disabled");
+      syncMuroComposerState();
     }
   };
 
@@ -2857,6 +3001,8 @@ async function initCarouselModule() {
   form?.addEventListener("submit", handleSubmit);
   saveBtn?.addEventListener("click", handleSubmit);
   btnAddImage?.addEventListener("click", openModal);
+  syncMuroComposerState();
+  muroInput?.addEventListener("input", syncMuroComposerState);
   muroInput?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -2864,8 +3010,10 @@ async function initCarouselModule() {
     }
   });
   muroSendBtn?.addEventListener("click", submitTextPost);
-  muroPhotoBtn?.addEventListener("click", () => {
-    openModal();
+  muroPhotoBtn?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    openModal({ focusFile: true });
   });
   refreshLikeUI();
 

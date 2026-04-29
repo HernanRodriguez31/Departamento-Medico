@@ -1,6 +1,6 @@
 import { getFirebase } from "../common/firebaseClient.js";
 
-const DEFAULT_SRC = "/asistente-ia/index.html?embed=1";
+const DEFAULT_SRC = "/asistente-ia/index.html?embed=1&v=20260428-mobile-ai-endpoint-recovery-1";
 const FRAME_SOURCES = {
   gemini: `${DEFAULT_SRC}&model=gemini`,
   gpt: `${DEFAULT_SRC}&model=gpt`

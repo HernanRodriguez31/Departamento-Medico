@@ -149,25 +149,18 @@ document.addEventListener('DOMContentLoaded', () => {
         comites: ['#comites'],
         foro: ['#foro']
     }
-    const PAGER_ORDER = [
-        { key: 'ghost-foro', viewId: 'foro', ghost: true },
-        { key: 'muro', viewId: 'muro', ghost: false },
-        { key: 'estructura', viewId: 'estructura', ghost: false },
-        { key: 'ia', viewId: 'ia', ghost: false },
-        { key: 'comites', viewId: 'comites', ghost: false },
-        { key: 'foro', viewId: 'foro', ghost: false },
-        { key: 'ghost-muro', viewId: 'muro', ghost: true }
-    ]
-    const PAGER_GHOST_REFRESH_DELAY_MS = 260
-    const PAGER_SETTLE_DEBOUNCE_MS = 140
-    const PAGER_SETTLE_STABLE_FRAMES = 4
-    const PAGER_SETTLE_MAX_MS = 520
-    const PAGER_HORIZONTAL_INTENT_PX = 12
-    const PAGER_VERTICAL_INTENT_PX = 10
-    const PAGER_HORIZONTAL_INTENT_RATIO = 1.3
-    const PAGER_RECENT_HORIZONTAL_GESTURE_MS = 520
-    const PAGER_SWIPE_TARGET_RATIO = 0.16
-    const PAGER_SWIPE_VELOCITY_PX_MS = 0.35
+    const PAGER_ORDER = ['muro', 'estructura', 'ia', 'comites', 'foro']
+    const PAGER_TOUCH_HORIZONTAL_PX = 10
+    const PAGER_TOUCH_VERTICAL_PX = 32
+    const PAGER_TOUCH_HORIZONTAL_RATIO = 1.25
+    const PAGER_TOUCH_VERTICAL_RATIO = 1.6
+    const PAGER_TOUCH_COMMIT_PX = 52
+    const PAGER_MOUSE_COMMIT_PX = 14
+    const PAGER_TOUCH_SWIPE_RATIO = 0.28
+    const PAGER_WHEEL_HORIZONTAL_PX = 36
+    const PAGER_WHEEL_HORIZONTAL_RATIO = 1.35
+    const PAGER_WHEEL_GESTURE_GAP_MS = 180
+    const PAGER_WHEEL_LOCK_MS = 520
 
     const rootStyle = document.documentElement.style
     let rafLayout = 0
@@ -179,38 +172,43 @@ document.addEventListener('DOMContentLoaded', () => {
         shellEl: null,
         viewportEl: null,
         trackEl: null,
+        trackInnerEl: null,
         assistantHostEl: null,
         pagesByKey: new Map(),
         realPagesByView: new Map(),
         scrollersByView: new Map(),
         anchors: [],
         stashedNodes: [],
-        mutationObservers: [],
-        ghostRefreshTimers: new Map(),
-        ghostViews: new Map(),
+        pageIndex: 0,
+        dragX: 0,
         isProgrammaticPagerScroll: false,
         programmaticTargetViewId: null,
-        isWrappingGhostJump: false,
-        pendingSettleTimer: 0,
-        settleRafId: 0,
+        touchActive: false,
+        touchIntent: 'idle',
+        gestureSource: 'idle',
+        pointerId: null,
+        touchStartX: 0,
+        touchStartY: 0,
+        touchStartIndex: -1,
+        touchTargetIndex: null,
+        touchLastX: 0,
+        touchLastY: 0,
+        pendingPointerTouch: null,
+        lastGestureAxis: 'idle',
         lastSettledIndex: -1,
-        scrollEndController: null,
-        activeUserGesture: false,
-        gestureIntent: 'idle',
-        gesturePointerId: null,
-        gestureStartX: 0,
-        gestureStartY: 0,
-        gestureStartScrollLeft: 0,
-        gestureStartAt: 0,
-        gestureLastX: 0,
-        gestureLastY: 0,
-        gestureLastMoveAt: 0,
-        gestureAssistedScroll: false,
-        gestureMomentumStopped: false,
-        lastUserGestureAt: 0,
-        lastUserHorizontalGestureAt: 0,
+        pagerController: null,
         programmaticStartedAt: 0,
-        programmaticSource: ''
+        programmaticSource: '',
+        lastGestureSource: 'idle',
+        lastGestureEndReason: '',
+        lastIgnoredTarget: '',
+        lastDx: 0,
+        lastDy: 0,
+        wheelAccumX: 0,
+        wheelAccumY: 0,
+        wheelLastAt: 0,
+        wheelLockUntil: 0,
+        suppressNextClick: false
     }
 
     const isStandalonePwa = () =>
@@ -319,9 +317,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const isAppShell = () => appShellQuery.matches || isStandalonePwa()
+    const hasTouchInput = () => navigator.maxTouchPoints > 0 || 'ontouchstart' in window
     const isSwipeRuntime = () => isAppShell()
         && swipeQuery.matches
-        && (coarsePointerQuery.matches || navigator.maxTouchPoints > 0)
+        && (
+            coarsePointerQuery.matches ||
+            hasTouchInput() ||
+            Boolean(window.PointerEvent)
+        )
     const prefersReducedMotion = () => reducedMotionQuery.matches
     const carreteSection = document.getElementById('carrete')
     const carouselHeader = carreteSection ? carreteSection.querySelector('.dm-carousel-header') : null
@@ -365,11 +368,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const getPagerRealIndex = (viewId) => {
         const normalized = normalizeViewId(viewId)
-        return PAGER_ORDER.findIndex((entry) => !entry.ghost && entry.viewId === normalized)
+        return PAGER_ORDER.indexOf(normalized)
     }
     const getViewIdFromPagerIndex = (index) => {
-        const entry = PAGER_ORDER[index] || PAGER_ORDER[getPagerRealIndex(currentViewId)]
-        return entry ? normalizeViewId(entry.viewId) : 'muro'
+        const viewId = PAGER_ORDER[index] || PAGER_ORDER[getPagerRealIndex(currentViewId)]
+        return viewId ? normalizeViewId(viewId) : 'muro'
     }
     const getViewNodes = (viewId) => {
         const selectors = MOBILE_VIEW_ROOTS[normalizeViewId(viewId)] || []
@@ -470,6 +473,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!carreteSection || !carouselHeader || !carouselViewport || !carouselHeaderAnchor) return
 
         const shouldInlineHeader = isAppShell()
+            && !isPagerMode()
             && document.body?.dataset?.view === 'carrete'
             && carreteSection.classList.contains('is-feed-mode')
 
@@ -646,11 +650,7 @@ document.addEventListener('DOMContentLoaded', () => {
             && source !== 'pager-wrap-jump'
             && source !== 'pager-sync'
         ) {
-            const pagerBehavior = (
-                prefersReducedMotion() ||
-                pagerState.activeUserGesture ||
-                isRecentHorizontalPagerGesture()
-            )
+            const pagerBehavior = prefersReducedMotion()
                 ? 'auto'
                 : 'smooth'
             scrollPagerToView(normalizedTarget, {
@@ -787,6 +787,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('dm:assistant-shell-ready', handleAssistantShellReady)
     window.addEventListener('dm:assistant-shell-swipe', handleAssistantShellSwipe)
     window.addEventListener('dm:mobile-scroll-release', () => {
+        releaseStaleChatMobileState(document.getElementById('brisa-chat-root'))
         refreshScrollState('chat-release')
     })
 
@@ -796,116 +797,29 @@ document.addEventListener('DOMContentLoaded', () => {
         getNextViewId,
         getPrevViewId,
         debugScrollState,
+        getVerticalScrollDiagnostics,
         refreshScrollState,
         getPagerState
     }
 
     function clearPagerSettleTimer() {
-        if (pagerState.pendingSettleTimer) {
-            clearTimeout(pagerState.pendingSettleTimer)
-            pagerState.pendingSettleTimer = 0
-        }
+        // Transform pager has no scroll settle timers.
     }
 
     function clearPagerRaf() {
-        if (pagerState.settleRafId) {
-            cancelAnimationFrame(pagerState.settleRafId)
-            pagerState.settleRafId = 0
-        }
+        // Transform pager has no scroll sampling RAF.
     }
 
     function resetPagerSyncFlags() {
         pagerState.isProgrammaticPagerScroll = false
         pagerState.programmaticTargetViewId = null
-        pagerState.isWrappingGhostJump = false
         pagerState.programmaticStartedAt = 0
         pagerState.programmaticSource = ''
+        pagerState.touchTargetIndex = null
     }
 
-    function resetPagerGestureState({ keepLastGesture = true } = {}) {
-        pagerState.activeUserGesture = false
-        pagerState.gestureIntent = 'idle'
-        pagerState.gesturePointerId = null
-        pagerState.gestureStartX = 0
-        pagerState.gestureStartY = 0
-        pagerState.gestureStartScrollLeft = 0
-        pagerState.gestureStartAt = 0
-        pagerState.gestureLastX = 0
-        pagerState.gestureLastY = 0
-        pagerState.gestureLastMoveAt = 0
-        pagerState.gestureAssistedScroll = false
-        pagerState.gestureMomentumStopped = false
-        if (!keepLastGesture) {
-            pagerState.lastUserGestureAt = 0
-            pagerState.lastUserHorizontalGestureAt = 0
-        }
-    }
-
-    function isRecentHorizontalPagerGesture() {
-        return Boolean(
-            pagerState.lastUserHorizontalGestureAt &&
-            performance.now() - pagerState.lastUserHorizontalGestureAt < PAGER_RECENT_HORIZONTAL_GESTURE_MS
-        )
-    }
-
-    function stopPagerMomentumForHorizontalGesture() {
-        const track = pagerState.trackEl
-        if (!track || pagerState.gestureMomentumStopped) return
-        const currentLeft = track.scrollLeft || 0
-        track.scrollTo({ left: currentLeft, behavior: 'auto' })
-        track.scrollLeft = currentLeft
-        pagerState.gestureMomentumStopped = true
-    }
-
-    function clampNumber(value, min, max) {
-        return Math.min(Math.max(value, min), max)
-    }
-
-    function getPagerMaxScrollLeft() {
-        const track = pagerState.trackEl
-        if (!track) return 0
-        return Math.max(0, (track.scrollWidth || 0) - (track.clientWidth || 0))
-    }
-
-    function applyPagerGestureScroll(dx) {
-        const track = pagerState.trackEl
-        if (!track) return
-        const nextLeft = clampNumber(
-            (pagerState.gestureStartScrollLeft || 0) - dx,
-            0,
-            getPagerMaxScrollLeft()
-        )
-        track.scrollLeft = nextLeft
-        pagerState.lastSettledIndex = getNearestPagerIndex()
-        pagerState.gestureAssistedScroll = true
-    }
-
-    function getPagerGestureTargetIndex() {
-        const width = getPagerPageWidth()
-        if (!width) return getNearestPagerIndex()
-        const startIndex = clampNumber(
-            Math.round((pagerState.gestureStartScrollLeft || 0) / width),
-            0,
-            PAGER_ORDER.length - 1
-        )
-        const dx = (pagerState.gestureLastX || pagerState.gestureStartX || 0) - (pagerState.gestureStartX || 0)
-        const elapsed = Math.max(
-            16,
-            (pagerState.gestureLastMoveAt || performance.now()) - (pagerState.gestureStartAt || performance.now())
-        )
-        const velocity = dx / elapsed
-        const distanceTargetMet = Math.abs(dx) >= width * PAGER_SWIPE_TARGET_RATIO
-        const velocityTargetMet = Math.abs(velocity) >= PAGER_SWIPE_VELOCITY_PX_MS
-
-        if (distanceTargetMet || velocityTargetMet) {
-            return clampNumber(
-                startIndex + (dx < 0 ? 1 : -1),
-                0,
-                PAGER_ORDER.length - 1
-            )
-        }
-
-        return getNearestPagerIndex()
+    function clearExpiredPagerTouchClamp() {
+        // Kept for diagnostics compatibility; transform pager does not clamp native momentum.
     }
 
     function getPagerState() {
@@ -915,36 +829,66 @@ document.addEventListener('DOMContentLoaded', () => {
             isProgrammaticPagerScroll: pagerState.isProgrammaticPagerScroll,
             programmaticTargetViewId: pagerState.programmaticTargetViewId,
             programmaticSource: pagerState.programmaticSource,
-            isWrappingGhostJump: pagerState.isWrappingGhostJump,
-            activeUserGesture: pagerState.activeUserGesture,
-            gestureIntent: pagerState.gestureIntent,
-            gestureStartScrollLeft: Math.round(pagerState.gestureStartScrollLeft || 0),
-            gestureAssistedScroll: pagerState.gestureAssistedScroll,
-            lastUserGestureAt: pagerState.lastUserGestureAt,
-            lastUserHorizontalGestureAt: pagerState.lastUserHorizontalGestureAt,
+            pageIndex: pagerState.pageIndex,
+            dragX: pagerState.dragX,
+            activeUserGesture: pagerState.touchActive,
+            gestureIntent: pagerState.touchIntent,
+            gestureSource: pagerState.gestureSource,
+            lastGestureAxis: pagerState.lastGestureAxis,
+            lastGestureSource: pagerState.lastGestureSource,
+            lastGestureEndReason: pagerState.lastGestureEndReason,
+            lastIgnoredTarget: pagerState.lastIgnoredTarget,
+            lastDx: pagerState.lastDx,
+            lastDy: pagerState.lastDy,
+            verticalGestureActive: pagerState.touchActive && pagerState.touchIntent === 'vertical',
+            horizontalGestureActive: pagerState.touchActive && pagerState.touchIntent === 'horizontal',
+            touchStartIndex: pagerState.touchStartIndex,
+            touchTargetIndex: pagerState.touchTargetIndex,
+            gestureAssistedScroll: false,
             lastSettledIndex: pagerState.lastSettledIndex,
-            pendingSettleTimer: Boolean(pagerState.pendingSettleTimer),
-            settleRafId: Boolean(pagerState.settleRafId),
+            pendingSettleTimer: false,
+            settleRafId: false,
             track: pagerState.trackEl
                 ? {
                     scrollLeft: Math.round(pagerState.trackEl.scrollLeft || 0),
                     clientWidth: pagerState.trackEl.clientWidth || 0,
-                    scrollWidth: pagerState.trackEl.scrollWidth || 0
+                    scrollWidth: pagerState.trackEl.scrollWidth || 0,
+                    transform: pagerState.trackInnerEl
+                        ? window.getComputedStyle(pagerState.trackInnerEl).transform
+                        : ''
                 }
                 : null
         }
     }
 
-    function debugScrollState() {
+    function getVerticalScrollDiagnostics() {
         const activeView = getCurrentViewId()
         const activeScroller = getViewScrollContainer(activeView)
         const chatRoot = document.getElementById('brisa-chat-root')
         const overlay = document.getElementById('brisa-chat-mobile-overlay')
         const bodyStyle = window.getComputedStyle(document.body)
         const htmlStyle = window.getComputedStyle(document.documentElement)
+        const scrollerStyle = activeScroller ? window.getComputedStyle(activeScroller) : null
+        const trackStyle = pagerState.trackEl ? window.getComputedStyle(pagerState.trackEl) : null
         const overlayStyle = overlay ? window.getComputedStyle(overlay) : null
         return {
             activeView,
+            visibleScrollerSelector: getElementDebugLabel(activeScroller),
+            visibleScrollerScrollTop: activeScroller?.scrollTop || 0,
+            visibleScrollerScrollHeight: activeScroller?.scrollHeight || 0,
+            visibleScrollerClientHeight: activeScroller?.clientHeight || 0,
+            visibleScrollerOverflowX: scrollerStyle?.overflowX || '',
+            visibleScrollerOverflowY: scrollerStyle?.overflowY || '',
+            visibleScrollerTouchAction: scrollerStyle?.touchAction || '',
+            visibleScrollerOverscrollY: scrollerStyle?.overscrollBehaviorY || '',
+            visibleScrollerWebkitOverflowScrolling:
+                activeScroller ? scrollerStyle?.webkitOverflowScrolling || '' : '',
+            pagerScrollLeft: Math.round(pagerState.trackEl?.scrollLeft || 0),
+            pagerClientWidth: pagerState.trackEl?.clientWidth || 0,
+            pagerScrollWidth: pagerState.trackEl?.scrollWidth || 0,
+            pagerTouchAction: trackStyle?.touchAction || '',
+            pagerOverscrollX: trackStyle?.overscrollBehaviorX || '',
+            pagerSnapType: trackStyle?.scrollSnapType || '',
             bodyClass: document.body.className,
             bodyOverflow: document.body.style.overflow || bodyStyle.overflow || '',
             bodyTouchAction: document.body.style.touchAction || bodyStyle.touchAction || '',
@@ -954,57 +898,54 @@ document.addEventListener('DOMContentLoaded', () => {
             chatRootClasses: chatRoot?.className || '',
             chatRootPointerEvents: chatRoot?.style.pointerEvents || '',
             overlayHidden: overlay ? overlay.classList.contains('hidden') : true,
-            overlayPointerEvents: overlay?.style.pointerEvents || overlayStyle?.pointerEvents || '',
-            visibleScrollerScrollTop: activeScroller?.scrollTop || 0
+            overlayPointerEvents: overlay?.style.pointerEvents || overlayStyle?.pointerEvents || ''
         }
+    }
+
+    function debugScrollState() {
+        return getVerticalScrollDiagnostics()
     }
 
     function refreshScrollState(source = 'manual') {
         scheduleSyncAppShellVars()
         syncMuroHeaderPlacement()
         requestAnimationFrame(syncForoLayoutVars)
-        if (isPagerMode()) {
-            schedulePagerSettle(`${source}-refresh`)
+        if (String(source) === 'chat-release') {
+            resetPagerSyncFlags()
+            return debugScrollState()
         }
         return debugScrollState()
     }
 
-    function createPagerPage(entry) {
+    function createPagerPage(viewId) {
+        const normalizedViewId = normalizeViewId(viewId)
         const page = document.createElement('section')
         page.className = 'dm-mobile-page'
-        page.dataset.pageKey = entry.key
-        page.dataset.view = entry.viewId
-        if (entry.ghost) {
-            page.classList.add('dm-mobile-page--ghost')
-            page.setAttribute('aria-hidden', 'true')
-        }
+        page.dataset.pageKey = normalizedViewId
+        page.dataset.view = normalizedViewId
 
         const scroller = document.createElement('div')
         scroller.className = 'dm-mobile-page__scroller'
-        scroller.dataset.view = entry.viewId
-        if (entry.viewId === 'muro') {
+        scroller.dataset.view = normalizedViewId
+        if (normalizedViewId === 'muro') {
             scroller.classList.add('dm-mobile-page__scroller--muro')
         }
-        if (entry.viewId === 'foro') {
+        if (normalizedViewId === 'foro') {
             scroller.classList.add('dm-mobile-page__scroller--foro')
         }
-        if (entry.viewId === 'ia') {
+        if (normalizedViewId === 'ia') {
             scroller.classList.add('dm-mobile-page__scroller--ia')
             const host = document.createElement('div')
             host.className = 'dm-mobile-page__ai-host'
             host.dataset.dmAiEmbeddedHost = 'true'
             scroller.appendChild(host)
-            if (!entry.ghost) {
-                pagerState.assistantHostEl = host
-            }
+            pagerState.assistantHostEl = host
         }
 
         page.appendChild(scroller)
-        pagerState.pagesByKey.set(entry.key, page)
-        if (!entry.ghost) {
-            pagerState.realPagesByView.set(entry.viewId, page)
-            pagerState.scrollersByView.set(entry.viewId, scroller)
-        }
+        pagerState.pagesByKey.set(normalizedViewId, page)
+        pagerState.realPagesByView.set(normalizedViewId, page)
+        pagerState.scrollersByView.set(normalizedViewId, scroller)
         return page
     }
 
@@ -1022,10 +963,15 @@ document.addEventListener('DOMContentLoaded', () => {
         track.className = 'dm-mobile-pager-track'
         track.dataset.dmPagerTrack = 'true'
 
-        PAGER_ORDER.forEach((entry) => {
-            track.appendChild(createPagerPage(entry))
+        const trackInner = document.createElement('div')
+        trackInner.className = 'dm-mobile-pager-track-inner'
+        trackInner.dataset.dmPagerTrackInner = 'true'
+
+        PAGER_ORDER.forEach((viewId) => {
+            trackInner.appendChild(createPagerPage(viewId))
         })
 
+        track.appendChild(trackInner)
         viewport.appendChild(track)
         shell.appendChild(viewport)
         mainEl.appendChild(shell)
@@ -1033,36 +979,9 @@ document.addEventListener('DOMContentLoaded', () => {
         pagerState.shellEl = shell
         pagerState.viewportEl = viewport
         pagerState.trackEl = track
+        pagerState.trackInnerEl = trackInner
+        applyPagerTransform()
         return shell
-    }
-
-    function sanitizeGhostClone(root) {
-        if (!root) return
-        const nodes = [root, ...root.querySelectorAll('*')]
-        root.setAttribute('inert', '')
-        root.style.pointerEvents = 'none'
-        nodes.forEach((node) => {
-            if (node.id) node.removeAttribute('id')
-            node.setAttribute('aria-hidden', 'true')
-            if (typeof node.getAttributeNames === 'function') {
-                node.getAttributeNames().forEach((attrName) => {
-                    if (/^on/i.test(attrName)) node.removeAttribute(attrName)
-                })
-            }
-            if (node.matches('a, button, input, textarea, select, iframe, video, audio, [tabindex]')) {
-                node.setAttribute('tabindex', '-1')
-            }
-            if (node.matches('iframe, video, audio')) {
-                node.removeAttribute('src')
-                node.removeAttribute('srcset')
-                node.removeAttribute('autoplay')
-                node.removeAttribute('controls')
-            }
-            if (node.matches('img')) {
-                node.setAttribute('loading', 'lazy')
-                node.setAttribute('decoding', 'async')
-            }
-        })
     }
 
     function moveViewNodesIntoPager(viewId) {
@@ -1105,69 +1024,6 @@ document.addEventListener('DOMContentLoaded', () => {
         pagerState.stashedNodes = []
     }
 
-    function getGhostPageKeyForView(viewId) {
-        const normalized = normalizeViewId(viewId)
-        if (normalized === 'foro') return 'ghost-foro'
-        if (normalized === 'muro') return 'ghost-muro'
-        return ''
-    }
-
-    function refreshGhostPage(viewId) {
-        const ghostKey = getGhostPageKeyForView(viewId)
-        if (!ghostKey) return
-        const page = pagerState.pagesByKey.get(ghostKey)
-        const scroller = page?.querySelector('.dm-mobile-page__scroller')
-        if (!scroller) return
-        scroller.innerHTML = ''
-        getViewNodes(viewId).forEach((node) => {
-            const clone = node.cloneNode(true)
-            sanitizeGhostClone(clone)
-            scroller.appendChild(clone)
-        })
-    }
-
-    function scheduleGhostRefresh(viewId) {
-        const normalized = normalizeViewId(viewId)
-        const existing = pagerState.ghostRefreshTimers.get(normalized)
-        if (existing) clearTimeout(existing)
-        const timer = window.setTimeout(() => {
-            pagerState.ghostRefreshTimers.delete(normalized)
-            if (!isPagerMode()) return
-            refreshGhostPage(normalized)
-        }, PAGER_GHOST_REFRESH_DELAY_MS)
-        pagerState.ghostRefreshTimers.set(normalized, timer)
-    }
-
-    function clearGhostRefreshTimers() {
-        pagerState.ghostRefreshTimers.forEach((timer) => clearTimeout(timer))
-        pagerState.ghostRefreshTimers.clear()
-    }
-
-    function bindGhostObservers() {
-        if (!window.MutationObserver) return
-        ;['muro', 'foro'].forEach((viewId) => {
-            getViewNodes(viewId).forEach((node) => {
-                const observer = new MutationObserver(() => {
-                    scheduleGhostRefresh(viewId)
-                })
-                observer.observe(node, {
-                    childList: true,
-                    subtree: true,
-                    characterData: true,
-                    attributes: false
-                })
-                pagerState.mutationObservers.push(observer)
-            })
-            refreshGhostPage(viewId)
-        })
-    }
-
-    function disconnectGhostObservers() {
-        pagerState.mutationObservers.forEach((observer) => observer.disconnect())
-        pagerState.mutationObservers = []
-        clearGhostRefreshTimers()
-    }
-
     function syncAssistantPresentationMode() {
         const assistantShell = getAssistantShellApi()
         if (!assistantShell?.setPresentationMode) return
@@ -1178,13 +1034,13 @@ document.addEventListener('DOMContentLoaded', () => {
         assistantShell.setPresentationMode('overlay')
     }
 
-    function getPagerIndexLeft(index) {
-        return (getPagerPageWidth() || 0) * index
+    function clampPagerIndex(index) {
+        const numeric = Number.isFinite(index) ? index : 0
+        return Math.min(Math.max(Math.round(numeric), 0), PAGER_ORDER.length - 1)
     }
 
     function getNearestPagerIndex() {
-        const width = getPagerPageWidth() || 1
-        return Math.round((pagerState.trackEl?.scrollLeft || 0) / width)
+        return clampPagerIndex(pagerState.pageIndex)
     }
 
     function syncRouteFromPager(viewId, { historyMode = 'push', source = 'pager' } = {}) {
@@ -1198,341 +1054,584 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function schedulePagerSettle(source = 'scroll') {
-        if (!isPagerMode()) return
-        clearPagerSettleTimer()
-        pagerState.pendingSettleTimer = window.setTimeout(() => {
-            startPagerStableSettle(source)
-        }, PAGER_SETTLE_DEBOUNCE_MS)
+    function applyPagerTransform({ dragging = false } = {}) {
+        const inner = pagerState.trackInnerEl
+        if (!inner) return
+        const index = clampPagerIndex(pagerState.pageIndex)
+        const dragX = Number.isFinite(pagerState.dragX) ? pagerState.dragX : 0
+        inner.style.setProperty('--dm-mobile-page-index', String(index))
+        inner.style.setProperty('--dm-mobile-page-x', `${index * -100}%`)
+        inner.style.setProperty('--dm-mobile-drag-x', `${Math.round(dragX)}px`)
+        inner.classList.toggle('is-dragging', Boolean(dragging))
     }
 
-    function startPagerStableSettle(source = 'scroll-stable') {
-        if (!isPagerMode() || !pagerState.trackEl) return
-        clearPagerSettleTimer()
-        clearPagerRaf()
-
-        const track = pagerState.trackEl
-        const startedAt = performance.now()
-        let lastLeft = track.scrollLeft || 0
-        let stableFrames = 0
-
-        const sample = () => {
-            if (!isPagerMode() || !pagerState.trackEl) {
-                pagerState.settleRafId = 0
-                return
-            }
-            const now = performance.now()
-            const currentLeft = pagerState.trackEl.scrollLeft || 0
-            const delta = Math.abs(currentLeft - lastLeft)
-            lastLeft = currentLeft
-            pagerState.lastSettledIndex = getNearestPagerIndex()
-
-            if (pagerState.activeUserGesture) {
-                stableFrames = 0
-            } else if (delta <= 0.5) {
-                stableFrames += 1
-            } else {
-                stableFrames = 0
-            }
-
-            if (stableFrames >= PAGER_SETTLE_STABLE_FRAMES || now - startedAt >= PAGER_SETTLE_MAX_MS) {
-                pagerState.settleRafId = 0
-                handlePagerSettled(source)
-                return
-            }
-
-            pagerState.settleRafId = requestAnimationFrame(sample)
+    function setPagerIndex(index, { source = 'pager', syncRoute = false, historyMode = 'push', dragging = false } = {}) {
+        const nextIndex = clampPagerIndex(index)
+        pagerState.pageIndex = nextIndex
+        pagerState.lastSettledIndex = nextIndex
+        pagerState.dragX = 0
+        pagerState.touchTargetIndex = nextIndex
+        pagerState.isProgrammaticPagerScroll = false
+        pagerState.programmaticTargetViewId = getViewIdFromPagerIndex(nextIndex)
+        pagerState.programmaticStartedAt = performance.now()
+        pagerState.programmaticSource = source
+        applyPagerTransform({ dragging })
+        if (syncRoute) {
+            syncRouteFromPager(getViewIdFromPagerIndex(nextIndex), { historyMode, source: 'pager' })
         }
-
-        pagerState.settleRafId = requestAnimationFrame(sample)
+        resetPagerSyncFlags()
     }
 
-    function handlePagerSettled(source = 'settle') {
-        if (!isPagerMode() || !pagerState.trackEl) return
-        clearPagerSettleTimer()
-        clearPagerRaf()
-
-        if (pagerState.activeUserGesture) {
-            schedulePagerSettle(`${source}-gesture-active`)
-            return
-        }
-
-        const nearestIndex = getNearestPagerIndex()
-        const entry = PAGER_ORDER[nearestIndex]
-        if (!entry) return
-
-        pagerState.lastSettledIndex = nearestIndex
-        const wasProgrammatic = pagerState.isProgrammaticPagerScroll
-        const expectedProgrammaticViewId = pagerState.programmaticTargetViewId
-
-        if (pagerState.isWrappingGhostJump) {
-            resetPagerSyncFlags()
-            return
-        }
-
-        const viewId = normalizeViewId(entry.viewId)
-        if (entry.ghost) {
-            syncRouteFromPager(viewId, {
-                historyMode: pagerState.isProgrammaticPagerScroll ? 'none' : 'push',
-                source: 'pager'
-            })
-            const realIndex = getPagerRealIndex(viewId)
-            pagerState.isWrappingGhostJump = true
-            pagerState.isProgrammaticPagerScroll = true
-            pagerState.programmaticTargetViewId = viewId
-            pagerState.trackEl.scrollTo({
-                left: getPagerIndexLeft(realIndex),
-                behavior: 'auto'
-            })
-            requestAnimationFrame(() => {
-                pagerState.lastSettledIndex = realIndex
-                resetPagerSyncFlags()
-            })
-            return
-        }
-
-        if (wasProgrammatic) {
-            resetPagerSyncFlags()
-            if (viewId !== getCurrentViewId() || viewId !== expectedProgrammaticViewId) {
-                syncRouteFromPager(viewId, {
-                    historyMode: viewId === getCurrentViewId() ? 'none' : 'replace',
-                    source: 'pager'
-                })
-            }
-            return
-        }
-
-        syncRouteFromPager(viewId, {
-            historyMode: viewId === getCurrentViewId() ? 'none' : 'push',
-            source: 'pager'
-        })
-    }
-
-    function handlePagerScroll() {
-        if (!isPagerMode()) return
-        debugStandaloneScrollState('pager-track-scroll')
-        pagerState.lastSettledIndex = getNearestPagerIndex()
-        if (!pagerState.activeUserGesture) {
-            schedulePagerSettle('scroll-stable')
-        }
-    }
-
-    function scrollPagerToView(viewId, { behavior = 'auto', source = 'route' } = {}) {
+    function scrollPagerToView(viewId, { source = 'route' } = {}) {
         if (!isPagerMode() || !pagerState.trackEl) return
         const realIndex = getPagerRealIndex(viewId)
         if (realIndex < 0) return
 
-        const targetLeft = getPagerIndexLeft(realIndex)
-        const effectiveBehavior = (
-            pagerState.activeUserGesture ||
-            isRecentHorizontalPagerGesture()
-        )
-            ? 'auto'
-            : behavior
-        pagerState.isProgrammaticPagerScroll = true
-        pagerState.programmaticTargetViewId = normalizeViewId(viewId)
-        pagerState.programmaticStartedAt = performance.now()
-        pagerState.programmaticSource = source
+        setPagerIndex(realIndex, { source, syncRoute: false })
+    }
 
-        if (Math.abs((pagerState.trackEl.scrollLeft || 0) - targetLeft) < 1) {
-            pagerState.trackEl.scrollLeft = targetLeft
-            pagerState.lastSettledIndex = realIndex
-            resetPagerSyncFlags()
-            return
+    function resetPagerTouchState({ preserveTarget = false, keepAxis = false } = {}) {
+        const pointerId = pagerState.pointerId
+        pagerState.touchActive = false
+        pagerState.touchIntent = 'idle'
+        pagerState.gestureSource = 'idle'
+        pagerState.pointerId = null
+        pagerState.pendingPointerTouch = null
+        pagerState.touchStartX = 0
+        pagerState.touchStartY = 0
+        pagerState.touchStartIndex = -1
+        if (!preserveTarget) pagerState.touchTargetIndex = null
+        pagerState.touchLastX = 0
+        pagerState.touchLastY = 0
+        pagerState.dragX = 0
+        if (!keepAxis) pagerState.lastGestureAxis = 'idle'
+        if (pointerId !== null) {
+            try {
+                pagerState.trackEl?.releasePointerCapture?.(pointerId)
+            } catch (e) {}
         }
-
-        pagerState.trackEl.scrollTo({
-            left: targetLeft,
-            behavior: effectiveBehavior
-        })
-        handlePagerScroll()
+        applyPagerTransform()
     }
 
     function getPagerPointerPoint(event) {
-        if (event?.touches?.length) {
-            return {
-                x: event.touches[0].clientX,
-                y: event.touches[0].clientY,
-                id: event.touches[0].identifier ?? 'touch'
-            }
+        if (!event) return null
+        return {
+            x: event.clientX,
+            y: event.clientY
         }
-        if (event?.changedTouches?.length) {
-            return {
-                x: event.changedTouches[0].clientX,
-                y: event.changedTouches[0].clientY,
-                id: event.changedTouches[0].identifier ?? 'touch'
-            }
-        }
-        if (typeof event?.clientX === 'number' && typeof event?.clientY === 'number') {
-            return {
-                x: event.clientX,
-                y: event.clientY,
-                id: event.pointerId ?? 'pointer'
-            }
-        }
-        return null
     }
 
-    function handlePagerGestureStart(event) {
+    function getPagerTouchPoint(event, { changed = false } = {}) {
+        const list = changed ? event?.changedTouches : event?.touches
+        const touch = list?.[0]
+        if (!touch) return null
+        return {
+            x: touch.clientX,
+            y: touch.clientY
+        }
+    }
+
+    function getPagerWheelDelta(event) {
+        if (!event) return { x: 0, y: 0 }
+        const unit = event.deltaMode === WheelEvent.DOM_DELTA_LINE
+            ? 16
+            : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+                ? getPagerPageWidth() || window.innerWidth || 1
+                : 1
+        const rawX = Number.isFinite(event.deltaX) ? event.deltaX : 0
+        const rawY = Number.isFinite(event.deltaY) ? event.deltaY : 0
+        return {
+            x: (rawX || (event.shiftKey ? rawY : 0)) * unit,
+            y: (rawX ? rawY : event.shiftKey ? 0 : rawY) * unit
+        }
+    }
+
+    function updatePagerGestureDiagnostics(dx = 0, dy = 0) {
+        pagerState.lastDx = Math.round(Number.isFinite(dx) ? dx : 0)
+        pagerState.lastDy = Math.round(Number.isFinite(dy) ? dy : 0)
+        pagerState.lastGestureSource = pagerState.gestureSource || 'idle'
+    }
+
+    function isChatMobileSurfaceActive(chatRoot) {
+        if (!chatRoot) return false
+        const overlay = chatRoot.querySelector('#brisa-chat-mobile-overlay')
+        const viewport = chatRoot.querySelector('#brisa-chat-mobile-viewport')
+        const activeSurface = chatRoot.querySelector(
+            '[data-chat-state="open"], [data-chat-state="opening"]'
+        )
+        const overlayActive = Boolean(
+            overlay &&
+            !overlay.classList.contains('hidden') &&
+            overlay.getAttribute('aria-hidden') !== 'true'
+        )
+        const viewportActive = Boolean(
+            viewport &&
+            viewport.getAttribute('aria-hidden') !== 'true' &&
+            viewport.inert !== true
+        )
+        return Boolean(activeSurface || overlayActive || viewportActive)
+    }
+
+    function releaseStaleChatMobileState(chatRoot) {
+        if (!chatRoot?.classList?.contains('brisa-chat-root--mobile-open')) return false
+        if (isChatMobileSurfaceActive(chatRoot)) return true
+        const overlay = chatRoot.querySelector('#brisa-chat-mobile-overlay')
+        const viewport = chatRoot.querySelector('#brisa-chat-mobile-viewport')
+        chatRoot.classList.remove('brisa-chat-root--mobile-open', 'brisa-chat-root--mobile-detail')
+        chatRoot.style.pointerEvents = ''
+        document.documentElement.style.overflow = ''
+        document.documentElement.style.touchAction = ''
+        document.body.style.overflow = ''
+        document.body.style.touchAction = ''
+        overlay?.classList.add('hidden')
+        overlay?.setAttribute('aria-hidden', 'true')
+        viewport?.setAttribute('aria-hidden', 'true')
+        if (viewport && 'inert' in viewport) viewport.inert = true
+        return false
+    }
+
+    function isPagerSwipeIgnoredTarget(target) {
+        const chatRoot = document.getElementById('brisa-chat-root')
+        if (releaseStaleChatMobileState(chatRoot)) {
+            pagerState.lastIgnoredTarget = getElementDebugLabel(chatRoot) || '#brisa-chat-root'
+            return true
+        }
+        const el = target?.closest?.(
+            'input, textarea, select, [contenteditable="true"], [data-no-pager-swipe], .dm-muro-composer, .dm-bottom-nav, .brisa-chat-bubble, .brisa-chat-panel[data-chat-state="open"], .brisa-chat-panel[data-chat-state="opening"], .brisa-chat-window[data-chat-state="open"], .brisa-chat-window[data-chat-state="opening"], .brisa-chat-mobile-overlay:not(.hidden), .brisa-chat-mobile-viewport:not([aria-hidden="true"])'
+        )
+        if (el) pagerState.lastIgnoredTarget = getElementDebugLabel(el) || ''
+        return Boolean(el)
+    }
+
+    function isPagerWheelIgnoredTarget(target) {
+        const chatRoot = document.getElementById('brisa-chat-root')
+        if (releaseStaleChatMobileState(chatRoot)) {
+            pagerState.lastIgnoredTarget = getElementDebugLabel(chatRoot) || '#brisa-chat-root'
+            return true
+        }
+        const el = target?.closest?.(
+            'input, textarea, select, [contenteditable="true"], [data-no-pager-swipe], .dm-bottom-nav, .brisa-chat-bubble, .brisa-chat-panel[data-chat-state="open"], .brisa-chat-panel[data-chat-state="opening"], .brisa-chat-window[data-chat-state="open"], .brisa-chat-window[data-chat-state="opening"], .brisa-chat-mobile-overlay:not(.hidden), .brisa-chat-mobile-viewport:not([aria-hidden="true"])'
+        )
+        if (el) pagerState.lastIgnoredTarget = getElementDebugLabel(el) || ''
+        return Boolean(el)
+    }
+
+    function startPagerGesture({ point, target, source = 'pointer', pointerId = null } = {}) {
         if (!isPagerMode() || !pagerState.trackEl) return
-        if (event?.pointerType === 'mouse') return
-        const point = getPagerPointerPoint(event)
+        if (pagerState.touchActive) return
         if (!point) return
-
-        pagerState.activeUserGesture = true
-        pagerState.gestureIntent = 'pending'
-        pagerState.gesturePointerId = point.id
-        pagerState.gestureStartX = point.x
-        pagerState.gestureStartY = point.y
-        pagerState.gestureStartScrollLeft = pagerState.trackEl.scrollLeft || 0
-        pagerState.gestureStartAt = performance.now()
-        pagerState.gestureLastX = point.x
-        pagerState.gestureLastY = point.y
-        pagerState.gestureLastMoveAt = pagerState.gestureStartAt
-        pagerState.gestureAssistedScroll = false
-        pagerState.gestureMomentumStopped = false
-        pagerState.lastUserGestureAt = performance.now()
-        clearPagerSettleTimer()
-        clearPagerRaf()
+        pagerState.lastGestureSource = source
+        pagerState.lastGestureEndReason = 'start'
+        pagerState.lastIgnoredTarget = ''
+        pagerState.lastDx = 0
+        pagerState.lastDy = 0
+        if (isPagerSwipeIgnoredTarget(target)) {
+            pagerState.lastGestureEndReason = 'ignored-target'
+            resetPagerTouchState()
+            return
+        }
+        const trackRect = pagerState.trackEl.getBoundingClientRect()
+        const startsInsideTrack =
+            point.x >= trackRect.left &&
+            point.x <= trackRect.right &&
+            point.y >= trackRect.top &&
+                point.y <= trackRect.bottom
+        if (!startsInsideTrack) {
+            pagerState.lastIgnoredTarget = getElementDebugLabel(target) || ''
+            pagerState.lastGestureEndReason = 'outside-track'
+            resetPagerTouchState()
+            return
+        }
+        pagerState.touchActive = true
+        pagerState.touchIntent = 'pending'
+        pagerState.gestureSource = source
+        pagerState.pointerId = pointerId
+        pagerState.touchStartX = point.x
+        pagerState.touchStartY = point.y
+        pagerState.touchStartIndex = clampPagerIndex(pagerState.pageIndex)
+        pagerState.touchTargetIndex = null
+        pagerState.touchLastX = point.x
+        pagerState.touchLastY = point.y
+        pagerState.lastGestureAxis = 'pending'
+        pagerState.dragX = 0
+        if ((source === 'pointer' || source === 'pointer-touch') && pointerId !== null) {
+            try {
+                pagerState.trackEl.setPointerCapture?.(pointerId)
+            } catch (e) {}
+        }
+        applyPagerTransform()
     }
 
-    function handlePagerGestureMove(event) {
-        if (!pagerState.activeUserGesture || !isPagerMode()) return
-        if (event?.pointerType === 'mouse') return
+    function updatePagerGesture(point, event, { pointerId = null } = {}) {
+        if (!pagerState.touchActive || !isPagerMode() || !pagerState.trackEl) return
+        if (pagerState.pointerId !== null && pointerId !== null && pointerId !== pagerState.pointerId) return
+        if (!point) return
+        const dx = point.x - pagerState.touchStartX
+        const dy = point.y - pagerState.touchStartY
+        const absX = Math.abs(dx)
+        const absY = Math.abs(dy)
+        pagerState.touchLastX = point.x
+        pagerState.touchLastY = point.y
+        updatePagerGestureDiagnostics(dx, dy)
+
+        if (pagerState.touchIntent === 'pending') {
+            const horizontalIntent =
+                absX >= PAGER_TOUCH_HORIZONTAL_PX &&
+                absX > absY * PAGER_TOUCH_HORIZONTAL_RATIO
+            const verticalIntent =
+                absY >= PAGER_TOUCH_VERTICAL_PX &&
+                absY > absX * PAGER_TOUCH_VERTICAL_RATIO
+            if (horizontalIntent) {
+                pagerState.touchIntent = 'horizontal'
+                pagerState.lastGestureAxis = 'horizontal'
+                pagerState.lastGestureEndReason = 'horizontal-intent'
+                resetPagerSyncFlags()
+                if (pointerId !== null) {
+                    try {
+                        pagerState.trackEl.setPointerCapture?.(pointerId)
+                    } catch (e) {}
+                }
+            } else if (verticalIntent) {
+                pagerState.touchIntent = 'vertical'
+                pagerState.lastGestureAxis = 'vertical'
+                pagerState.lastGestureEndReason = 'vertical-intent'
+                if (pagerState.pointerId !== null) {
+                    try {
+                        pagerState.trackEl.releasePointerCapture?.(pagerState.pointerId)
+                    } catch (e) {}
+                }
+                return
+            } else {
+                return
+            }
+        }
+
+        if (pagerState.touchIntent !== 'horizontal') return
+        const width = getPagerPageWidth()
+        if (width) {
+            const minIndex = clampPagerIndex(pagerState.touchStartIndex - 1)
+            const maxIndex = clampPagerIndex(pagerState.touchStartIndex + 1)
+            const minDrag = (pagerState.touchStartIndex - maxIndex) * width
+            const maxDrag = (pagerState.touchStartIndex - minIndex) * width
+            pagerState.dragX = Math.min(Math.max(dx, minDrag), maxDrag)
+            applyPagerTransform({ dragging: true })
+        }
+        if (pagerState.gestureSource !== 'mouse' && event.cancelable) event.preventDefault()
+    }
+
+    function finishPagerGesture(event, { pointerId = null, cancelled = false } = {}) {
+        if (!pagerState.touchActive) return
+        if (pagerState.pointerId !== null && pointerId !== null && pointerId !== pagerState.pointerId) return
+        const dx = pagerState.touchLastX - pagerState.touchStartX
+        const dy = pagerState.touchLastY - pagerState.touchStartY
+        updatePagerGestureDiagnostics(dx, dy)
+        if (cancelled) {
+            pagerState.lastGestureEndReason = 'cancelled'
+            resetPagerTouchState({ keepAxis: true })
+            return
+        }
+        const wasHorizontal = pagerState.touchIntent === 'horizontal'
+        const width = getPagerPageWidth()
+        const startIndex = pagerState.touchStartIndex >= 0
+            ? pagerState.touchStartIndex
+            : getNearestPagerIndex()
+
+        if (!wasHorizontal || !isPagerMode() || !pagerState.trackEl || !width) {
+            pagerState.lastGestureEndReason = pagerState.touchIntent || 'not-horizontal'
+            resetPagerTouchState({ keepAxis: true })
+            return
+        }
+
+        const commitPx = pagerState.gestureSource === 'mouse'
+            ? PAGER_MOUSE_COMMIT_PX
+            : PAGER_TOUCH_COMMIT_PX
+        const movedEnough =
+            Math.abs(dx) >= commitPx ||
+            Math.abs(dx) >= width * PAGER_TOUCH_SWIPE_RATIO
+        const direction = dx < 0 ? 1 : -1
+        const targetIndex = clampPagerIndex(movedEnough ? startIndex + direction : startIndex)
+        const didChangePage = targetIndex !== startIndex
+        pagerState.lastGestureEndReason = didChangePage ? 'committed' : 'below-threshold'
+        if (didChangePage) {
+            pagerState.suppressNextClick = true
+            window.setTimeout(() => {
+                pagerState.suppressNextClick = false
+            }, 450)
+        }
+        resetPagerTouchState({ preserveTarget: true, keepAxis: true })
+        setPagerIndex(targetIndex, {
+            source: 'touch',
+            syncRoute: didChangePage,
+            historyMode: 'push'
+        })
+    }
+
+    function handlePagerPointerDown(event) {
+        if (event.pointerType === 'touch' && hasTouchInput()) {
+            if (event.isPrimary === false) return
+            pagerState.pendingPointerTouch = {
+                point: getPagerPointerPoint(event),
+                target: event.target,
+                pointerId: event.pointerId
+            }
+            return
+        }
+        if (event.pointerType === 'mouse') return
+        if (event.isPrimary === false) return
+        startPagerGesture({
+            point: getPagerPointerPoint(event),
+            target: event.target,
+            source: 'pointer',
+            pointerId: event.pointerId
+        })
+    }
+
+    function handlePagerPointerMove(event) {
+        if (event.pointerType === 'touch' && hasTouchInput()) {
+            if (pagerState.gestureSource === 'touch') return
+            if (!pagerState.touchActive && pagerState.pendingPointerTouch?.pointerId === event.pointerId) {
+                startPagerGesture({
+                    ...pagerState.pendingPointerTouch,
+                    source: 'pointer-touch'
+                })
+            }
+            if (pagerState.gestureSource !== 'pointer-touch') return
+            updatePagerGesture(getPagerPointerPoint(event), event, { pointerId: event.pointerId })
+            return
+        }
+        if (event.pointerType === 'mouse') return
+        if (pagerState.gestureSource !== 'pointer') return
+        updatePagerGesture(getPagerPointerPoint(event), event, { pointerId: event.pointerId })
+    }
+
+    function handlePagerPointerEnd(event) {
+        if (event?.pointerType === 'touch' && hasTouchInput()) {
+            if (pagerState.pendingPointerTouch?.pointerId === event?.pointerId) {
+                pagerState.pendingPointerTouch = null
+            }
+            if (pagerState.gestureSource !== 'pointer-touch') return
+        } else if (event?.pointerType === 'mouse') {
+            if (pagerState.gestureSource === 'mouse') finishPagerGesture(event)
+            return
+        } else if (pagerState.gestureSource !== 'pointer') {
+            return
+        }
+        if (event?.type === 'lostpointercapture') return
+        const shouldCancel = event?.type === 'pointercancel' && pagerState.touchIntent !== 'horizontal'
+        finishPagerGesture(event, {
+            pointerId: event?.pointerId,
+            cancelled: shouldCancel
+        })
+    }
+
+    function handlePagerClickCapture(event) {
+        if (!pagerState.suppressNextClick) return
+        pagerState.suppressNextClick = false
+        event.preventDefault()
+        event.stopPropagation()
+    }
+
+    function handlePagerTouchStart(event) {
+        if (event.touches?.length !== 1) return
+        pagerState.pendingPointerTouch = null
+        startPagerGesture({
+            point: getPagerTouchPoint(event),
+            target: event.target,
+            source: 'touch'
+        })
+    }
+
+    function handlePagerTouchMove(event) {
+        if (pagerState.gestureSource !== 'touch') return
+        if (event.touches?.length !== 1) {
+            pagerState.lastGestureEndReason = 'multi-touch'
+            resetPagerTouchState({ keepAxis: true })
+            return
+        }
+        updatePagerGesture(getPagerTouchPoint(event), event)
+    }
+
+    function handlePagerTouchEnd(event) {
+        if (pagerState.gestureSource !== 'touch') return
+        const point = getPagerTouchPoint(event, { changed: true })
+        if (point) {
+            pagerState.touchLastX = point.x
+            pagerState.touchLastY = point.y
+        }
+        const shouldCancel = event?.type === 'touchcancel' && pagerState.touchIntent !== 'horizontal'
+        finishPagerGesture(event, { cancelled: shouldCancel })
+    }
+
+    function handlePagerMouseDown(event) {
+        if (event.button !== 0) return
+        if (pagerState.touchActive) return
+        startPagerGesture({
+            point: getPagerPointerPoint(event),
+            target: event.target,
+            source: 'mouse'
+        })
+    }
+
+    function handlePagerMouseMove(event) {
+        if (pagerState.gestureSource !== 'mouse') return
+        updatePagerGesture(getPagerPointerPoint(event), event)
+    }
+
+    function handlePagerMouseEnd(event) {
+        if (pagerState.gestureSource !== 'mouse') return
+        finishPagerGesture(event)
+    }
+
+    function handlePagerWheel(event) {
+        if (!isPagerMode() || !pagerState.trackEl || pagerState.touchActive) return
         const point = getPagerPointerPoint(event)
         if (!point) return
+        const trackRect = pagerState.trackEl.getBoundingClientRect()
+        const isInsideTrack =
+            point.x >= trackRect.left &&
+            point.x <= trackRect.right &&
+            point.y >= trackRect.top &&
+            point.y <= trackRect.bottom
+        if (!isInsideTrack || isPagerWheelIgnoredTarget(event.target)) return
+
+        const { x, y } = getPagerWheelDelta(event)
+        const absX = Math.abs(x)
+        const absY = Math.abs(y)
+        const horizontalWheel = absX > 0 && absX > absY * PAGER_WHEEL_HORIZONTAL_RATIO
+        if (!horizontalWheel) return
+
+        const now = performance.now()
+        if (now < pagerState.wheelLockUntil) {
+            if (event.cancelable) event.preventDefault()
+            pagerState.lastGestureAxis = 'horizontal'
+            pagerState.lastGestureEndReason = 'wheel-locked'
+            updatePagerGestureDiagnostics(x, y)
+            pagerState.lastGestureSource = 'wheel'
+            return
+        }
+
+        if (now - pagerState.wheelLastAt > PAGER_WHEEL_GESTURE_GAP_MS) {
+            pagerState.wheelAccumX = 0
+            pagerState.wheelAccumY = 0
+        }
+        pagerState.wheelLastAt = now
+        pagerState.wheelAccumX += x
+        pagerState.wheelAccumY += y
+        const totalX = pagerState.wheelAccumX
+        const totalY = pagerState.wheelAccumY
+        const totalAbsX = Math.abs(totalX)
+        const totalAbsY = Math.abs(totalY)
+
+        pagerState.lastGestureAxis = 'horizontal'
+        pagerState.lastGestureEndReason = 'wheel-collecting'
+        updatePagerGestureDiagnostics(totalX, totalY)
+        pagerState.lastGestureSource = 'wheel'
+
         if (
-            pagerState.gesturePointerId !== null &&
-            pagerState.gesturePointerId !== 'touch' &&
-            point.id !== pagerState.gesturePointerId
+            totalAbsX < PAGER_WHEEL_HORIZONTAL_PX ||
+            totalAbsX <= totalAbsY * PAGER_WHEEL_HORIZONTAL_RATIO
         ) {
             return
         }
 
-        const dx = point.x - pagerState.gestureStartX
-        const dy = point.y - pagerState.gestureStartY
-        const absX = Math.abs(dx)
-        const absY = Math.abs(dy)
-        pagerState.gestureLastX = point.x
-        pagerState.gestureLastY = point.y
-        pagerState.gestureLastMoveAt = performance.now()
-
-        if (pagerState.gestureIntent === 'pending') {
-            const isHorizontalIntent =
-                absX >= PAGER_HORIZONTAL_INTENT_PX &&
-                absX > absY * PAGER_HORIZONTAL_INTENT_RATIO
-            const isVerticalIntent =
-                absY >= PAGER_VERTICAL_INTENT_PX &&
-                absY > absX
-
-            if (isHorizontalIntent) {
-                pagerState.gestureIntent = 'horizontal'
-                pagerState.lastUserHorizontalGestureAt = performance.now()
-                stopPagerMomentumForHorizontalGesture()
-                resetPagerSyncFlags()
-                if (event?.cancelable) event.preventDefault()
-                applyPagerGestureScroll(dx)
-                return
-            }
-
-            if (isVerticalIntent) {
-                pagerState.gestureIntent = 'vertical'
-            }
-        } else if (pagerState.gestureIntent === 'horizontal') {
-            pagerState.lastUserHorizontalGestureAt = performance.now()
-            if (event?.cancelable) event.preventDefault()
-            applyPagerGestureScroll(dx)
+        if (event.cancelable) event.preventDefault()
+        const startIndex = clampPagerIndex(pagerState.pageIndex)
+        const direction = totalX > 0 ? 1 : -1
+        const targetIndex = clampPagerIndex(startIndex + direction)
+        const didChangePage = targetIndex !== startIndex
+        pagerState.wheelAccumX = 0
+        pagerState.wheelAccumY = 0
+        pagerState.wheelLockUntil = now + PAGER_WHEEL_LOCK_MS
+        pagerState.lastGestureEndReason = didChangePage ? 'wheel-committed' : 'wheel-boundary'
+        if (didChangePage) {
+            setPagerIndex(targetIndex, {
+                source: 'wheel',
+                syncRoute: true,
+                historyMode: 'push'
+            })
         }
     }
 
-    function handlePagerGestureEnd() {
-        if (!pagerState.activeUserGesture) return
-        const wasHorizontal = pagerState.gestureIntent === 'horizontal'
-        const trackMoved = isPagerMode() && pagerState.trackEl
-            ? Math.abs((pagerState.trackEl.scrollLeft || 0) - (pagerState.gestureStartScrollLeft || 0)) > 8
-            : false
-        const targetIndex = wasHorizontal && isPagerMode()
-            ? getPagerGestureTargetIndex()
-            : -1
-        resetPagerGestureState()
-        if ((wasHorizontal || trackMoved) && isPagerMode()) {
-            if (targetIndex >= 0) {
-                pagerState.trackEl.scrollTo({
-                    left: getPagerIndexLeft(targetIndex),
-                    behavior: 'auto'
-                })
-            }
-            schedulePagerSettle('gesture-end')
-        }
-    }
-
-    function syncPagerFromRoute({ behavior = 'auto', source = 'pager-sync' } = {}) {
+    function syncPagerFromRoute({ source = 'pager-sync' } = {}) {
         if (!isPagerMode()) return
-        scrollPagerToView(getCurrentViewId(), { behavior, source })
+        scrollPagerToView(getCurrentViewId(), { source })
     }
 
     function cleanupPagerListeners() {
-        clearPagerSettleTimer()
-        clearPagerRaf()
-        pagerState.scrollEndController?.abort?.()
-        pagerState.scrollEndController = null
+        pagerState.pagerController?.abort?.()
+        pagerState.pagerController = null
         resetPagerSyncFlags()
-        resetPagerGestureState({ keepLastGesture: false })
+        resetPagerTouchState()
     }
 
     function bindPagerListeners() {
         if (!pagerState.trackEl) return
         cleanupPagerListeners()
         const controller = new AbortController()
-        pagerState.scrollEndController = controller
-        pagerState.trackEl.addEventListener('scroll', handlePagerScroll, {
-            passive: true,
-            signal: controller.signal
-        })
-        if (window.PointerEvent) {
-            pagerState.trackEl.addEventListener('pointerdown', handlePagerGestureStart, {
+        pagerState.pagerController = controller
+        if (hasTouchInput()) {
+            document.addEventListener('touchstart', handlePagerTouchStart, {
                 passive: true,
-                signal: controller.signal
-            })
-            document.addEventListener('pointermove', handlePagerGestureMove, {
-                passive: false,
                 capture: true,
                 signal: controller.signal
             })
-            ;['pointerup', 'pointercancel', 'lostpointercapture'].forEach((eventName) => {
-                document.addEventListener(eventName, handlePagerGestureEnd, {
-                    passive: true,
-                    capture: true,
-                    signal: controller.signal
-                })
-            })
-        } else {
-            pagerState.trackEl.addEventListener('touchstart', handlePagerGestureStart, {
-                passive: true,
-                signal: controller.signal
-            })
-            document.addEventListener('touchmove', handlePagerGestureMove, {
+            document.addEventListener('touchmove', handlePagerTouchMove, {
                 passive: false,
                 capture: true,
                 signal: controller.signal
             })
             ;['touchend', 'touchcancel'].forEach((eventName) => {
-                document.addEventListener(eventName, handlePagerGestureEnd, {
+                document.addEventListener(eventName, handlePagerTouchEnd, {
                     passive: true,
                     capture: true,
                     signal: controller.signal
                 })
             })
         }
-        if ('onscrollend' in pagerState.trackEl) {
-            pagerState.trackEl.addEventListener('scrollend', () => {
-                if (pagerState.activeUserGesture) {
-                    schedulePagerSettle('scrollend-active')
-                    return
-                }
-                handlePagerSettled('scrollend')
-            }, { signal: controller.signal })
+        if (window.PointerEvent) {
+            document.addEventListener('pointerdown', handlePagerPointerDown, {
+                passive: true,
+                capture: true,
+                signal: controller.signal
+            })
+            document.addEventListener('pointermove', handlePagerPointerMove, {
+                passive: false,
+                capture: true,
+                signal: controller.signal
+            })
+            ;['pointerup', 'pointercancel'].forEach((eventName) => {
+                document.addEventListener(eventName, handlePagerPointerEnd, {
+                    passive: true,
+                    capture: true,
+                    signal: controller.signal
+                })
+            })
         }
+        document.addEventListener('mousedown', handlePagerMouseDown, {
+            passive: true,
+            capture: true,
+            signal: controller.signal
+        })
+        document.addEventListener('mousemove', handlePagerMouseMove, {
+            passive: false,
+            capture: true,
+            signal: controller.signal
+        })
+        document.addEventListener('mouseup', handlePagerMouseEnd, {
+            passive: true,
+            capture: true,
+            signal: controller.signal
+        })
+        document.addEventListener('wheel', handlePagerWheel, {
+            passive: false,
+            capture: true,
+            signal: controller.signal
+        })
+        document.addEventListener('click', handlePagerClickCapture, {
+            passive: false,
+            capture: true,
+            signal: controller.signal
+        })
     }
 
     function enterMobilePagerMode() {
@@ -1546,7 +1645,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.classList.add('dm-mobile-pager-mode')
         pagerState.enabled = true
         bindPagerListeners()
-        bindGhostObservers()
         syncAssistantPresentationMode()
         syncAssistantShellForView(getCurrentViewId())
         syncMuroHeaderPlacement()
@@ -1559,7 +1657,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!isPagerMode()) return
 
         cleanupPagerListeners()
-        disconnectGhostObservers()
         document.body.classList.remove('dm-mobile-pager-mode')
         pagerState.enabled = false
         syncAssistantPresentationMode()
@@ -1573,6 +1670,9 @@ document.addEventListener('DOMContentLoaded', () => {
         pagerState.shellEl = null
         pagerState.viewportEl = null
         pagerState.trackEl = null
+        pagerState.trackInnerEl = null
+        pagerState.pageIndex = 0
+        pagerState.dragX = 0
         pagerState.lastSettledIndex = -1
         syncMuroHeaderPlacement()
         syncAssistantShellForView(getCurrentViewId())
@@ -1605,14 +1705,14 @@ document.addEventListener('DOMContentLoaded', () => {
         clearPagerSettleTimer()
         clearPagerRaf()
         resetPagerSyncFlags()
-        resetPagerGestureState()
+        resetPagerTouchState()
     })
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden || !isPagerMode()) return
         clearPagerSettleTimer()
         clearPagerRaf()
         resetPagerSyncFlags()
-        resetPagerGestureState()
+        resetPagerTouchState()
     })
     window.addEventListener('orientationchange', () => {
         if (!isPagerMode()) return
@@ -1702,6 +1802,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function scrollUp(y = getScrollTop()) {
         const btn = document.getElementById("scroll-up");
         if (!btn) return;
+        if (isPagerMode() || document.body?.dataset?.view) {
+            scrollUpVisible = false;
+            btn.classList.remove("show-scroll");
+            return;
+        }
         const shouldShow = y >= 200;
         if (scrollUpVisible === shouldShow) return;
         scrollUpVisible = shouldShow;
