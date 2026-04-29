@@ -205,6 +205,309 @@ async function initCarouselModule() {
     if (typeof unsubscribeTopics === "function") unsubscribeTopics();
   };
 
+  const parseKpiNumber = (value) => {
+    const parsed = Number.parseInt(String(value).replace(/[^\d-]/g, ""), 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const shouldReduceKpiMotion = () =>
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const KPI_COUNT_DURATION = 320;
+  const KPI_TEMPORARY_TICK_MS = 58;
+  const KPI_TEMPORARY_FALLBACK_MS = 6500;
+  const KPI_COUNT_IDS = ["kpi-members", "kpi-committees", "kpi-projects"];
+  const easeOutCubic = (progress) => 1 - Math.pow(1 - progress, 3);
+
+  const cancelKpiCount = (el) => {
+    const frameId = Number(el?.dataset.kpiFrameId);
+    if (Number.isFinite(frameId) && frameId > 0) {
+      window.cancelAnimationFrame(frameId);
+    }
+    if (!el) return;
+    delete el.dataset.kpiFrameId;
+    delete el.dataset.kpiAnimating;
+  };
+
+  const finishKpiValue = (el, target) => {
+    if (!el) return;
+    el.textContent = String(target);
+    el.dataset.kpiTarget = String(target);
+    el.dataset.kpiHasCounted = "true";
+    delete el.dataset.kpiFrameId;
+    delete el.dataset.kpiAnimating;
+  };
+
+  const animateKpiBatch = (items, { forceDuration = false, holdFinalUntilEnd = false } = {}) => {
+    const entries = items
+      .map(({ el, target, from, fromZero = false }) => {
+        if (!el || !Number.isFinite(target)) return null;
+        const start = Number.isFinite(from) ? from : fromZero ? 0 : (parseKpiNumber(el.textContent) ?? 0);
+        cancelKpiCount(el);
+        el.dataset.kpiTarget = String(target);
+        return { el, start, target };
+      })
+      .filter(Boolean);
+
+    if (!entries.length) return;
+
+    if (shouldReduceKpiMotion() || (!forceDuration && entries.every((entry) => entry.start === entry.target))) {
+      entries.forEach(({ el, target }) => finishKpiValue(el, target));
+      return;
+    }
+
+    let startTime = 0;
+
+    entries.forEach(({ el, start }) => {
+      el.dataset.kpiAnimating = "true";
+      el.textContent = String(start);
+    });
+
+    const tick = (timestamp) => {
+      if (!startTime) startTime = timestamp;
+      const progress = Math.min(1, (timestamp - startTime) / KPI_COUNT_DURATION);
+      entries.forEach(({ el, start, target }) => {
+        let current = Math.round(start + (target - start) * easeOutCubic(progress));
+        if (holdFinalUntilEnd && progress < 1 && start !== target && current === target) {
+          current = target > start ? target - 1 : target + 1;
+        }
+        el.textContent = String(current);
+      });
+
+      if (progress < 1) {
+        const frameId = window.requestAnimationFrame(tick);
+        entries.forEach(({ el }) => {
+          el.dataset.kpiFrameId = String(frameId);
+        });
+        return;
+      }
+
+      entries.forEach(({ el, target }) => finishKpiValue(el, target));
+    };
+
+    const frameId = window.requestAnimationFrame(tick);
+    entries.forEach(({ el }) => {
+      el.dataset.kpiFrameId = String(frameId);
+    });
+  };
+
+  const animateKpiValue = (el, target, options = {}) => {
+    animateKpiBatch([{ el, target, ...options }]);
+  };
+
+  const createKpiCountController = () => {
+    const root = document.getElementById("kpi");
+    const kpiEls = KPI_COUNT_IDS.map((id) => document.getElementById(id)).filter(Boolean);
+    const managedEls = new Set(kpiEls);
+    const targets = new Map();
+    const placeholders = new Map();
+    const state = {
+      reducedMotion: shouldReduceKpiMotion(),
+      visualReady: shouldReduceKpiMotion() || !root,
+      introStarted: false,
+      finalStarted: shouldReduceKpiMotion() || !root || kpiEls.length === 0,
+    };
+    let observer = null;
+    let mutationObserver = null;
+    let visibilityFallbackTimer = null;
+    let temporaryFrame = null;
+    let temporaryFallbackTimer = null;
+
+    const cleanupVisibilityWatchers = () => {
+      observer?.disconnect();
+      mutationObserver?.disconnect();
+      window.removeEventListener("scroll", tryMarkVisible);
+      window.removeEventListener("resize", tryMarkVisible);
+      window.clearTimeout(visibilityFallbackTimer);
+    };
+
+    const stopTemporaryCount = () => {
+      if (Number.isFinite(temporaryFrame) && temporaryFrame > 0) {
+        window.cancelAnimationFrame(temporaryFrame);
+      }
+      window.clearTimeout(temporaryFallbackTimer);
+      temporaryFrame = null;
+      temporaryFallbackTimer = null;
+      kpiEls.forEach((el) => {
+        delete el.dataset.kpiFrameId;
+        delete el.dataset.kpiAnimating;
+      });
+    };
+
+    const isSplashGone = () => !document.getElementById("splash-screen");
+    const isRootVisible = () => {
+      if (!root) return true;
+      const rect = root.getBoundingClientRect();
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+      const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+      return rect.bottom > 0 && rect.right > 0 && rect.top < viewportHeight && rect.left < viewportWidth;
+    };
+    const hasAllTargets = () => kpiEls.length > 0 && kpiEls.every((el) => targets.has(el));
+    const getFinalStart = (el, target) => {
+      const current = parseKpiNumber(el.textContent) ?? 0;
+      if (current !== target) return current;
+      if (target > 0) return target - 1;
+      return 1;
+    };
+    const startFinalBatch = () => {
+      if (state.finalStarted || !hasAllTargets()) return;
+      state.finalStarted = true;
+      stopTemporaryCount();
+      cleanupVisibilityWatchers();
+      const entries = kpiEls.map((el) => {
+        const target = targets.get(el);
+        return { el, target, from: getFinalStart(el, target) };
+      });
+      animateKpiBatch(entries, { forceDuration: true, holdFinalUntilEnd: true });
+    };
+    const applyTemporaryFallback = () => {
+      if (state.finalStarted) return;
+      state.finalStarted = true;
+      stopTemporaryCount();
+      cleanupVisibilityWatchers();
+      const entries = [];
+      kpiEls.forEach((el) => {
+        if (targets.has(el)) {
+          const target = targets.get(el);
+          entries.push({ el, target, from: getFinalStart(el, target) });
+          return;
+        }
+        cancelKpiCount(el);
+        delete el.dataset.kpiTarget;
+        el.textContent = placeholders.get(el) || "—";
+      });
+      animateKpiBatch(entries, { forceDuration: true, holdFinalUntilEnd: true });
+    };
+    const getTemporaryValue = (el, elapsed, index) => {
+      const target = targets.get(el);
+      const ceiling = Number.isFinite(target) ? Math.max(9, Math.min(42, target + 6)) : 12 + index;
+      const step = Math.floor(elapsed / KPI_TEMPORARY_TICK_MS);
+      return step % (ceiling + 1);
+    };
+    const startTemporaryCount = () => {
+      if (state.introStarted || state.finalStarted) return;
+      state.introStarted = true;
+      let startTime = 0;
+      kpiEls.forEach((el) => {
+        cancelKpiCount(el);
+        el.textContent = "0";
+        el.dataset.kpiAnimating = "true";
+      });
+      const tick = (timestamp) => {
+        if (state.finalStarted) return;
+        if (!startTime) startTime = timestamp;
+        const elapsed = timestamp - startTime;
+        kpiEls.forEach((el, index) => {
+          el.textContent = String(getTemporaryValue(el, elapsed, index));
+        });
+        temporaryFrame = window.requestAnimationFrame(tick);
+        kpiEls.forEach((el) => {
+          el.dataset.kpiFrameId = String(temporaryFrame);
+        });
+      };
+      temporaryFrame = window.requestAnimationFrame(tick);
+      temporaryFallbackTimer = window.setTimeout(applyTemporaryFallback, KPI_TEMPORARY_FALLBACK_MS);
+    };
+    const syncIntroState = () => {
+      if (!state.visualReady || state.finalStarted) return;
+      if (hasAllTargets()) {
+        startFinalBatch();
+        return;
+      }
+      startTemporaryCount();
+    };
+    const markVisible = () => {
+      if (state.visualReady) return;
+      state.visualReady = true;
+      cleanupVisibilityWatchers();
+      syncIntroState();
+    };
+    const tryMarkVisible = () => {
+      if (state.visualReady || !isSplashGone() || !isRootVisible()) return;
+      markVisible();
+    };
+    const observeKpiVisibility = () => {
+      if (state.visualReady) return;
+      tryMarkVisible();
+      if (state.visualReady) return;
+
+      if ("IntersectionObserver" in window) {
+        observer = new IntersectionObserver(() => tryMarkVisible(), { threshold: 0.15 });
+        observer.observe(root);
+      } else {
+        window.addEventListener("scroll", tryMarkVisible, { passive: true });
+        window.addEventListener("resize", tryMarkVisible, { passive: true });
+      }
+    };
+
+    if (!state.finalStarted) {
+      if (isSplashGone()) {
+        observeKpiVisibility();
+      } else {
+        mutationObserver = new MutationObserver(() => {
+          if (!isSplashGone()) return;
+          mutationObserver?.disconnect();
+          observeKpiVisibility();
+        });
+        mutationObserver.observe(document.body || document.documentElement, {
+          childList: true,
+          subtree: true,
+        });
+        visibilityFallbackTimer = window.setTimeout(observeKpiVisibility, 2600);
+      }
+    }
+
+    return {
+      set(el, value) {
+        if (!el) return;
+
+        const target = parseKpiNumber(value);
+        const isManaged = managedEls.has(el);
+        if (target === null) {
+          placeholders.set(el, String(value));
+          if (isManaged && !state.finalStarted) {
+            if (!state.introStarted) {
+              cancelKpiCount(el);
+              el.textContent = "0";
+            }
+            return;
+          }
+          if (el.dataset.kpiTarget) return;
+          cancelKpiCount(el);
+          delete el.dataset.kpiTarget;
+          el.textContent = String(value);
+          return;
+        }
+
+        const targetText = String(target);
+        const previousTarget = el.dataset.kpiTarget;
+        targets.set(el, target);
+        placeholders.delete(el);
+        el.dataset.kpiTarget = targetText;
+
+        if (state.reducedMotion || !isManaged) {
+          cancelKpiCount(el);
+          finishKpiValue(el, target);
+          return;
+        }
+
+        if (!state.finalStarted) {
+          if (!state.introStarted) {
+            cancelKpiCount(el);
+            el.textContent = "0";
+          }
+          syncIntroState();
+          return;
+        }
+
+        if (previousTarget === targetText && el.dataset.kpiAnimating === "true") return;
+        if (previousTarget === targetText && el.dataset.kpiHasCounted === "true" && el.textContent.trim() === targetText) return;
+        animateKpiValue(el, target);
+      },
+    };
+  };
+
   const loadCommitteeStats = () => {
     const committeeDataPath = (...segments) => [
       "artifacts",
@@ -216,11 +519,19 @@ async function initCarouselModule() {
     const kpiCommittees = document.getElementById("kpi-committees");
     const kpiMembers = document.getElementById("kpi-members");
     const kpiProjects = document.getElementById("kpi-projects");
+    const kpiCounter = createKpiCountController();
     const setKpis = (committees, members, projects) => {
-      if (kpiCommittees) kpiCommittees.textContent = String(committees);
-      if (kpiMembers && kpiMembers.dataset.dynamic === "true") kpiMembers.textContent = String(members);
-      if (kpiProjects) kpiProjects.textContent = String(projects);
+      kpiCounter.set(kpiCommittees, committees);
+      if (kpiMembers && kpiMembers.dataset.dynamic === "true") kpiCounter.set(kpiMembers, members);
+      kpiCounter.set(kpiProjects, projects);
     };
+    if (kpiMembers && kpiMembers.dataset.dynamic !== "true") {
+      const staticMembers = parseKpiNumber(kpiMembers.dataset.kpiStaticValue || kpiMembers.textContent);
+      if (staticMembers !== null) {
+        kpiMembers.dataset.kpiStaticValue = String(staticMembers);
+        kpiCounter.set(kpiMembers, staticMembers);
+      }
+    }
     const cards = Array.from(document.querySelectorAll("#comites .comite__card"));
     const committeeIds = cards
       .map((card) => card.getAttribute("data-committee-id"))
