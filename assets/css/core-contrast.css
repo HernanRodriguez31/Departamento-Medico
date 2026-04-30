@@ -2849,3 +2849,388 @@ body.ui-clarity .region-accordion {
     color: var(--org-brisa-accent);
   }
 }
+
+/* ORGTREE: avatar refinement and lightbox */
+.orgtree .structure-avatar[data-has-avatar="1"] {
+  cursor: zoom-in;
+}
+
+.orgtree .structure-avatar__img {
+  transition: transform 0.22s ease, filter 0.22s ease;
+}
+
+.orgtree .structure-avatar[data-has-avatar="1"]:hover .structure-avatar__img {
+  transform: scale(1.04);
+  filter: saturate(1.04) contrast(1.02);
+}
+
+.orgtree .structure__director-card {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr) 3.2rem;
+  align-items: center;
+  gap: 1.1rem;
+  min-height: 8.25rem;
+  max-width: 44.5rem;
+  padding: 1.12rem 1.42rem;
+  text-align: left;
+}
+
+.orgtree .structure__director-avatar.structure-avatar {
+  grid-column: 1;
+  grid-row: 1;
+  width: 5.5rem;
+  height: 5.5rem;
+  flex: 0 0 5.5rem;
+  padding: 0 !important;
+  border-radius: 999px;
+  background: #f8fafc;
+  border: 2px solid #ffffff;
+  color: var(--org-accent);
+  box-shadow:
+    0 12px 26px rgba(15, 23, 42, 0.12),
+    0 0 0 1px rgba(122, 184, 0, 0.18);
+}
+
+.orgtree .structure__director-avatar .structure-avatar__fallback svg {
+  width: 2.1rem;
+  height: 2.1rem;
+}
+
+.orgtree .structure__director-icon-wrapper.structure__director-ribbon {
+  grid-column: 3;
+  grid-row: 1;
+  position: static;
+  inset: auto;
+  transform: none;
+  width: 3.2rem;
+  height: 3.2rem;
+  flex: 0 0 3.2rem;
+  padding: 0 !important;
+  border-radius: 0.9rem;
+  background: var(--org-accent);
+  color: #ffffff;
+  border: 2px solid #ffffff;
+  box-shadow:
+    0 10px 20px rgba(46, 173, 80, 0.18),
+    0 0 0 1px rgba(46, 173, 80, 0.18);
+}
+
+.orgtree .structure__director-icon-wrapper.structure__director-ribbon svg {
+  width: 1.78rem;
+  height: 1.78rem;
+}
+
+.orgtree .structure__director-content {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  min-width: 0;
+  margin-top: 0;
+}
+
+.orgtree .structure__director-name {
+  margin: 0 0 0.24rem;
+  font-size: 1.5rem;
+  line-height: 1.12;
+}
+
+.orgtree .structure__director-role {
+  margin: 0 0 0.38rem;
+  font-size: 0.82rem;
+  line-height: 1.2;
+}
+
+.orgtree .structure__director-subroles {
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.46rem 0.78rem;
+  font-size: 0.86rem;
+  line-height: 1.25;
+}
+
+.orgtree .dot-separator {
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+.orgtree .group-leader-badge {
+  min-width: 15.25rem;
+  padding: 0.7rem 0.9rem;
+  gap: 0.85rem;
+}
+
+.orgtree .leader-icon-circle.structure-avatar {
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: 0 0 2.75rem;
+  border: 2px solid rgba(122, 184, 0, 0.2);
+}
+
+.orgtree .leader-info,
+.orgtree .staff-info,
+.orgtree .coordination-card__info {
+  min-width: 0;
+}
+
+.orgtree .leader-label {
+  line-height: 1.05;
+}
+
+.orgtree .leader-name {
+  line-height: 1.18;
+}
+
+.orgtree .staff-badge {
+  min-height: 3.25rem;
+  padding: 0.62rem 0.85rem;
+  gap: 0.85rem;
+}
+
+.orgtree .staff-icon-circle.structure-avatar {
+  width: 2.3rem;
+  height: 2.3rem;
+  flex: 0 0 2.3rem;
+  border: 1px solid rgba(122, 184, 0, 0.18);
+}
+
+.orgtree .coordination-card {
+  gap: 0.75rem;
+}
+
+.orgtree .coordination-card__icon.structure-avatar {
+  width: 2.65rem;
+  height: 2.65rem;
+  flex: 0 0 2.65rem;
+  border: 1px solid rgba(122, 184, 0, 0.2);
+}
+
+.structure-avatar-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 22050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: rgba(15, 23, 42, 0.58);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.structure-avatar-lightbox[hidden] {
+  display: none;
+}
+
+.structure-avatar-lightbox__figure {
+  position: relative;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.structure-avatar-lightbox__image-wrap {
+  width: min(72vw, 26rem);
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 5px solid #ffffff;
+  box-shadow:
+    0 28px 70px rgba(15, 23, 42, 0.34),
+    0 0 0 1px rgba(255, 255, 255, 0.55);
+}
+
+.structure-avatar-lightbox__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.structure-avatar-lightbox__caption {
+  max-width: min(72vw, 26rem);
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  text-shadow: 0 1px 8px rgba(15, 23, 42, 0.45);
+}
+
+.structure-avatar-lightbox__close {
+  position: absolute;
+  top: -0.85rem;
+  right: -0.85rem;
+  width: 2.45rem;
+  height: 2.45rem;
+  border: 1px solid rgba(226, 232, 240, 0.72);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 1.45rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.22);
+}
+
+.structure-avatar-lightbox__close:focus-visible {
+  outline: 3px solid rgba(122, 184, 0, 0.45);
+  outline-offset: 3px;
+}
+
+@media (max-width: 640px) {
+  .orgtree .structure__director-card {
+    grid-template-columns: 4rem minmax(0, 1fr) 2.55rem;
+    align-items: center;
+    justify-items: stretch;
+    gap: 0.58rem;
+    min-height: 0;
+    padding: 0.92rem 0.82rem;
+    text-align: left;
+  }
+
+  .orgtree .structure__director-avatar.structure-avatar {
+    grid-column: 1;
+    grid-row: 1;
+    width: 4rem;
+    height: 4rem;
+    flex-basis: 4rem;
+  }
+
+  .orgtree .structure__director-icon-wrapper.structure__director-ribbon {
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
+    width: 2.55rem;
+    height: 2.55rem;
+    flex-basis: 2.55rem;
+  }
+
+  .orgtree .structure__director-icon-wrapper.structure__director-ribbon svg {
+    width: 1.38rem;
+    height: 1.38rem;
+  }
+
+  .orgtree .structure__director-content {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
+  }
+
+  .orgtree .structure__director-name {
+    margin-bottom: 0.18rem;
+    font-size: 1.2rem;
+    line-height: 1.08;
+  }
+
+  .orgtree .structure__director-role {
+    margin-bottom: 0.28rem;
+    font-size: 0.68rem;
+    line-height: 1.15;
+  }
+
+  .orgtree .structure__director-subroles {
+    justify-content: flex-start;
+    gap: 0.28rem 0.48rem;
+    font-size: 0.72rem;
+    line-height: 1.18;
+  }
+
+  .orgtree .group-leader-badge {
+    min-width: min(100%, 15rem);
+    padding: 0.58rem 0.74rem;
+    gap: 0.68rem;
+  }
+
+  .orgtree .leader-icon-circle.structure-avatar {
+    width: 2.55rem;
+    height: 2.55rem;
+    flex-basis: 2.55rem;
+  }
+
+  .orgtree .coordination-card__icon.structure-avatar,
+  .orgtree .coordination-grid[data-count="2"] .coordination-card__icon.structure-avatar {
+    width: 2.55rem;
+    height: 2.55rem;
+    flex-basis: 2.55rem;
+  }
+
+  .orgtree .staff-icon-circle.structure-avatar {
+    width: 2.2rem;
+    height: 2.2rem;
+    flex-basis: 2.2rem;
+  }
+
+  .orgtree .staff-grid[data-layout="peer-pair"] .staff-badge,
+  .orgtree .staff-grid[data-layout="peer-pair"] .staff-badge:nth-child(2n) {
+    padding: 0.62rem 0.42rem 0.55rem;
+  }
+
+  .structure-avatar-lightbox {
+    padding: 1.25rem;
+  }
+
+  .structure-avatar-lightbox__image-wrap {
+    width: min(82vw, 21rem);
+    border-width: 4px;
+  }
+
+  .structure-avatar-lightbox__caption {
+    max-width: min(82vw, 21rem);
+  }
+}
+
+@media (max-width: 380px) {
+  .orgtree .structure__director-card {
+    grid-template-columns: 3.55rem minmax(0, 1fr) 2.25rem;
+    gap: 0.46rem;
+    padding: 0.82rem 0.68rem;
+  }
+
+  .orgtree .structure__director-avatar.structure-avatar {
+    width: 3.55rem;
+    height: 3.55rem;
+    flex-basis: 3.55rem;
+  }
+
+  .orgtree .structure__director-icon-wrapper.structure__director-ribbon {
+    width: 2.25rem;
+    height: 2.25rem;
+    flex-basis: 2.25rem;
+    border-radius: 0.74rem;
+  }
+
+  .orgtree .structure__director-icon-wrapper.structure__director-ribbon svg {
+    width: 1.22rem;
+    height: 1.22rem;
+  }
+
+  .orgtree .structure__director-name {
+    font-size: 1.06rem;
+  }
+
+  .orgtree .structure__director-role {
+    font-size: 0.62rem;
+  }
+
+  .orgtree .structure__director-subroles {
+    font-size: 0.66rem;
+    gap: 0.2rem 0.36rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orgtree .structure-avatar__img {
+    transition: none !important;
+  }
+
+  .orgtree .structure-avatar[data-has-avatar="1"]:hover .structure-avatar__img {
+    transform: none;
+    filter: none;
+  }
+}

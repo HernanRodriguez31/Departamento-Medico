@@ -151,7 +151,7 @@
     />
     <link
       rel="stylesheet"
-      href="assets/css/core-contrast.css?v=20260430-orgtree-avatars-1"
+      href="assets/css/core-contrast.css?v=20260430-orgtree-mobile-zoom-1"
     />
 
     <style>
@@ -3144,10 +3144,11 @@
                 <div class="structure__director-container">
                   <div class="structure__director-card">
                     <div
-                      class="structure__director-icon-wrapper structure-avatar"
+                      class="structure__director-avatar structure-avatar"
                       data-dm-avatar-uid="LCura"
                       data-dm-author="Dra. Leila Cura"
                       data-dm-avatar-name="Dra. Leila Cura"
+                      data-dm-avatar-zoom
                     >
                       <img
                         class="structure-avatar__img"
@@ -3171,12 +3172,31 @@
                         stroke-linecap="round"
                         stroke-linejoin="round"
                       >
+                        <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg>
+                      </span>
+                    </div>
+                    <div
+                      class="structure__director-icon-wrapper structure__director-ribbon"
+                      aria-hidden="true"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="32"
+                        height="32"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
                         <circle cx="12" cy="8" r="7" />
                         <polyline
                           points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"
                         />
                       </svg>
-                      </span>
                     </div>
                     <div class="structure__director-content">
                       <h2 class="structure__director-name">Dra. Leila Cura</h2>
@@ -4384,7 +4404,7 @@
 
       <!-- SweetAlert2 -->
       <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.26.24"></script>
-      <script src="js/app.js?v=20260430-orgtree-avatars-1"></script>
+      <script src="js/app.js?v=20260430-orgtree-avatar-zoom-1"></script>
 
       <!-- Lucide para iconos del foro general -->
       <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>

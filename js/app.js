@@ -1057,7 +1057,9 @@ function initMedicalStructure() {
     Object.values(medicalStructure).forEach(group => {
         container.appendChild(createGroupElement(group));
     });
-    hydrateStructureAvatars(document.getElementById('estructura-funcional') || contentWrapper);
+    const structureRoot = document.getElementById('estructura-funcional') || contentWrapper;
+    initStructureAvatarLightbox(structureRoot);
+    hydrateStructureAvatars(structureRoot);
 
     // 2. Main Toggle Logic
     const lockMainExpanded = window.matchMedia('(max-width: 768px)').matches
@@ -1110,7 +1112,7 @@ function renderStructureAvatar({ className, name, uid, fallbackIcon }) {
     const uidAttr = safeUid ? ` data-dm-avatar-uid="${safeUid}"` : '';
 
     return `
-        <div class="${className} structure-avatar"${uidAttr} data-dm-author="${safeName}" data-dm-avatar-name="${safeName}">
+        <div class="${className} structure-avatar"${uidAttr} data-dm-author="${safeName}" data-dm-avatar-name="${safeName}" data-dm-avatar-zoom>
             <img class="structure-avatar__img" data-dm-avatar-img alt="${safeName}" hidden>
             <span class="structure-avatar__fallback" data-dm-avatar-fallback aria-hidden="true">${fallbackIcon}</span>
         </div>
@@ -1124,6 +1126,112 @@ function hydrateStructureAvatars(root = document) {
         .catch((err) => {
             console.warn('No se pudieron hidratar avatares de estructura.', err);
         });
+}
+
+let structureAvatarLightbox = null;
+
+function ensureStructureAvatarLightbox() {
+    if (structureAvatarLightbox) return structureAvatarLightbox;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'structure-avatar-lightbox';
+    overlay.setAttribute('hidden', '');
+    overlay.setAttribute('aria-hidden', 'true');
+    overlay.innerHTML = `
+        <figure class="structure-avatar-lightbox__figure" role="dialog" aria-modal="true" aria-label="Avatar ampliado">
+            <button class="structure-avatar-lightbox__close" type="button" aria-label="Cerrar avatar ampliado">&times;</button>
+            <div class="structure-avatar-lightbox__image-wrap">
+                <img class="structure-avatar-lightbox__img" alt="">
+            </div>
+            <figcaption class="structure-avatar-lightbox__caption"></figcaption>
+        </figure>
+    `;
+    document.body.appendChild(overlay);
+
+    const image = overlay.querySelector('.structure-avatar-lightbox__img');
+    const caption = overlay.querySelector('.structure-avatar-lightbox__caption');
+    const closeButton = overlay.querySelector('.structure-avatar-lightbox__close');
+
+    const close = () => {
+        overlay.setAttribute('hidden', '');
+        overlay.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('dm-modal-open');
+        if (image) {
+            image.removeAttribute('src');
+            image.alt = '';
+        }
+        if (caption) caption.textContent = '';
+    };
+
+    overlay.addEventListener('click', (event) => {
+        event.stopPropagation();
+        if (event.target === overlay) close();
+    });
+
+    closeButton?.addEventListener('click', (event) => {
+        event.stopPropagation();
+        close();
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !overlay.hasAttribute('hidden')) {
+            close();
+        }
+    });
+
+    structureAvatarLightbox = {
+        overlay,
+        image,
+        caption,
+        close
+    };
+
+    return structureAvatarLightbox;
+}
+
+function getStructureAvatarImage(avatarEl) {
+    if (!avatarEl?.dataset || avatarEl.dataset.hasAvatar !== '1') return null;
+    const image = avatarEl.querySelector('[data-dm-avatar-img], .structure-avatar__img');
+    if (!image || image.hidden) return null;
+    const src = image.currentSrc || image.src || '';
+    return src ? image : null;
+}
+
+function openStructureAvatarLightbox(avatarEl) {
+    const sourceImage = getStructureAvatarImage(avatarEl);
+    if (!sourceImage) return;
+
+    const modal = ensureStructureAvatarLightbox();
+    const displayName =
+        avatarEl.dataset.dmAvatarName ||
+        avatarEl.dataset.dmAuthor ||
+        sourceImage.alt ||
+        'Avatar';
+
+    if (modal.image) {
+        modal.image.src = sourceImage.currentSrc || sourceImage.src;
+        modal.image.alt = displayName;
+    }
+    if (modal.caption) modal.caption.textContent = displayName;
+
+    modal.overlay.removeAttribute('hidden');
+    modal.overlay.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('dm-modal-open');
+}
+
+function initStructureAvatarLightbox(root = document) {
+    const scope = root || document;
+    if (!scope || scope.dataset?.structureAvatarLightboxBound === '1') return;
+    if (scope.dataset) scope.dataset.structureAvatarLightboxBound = '1';
+
+    scope.addEventListener('click', (event) => {
+        const avatarEl = event.target.closest?.('[data-dm-avatar-zoom]');
+        if (!avatarEl || !scope.contains(avatarEl)) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        openStructureAvatarLightbox(avatarEl);
+    }, true);
 }
 
 function createGroupElement(group) {

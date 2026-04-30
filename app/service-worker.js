@@ -1,7 +1,7 @@
 const CACHE_PREFIX = "brisa-app-";
 // Bump this whenever we change precached assets (CSS/JS) to ensure clients
 // receive the updated files instead of an older cached copy.
-const CACHE_VERSION = "v63";
+const CACHE_VERSION = "v66";
 const CACHE = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const APP_SHELL_URL = "/app/index.html";
 const OFFLINE_URL = "/offline.html";
@@ -10,11 +10,11 @@ const PRECACHE_URLS = [
   OFFLINE_URL,
   "/css/app.css?v=20260428-mobile-ai-interactions-1",
   "/css/structure.css?v=20260430-orgtree-avatars-1",
-  "/assets/css/core-contrast.css?v=20260430-orgtree-avatars-1",
+  "/assets/css/core-contrast.css?v=20260430-orgtree-mobile-zoom-1",
   "/assets/css/pages/app.css?v=20260428-mobile-muro-composer-width-1",
   "/assets/js/pages/app.js?v=20260430-orgtree-avatars-1",
   "/js/chat.js?v=20260428-chat-read-receipts-1",
-  "/js/app-mobile.js?v=20260430-orgtree-avatars-1",
+  "/js/app-mobile.js?v=20260430-orgtree-mobile-zoom-1",
   "/assets/images/committees/committee-emergencias.png?v=20260429-committee-cards-2",
   "/assets/images/committees/committee-salud-ocupacional.png?v=20260429-committee-cards-2",
   "/assets/images/committees/committee-calidad-seguridad.png?v=20260429-committee-cards-2",
