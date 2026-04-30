@@ -12,7 +12,7 @@ import {
   buildAvatarSrc,
   applyAvatarElement,
   setUserProfileCache
-} from "./user-profiles.js?v=20260427-profile-avatar-priority-1";
+} from "./user-profiles.js?v=20260430-orgtree-avatars-1";
 
 const warnOnce = (() => {
   const seen = new Set();

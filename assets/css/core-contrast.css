@@ -23,6 +23,75 @@
   --org-subtle: rgba(0, 0, 0, 0.04);
 }
 
+/* ORGTREE: profile avatars */
+.orgtree .structure-avatar {
+  position: relative;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+
+.orgtree .structure-avatar__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+.orgtree .structure-avatar__img[hidden],
+.orgtree .structure-avatar__fallback[hidden] {
+  display: none !important;
+}
+
+.orgtree .structure-avatar__fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.orgtree .structure__director-icon-wrapper.structure-avatar {
+  width: 4.5rem;
+  height: 4.5rem;
+  padding: 0 !important;
+}
+
+.orgtree .leader-icon-circle.structure-avatar,
+.orgtree .coordination-card__icon.structure-avatar {
+  width: 2rem;
+  height: 2rem;
+  padding: 0 !important;
+}
+
+.orgtree .staff-icon-circle.structure-avatar {
+  width: 1.625rem;
+  height: 1.625rem;
+  padding: 0 !important;
+}
+
+@media (max-width: 640px) {
+  .orgtree .structure__director-icon-wrapper.structure-avatar {
+    width: 3.4rem;
+    height: 3.4rem;
+    padding: 0 !important;
+  }
+
+  .orgtree .leader-icon-circle.structure-avatar,
+  .orgtree .coordination-card__icon.structure-avatar,
+  .orgtree .coordination-grid[data-count="2"] .coordination-card__icon.structure-avatar {
+    width: 2rem;
+    height: 2rem;
+    flex: 0 0 2rem;
+  }
+
+  .orgtree .staff-icon-circle.structure-avatar {
+    width: 1.7rem;
+    height: 1.7rem;
+    flex: 0 0 1.7rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .orgtree .structure__content-wrapper,
   .orgtree .group-content,

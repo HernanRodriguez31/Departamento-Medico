@@ -9,7 +9,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getFirebase } from "./firebaseClient.js";
 import { logger, once as logOnce } from "./app-logger.js";
-import { resolveDefaultAvatarUrl } from "./default-avatars.js?v=20260427-profile-avatar-priority-1";
+import { resolveDefaultAvatarUrl } from "./default-avatars.js?v=20260430-orgtree-avatars-1";
 
 const profileCache = new Map();
 const profileRequests = new Map();

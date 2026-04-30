@@ -855,6 +855,49 @@ const StructureIcons = {
     MapPin: `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>`
 };
 
+const MEDICAL_USER_UIDS = Object.freeze({
+    'Dra. Leila Cura': 'LCura',
+    'Leila Cura': 'LCura',
+    'Gustavo Silva': 'GSilva',
+    'Juan Martín Azcárate': 'JAzcarate',
+    'Leandro Medina': 'LMedina',
+    'Juan Maurino': 'JMaurino',
+    'Hernán Rodríguez': 'HRodriguez',
+    'Sergio Aciar': 'SAciar',
+    'Adriane Dal Mas': 'ADalMas',
+    'Arquímedes Pedraz': 'APedraz',
+    'Alberto Bartra': 'ABartra',
+    'Marcelo Rosales': 'MRosales',
+    'Fernando Mazzarelli': 'GMazzarelli',
+    'Roque Ricco': 'RRicco',
+    'Cristian Ruben': 'CRuben',
+    'Juan Gandarillas': 'JGandarillas',
+    'Emmanuel Rivas': 'ERivas',
+    'Maximiliano Toledo': 'MToledo',
+    'Fiorella Cappelli': 'FCappelli',
+    'Braian Salas': 'BSalas',
+    'Gabriel Medina': 'GMedina',
+    'Pablo Mayo': 'PMayo',
+    'Marcelo Calvo': 'MCalvo',
+    'Verónica Castro': 'VCastro',
+    'Santiago González Calcagno': 'SGonzalezCalcagno',
+    'Gastón Castellan': 'GCastellan',
+    'Paula Fernández': 'PFernandez',
+    'Edgar Jerez': 'EJerez',
+    'Francisco Bustos': 'FBustos',
+    'Roberto Sabha': 'RSabha',
+    'Mario Bianchi': 'MBianchi',
+    'José Carlini': 'JCarlini',
+    'Betina Robledo': 'BRobledo',
+    'Willie Billie Mateo': 'MWilleBille'
+});
+
+const createMedicalPerson = (name, extra = {}) => ({
+    name,
+    uid: MEDICAL_USER_UIDS[name] || '',
+    ...extra
+});
+
 // --- DATA STRUCTURE ---
 const medicalStructure = {
     upstream: {
@@ -862,6 +905,7 @@ const medicalStructure = {
         title: 'Upstream',
         subtitle: 'Exploración y Producción',
         leader: 'Gustavo Silva',
+        leaderUid: MEDICAL_USER_UIDS['Gustavo Silva'],
         leaderLabel: 'Líder Médico PAE',
         icon: StructureIcons.Pumpjack,
         regions: [
@@ -872,17 +916,17 @@ const medicalStructure = {
                     {
                         name: 'Cerro Dragón',
                         staff: [
-                            { name: 'Hernán Rodríguez', role: 'Coordinador', isCoordinator: true },
-                            { name: 'Sergio Aciar', role: 'Coordinador', isCoordinator: true }
+                            createMedicalPerson('Hernán Rodríguez', { role: 'Coordinador', isCoordinator: true }),
+                            createMedicalPerson('Sergio Aciar', { role: 'Coordinador', isCoordinator: true })
                         ]
                     },
-                    { name: 'Resero', staff: [{ name: 'Adriane Dal Mas' }, { name: 'Arquímedes Pedraz' }] },
-                    { name: 'Valle Hermoso', staff: [{ name: 'Alberto Bartra' }, { name: 'Marcelo Rosales' }] },
-                    { name: 'Tres Picos', staff: [{ name: 'Fernando Mazzarelli' }, { name: 'Roque Ricco' }] },
-                    { name: 'Oriental GSJ', staff: [{ name: 'Cristian Ruben' }, { name: 'Juan Gandarillas' }] },
-                    { name: 'Anticlinal Grande', staff: [{ name: 'Emmanuel Rivas' }, { name: 'Maximiliano Toledo' }] },
+                    { name: 'Resero', staff: [createMedicalPerson('Adriane Dal Mas'), createMedicalPerson('Arquímedes Pedraz')] },
+                    { name: 'Valle Hermoso', staff: [createMedicalPerson('Alberto Bartra'), createMedicalPerson('Marcelo Rosales')] },
+                    { name: 'Tres Picos', staff: [createMedicalPerson('Fernando Mazzarelli'), createMedicalPerson('Roque Ricco')] },
+                    { name: 'Oriental GSJ', staff: [createMedicalPerson('Cristian Ruben'), createMedicalPerson('Juan Gandarillas')] },
+                    { name: 'Anticlinal Grande', staff: [createMedicalPerson('Emmanuel Rivas'), createMedicalPerson('Maximiliano Toledo')] },
                     { name: 'Koluel Kaike', staff: [] },
-                    { name: 'Democracia', staff: [{ name: 'Fiorella Cappelli' }] }
+                    { name: 'Democracia', staff: [createMedicalPerson('Fiorella Cappelli')] }
                 ]
             },
             {
@@ -892,14 +936,14 @@ const medicalStructure = {
                     {
                         name: 'ECOR I',
                         staff: [
-                            { name: 'Juan Maurino', role: 'Coordinador', isCoordinator: true }
+                            createMedicalPerson('Juan Maurino', { role: 'Coordinador', isCoordinator: true })
                         ]
                     },
-                    { name: 'Lindero Oriental', staff: [{ name: 'Braian Salas' }, { name: 'Gabriel Medina' }] },
-                    { name: 'Itinerante NQN', staff: [{ name: 'Pablo Mayo' }, { name: 'Marcelo Calvo' }] },
-                    { name: 'Bandurria Centro', staff: [{ name: 'Verónica Castro' }, { name: 'Santiago González Calcagno' }] },
-                    { name: 'Aguada Pichana Oeste', staff: [{ name: 'Gastón Castellan' }, { name: 'Paula Fernández' }] },
-                    { name: 'Coirón Amargo Sur Este', staff: [{ name: 'Edgar Jerez' }, { name: 'Francisco Bustos' }] },
+                    { name: 'Lindero Oriental', staff: [createMedicalPerson('Braian Salas'), createMedicalPerson('Gabriel Medina')] },
+                    { name: 'Itinerante NQN', staff: [createMedicalPerson('Pablo Mayo'), createMedicalPerson('Marcelo Calvo')] },
+                    { name: 'Bandurria Centro', staff: [createMedicalPerson('Verónica Castro'), createMedicalPerson('Santiago González Calcagno')] },
+                    { name: 'Aguada Pichana Oeste', staff: [createMedicalPerson('Gastón Castellan'), createMedicalPerson('Paula Fernández')] },
+                    { name: 'Coirón Amargo Sur Este', staff: [createMedicalPerson('Edgar Jerez'), createMedicalPerson('Francisco Bustos')] },
                     { name: 'Aguada Cánepa', staff: [] }
                 ]
             },
@@ -910,11 +954,11 @@ const medicalStructure = {
                     {
                         name: 'Planta Piquirenda',
                         staff: [
-                            { name: 'Roberto Sabha', role: 'Coordinador', isCoordinator: true }
+                            createMedicalPerson('Roberto Sabha', { role: 'Coordinador', isCoordinator: true })
                         ]
                     },
-                    { name: 'Macueta Norte', staff: [{ name: 'Roberto Sabha' }] },
-                    { name: 'San Pedrito', staff: [{ name: 'Roberto Sabha' }] }
+                    { name: 'Macueta Norte', staff: [createMedicalPerson('Roberto Sabha')] },
+                    { name: 'San Pedrito', staff: [createMedicalPerson('Roberto Sabha')] }
                 ]
             }
         ]
@@ -924,6 +968,7 @@ const medicalStructure = {
         title: 'Downstream',
         subtitle: 'Av. Alem, Refinería Campana y CORS',
         leader: 'Juan Martín Azcárate',
+        leaderUid: MEDICAL_USER_UIDS['Juan Martín Azcárate'],
         leaderLabel: 'Líder Médico PAE',
         icon: StructureIcons.Refinery,
         regions: [
@@ -934,8 +979,8 @@ const medicalStructure = {
                     {
                         name: 'Edificio Alem 1110',
                         staff: [
-                            { name: 'Mario Bianchi', role: 'Coordinador', isCoordinator: true },
-                            { name: 'José Carlini' }
+                            createMedicalPerson('Mario Bianchi', { role: 'Coordinador', isCoordinator: true }),
+                            createMedicalPerson('José Carlini')
                         ]
                     }
                 ]
@@ -947,8 +992,8 @@ const medicalStructure = {
                     {
                         name: 'Refinería Campana',
                         staff: [
-                            { name: 'Mario Bianchi', role: 'Coordinador', isCoordinator: true },
-                            { name: 'Betina Robledo' }
+                            createMedicalPerson('Mario Bianchi', { role: 'Coordinador', isCoordinator: true }),
+                            createMedicalPerson('Betina Robledo')
                         ]
                     }
                 ]
@@ -960,8 +1005,8 @@ const medicalStructure = {
                     {
                         name: 'CORS',
                         staff: [
-                            { name: 'Mario Bianchi', role: 'Coordinador', isCoordinator: true },
-                            { name: 'José Carlini' }
+                            createMedicalPerson('Mario Bianchi', { role: 'Coordinador', isCoordinator: true }),
+                            createMedicalPerson('José Carlini')
                         ]
                     }
                 ]
@@ -973,6 +1018,7 @@ const medicalStructure = {
         title: 'Salud Ocupacional',
         subtitle: 'Brisa para MPSA / FSE',
         leader: 'Leandro Medina',
+        leaderUid: MEDICAL_USER_UIDS['Leandro Medina'],
         leaderLabel: 'Líder Médico',
         icon: StructureIcons.OccupationalHealth,
         regions: [
@@ -980,14 +1026,14 @@ const medicalStructure = {
                 id: 'mpsa-gsj',
                 name: 'Golfo San Jorge',
                 sectors: [
-                    { name: 'Médico de Base MPSA/FSE', staff: [{ name: 'Leandro Medina' }, { name: 'Willie Billie Mateo' }] }
+                    { name: 'Médico de Base MPSA/FSE', staff: [createMedicalPerson('Leandro Medina'), createMedicalPerson('Willie Billie Mateo')] }
                 ]
             },
             {
                 id: 'mpsa-nqn',
                 name: 'Neuquén',
                 sectors: [
-                    { name: 'Médico de Base MPSA/FSE', staff: [{ name: 'Leandro Medina' }] }
+                    { name: 'Médico de Base MPSA/FSE', staff: [createMedicalPerson('Leandro Medina')] }
                 ]
             }
         ]
@@ -1011,6 +1057,7 @@ function initMedicalStructure() {
     Object.values(medicalStructure).forEach(group => {
         container.appendChild(createGroupElement(group));
     });
+    hydrateStructureAvatars(document.getElementById('estructura-funcional') || contentWrapper);
 
     // 2. Main Toggle Logic
     const lockMainExpanded = window.matchMedia('(max-width: 768px)').matches
@@ -1049,6 +1096,36 @@ function initMedicalStructure() {
     });
 }
 
+function escapeStructureAttribute(value = '') {
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+function renderStructureAvatar({ className, name, uid, fallbackIcon }) {
+    const safeName = escapeStructureAttribute(name || 'Usuario');
+    const safeUid = escapeStructureAttribute(uid || MEDICAL_USER_UIDS[name] || '');
+    const uidAttr = safeUid ? ` data-dm-avatar-uid="${safeUid}"` : '';
+
+    return `
+        <div class="${className} structure-avatar"${uidAttr} data-dm-author="${safeName}" data-dm-avatar-name="${safeName}">
+            <img class="structure-avatar__img" data-dm-avatar-img alt="${safeName}" hidden>
+            <span class="structure-avatar__fallback" data-dm-avatar-fallback aria-hidden="true">${fallbackIcon}</span>
+        </div>
+    `;
+}
+
+function hydrateStructureAvatars(root = document) {
+    if (!root) return;
+    import('/assets/js/common/user-profiles.js?v=20260430-orgtree-avatars-1')
+        .then(({ hydrateAvatars }) => hydrateAvatars(root))
+        .catch((err) => {
+            console.warn('No se pudieron hidratar avatares de estructura.', err);
+        });
+}
+
 function createGroupElement(group) {
     const groupCard = document.createElement('div');
     groupCard.className = 'group-card';
@@ -1072,9 +1149,12 @@ function createGroupElement(group) {
             </div>
             
             <div class="group-leader-badge">
-                <div class="leader-icon-circle">
-                    ${StructureIcons.UserLarge}
-                </div>
+                ${renderStructureAvatar({
+                    className: 'leader-icon-circle',
+                    name: group.leader,
+                    uid: group.leaderUid,
+                    fallbackIcon: StructureIcons.UserLarge
+                })}
                 <div class="leader-info">
                     <span class="leader-label">${group.leaderLabel || 'Líder Médico'}</span>
                     <span class="leader-name">${group.leader}</span>
@@ -1255,9 +1335,12 @@ function createCoordinationCard(person) {
     const card = document.createElement('article');
     card.className = 'coordination-card';
     card.innerHTML = `
-        <div class="coordination-card__icon">
-            ${StructureIcons.ClipboardCheck}
-        </div>
+        ${renderStructureAvatar({
+            className: 'coordination-card__icon',
+            name: person.name,
+            uid: person.uid,
+            fallbackIcon: StructureIcons.ClipboardCheck
+        })}
         <div class="coordination-card__info">
             <span class="coordination-card__name">${person.name}</span>
             <span class="coordination-card__role">${person.role || 'Coordinador'}</span>
@@ -1377,9 +1460,12 @@ function createStaffBadge(person) {
     badge.className = `staff-badge ${isCoord ? 'coordinator' : ''}`;
 
     badge.innerHTML = `
-        <div class="staff-icon-circle">
-            ${isCoord ? StructureIcons.ClipboardCheck : StructureIcons.User}
-        </div>
+        ${renderStructureAvatar({
+            className: 'staff-icon-circle',
+            name: person.name,
+            uid: person.uid,
+            fallbackIcon: isCoord ? StructureIcons.ClipboardCheck : StructureIcons.User
+        })}
         <div class="staff-info">
             <span class="staff-name">${person.name}</span>
             ${isCoord ? `<span class="staff-role">${person.role}</span>` : ''}

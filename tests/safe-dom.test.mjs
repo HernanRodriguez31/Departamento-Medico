@@ -109,6 +109,9 @@ test("default profile avatars resolve by uid, email, and display name", () => {
     [{ email: "JAzcarate@pan-energy.com" }, "avatar-azcarate-new.png"],
     [{ name: "Juan Martin Azcarate" }, "avatar-azcarate-new.png"],
     [{ name: "Juan Martín Azcárate" }, "avatar-azcarate-new.png"],
+    [{ uid: "LMedina" }, "avatar-medina-new.png"],
+    [{ email: "leandro.medina@manpetrol.com" }, "avatar-medina-new.png"],
+    [{ name: "Leandro Medina" }, "avatar-medina-new.png"],
     [{ uid: "MBianchi" }, "coord-bianchi-new.png"],
     [{ email: "MBianchi@pan-energy.com" }, "coord-bianchi-new.png"],
     [{ name: "Mario Bianchi" }, "coord-bianchi-new.png"],
@@ -134,7 +137,7 @@ test("default profile avatars resolve by uid, email, and display name", () => {
 
 test("default avatar migration rows never write user-selected avatarUrl", () => {
   const rows = getDefaultAvatarMigrationRows();
-  assert.equal(rows.length, 8);
+  assert.equal(rows.length, 9);
   assert.equal(new Set(rows.map((row) => row.uid)).size, rows.length);
   rows.forEach((row) => {
     assert.ok(row.defaultAvatarUrl.includes(PROFILE_AVATAR_VERSION));

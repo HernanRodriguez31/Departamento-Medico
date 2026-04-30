@@ -140,7 +140,7 @@
     <!-- Styles -->
     <link rel="stylesheet" href="css/variables.css?v=20260306-network-bg-1" />
     <link rel="stylesheet" href="css/style.css?v=20260428-desktop-orgtree-eyebrow-plus-1" />
-    <link rel="stylesheet" href="css/structure.css" />
+    <link rel="stylesheet" href="css/structure.css?v=20260430-orgtree-avatars-1" />
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
@@ -151,7 +151,7 @@
     />
     <link
       rel="stylesheet"
-      href="assets/css/core-contrast.css?v=20260305-orgtree-header-1"
+      href="assets/css/core-contrast.css?v=20260430-orgtree-avatars-1"
     />
 
     <style>
@@ -2795,7 +2795,7 @@
                           class="referente-hero-photo referente-hero-photo--asset-framed"
                         >
                           <img
-                            src="assets/images/avatar-leila-cura-featured-tight-20260411.png?v=20260426-profile-avatars-1"
+                            src="assets/images/avatar-leila-cura-featured-tight-20260411.png?v=20260430-orgtree-avatars-1"
                             alt="Dra. Leila Cura"
                             width="1000"
                             height="1000"
@@ -2838,7 +2838,7 @@
                     >
                       <div class="referente__img-wrapper">
                         <img
-                          src="assets/images/avatar-silva-new.png?v=20260426-profile-avatars-1"
+                          src="assets/images/avatar-silva-new.png?v=20260430-orgtree-avatars-1"
                           alt="Gustavo Silva"
                           class="referente__img"
                           width="1000"
@@ -2872,7 +2872,7 @@
                     >
                       <div class="referente__img-wrapper">
                         <img
-                          src="assets/images/avatar-azcarate-new.png?v=20260426-profile-avatars-1"
+                          src="assets/images/avatar-azcarate-new.png?v=20260430-orgtree-avatars-1"
                           alt="Juan Martín Azcárate"
                           class="referente__img"
                           width="1000"
@@ -2906,7 +2906,7 @@
                     >
                       <div class="referente__img-wrapper">
                         <img
-                          src="assets/images/avatar-medina-new.png"
+                          src="assets/images/avatar-medina-new.png?v=20260430-orgtree-avatars-1"
                           alt="Leandro Medina"
                           class="referente__img"
                           width="1000"
@@ -2949,7 +2949,7 @@
                     >
                       <div class="coordinator__img-wrapper">
                         <img
-                          src="assets/images/coord-maurino-new.png?v=20260426-profile-avatars-1"
+                          src="assets/images/coord-maurino-new.png?v=20260430-orgtree-avatars-1"
                           alt="Juan Maurino"
                           class="coordinator__img"
                           width="1000"
@@ -2968,7 +2968,7 @@
                     >
                       <div class="coordinator__img-wrapper">
                         <img
-                          src="assets/images/coord-bianchi-new.png?v=20260426-profile-avatars-1"
+                          src="assets/images/coord-bianchi-new.png?v=20260430-orgtree-avatars-1"
                           alt="Mario Bianchi"
                           class="coordinator__img"
                           width="1000"
@@ -2987,7 +2987,7 @@
                     >
                       <div class="coordinator__img-wrapper">
                         <img
-                          src="assets/images/coord-aciar-new.png?v=20260426-profile-avatars-1"
+                          src="assets/images/coord-aciar-new.png?v=20260430-orgtree-avatars-1"
                           alt="Sergio Aciar"
                           class="coordinator__img"
                           width="1000"
@@ -3006,7 +3006,7 @@
                     >
                       <div class="coordinator__img-wrapper">
                         <img
-                          src="assets/images/coord-rodriguez-new.png?v=20260426-profile-avatars-1"
+                          src="assets/images/coord-rodriguez-new.png?v=20260430-orgtree-avatars-1"
                           alt="Hernán Rodríguez"
                           class="coordinator__img"
                           width="1000"
@@ -3025,7 +3025,7 @@
                     >
                       <div class="coordinator__img-wrapper">
                         <img
-                          src="assets/images/coord-sabha-new.png?v=20260426-profile-avatars-1"
+                          src="assets/images/coord-sabha-new.png?v=20260430-orgtree-avatars-1"
                           alt="Roberto Sabha"
                           class="coordinator__img"
                           width="1000"
@@ -3143,7 +3143,23 @@
                 <!-- Director Card -->
                 <div class="structure__director-container">
                   <div class="structure__director-card">
-                    <div class="structure__director-icon-wrapper">
+                    <div
+                      class="structure__director-icon-wrapper structure-avatar"
+                      data-dm-avatar-uid="LCura"
+                      data-dm-author="Dra. Leila Cura"
+                      data-dm-avatar-name="Dra. Leila Cura"
+                    >
+                      <img
+                        class="structure-avatar__img"
+                        data-dm-avatar-img
+                        alt="Dra. Leila Cura"
+                        hidden
+                      />
+                      <span
+                        class="structure-avatar__fallback"
+                        data-dm-avatar-fallback
+                        aria-hidden="true"
+                      >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         width="32"
@@ -3160,6 +3176,7 @@
                           points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"
                         />
                       </svg>
+                      </span>
                     </div>
                     <div class="structure__director-content">
                       <h2 class="structure__director-name">Dra. Leila Cura</h2>
@@ -4367,7 +4384,7 @@
 
       <!-- SweetAlert2 -->
       <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.26.24"></script>
-      <script src="js/app.js"></script>
+      <script src="js/app.js?v=20260430-orgtree-avatars-1"></script>
 
       <!-- Lucide para iconos del foro general -->
       <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
@@ -4836,7 +4853,7 @@
         import {
           hydrateAvatars,
           resolveUidForAuthor,
-        } from "/assets/js/common/user-profiles.js?v=20260427-profile-avatar-priority-1";
+        } from "/assets/js/common/user-profiles.js?v=20260430-orgtree-avatars-1";
         import {
           escapeAttribute,
           escapeHTML,
@@ -6192,7 +6209,7 @@
       </script>
       <script
         type="module"
-        src="assets/js/pages/index.js?v=20260429-kpi-countup-5"
+        src="assets/js/pages/index.js?v=20260430-orgtree-avatars-1"
       ></script>
       <script type="module">
         import {

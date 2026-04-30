@@ -6,13 +6,14 @@ const QA_EMAIL = process.env.MOBILE_QA_EMAIL || "mobile.qa@departamento-medico.t
 const QA_PASSWORD = process.env.MOBILE_QA_PASSWORD || "MobileQa!12345";
 const CAPTURE_PHASE = process.env.MOBILE_QA_CAPTURE_PHASE || "after";
 const SHOULD_ASSERT = CAPTURE_PHASE !== "before";
-const PROFILE_AVATAR_VERSION = "20260426-profile-avatars-1";
-const PROFILE_AVATAR_JS_VERSION = "20260427-profile-avatar-priority-1";
+const PROFILE_AVATAR_VERSION = "20260430-orgtree-avatars-1";
+const PROFILE_AVATAR_JS_VERSION = "20260430-orgtree-avatars-1";
 const DEFAULT_AVATAR_EXPECTATIONS = [
   { uid: "HRodriguez", name: "Hernan Rodriguez", file: "coord-rodriguez-new.png" },
   { uid: "LCura", name: "Dra. Leila Cura", file: "avatar-leila-cura-featured-tight-20260411.png" },
   { uid: "GSilva", name: "Gustavo Silva", file: "avatar-silva-new.png" },
   { uid: "JAzcarate", name: "Juan Martin Azcarate", file: "avatar-azcarate-new.png" },
+  { uid: "LMedina", name: "Leandro Medina", file: "avatar-medina-new.png" },
   { uid: "JMaurino", name: "Juan Maurino", file: "coord-maurino-new.png" },
   { uid: "MBianchi", name: "Mario Bianchi", file: "coord-bianchi-new.png" },
   { uid: "SAciar", name: "Sergio Aciar", file: "coord-aciar-new.png" },

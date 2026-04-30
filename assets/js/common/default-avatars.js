@@ -1,4 +1,4 @@
-const PROFILE_AVATAR_VERSION = "20260426-profile-avatars-1";
+const PROFILE_AVATAR_VERSION = "20260430-orgtree-avatars-1";
 
 const withVersion = (path) => `${path}?v=${PROFILE_AVATAR_VERSION}`;
 
@@ -37,6 +37,12 @@ const DEFAULT_PROFILE_AVATARS = Object.freeze([
     email: "JAzcarate@pan-energy.com",
     names: ["Juan Martin Azcarate"],
     src: "/assets/images/avatar-azcarate-new.png"
+  },
+  {
+    uid: "LMedina",
+    email: "leandro.medina@manpetrol.com",
+    names: ["Leandro Medina"],
+    src: "/assets/images/avatar-medina-new.png"
   },
   {
     uid: "JMaurino",
