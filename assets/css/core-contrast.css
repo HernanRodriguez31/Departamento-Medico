@@ -2606,6 +2606,12 @@ body.ui-clarity .region-accordion {
 
   .orgtree .structure__toggle-container {
     margin-block: 0.95rem !important;
+    border-top: 2px solid var(--org-brisa-accent, var(--first-color, #7ab800)) !important;
+  }
+
+  .orgtree .structure__toggle-container::before {
+    content: none;
+    display: none;
   }
 
   .orgtree .structure__main-btn {
@@ -2615,6 +2621,7 @@ body.ui-clarity .region-accordion {
     align-items: center;
     justify-content: center;
     min-height: 5.7rem;
+    border-top: 0;
   }
 
   .orgtree .structure__main-btn .dashboard-icon-box,
@@ -2661,10 +2668,6 @@ body.ui-clarity .region-accordion {
     --org-brisa-accent-ink: #7ab800;
     --org-brisa-accent-soft: rgba(122, 184, 0, 0.10);
     --org-brisa-accent-ring: rgba(122, 184, 0, 0.24);
-  }
-
-  .orgtree .structure__main-btn {
-    border-top: 2px solid var(--org-brisa-accent);
   }
 
   .orgtree .dashboard-header-left h2.dashboard-eyebrow {
