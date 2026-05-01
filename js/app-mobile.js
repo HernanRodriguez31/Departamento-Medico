@@ -2682,6 +2682,7 @@ const medicalStructure = {
         leader: 'Gustavo Silva',
         leaderUid: MEDICAL_USER_UIDS['Gustavo Silva'],
         leaderLabel: 'Líder Médico PAE',
+        leaderManagementUnit: 'Golfo San Jorge, Neuquén y Acambuco',
         icon: StructureIcons.Pumpjack,
         regions: [
             {
@@ -2745,6 +2746,7 @@ const medicalStructure = {
         leader: 'Juan Martín Azcárate',
         leaderUid: MEDICAL_USER_UIDS['Juan Martín Azcárate'],
         leaderLabel: 'Líder Médico PAE',
+        leaderManagementUnit: 'UG BA, Refinería Campana y CORS',
         icon: StructureIcons.Refinery,
         regions: [
             {
@@ -2795,6 +2797,9 @@ const medicalStructure = {
         leader: 'Leandro Medina',
         leaderUid: MEDICAL_USER_UIDS['Leandro Medina'],
         leaderLabel: 'Líder Médico',
+        leaderRole: 'Líder de Salud Ocupacional para MPSA / FSE',
+        leaderBusinessUnit: 'Upstream',
+        leaderManagementUnit: 'Golfo San Jorge y Neuquén',
         icon: StructureIcons.OccupationalHealth,
         regions: [
             {
@@ -2881,17 +2886,58 @@ function escapeStructureAttribute(value = '') {
         .replace(/>/g, '&gt;');
 }
 
-function renderStructureAvatar({ className, name, uid, fallbackIcon }) {
+function getStructureInitials(name = '') {
+    const words = String(name || '').trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return 'U';
+
+    const pickLetter = (word = '') => Array.from(word.normalize('NFC')).find(char => /\p{L}/u.test(char)) || '';
+    const first = pickLetter(words[0]);
+    const second = pickLetter(words.length > 1 ? words[1] : words[0]);
+    return `${first}${second}`.toLocaleUpperCase('es-AR') || 'U';
+}
+
+function renderStructureInitials(name = '') {
+    return `<span class="structure-avatar__initials">${escapeStructureAttribute(getStructureInitials(name))}</span>`;
+}
+
+function renderStructureAvatar({
+    className,
+    name,
+    uid,
+    fallbackIcon,
+    businessUnit,
+    managementUnit,
+    subsector,
+    role
+}) {
     const safeName = escapeStructureAttribute(name || 'Usuario');
     const safeUid = escapeStructureAttribute(uid || MEDICAL_USER_UIDS[name] || '');
     const uidAttr = safeUid ? ` data-dm-avatar-uid="${safeUid}"` : '';
+    const metaAttrs = [
+        ['data-dm-avatar-business', businessUnit],
+        ['data-dm-avatar-management', managementUnit],
+        ['data-dm-avatar-subsector', subsector],
+        ['data-dm-avatar-role', role]
+    ].map(([attr, value]) => {
+        const safeValue = escapeStructureAttribute(value || '');
+        return safeValue ? ` ${attr}="${safeValue}"` : '';
+    }).join('');
 
     return `
-        <div class="${className} structure-avatar"${uidAttr} data-dm-author="${safeName}" data-dm-avatar-name="${safeName}" data-dm-avatar-zoom>
+        <div class="${className} structure-avatar"${uidAttr}${metaAttrs} data-dm-author="${safeName}" data-dm-avatar-name="${safeName}" data-dm-avatar-zoom>
             <img class="structure-avatar__img" data-dm-avatar-img alt="${safeName}" hidden>
             <span class="structure-avatar__fallback" data-dm-avatar-fallback aria-hidden="true">${fallbackIcon}</span>
         </div>
     `;
+}
+
+function createStructureAvatarContext({ group, region, sector, role, businessUnit, managementUnit } = {}) {
+    return {
+        businessUnit: businessUnit || group?.title || '',
+        managementUnit: managementUnit || region?.name || group?.subtitle || '',
+        subsector: sector?.name || '',
+        role: role || ''
+    };
 }
 
 function hydrateStructureAvatars(root = document) {
@@ -2917,6 +2963,7 @@ function ensureStructureAvatarLightbox() {
             <button class="structure-avatar-lightbox__close" type="button" aria-label="Cerrar avatar ampliado">&times;</button>
             <div class="structure-avatar-lightbox__image-wrap">
                 <img class="structure-avatar-lightbox__img" alt="">
+                <div class="structure-avatar-lightbox__fallback" hidden aria-hidden="true"></div>
             </div>
             <figcaption class="structure-avatar-lightbox__caption"></figcaption>
         </figure>
@@ -2924,6 +2971,7 @@ function ensureStructureAvatarLightbox() {
     document.body.appendChild(overlay);
 
     const image = overlay.querySelector('.structure-avatar-lightbox__img');
+    const fallback = overlay.querySelector('.structure-avatar-lightbox__fallback');
     const caption = overlay.querySelector('.structure-avatar-lightbox__caption');
     const closeButton = overlay.querySelector('.structure-avatar-lightbox__close');
 
@@ -2934,8 +2982,13 @@ function ensureStructureAvatarLightbox() {
         if (image) {
             image.removeAttribute('src');
             image.alt = '';
+            image.hidden = false;
         }
-        if (caption) caption.textContent = '';
+        if (fallback) {
+            fallback.innerHTML = '';
+            fallback.setAttribute('hidden', '');
+        }
+        if (caption) caption.replaceChildren();
     };
 
     overlay.addEventListener('click', (event) => {
@@ -2957,6 +3010,7 @@ function ensureStructureAvatarLightbox() {
     structureAvatarLightbox = {
         overlay,
         image,
+        fallback,
         caption,
         close
     };
@@ -2964,30 +3018,122 @@ function ensureStructureAvatarLightbox() {
     return structureAvatarLightbox;
 }
 
-function getStructureAvatarImage(avatarEl) {
-    if (!avatarEl?.dataset || avatarEl.dataset.hasAvatar !== '1') return null;
+function getStructureAvatarMedia(avatarEl) {
+    if (!avatarEl) return null;
     const image = avatarEl.querySelector('[data-dm-avatar-img], .structure-avatar__img');
-    if (!image || image.hidden) return null;
-    const src = image.currentSrc || image.src || '';
-    return src ? image : null;
+    if (avatarEl.dataset?.hasAvatar === '1' && image && !image.hidden) {
+        const src = image.currentSrc || image.src || '';
+        if (src) {
+            return {
+                type: 'image',
+                src,
+                alt: image.alt || ''
+            };
+        }
+    }
+
+    const fallback = avatarEl.querySelector('[data-dm-avatar-fallback], .structure-avatar__fallback');
+    const fallbackHtml = fallback?.innerHTML?.trim() || '';
+    if (!fallbackHtml) return null;
+
+    return {
+        type: 'fallback',
+        html: fallbackHtml,
+        alt: avatarEl.dataset?.dmAvatarName || avatarEl.dataset?.dmAuthor || 'Avatar'
+    };
+}
+
+function appendStructureAvatarCaptionRow(container, label, value) {
+    if (!container || !value) return;
+
+    const row = document.createElement('div');
+    row.className = 'structure-avatar-lightbox__meta-row';
+
+    const labelEl = document.createElement('dt');
+    labelEl.textContent = label;
+
+    const valueEl = document.createElement('dd');
+    valueEl.textContent = value;
+
+    row.append(labelEl, valueEl);
+    container.appendChild(row);
+}
+
+function renderStructureAvatarCaption(caption, avatarEl, displayName) {
+    if (!caption) return;
+
+    caption.replaceChildren();
+
+    const title = document.createElement('strong');
+    title.className = 'structure-avatar-lightbox__name';
+    title.textContent = displayName;
+    caption.appendChild(title);
+
+    const roleLines = (avatarEl.dataset.dmAvatarRoleLines || '')
+        .split('|')
+        .map(line => line.trim())
+        .filter(Boolean);
+    const isProfileCaption = roleLines.length > 0;
+    caption.classList.toggle('structure-avatar-lightbox__caption--profile', isProfileCaption);
+    if (roleLines.length) {
+        const roles = document.createElement('div');
+        roles.className = 'structure-avatar-lightbox__roles';
+        roleLines.forEach(line => {
+            const lineEl = document.createElement('span');
+            lineEl.className = 'structure-avatar-lightbox__role-line';
+            lineEl.textContent = line;
+            roles.appendChild(lineEl);
+        });
+        caption.appendChild(roles);
+    } else {
+        const role = avatarEl.dataset.dmAvatarRole || '';
+        if (role) {
+            const roleEl = document.createElement('span');
+            roleEl.className = 'structure-avatar-lightbox__role';
+            roleEl.textContent = role;
+            caption.appendChild(roleEl);
+        }
+    }
+
+    const meta = document.createElement('dl');
+    meta.className = 'structure-avatar-lightbox__meta';
+    if (isProfileCaption) {
+        meta.classList.add('structure-avatar-lightbox__meta--profile');
+    }
+    appendStructureAvatarCaptionRow(meta, 'Operaciones', avatarEl.dataset.dmAvatarBusiness);
+    appendStructureAvatarCaptionRow(meta, 'Unidad de gestión', avatarEl.dataset.dmAvatarManagement);
+    appendStructureAvatarCaptionRow(meta, 'Sector', avatarEl.dataset.dmAvatarSubsector);
+
+    if (meta.children.length) caption.appendChild(meta);
 }
 
 function openStructureAvatarLightbox(avatarEl) {
-    const sourceImage = getStructureAvatarImage(avatarEl);
-    if (!sourceImage) return;
+    const sourceMedia = getStructureAvatarMedia(avatarEl);
+    if (!sourceMedia) return;
 
     const modal = ensureStructureAvatarLightbox();
     const displayName =
         avatarEl.dataset.dmAvatarName ||
         avatarEl.dataset.dmAuthor ||
-        sourceImage.alt ||
+        sourceMedia.alt ||
         'Avatar';
 
-    if (modal.image) {
-        modal.image.src = sourceImage.currentSrc || sourceImage.src;
+    if (sourceMedia.type === 'image' && modal.image) {
+        modal.image.hidden = false;
+        modal.image.src = sourceMedia.src;
         modal.image.alt = displayName;
+        modal.fallback?.setAttribute('hidden', '');
+        if (modal.fallback) modal.fallback.innerHTML = '';
+    } else if (sourceMedia.type === 'fallback' && modal.fallback) {
+        if (modal.image) {
+            modal.image.removeAttribute('src');
+            modal.image.alt = '';
+            modal.image.hidden = true;
+        }
+        modal.fallback.innerHTML = sourceMedia.html;
+        modal.fallback.removeAttribute('hidden');
     }
-    if (modal.caption) modal.caption.textContent = displayName;
+    renderStructureAvatarCaption(modal.caption, avatarEl, displayName);
 
     modal.overlay.removeAttribute('hidden');
     modal.overlay.setAttribute('aria-hidden', 'false');
@@ -3036,7 +3182,13 @@ function createGroupElement(group) {
                     className: 'leader-icon-circle',
                     name: group.leader,
                     uid: group.leaderUid,
-                    fallbackIcon: StructureIcons.UserLarge
+                    fallbackIcon: StructureIcons.UserLarge,
+                    ...createStructureAvatarContext({
+                        group,
+                        role: group.leaderRole || group.leaderLabel || 'Líder Médico',
+                        businessUnit: group.leaderBusinessUnit,
+                        managementUnit: group.leaderManagementUnit
+                    })
                 })}
                 <div class="leader-info">
                     <span class="leader-label">${group.leaderLabel || 'Líder Médico'}</span>
@@ -3058,7 +3210,7 @@ function createGroupElement(group) {
     // Inject Regions
     const regionsContainer = groupCard.querySelector(`#regions-container-${group.id}`);
     group.regions.forEach(region => {
-        regionsContainer.appendChild(createRegionElement(region));
+        regionsContainer.appendChild(createRegionElement(region, group));
     });
 
     // Toggle Logic
@@ -3109,8 +3261,8 @@ function extractRegionalCoordinators(coordinationSectors = []) {
     const seen = new Set();
 
     return coordinationSectors
-        .flatMap(sector => sector.staff || [])
-        .filter(person => {
+        .flatMap(sector => (sector.staff || []).map(person => ({ person, sector })))
+        .filter(({ person }) => {
             const key = `${person.name}|${person.role || ''}|${person.isCoordinator ? '1' : '0'}`;
             if (seen.has(key)) return false;
             seen.add(key);
@@ -3118,7 +3270,7 @@ function extractRegionalCoordinators(coordinationSectors = []) {
         });
 }
 
-function createRegionElement(region) {
+function createRegionElement(region, group) {
     const regionWrapper = document.createElement('div');
     regionWrapper.className = 'region-accordion';
     const useHierarchicalMobile = isHierarchicalMobileView();
@@ -3156,7 +3308,7 @@ function createRegionElement(region) {
     const sectorsContainer = regionWrapper.querySelector('.sectors-container');
 
     if (useHierarchicalMobile && coordinationSectors.length && coordinationSlot) {
-        const coordinationBlock = createRegionCoordinationBlock(region, coordinationSectors);
+        const coordinationBlock = createRegionCoordinationBlock(region, coordinationSectors, group);
         if (coordinationBlock) {
             coordinationSlot.appendChild(coordinationBlock);
             coordinationSlot.classList.add('has-content');
@@ -3173,7 +3325,7 @@ function createRegionElement(region) {
     }
 
     visibleSectors.forEach(sector => {
-        sectorsList.appendChild(createSectorElement(sector));
+        sectorsList.appendChild(createSectorElement(sector, { group, region }));
     });
 
     // Toggle Logic
@@ -3194,27 +3346,27 @@ function createRegionElement(region) {
     return regionWrapper;
 }
 
-function createRegionCoordinationBlock(region, coordinationSectors = []) {
-    const coordinators = extractRegionalCoordinators(coordinationSectors);
-    if (!coordinators.length) return null;
+function createRegionCoordinationBlock(region, coordinationSectors = [], group) {
+    const coordinatorRecords = extractRegionalCoordinators(coordinationSectors);
+    if (!coordinatorRecords.length) return null;
 
     const block = document.createElement('section');
     block.className = 'region-coordination-block';
     block.innerHTML = `
-        <div class="coordination-grid" data-count="${coordinators.length}">
+        <div class="coordination-grid" data-count="${coordinatorRecords.length}">
             <!-- Coordinators injected here -->
         </div>
     `;
 
     const grid = block.querySelector('.coordination-grid');
-    coordinators.forEach(person => {
-        grid.appendChild(createCoordinationCard(person));
+    coordinatorRecords.forEach(({ person, sector }) => {
+        grid.appendChild(createCoordinationCard(person, { group, region, sector }));
     });
 
     return block;
 }
 
-function createCoordinationCard(person) {
+function createCoordinationCard(person, context = {}) {
     const card = document.createElement('article');
     card.className = 'coordination-card';
     card.innerHTML = `
@@ -3222,7 +3374,11 @@ function createCoordinationCard(person) {
             className: 'coordination-card__icon',
             name: person.name,
             uid: person.uid,
-            fallbackIcon: StructureIcons.ClipboardCheck
+            fallbackIcon: StructureIcons.ClipboardCheck,
+            ...createStructureAvatarContext({
+                ...context,
+                role: person.role || 'Coordinador'
+            })
         })}
         <div class="coordination-card__info">
             <span class="coordination-card__name">${person.name}</span>
@@ -3269,13 +3425,13 @@ function classifySectorLayout(staff = []) {
     };
 }
 
-function createSectorElement(sector) {
+function createSectorElement(sector, context = {}) {
     if (!sector.staff || sector.staff.length === 0) return document.createElement('div');
 
     const { layout, pairKind, staffCount } = classifySectorLayout(sector.staff);
 
     if (isHierarchicalMobileView()) {
-        return createMobileSectorElement(sector, { layout, pairKind, staffCount });
+        return createMobileSectorElement(sector, { layout, pairKind, staffCount, ...context });
     }
 
     const sectorDiv = document.createElement('div');
@@ -3299,13 +3455,13 @@ function createSectorElement(sector) {
 
     const staffGrid = sectorDiv.querySelector('.staff-grid');
     sector.staff.forEach(person => {
-        staffGrid.appendChild(createStaffBadge(person));
+        staffGrid.appendChild(createStaffBadge(person, { ...context, sector }));
     });
 
     return sectorDiv;
 }
 
-function createMobileSectorElement(sector, { layout, pairKind, staffCount }) {
+function createMobileSectorElement(sector, { layout, pairKind, staffCount, group, region }) {
     const sectorDiv = document.createElement('div');
     sectorDiv.className = 'sector-item sector-item--card';
 
@@ -3330,24 +3486,29 @@ function createMobileSectorElement(sector, { layout, pairKind, staffCount }) {
 
     const staffGrid = sectorDiv.querySelector('.staff-grid');
     sector.staff.forEach(person => {
-        staffGrid.appendChild(createStaffBadge(person));
+        staffGrid.appendChild(createStaffBadge(person, { group, region, sector }));
     });
 
     return sectorDiv;
 }
 
-function createStaffBadge(person) {
+function createStaffBadge(person, context = {}) {
     const badge = document.createElement('div');
     const isCoord = person.isCoordinator;
 
     badge.className = `staff-badge ${isCoord ? 'coordinator' : ''}`;
+    const fallbackIcon = isCoord ? StructureIcons.ClipboardCheck : renderStructureInitials(person.name);
 
     badge.innerHTML = `
         ${renderStructureAvatar({
-            className: 'staff-icon-circle',
+            className: `staff-icon-circle${isCoord ? '' : ' staff-icon-circle--initials'}`,
             name: person.name,
             uid: person.uid,
-            fallbackIcon: isCoord ? StructureIcons.ClipboardCheck : StructureIcons.User
+            fallbackIcon,
+            ...createStructureAvatarContext({
+                ...context,
+                role: person.role || ''
+            })
         })}
         <div class="staff-info">
             <span class="staff-name">${person.name}</span>
