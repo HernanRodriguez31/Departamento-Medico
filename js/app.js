@@ -844,6 +844,7 @@ const StructureIcons = {
     Pumpjack: `<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 501.352 501.352" fill="currentColor" xmlSpace="preserve"><path d="M490.676,474.686H448.01V185.619c10.88-11.2,13.76-27.84,7.147-42.027L401.503,27.326 c-8.747-18.987-31.147-27.2-50.133-18.56c-1.067,0.533-2.133,1.067-3.093,1.6l-20.053,11.627 c-18.133,10.453-24.213,33.707-13.76,51.733c0.533,0.96,1.173,1.92,1.813,2.773l17.067,24.32L88.436,242.046 c-13.12,7.573-17.707,24.32-10.133,37.547v0.107c1.813,2.987,4.16,5.547,6.933,7.68v155.307H64.009 c-5.867,0-10.667,4.8-10.667,10.667v21.333H10.996c-5.333,0-10.133,3.84-10.88,9.067c-0.96,6.613,4.16,12.267,10.56,12.267h479.68 c5.333,0,10.133-3.84,10.88-9.067C502.196,480.339,497.076,474.686,490.676,474.686z M96.223,264.232 c0.427-1.6,1.493-2.987,2.88-3.733l246.613-142.08l6.933,9.813L105.396,271.166c-2.987,1.707-6.827,0.747-8.533-2.24 C96.009,267.539,95.796,265.832,96.223,264.232z M186.996,325.352l14.08-84.907l99.84-57.707l23.893,142.613H186.996z M310.196,346.686l-54.187,42.133l-54.293-42.133H310.196z M117.343,474.686H74.676v-10.667h42.667V474.686z M138.676,474.686 v-21.333c0-5.867-4.8-10.667-10.667-10.667h-21.333V292.712c3.307-0.427,6.4-1.493,9.387-3.093l61.12-35.307L140.49,474.686 H138.676z M181.45,357.992l57.067,44.373l-74.133,57.6L181.45,357.992z M180.383,474.686l75.627-58.773l75.627,58.773H180.383z M273.396,402.366l56.853-44.16l16.96,101.547L273.396,402.366z M426.783,474.686h-55.36l-50.667-303.36l44.267-25.6 l25.067,35.627c8.107,11.947,22.507,18.027,36.693,15.573V474.686z M427.85,174.312c-7.253,3.307-15.787,1.067-20.373-5.44 L333.77,64.126c-2.773-3.627-3.733-8.32-2.773-12.907c0.96-4.48,3.84-8.427,7.893-10.773l20.053-11.627 c2.453-1.493,5.333-2.24,8.213-2.24c1.707,0,3.413,0.213,5.013,0.747c4.48,1.387,8.107,4.587,10.027,8.853l53.653,116.267 C439.69,160.659,436.063,170.472,427.85,174.312z" /></svg>`,
     Refinery: `<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 496 496" fill="currentColor" xmlSpace="preserve"><path d="M496,80V64h-16V0H64v64H48v16h16v48H16v64H0v16h16v272H0v16h496v-16h-16V80H496z M320,16h64v16h-64V16z M320,48h64v16h-64V48z M240,16h64v16h-64V16z M240,48h64v16h-64V48z M160,16h64v16h-64V16z M160,48h64v16h-64V48z M80,16h64v16H80V16z M80,48h64v16H80V48z M32,144h48v16H32V144z M32,176h48v16H32V176z M216,288h-16v16h16v80h-16v16h16v80H32v-80h152v-16H32v-80h152v-16H32v-80h184V288z M152,176v16H96v-16H152z M96,160v-16h56v16H96z M216,192h-48v-16h48V192z M216,160h-48v-16h48V160z M368,480H232V333.248l136,71.576V480z M232,315.176v-45.92l32,16.84v45.92L232,315.176z M280,340.432v-45.92l40,21.056v45.92L280,340.432z M368,386.752l-32-16.84v-45.92l32,16.84V386.752z M432,480h-48v-16h48V480z M432,448h-48v-16h48V448z M432,416h-48v-16h48V416z M464,480h-16V336h-16v48h-48v-52.832l-152-80V208h16v-16h-16v-64H80V80h384V480z M464,64h-64V48h64V64z M464,32h-64V16h64V32z"/><rect x="432" y="96" width="16" height="16"/><rect x="400" y="96" width="16" height="16"/><rect x="432" y="128" width="16" height="16"/><rect x="184" y="224" width="16" height="16"/><rect x="152" y="224" width="16" height="16"/><rect x="184" y="256" width="16" height="16"/></svg>`,
     OccupationalHealth: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 96 96" fill="none"><path d="M18,2H78V82a4,4,0,0,1-4,4H22a4,4,0,0,1-4-4V2Z" fill="white" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M33,2H63V9a4,4,0,0,1-4,4H37a4,4,0,0,1-4-4V2Z" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M14,6V86a8,8,0,0,0,8,8H18" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M82,6V86a8,8,0,0,1-8,8H78" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M14,6h4" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M78,6h4" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><polyline points="40 29 30.71 36 27 32.5" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><line x1="49" x2="69" y1="32" y2="32" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><polyline points="40 48 30.71 55 27 51.5" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><line x1="49" x2="69" y1="51" y2="51" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><polyline points="40 67 30.71 74 27 70.5" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><line x1="49" x2="69" y1="70" y2="70" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    Stethoscope: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2v2"/><path d="M5 2v2"/><path d="M5 3H4a2 2 0 0 0-2 2v4a6 6 0 0 0 12 0V5a2 2 0 0 0-2-2h-1"/><path d="M8 15a6 6 0 0 0 12 0v-3"/><circle cx="20" cy="10" r="2"/></svg>`,
     Droplet: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.74 5.88a9.81 9.81 0 1 1-11.48 0l5.74-5.88z"/><path d="M12 2.69l5.74 5.88a9.81 9.81 0 1 1-11.48 0l5.74-5.88z"/></svg>`,
     ChevronDown: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`,
     ChevronUp: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>`,
@@ -1042,6 +1043,21 @@ const medicalStructure = {
                 ]
             }
         ]
+    },
+    specialists: {
+        id: 'specialists',
+        title: 'Staff Médicos Especialistas Asociados',
+        subtitle: 'Especialistas asociados',
+        icon: StructureIcons.Stethoscope,
+        directStaff: [
+            createMedicalPerson('Juliana Mociulsky', { role: 'Médico especialista asociado', forceInitials: true }),
+            createMedicalPerson('Florencia Rolandi', { role: 'Médico especialista asociado', forceInitials: true }),
+            createMedicalPerson('Lorena Provenzano', { role: 'Médico especialista asociado', forceInitials: true }),
+            createMedicalPerson('Alberto Lambierto', { role: 'Médico especialista asociado', forceInitials: true }),
+            createMedicalPerson('Alberto Marty', { role: 'Médico especialista asociado', forceInitials: true }),
+            createMedicalPerson('Alejandro García', { role: 'Médico especialista asociado', forceInitials: true }),
+            createMedicalPerson('Luis Caro', { role: 'Médico especialista asociado', forceInitials: true })
+        ]
     }
 };
 
@@ -1133,11 +1149,15 @@ function renderStructureAvatar({
     businessUnit,
     managementUnit,
     subsector,
-    role
+    role,
+    forceInitials = false,
+    hideManagementInLightbox = false
 }) {
     const safeName = escapeStructureAttribute(name || 'Usuario');
-    const safeUid = escapeStructureAttribute(uid || MEDICAL_USER_UIDS[name] || '');
+    const safeUid = escapeStructureAttribute(forceInitials ? '' : (uid || MEDICAL_USER_UIDS[name] || ''));
     const uidAttr = safeUid ? ` data-dm-avatar-uid="${safeUid}"` : '';
+    const authorAttr = forceInitials ? '' : ` data-dm-author="${safeName}"`;
+    const hideManagementAttr = hideManagementInLightbox ? ' data-dm-avatar-hide-management="1"' : '';
     const metaAttrs = [
         ['data-dm-avatar-business', businessUnit],
         ['data-dm-avatar-management', managementUnit],
@@ -1149,7 +1169,7 @@ function renderStructureAvatar({
     }).join('');
 
     return `
-        <div class="${className} structure-avatar"${uidAttr}${metaAttrs} data-dm-author="${safeName}" data-dm-avatar-name="${safeName}" data-dm-avatar-zoom>
+        <div class="${className} structure-avatar"${uidAttr}${metaAttrs}${authorAttr}${hideManagementAttr} data-dm-avatar-name="${safeName}" data-dm-avatar-zoom>
             <img class="structure-avatar__img" data-dm-avatar-img alt="${safeName}" hidden>
             <span class="structure-avatar__fallback" data-dm-avatar-fallback aria-hidden="true">${fallbackIcon}</span>
         </div>
@@ -1326,7 +1346,9 @@ function renderStructureAvatarCaption(caption, avatarEl, displayName) {
         meta.classList.add('structure-avatar-lightbox__meta--profile');
     }
     appendStructureAvatarCaptionRow(meta, 'Operaciones', avatarEl.dataset.dmAvatarBusiness);
-    appendStructureAvatarCaptionRow(meta, 'Unidad de gestión', avatarEl.dataset.dmAvatarManagement);
+    if (avatarEl.dataset.dmAvatarHideManagement !== '1') {
+        appendStructureAvatarCaptionRow(meta, 'Unidad de gestión', avatarEl.dataset.dmAvatarManagement);
+    }
     appendStructureAvatarCaptionRow(meta, 'Sector', avatarEl.dataset.dmAvatarSubsector);
 
     if (meta.children.length) caption.appendChild(meta);
@@ -1381,8 +1403,29 @@ function initStructureAvatarLightbox(root = document) {
 }
 
 function createGroupElement(group) {
+    const hasLeader = Boolean(group.leader);
+    const hasDirectStaff = Array.isArray(group.directStaff) && group.directStaff.length > 0;
+    const leaderMarkup = hasLeader ? `
+            <div class="group-leader-badge">
+                ${renderStructureAvatar({
+                    className: 'leader-icon-circle',
+                    name: group.leader,
+                    uid: group.leaderUid,
+                    fallbackIcon: StructureIcons.UserLarge,
+                    ...createStructureAvatarContext({
+                        group,
+                        role: group.leaderRole || group.leaderLabel || 'Líder Médico',
+                        businessUnit: group.leaderBusinessUnit,
+                        managementUnit: group.leaderManagementUnit
+                    })
+                })}
+                <div class="leader-info">
+                    <span class="leader-label">${group.leaderLabel || 'Líder Médico'}</span>
+                    <span class="leader-name">${group.leader}</span>
+                </div>
+            </div>` : '';
     const groupCard = document.createElement('div');
-    groupCard.className = 'group-card';
+    groupCard.className = `group-card${hasDirectStaff ? ' group-card--direct-staff' : ''}${hasLeader ? '' : ' group-card--no-leader'}`;
     groupCard.dataset.groupId = group.id;
     groupCard.setAttribute('aria-expanded', 'false');
 
@@ -1402,41 +1445,27 @@ function createGroupElement(group) {
                 </div>
             </div>
             
-            <div class="group-leader-badge">
-                ${renderStructureAvatar({
-                    className: 'leader-icon-circle',
-                    name: group.leader,
-                    uid: group.leaderUid,
-                    fallbackIcon: StructureIcons.UserLarge,
-                    ...createStructureAvatarContext({
-                        group,
-                        role: group.leaderRole || group.leaderLabel || 'Líder Médico',
-                        businessUnit: group.leaderBusinessUnit,
-                        managementUnit: group.leaderManagementUnit
-                    })
-                })}
-                <div class="leader-info">
-                    <span class="leader-label">${group.leaderLabel || 'Líder Médico'}</span>
-                    <span class="leader-name">${group.leader}</span>
-                </div>
-            </div>
+            ${leaderMarkup}
             <span class="group-chevron" aria-hidden="true">${StructureIcons.ChevronDown}</span>
         </button>
 
         <div class="group-content">
-            <div class="group-content-inner">
-                <div class="regions-stack" id="regions-container-${group.id}">
-                    <!-- Regions injected here -->
-                </div>
-            </div>
+            <div class="group-content-inner"></div>
         </div>
     `;
 
-    // Inject Regions
-    const regionsContainer = groupCard.querySelector(`#regions-container-${group.id}`);
-    group.regions.forEach(region => {
-        regionsContainer.appendChild(createRegionElement(region, group));
-    });
+    const contentInner = groupCard.querySelector('.group-content-inner');
+    if (hasDirectStaff) {
+        contentInner.appendChild(createDirectStaffPanel(group));
+    } else {
+        const regionsContainer = document.createElement('div');
+        regionsContainer.className = 'regions-stack';
+        regionsContainer.id = `regions-container-${group.id}`;
+        contentInner.appendChild(regionsContainer);
+        (group.regions || []).forEach(region => {
+            regionsContainer.appendChild(createRegionElement(region, group));
+        });
+    }
 
     // Toggle Logic
     const headerBtn = groupCard.querySelector('.group-header-btn');
@@ -1456,6 +1485,31 @@ function createGroupElement(group) {
     });
 
     return groupCard;
+}
+
+function createDirectStaffPanel(group) {
+    const staff = Array.isArray(group.directStaff) ? group.directStaff : [];
+    const hideManagementInLightbox = group.id === 'specialists';
+    const panel = document.createElement('section');
+    panel.className = 'direct-staff-panel';
+    panel.setAttribute('aria-label', group.title);
+    panel.innerHTML = `
+        <div class="direct-staff-panel__header">
+            <span class="direct-staff-panel__eyebrow">Staff médico</span>
+        </div>
+        <div class="staff-grid direct-staff-grid" data-layout="stack" data-pair-kind="none" data-staff-count="${staff.length}"></div>
+    `;
+
+    const staffGrid = panel.querySelector('.direct-staff-grid');
+    staff.forEach(person => {
+        staffGrid.appendChild(createStaffBadge({ ...person, forceInitials: true }, {
+            group,
+            forceInitials: true,
+            hideManagementInLightbox
+        }));
+    });
+
+    return panel;
 }
 
 function isHierarchicalMobileView() {
@@ -1730,6 +1784,8 @@ function createStaffBadge(person, context = {}) {
             name: person.name,
             uid: person.uid,
             fallbackIcon,
+            forceInitials: Boolean(person.forceInitials || context.forceInitials),
+            hideManagementInLightbox: Boolean(person.hideManagementInLightbox || context.hideManagementInLightbox),
             ...createStructureAvatarContext({
                 ...context,
                 role: person.role || ''

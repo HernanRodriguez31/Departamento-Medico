@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "brisa-root-";
-const CACHE_VERSION = "v83";
+const CACHE_VERSION = "v89";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const OFFLINE_URL = "/offline.html";
 const PRECACHE_URLS = [
@@ -8,9 +8,10 @@ const PRECACHE_URLS = [
   OFFLINE_URL,
   "/css/style.css?v=20260428-desktop-orgtree-eyebrow-plus-1",
   "/assets/css/pages/index.css?v=20260428-desktop-orgtree-header-line-wrap-1",
-  "/css/structure.css?v=20260430-orgtree-avatars-1",
-  "/assets/css/core-contrast.css?v=20260502-maurino-coordinator-align-1",
+  "/css/structure.css?v=20260502-specialists-lorena-popup-card-1",
+  "/assets/css/core-contrast.css?v=20260502-specialists-rail-header-1",
   "/assets/js/pages/index.js?v=20260430-orgtree-avatars-1",
+  "/js/app.js?v=20260502-specialists-rail-header-1",
   "/js/chat.js?v=20260428-chat-read-receipts-1",
   "/assets/js/common/firebaseClient.js",
   "/assets/js/common/notifications.js",
