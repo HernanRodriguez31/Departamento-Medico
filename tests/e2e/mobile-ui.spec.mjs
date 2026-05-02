@@ -8,6 +8,17 @@ const CAPTURE_PHASE = process.env.MOBILE_QA_CAPTURE_PHASE || "after";
 const SHOULD_ASSERT = CAPTURE_PHASE !== "before";
 const PROFILE_AVATAR_VERSION = "20260430-orgtree-avatars-1";
 const PROFILE_AVATAR_JS_VERSION = "20260430-orgtree-avatars-1";
+const EXPECTED_COMMITTEE_ASSET_VERSION = "20260502-committee-cards-precision-1";
+const EXPECTED_COMMITTEE_IMAGE_FILES = [
+  "committee-emergencias.png",
+  "committee-salud-ocupacional.png",
+  "committee-calidad-seguridad.png",
+  "committee-salud-digital-innovacion.png",
+  "committee-docencia-investigacion.png",
+  "committee-farmacia-terapeutica.png",
+  "committee-bioetica.png"
+];
+const MOBILE_MAX_COMMITTEE_GAP_DELTA = 5;
 const DEFAULT_AVATAR_EXPECTATIONS = [
   { uid: "HRodriguez", name: "Hernan Rodriguez", file: "coord-rodriguez-new.png" },
   { uid: "LCura", name: "Dra. Leila Cura", file: "avatar-leila-cura-featured-tight-20260411.png" },
@@ -91,14 +102,16 @@ const checkNoHorizontalOverflow = async (page, testInfo, label) => {
       }));
     const offenders = [...document.querySelectorAll("body *")]
       .map((el) => {
-        const style = window.getComputedStyle(el);
-        const rect = el.getBoundingClientRect();
-        const pagerPage = el.closest(".dm-mobile-page");
-        return {
-          el,
-          rect,
-          inInactivePagerPage: Boolean(pagerPage && pagerPage !== activePage),
-          visible:
+	        const style = window.getComputedStyle(el);
+	        const rect = el.getBoundingClientRect();
+	        const pagerPage = el.closest(".dm-mobile-page");
+	        const isPagerTrack = el.classList.contains("dm-mobile-pager-track-inner");
+	        return {
+	          el,
+	          rect,
+	          isPagerTrack,
+	          inInactivePagerPage: Boolean(pagerPage && pagerPage !== activePage),
+	          visible:
             style.display !== "none" &&
             style.visibility !== "hidden" &&
             Number(style.opacity || 1) > 0 &&
@@ -106,11 +119,12 @@ const checkNoHorizontalOverflow = async (page, testInfo, label) => {
             rect.height > 1
         };
       })
-      .filter(({ rect, visible, inInactivePagerPage }) =>
-        visible &&
-        !inInactivePagerPage &&
-        (rect.left < -1 || rect.right > window.innerWidth + 1)
-      )
+	      .filter(({ rect, visible, inInactivePagerPage, isPagerTrack }) =>
+	        visible &&
+	        !isPagerTrack &&
+	        !inInactivePagerPage &&
+	        (rect.left < -1 || rect.right > window.innerWidth + 1)
+	      )
       .slice(0, 12)
       .map(({ el, rect }) => ({
         selector:
@@ -182,6 +196,8 @@ const checkCommitteeImages = async (page, testInfo, label) => {
     const actionButtons = [
       ...document.querySelectorAll("#comites .comite__join-btn, #comites .comite__btn-secondary")
     ];
+    const fits = (elements) => elements.every((el) => el.scrollWidth <= el.clientWidth + 1);
+
     return {
       cardCount: cards.length,
       imageCount: images.length,
@@ -194,22 +210,89 @@ const checkCommitteeImages = async (page, testInfo, label) => {
         complete: img.complete,
         naturalWidth: img.naturalWidth,
         naturalHeight: img.naturalHeight
-      }))
+      })),
+      cards: cards.map((card) => {
+        const imageWrap = card.querySelector(".comite__image-wrap");
+        const overlay = card.querySelector(".comite__text-overlay");
+        const title = card.querySelector(".comite__title");
+        const desc = card.querySelector(".comite__desc");
+        const titleLines = [...card.querySelectorAll(".comite__title-line")];
+        const descLines = [...card.querySelectorAll(".comite__desc-line")];
+        const imageRect = imageWrap?.getBoundingClientRect();
+        const overlayRect = overlay?.getBoundingClientRect();
+        const titleRect = title?.getBoundingClientRect();
+        const descRect = desc?.getBoundingClientRect();
+        const overlayStyle = overlay ? getComputedStyle(overlay) : null;
+        const circleBottom = imageRect ? imageRect.top + imageRect.height * (676 / 1254) : 0;
+        const heartTop = imageRect ? imageRect.top + imageRect.height * (1062 / 1254) : 0;
+        const railTopGap = titleRect ? titleRect.top - circleBottom : Infinity;
+        const railBottomGap = descRect ? heartTop - descRect.bottom : Infinity;
+
+        return {
+          overlayVisible:
+            Boolean(overlay) &&
+            overlayStyle.display !== "none" &&
+            overlayStyle.visibility !== "hidden" &&
+            Number(overlayStyle.opacity || 1) > 0 &&
+            overlayRect.width > 20 &&
+            overlayRect.height > 20,
+          overlayInsideImage:
+            Boolean(imageRect && overlayRect) &&
+            overlayRect.left >= imageRect.left - 1 &&
+            overlayRect.right <= imageRect.right + 1 &&
+            overlayRect.top >= imageRect.top - 1 &&
+            overlayRect.bottom <= imageRect.bottom + 1,
+          overlayPointerEvents: overlayStyle?.pointerEvents,
+          overlayBackground: overlayStyle?.backgroundColor,
+          overlayBorderWidth: overlayStyle?.borderTopWidth,
+          overlayBorderRadius: overlayStyle?.borderTopLeftRadius,
+          overlayBoxShadow: overlayStyle?.boxShadow,
+          titleLineCount: titleLines.length,
+          descLineCount: descLines.length,
+          railTopGap: Math.round(railTopGap),
+          railBottomGap: Math.round(railBottomGap),
+          railGapDelta: Math.round(Math.abs(railTopGap - railBottomGap)),
+          textFits: fits([...titleLines, ...descLines])
+        };
+      })
     };
   });
+  const imageUrls = payload.images.map((img) => new URL(img.src, "https://departamento-medico.local/"));
   const pass =
     payload.cardCount === 7 &&
     payload.imageCount === 7 &&
     payload.statsCount === 0 &&
     payload.footerCount === 0 &&
     payload.actionButtonCount === 0 &&
+    imageUrls.map((url) => url.pathname.split("/").pop()).join("|") ===
+      EXPECTED_COMMITTEE_IMAGE_FILES.join("|") &&
     payload.images.every(
       (img) =>
         img.complete &&
         img.naturalWidth > 0 &&
         img.naturalHeight > 0 &&
-        img.alt &&
-        img.src.includes("committee-graphic-3")
+        img.alt
+    ) &&
+    imageUrls.every(
+      (url) =>
+        url.searchParams.get("v") === EXPECTED_COMMITTEE_ASSET_VERSION &&
+        !url.pathname.includes("committee-graphic-3")
+    ) &&
+    payload.cards.every(
+      (card) =>
+        card.overlayVisible &&
+        card.overlayInsideImage &&
+        card.overlayPointerEvents === "none" &&
+        (card.overlayBackground === "rgba(0, 0, 0, 0)" || card.overlayBackground === "transparent") &&
+        card.overlayBorderWidth === "0px" &&
+        card.overlayBorderRadius === "0px" &&
+        card.overlayBoxShadow === "none" &&
+        card.titleLineCount === 2 &&
+        card.descLineCount === 2 &&
+        card.railTopGap > 0 &&
+        card.railBottomGap > 0 &&
+        card.railGapDelta <= MOBILE_MAX_COMMITTEE_GAP_DELTA &&
+        card.textFits
     );
   await recordOrAssert(testInfo, pass, `${label} committee images load`, payload);
 };

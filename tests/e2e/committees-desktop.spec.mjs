@@ -14,6 +14,18 @@ const screenshotPath = path.join(
   "desktop-1440",
   "comites.png"
 );
+const EXPECTED_IMAGE_FILES = [
+  "committee-emergencias.png",
+  "committee-salud-ocupacional.png",
+  "committee-calidad-seguridad.png",
+  "committee-salud-digital-innovacion.png",
+  "committee-docencia-investigacion.png",
+  "committee-farmacia-terapeutica.png",
+  "committee-bioetica.png"
+];
+const EXPECTED_COMMITTEE_ASSET_VERSION = "20260502-committee-cards-precision-1";
+const DESKTOP_MAX_COMMITTEE_GAP_DELTA = 4;
+const parseAssetUrl = (src) => new URL(src, "https://departamento-medico.local/");
 
 const openCommittees = async (page) => {
   await page.goto(COMMITTEES_URL);
@@ -56,6 +68,8 @@ test("desktop committees image cards render and remain clickable", async ({ page
     const actionButtons = [
       ...document.querySelectorAll("#comites .comite__join-btn, #comites .comite__btn-secondary")
     ];
+    const fits = (elements) => elements.every((el) => el.scrollWidth <= el.clientWidth + 1);
+
     return {
       cardCount: cards.length,
       imageCount: images.length,
@@ -71,15 +85,58 @@ test("desktop committees image cards render and remain clickable", async ({ page
         naturalWidth: img.naturalWidth,
         naturalHeight: img.naturalHeight
       })),
-      cards: cards.map((card) => ({
-        id: card.getAttribute("data-committee-id"),
-        link: card.getAttribute("data-link"),
-        role: card.getAttribute("role"),
-        tabindex: card.getAttribute("tabindex"),
-        ariaLabel: card.getAttribute("aria-label"),
-        width: Math.round(card.getBoundingClientRect().width),
-        height: Math.round(card.getBoundingClientRect().height)
-      }))
+      cards: cards.map((card) => {
+        const imageWrap = card.querySelector(".comite__image-wrap");
+        const overlay = card.querySelector(".comite__text-overlay");
+        const title = card.querySelector(".comite__title");
+        const desc = card.querySelector(".comite__desc");
+        const titleLines = [...card.querySelectorAll(".comite__title-line")];
+        const descLines = [...card.querySelectorAll(".comite__desc-line")];
+        const cardRect = card.getBoundingClientRect();
+        const imageRect = imageWrap?.getBoundingClientRect();
+        const overlayRect = overlay?.getBoundingClientRect();
+        const titleRect = title?.getBoundingClientRect();
+        const descRect = desc?.getBoundingClientRect();
+        const overlayStyle = overlay ? getComputedStyle(overlay) : null;
+        const circleBottom = imageRect ? imageRect.top + imageRect.height * (676 / 1254) : 0;
+        const heartTop = imageRect ? imageRect.top + imageRect.height * (1062 / 1254) : 0;
+        const railTopGap = titleRect ? titleRect.top - circleBottom : Infinity;
+        const railBottomGap = descRect ? heartTop - descRect.bottom : Infinity;
+
+        return {
+          id: card.getAttribute("data-committee-id"),
+          link: card.getAttribute("data-link"),
+          role: card.getAttribute("role"),
+          tabindex: card.getAttribute("tabindex"),
+          ariaLabel: card.getAttribute("aria-label"),
+          width: Math.round(cardRect.width),
+          height: Math.round(cardRect.height),
+          overlayVisible:
+            Boolean(overlay) &&
+            overlayStyle.display !== "none" &&
+            overlayStyle.visibility !== "hidden" &&
+            Number(overlayStyle.opacity || 1) > 0 &&
+            overlayRect.width > 20 &&
+            overlayRect.height > 20,
+          overlayInsideImage:
+            Boolean(imageRect && overlayRect) &&
+            overlayRect.left >= imageRect.left - 1 &&
+            overlayRect.right <= imageRect.right + 1 &&
+            overlayRect.top >= imageRect.top - 1 &&
+            overlayRect.bottom <= imageRect.bottom + 1,
+          overlayPointerEvents: overlayStyle?.pointerEvents,
+          overlayBackground: overlayStyle?.backgroundColor,
+          overlayBorderWidth: overlayStyle?.borderTopWidth,
+          overlayBorderRadius: overlayStyle?.borderTopLeftRadius,
+          overlayBoxShadow: overlayStyle?.boxShadow,
+          titleLineCount: titleLines.length,
+          descLineCount: descLines.length,
+          railTopGap: Math.round(railTopGap),
+          railBottomGap: Math.round(railBottomGap),
+          railGapDelta: Math.round(Math.abs(railTopGap - railBottomGap)),
+          textFits: fits([...titleLines, ...descLines])
+        };
+      })
     };
   });
 
@@ -91,12 +148,15 @@ test("desktop committees image cards render and remain clickable", async ({ page
   expect(payload.documentWidth).toBeLessThanOrEqual(payload.viewportWidth + 1);
   expect(
     payload.images.every(
-      (img) =>
-        img.complete &&
-        img.naturalWidth > 0 &&
-        img.naturalHeight > 0 &&
-        img.alt &&
-        img.src.includes("committee-graphic-3")
+      (img) => img.complete && img.naturalWidth > 0 && img.naturalHeight > 0 && img.alt
+    )
+  ).toBeTruthy();
+  expect(payload.images.map((img) => parseAssetUrl(img.src).pathname.split("/").pop())).toEqual(
+    EXPECTED_IMAGE_FILES
+  );
+  expect(
+    payload.images.every(
+      (img) => parseAssetUrl(img.src).searchParams.get("v") === EXPECTED_COMMITTEE_ASSET_VERSION
     )
   ).toBeTruthy();
   expect(
@@ -109,6 +169,24 @@ test("desktop committees image cards render and remain clickable", async ({ page
         card.ariaLabel &&
         card.width >= 44 &&
         card.height >= 44
+    )
+  ).toBeTruthy();
+  expect(
+    payload.cards.every(
+      (card) =>
+        card.overlayVisible &&
+        card.overlayInsideImage &&
+        card.overlayPointerEvents === "none" &&
+        (card.overlayBackground === "rgba(0, 0, 0, 0)" || card.overlayBackground === "transparent") &&
+        card.overlayBorderWidth === "0px" &&
+        card.overlayBorderRadius === "0px" &&
+        card.overlayBoxShadow === "none" &&
+        card.titleLineCount === 2 &&
+        card.descLineCount === 2 &&
+        card.railTopGap > 0 &&
+        card.railBottomGap > 0 &&
+        card.railGapDelta <= DESKTOP_MAX_COMMITTEE_GAP_DELTA &&
+        card.textFits
     )
   ).toBeTruthy();
 
