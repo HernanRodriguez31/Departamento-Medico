@@ -2661,6 +2661,7 @@ const MEDICAL_USER_UIDS = Object.freeze({
     'Paula Fernández': 'PFernandez',
     'Edgar Jerez': 'EJerez',
     'Francisco Bustos': 'FBustos',
+    'Verónica Rodríguez': 'VRodriguez',
     'Roberto Sabha': 'RSabha',
     'Mario Bianchi': 'MBianchi',
     'José Carlini': 'JCarlini',
@@ -2721,6 +2722,7 @@ const medicalStructure = {
                     { name: 'Bandurria Centro', staff: [createMedicalPerson('Verónica Castro'), createMedicalPerson('Santiago González Calcagno')] },
                     { name: 'Aguada Pichana Oeste', staff: [createMedicalPerson('Gastón Castellan'), createMedicalPerson('Paula Fernández')] },
                     { name: 'Coirón Amargo Sur Este', staff: [createMedicalPerson('Edgar Jerez'), createMedicalPerson('Francisco Bustos')] },
+                    { name: 'Médico Relevo', staff: [createMedicalPerson('Verónica Rodríguez', { role: 'Médico Relevo' })] },
                     { name: 'Aguada Cánepa', staff: [] }
                 ]
             },

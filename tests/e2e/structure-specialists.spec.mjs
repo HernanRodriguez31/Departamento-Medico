@@ -12,6 +12,18 @@ const EXPECTED_NAMES = [
   "Luis Caro"
 ];
 const EXPECTED_INITIALS = ["JM", "FR", "LP", "AL", "AM", "AG", "LC"];
+const EXPECTED_NEUQUEN_VISIBLE_SECTORS = [
+  "ECOR I",
+  "Lindero Oriental",
+  "Itinerante NQN",
+  "Bandurria Centro",
+  "Aguada Pichana Oeste",
+  "Coirón Amargo Sur Este",
+  "Médico Relevo"
+];
+const EXPECTED_NEUQUEN_MOBILE_VISIBLE_SECTORS = EXPECTED_NEUQUEN_VISIBLE_SECTORS.filter(
+  (sector) => sector !== "ECOR I"
+);
 
 const maxMetricSpread = (items, key) => {
   const values = items.map((item) => item[key]).filter(Number.isFinite);
@@ -49,6 +61,30 @@ const openSpecialistsGroup = async (page) => {
   await expect(header).toHaveAttribute("aria-expanded", "true");
   await expect(group.locator(".direct-staff-grid")).toBeVisible();
   return { group, header };
+};
+
+const openStructureGroup = async (page, groupId) => {
+  const group = page.locator(`[data-group-id="${groupId}"]`);
+  await expect(group).toBeVisible();
+  const header = group.locator(".group-header-btn");
+  if ((await header.getAttribute("aria-expanded")) !== "true") {
+    await header.click();
+  }
+  await expect(header).toHaveAttribute("aria-expanded", "true");
+  return { group, header };
+};
+
+const openRegion = async (page, group, regionName) => {
+  const region = group.locator(".region-accordion").filter({
+    has: page.locator(".region-name", { hasText: regionName })
+  });
+  await expect(region).toBeVisible();
+  const button = region.locator(".region-btn");
+  if ((await button.getAttribute("aria-expanded")) !== "true") {
+    await button.click();
+  }
+  await expect(button).toHaveAttribute("aria-expanded", "true");
+  return region;
 };
 
 const collectSpecialistsPayload = async (page) =>
@@ -120,6 +156,62 @@ const collectSpecialistsPayload = async (page) =>
       })),
       badgeMetrics,
       lastBadgeCentered: lastBadgeCenterDelta <= 2,
+      noHorizontalOverflow: root.scrollWidth <= root.clientWidth + 1
+    };
+  });
+
+const collectNeuquenReliefPayload = async (page) =>
+  page.evaluate(() => {
+    const root = document.documentElement;
+    const group = document.querySelector('[data-group-id="upstream"]');
+    const region = [...(group?.querySelectorAll(".region-accordion") || [])].find(
+      (item) => item.querySelector(".region-name")?.textContent?.trim() === "Neuquén"
+    );
+    const visibleSectors = [...(region?.querySelectorAll(".sector-item") || [])].filter((item) =>
+      item.querySelector(".staff-grid")
+    );
+    const sectorTitles = visibleSectors.map((item) =>
+      (item.querySelector(".sector-title, .sector-card__title")?.textContent || "").trim().replace(/\s+/g, " ")
+    );
+    const reliefSector = visibleSectors.find((item) =>
+      (item.querySelector(".sector-title, .sector-card__title")?.textContent || "").trim().replace(/\s+/g, " ") ===
+      "Médico Relevo"
+    );
+    const grid = reliefSector?.querySelector(".staff-grid");
+    const badge = reliefSector?.querySelector(".staff-badge");
+    const avatar = badge?.querySelector(".structure-avatar");
+    const name = badge?.querySelector(".staff-name");
+    const badgeRect = badge?.getBoundingClientRect();
+    const avatarRect = avatar?.getBoundingClientRect();
+    const infoRect = badge?.querySelector(".staff-info")?.getBoundingClientRect();
+    const groupLeft = Math.min(avatarRect?.left ?? Infinity, infoRect?.left ?? Infinity);
+    const groupRight = Math.max(avatarRect?.right ?? -Infinity, infoRect?.right ?? -Infinity);
+
+    return {
+      groupExpanded: group?.getAttribute("aria-expanded"),
+      regionExpanded: region?.querySelector(".region-btn")?.getAttribute("aria-expanded"),
+      sectorTitles,
+      lastSectorTitle: sectorTitles.at(-1) || "",
+      gridLayout: grid?.dataset.layout || "",
+      pairKind: grid?.dataset.pairKind || "",
+      staffCount: Number(grid?.dataset.staffCount || 0),
+      name: name?.textContent?.trim() || "",
+      initials: avatar?.querySelector(".structure-avatar__initials")?.textContent?.trim() || "",
+      uid: avatar?.getAttribute("data-dm-avatar-uid") || "",
+      author: avatar?.getAttribute("data-dm-author") || "",
+      role: avatar?.dataset.dmAvatarRole || "",
+      business: avatar?.dataset.dmAvatarBusiness || "",
+      management: avatar?.dataset.dmAvatarManagement || "",
+      subsector: avatar?.dataset.dmAvatarSubsector || "",
+      hasAvatar: avatar?.dataset.hasAvatar || "",
+      visualCenterDelta:
+        badgeRect && Number.isFinite(groupLeft) && Number.isFinite(groupRight)
+          ? Math.abs((groupLeft + groupRight) / 2 - (badgeRect.left + badgeRect.right) / 2)
+          : Infinity,
+      contentInsideBadge:
+        Boolean(badgeRect) && groupLeft >= badgeRect.left - 1 && groupRight <= badgeRect.right + 1,
+      noBadgeOverflow: !badge || badge.scrollWidth <= badge.clientWidth + 1,
+      noNameOverflow: !name || name.scrollWidth <= name.clientWidth + 1,
       noHorizontalOverflow: root.scrollWidth <= root.clientWidth + 1
     };
   });
@@ -217,4 +309,86 @@ test("mobile structure keeps specialists direct staff readable", async ({ page }
   expect(maxMetricSpread(payload.badgeMetrics, "nameLeftOffset")).toBeLessThanOrEqual(5);
   expect(maxAbsMetric(payload.badgeMetrics, "visualCenterDelta")).toBeLessThanOrEqual(8);
   expect(payload.noHorizontalOverflow).toBe(true);
+});
+
+test("desktop structure adds Veronica Rodriguez as Neuquen relief doctor", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-1440", "Desktop audit only.");
+
+  await login(page, "/index.html?desktop=1&dmEmulators=1#estructura");
+  await page.waitForURL(/\/index\.html\?desktop=1&dmEmulators=1#estructura$/, { timeout: 30_000 });
+  await ensureStructureOpen(page);
+  const { group } = await openStructureGroup(page, "upstream");
+  await openRegion(page, group, "Neuquén");
+
+  const payload = await collectNeuquenReliefPayload(page);
+  expect(payload.groupExpanded).toBe("true");
+  expect(payload.regionExpanded).toBe("true");
+  expect(payload.sectorTitles).toEqual(EXPECTED_NEUQUEN_VISIBLE_SECTORS);
+  expect(payload.lastSectorTitle).toBe("Médico Relevo");
+  expect(payload.gridLayout).toBe("stack");
+  expect(payload.pairKind).toBe("none");
+  expect(payload.staffCount).toBe(1);
+  expect(payload.name).toBe("Verónica Rodríguez");
+  expect(payload.initials).toBe("VR");
+  expect(payload.uid).toBe("VRodriguez");
+  expect(payload.author).toBe("Verónica Rodríguez");
+  expect(payload.role).toBe("Médico Relevo");
+  expect(payload.business).toBe("Upstream");
+  expect(payload.management).toBe("Neuquén");
+  expect(payload.subsector).toBe("Médico Relevo");
+  expect(payload.hasAvatar).toBe("");
+  expect(payload.contentInsideBadge).toBeTruthy();
+  expect(payload.noBadgeOverflow).toBeTruthy();
+  expect(payload.noNameOverflow).toBeTruthy();
+  expect(payload.visualCenterDelta).toBeLessThanOrEqual(12);
+  expect(payload.noHorizontalOverflow).toBeTruthy();
+
+  await group.locator(".region-accordion", { hasText: "Neuquén" }).locator(".sector-item", { hasText: "Médico Relevo" }).locator(".structure-avatar").click();
+  await expect(page.locator(".structure-avatar-lightbox")).toBeVisible();
+  const popup = await page.evaluate(() => {
+    const caption = document.querySelector(".structure-avatar-lightbox__caption");
+    return {
+      text: caption?.textContent || "",
+      labels: [...(caption?.querySelectorAll(".structure-avatar-lightbox__meta-row dt") || [])].map((el) =>
+        el.textContent.trim()
+      ),
+      values: [...(caption?.querySelectorAll(".structure-avatar-lightbox__meta-row dd") || [])].map((el) =>
+        el.textContent.trim()
+      )
+    };
+  });
+  expect(popup.text).toContain("Verónica Rodríguez");
+  expect(popup.text).toContain("Médico Relevo");
+  expect(popup.labels).toEqual(["Operaciones", "Unidad de gestión", "Sector"]);
+  expect(popup.values).toEqual(["Upstream", "Neuquén", "Médico Relevo"]);
+});
+
+test("mobile structure keeps Veronica Rodriguez relief doctor readable", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "iphone-13", "Mobile audit runs on iPhone viewport.");
+
+  await login(page, "#estructura");
+  await page.waitForURL(/\/app\/index\.html\?dmEmulators=1#estructura$/, { timeout: 30_000 });
+  await expect(page.locator(".dm-bottom-nav")).toBeVisible({ timeout: 30_000 });
+  await page.waitForFunction(() => document.body?.dataset?.view === "estructura");
+  await page.locator("#app-splash").waitFor({ state: "detached", timeout: 6_000 }).catch(() => {});
+  await ensureStructureOpen(page);
+  const { group } = await openStructureGroup(page, "upstream");
+  await openRegion(page, group, "Neuquén");
+
+  const payload = await collectNeuquenReliefPayload(page);
+  expect(payload.sectorTitles).toEqual(EXPECTED_NEUQUEN_MOBILE_VISIBLE_SECTORS);
+  expect(payload.lastSectorTitle).toBe("Médico Relevo");
+  expect(payload.staffCount).toBe(1);
+  expect(payload.name).toBe("Verónica Rodríguez");
+  expect(payload.initials).toBe("VR");
+  expect(payload.uid).toBe("VRodriguez");
+  expect(payload.role).toBe("Médico Relevo");
+  expect(payload.business).toBe("Upstream");
+  expect(payload.management).toBe("Neuquén");
+  expect(payload.subsector).toBe("Médico Relevo");
+  expect(payload.contentInsideBadge).toBeTruthy();
+  expect(payload.noBadgeOverflow).toBeTruthy();
+  expect(payload.noNameOverflow).toBeTruthy();
+  expect(payload.visualCenterDelta).toBeLessThanOrEqual(14);
+  expect(payload.noHorizontalOverflow).toBeTruthy();
 });

@@ -44,6 +44,7 @@ const medicos = [
     { nombre: "Paula Fernández", id: "PFernandez", email: "PVFernandez@pan-energy.com", dni: "38415437", puesto: "Médico en Yacimiento", unidad: "Upstream", gestion: "Neuquén" },
     { nombre: "Edgar Jerez", id: "EJerez", email: "EJerez@pan-energy.com", dni: "29255962", puesto: "Médico en Yacimiento", unidad: "Upstream", gestion: "Neuquén" },
     { nombre: "Francisco Bustos", id: "FBustos", email: "FBustos@pan-energy.com", dni: "94026623", puesto: "Médico en Yacimiento", unidad: "Upstream", gestion: "Neuquén" },
+    { nombre: "Verónica Rodríguez", id: "VRodriguez", email: "VERodriguez@pan-energy.com", dni: "36934574", puesto: "Médico Relevo", unidad: "Upstream", gestion: "Neuquén" },
     { nombre: "Roberto Sabha", id: "RSabha", email: "RSabha@pan-energy.com", dni: "25437004", puesto: "Coordinador Médico", unidad: "Upstream", gestion: "Acambuco" },
     { nombre: "Mario Bianchi", id: "MBianchi", email: "MBianchi@pan-energy.com", dni: "29391985", puesto: "Coordinador Médico", unidad: "Downstream", gestion: "Edificio Av. Alem 1110 - Refinería Campana - CORS." },
     { nombre: "José Carlini", id: "JCarlini", email: "JCarlini@pan-energy.com", dni: "30834246", puesto: "Medico de CORS", unidad: "Downstream", gestion: "CORS" },

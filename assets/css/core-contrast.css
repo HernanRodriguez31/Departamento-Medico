@@ -1705,6 +1705,11 @@ body.ui-clarity .region-accordion {
     box-shadow: 0 4px 12px rgba(15, 23, 42, 0.045);
   }
 
+  .orgtree .region-accordion.open .sector-item .staff-grid[data-staff-count="1"] .staff-badge,
+  .orgtree .region-accordion.open .sector-item .staff-grid[data-staff-count="1"] .staff-badge:nth-child(2n) {
+    padding-inline: 0.82rem;
+  }
+
   .orgtree .region-accordion.open .sector-item .staff-info {
     flex: 0 1 auto;
     min-width: 0;
@@ -2359,6 +2364,30 @@ body.ui-clarity .region-accordion {
 
   .orgtree .staff-grid[data-layout="stack"] .staff-role {
     color: var(--org-mobile-muted);
+  }
+
+  .orgtree .sector-card__body .staff-grid[data-staff-count="1"] .staff-badge,
+  .orgtree .sector-card__body .staff-grid[data-staff-count="1"] .staff-badge:nth-child(2n) {
+    display: grid;
+    grid-template-columns: 2.3rem minmax(9.4rem, 12.4rem);
+    justify-content: center;
+    align-items: center;
+    column-gap: 0.58rem;
+    padding-inline: 0.62rem;
+  }
+
+  .orgtree .sector-card__body .staff-grid[data-staff-count="1"] .staff-info {
+    align-items: flex-start;
+    min-width: 0;
+    text-align: left;
+  }
+
+  .orgtree .sector-card__body .staff-grid[data-staff-count="1"] .staff-name {
+    width: 100%;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .orgtree .staff-info {
