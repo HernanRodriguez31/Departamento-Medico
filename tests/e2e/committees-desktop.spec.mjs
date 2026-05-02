@@ -27,8 +27,19 @@ const EXPECTED_COMMITTEE_ASSET_VERSION = "20260502-committee-cards-precision-1";
 const DESKTOP_MAX_COMMITTEE_GAP_DELTA = 4;
 const parseAssetUrl = (src) => new URL(src, "https://departamento-medico.local/");
 
+const submitLogin = async (page) => {
+  await page.locator("#email").fill(QA_EMAIL);
+  await page.locator("#password").fill(QA_PASSWORD);
+  await page.locator("#login-form").evaluate((form) => form.requestSubmit());
+  await page.waitForLoadState("domcontentloaded");
+};
+
 const openCommittees = async (page) => {
   await page.goto(COMMITTEES_URL);
+  if (await page.locator("#login-form").isVisible({ timeout: 2000 }).catch(() => false)) {
+    await submitLogin(page);
+    await page.goto(COMMITTEES_URL);
+  }
   await page.locator("#comites").scrollIntoViewIfNeeded();
   await page.waitForFunction(() => document.readyState === "complete");
   await page.waitForFunction(() =>
@@ -52,9 +63,7 @@ test("desktop committees image cards render and remain clickable", async ({ page
 
   await page.goto(LOGIN_URL);
   await expect(page.locator("#login-form")).toBeVisible();
-  await page.locator("#email").fill(QA_EMAIL);
-  await page.locator("#password").fill(QA_PASSWORD);
-  await page.locator("#login-form").evaluate((form) => form.requestSubmit());
+  await submitLogin(page);
   await page.waitForURL(/\/index\.html\?desktop=1&dmEmulators=1#comites$/, { timeout: 30_000 });
 
   await openCommittees(page);
@@ -98,6 +107,8 @@ test("desktop committees image cards render and remain clickable", async ({ page
         const titleRect = title?.getBoundingClientRect();
         const descRect = desc?.getBoundingClientRect();
         const overlayStyle = overlay ? getComputedStyle(overlay) : null;
+        const imageBeforeStyle = imageWrap ? getComputedStyle(imageWrap, "::before") : null;
+        const imageAfterStyle = imageWrap ? getComputedStyle(imageWrap, "::after") : null;
         const circleBottom = imageRect ? imageRect.top + imageRect.height * (676 / 1254) : 0;
         const heartTop = imageRect ? imageRect.top + imageRect.height * (1062 / 1254) : 0;
         const railTopGap = titleRect ? titleRect.top - circleBottom : Infinity;
@@ -129,6 +140,11 @@ test("desktop committees image cards render and remain clickable", async ({ page
           overlayBorderWidth: overlayStyle?.borderTopWidth,
           overlayBorderRadius: overlayStyle?.borderTopLeftRadius,
           overlayBoxShadow: overlayStyle?.boxShadow,
+          imageBeforeBorderWidth: imageBeforeStyle?.borderTopWidth,
+          imageBeforeBoxShadow: imageBeforeStyle?.boxShadow,
+          imageAfterContent: imageAfterStyle?.content,
+          imageAfterDisplay: imageAfterStyle?.display,
+          imageAfterBorderWidth: imageAfterStyle?.borderTopWidth,
           titleLineCount: titleLines.length,
           descLineCount: descLines.length,
           railTopGap: Math.round(railTopGap),
@@ -181,6 +197,11 @@ test("desktop committees image cards render and remain clickable", async ({ page
         card.overlayBorderWidth === "0px" &&
         card.overlayBorderRadius === "0px" &&
         card.overlayBoxShadow === "none" &&
+        card.imageBeforeBorderWidth === "0px" &&
+        card.imageBeforeBoxShadow !== "none" &&
+        card.imageAfterContent === "none" &&
+        card.imageAfterDisplay === "none" &&
+        card.imageAfterBorderWidth === "0px" &&
         card.titleLineCount === 2 &&
         card.descLineCount === 2 &&
         card.railTopGap > 0 &&

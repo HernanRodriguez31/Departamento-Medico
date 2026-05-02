@@ -3561,7 +3561,7 @@ body.ui-clarity .region-accordion {
   position: absolute;
   inset: 3.67%;
   z-index: 0;
-  border-radius: 1.28rem;
+  border-radius: 5.03%;
   pointer-events: none;
   box-shadow:
     0 11px 15px -13px rgba(15, 23, 42, 0.16),
@@ -3572,15 +3572,8 @@ body.ui-clarity .region-accordion {
 }
 
 #comites .comite__image-wrap::after {
-  content: "";
-  position: absolute;
-  inset: 3.67%;
-  z-index: 2;
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  border-radius: 1.28rem;
-  pointer-events: none;
-  opacity: 1;
-  transition: border-color 180ms ease, opacity 180ms ease;
+  content: none !important;
+  display: none !important;
 }
 
 #comites .comite__content {
@@ -3762,10 +3755,6 @@ body.ui-clarity .region-accordion {
     0 8px 15px -15px rgba(122, 184, 0, 0.24);
   opacity: 0.72;
   transform: translateY(1px);
-}
-
-#comites .comite__card:hover .comite__image-wrap::after {
-  border-color: rgba(148, 163, 184, 0.28);
 }
 
 #comites .comite__image-wrap.is-image-failed::before,

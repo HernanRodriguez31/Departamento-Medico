@@ -223,6 +223,8 @@ const checkCommitteeImages = async (page, testInfo, label) => {
         const titleRect = title?.getBoundingClientRect();
         const descRect = desc?.getBoundingClientRect();
         const overlayStyle = overlay ? getComputedStyle(overlay) : null;
+        const imageBeforeStyle = imageWrap ? getComputedStyle(imageWrap, "::before") : null;
+        const imageAfterStyle = imageWrap ? getComputedStyle(imageWrap, "::after") : null;
         const circleBottom = imageRect ? imageRect.top + imageRect.height * (676 / 1254) : 0;
         const heartTop = imageRect ? imageRect.top + imageRect.height * (1062 / 1254) : 0;
         const railTopGap = titleRect ? titleRect.top - circleBottom : Infinity;
@@ -247,6 +249,11 @@ const checkCommitteeImages = async (page, testInfo, label) => {
           overlayBorderWidth: overlayStyle?.borderTopWidth,
           overlayBorderRadius: overlayStyle?.borderTopLeftRadius,
           overlayBoxShadow: overlayStyle?.boxShadow,
+          imageBeforeBorderWidth: imageBeforeStyle?.borderTopWidth,
+          imageBeforeBoxShadow: imageBeforeStyle?.boxShadow,
+          imageAfterContent: imageAfterStyle?.content,
+          imageAfterDisplay: imageAfterStyle?.display,
+          imageAfterBorderWidth: imageAfterStyle?.borderTopWidth,
           titleLineCount: titleLines.length,
           descLineCount: descLines.length,
           railTopGap: Math.round(railTopGap),
@@ -287,6 +294,11 @@ const checkCommitteeImages = async (page, testInfo, label) => {
         card.overlayBorderWidth === "0px" &&
         card.overlayBorderRadius === "0px" &&
         card.overlayBoxShadow === "none" &&
+        card.imageBeforeBorderWidth === "0px" &&
+        card.imageBeforeBoxShadow !== "none" &&
+        card.imageAfterContent === "none" &&
+        card.imageAfterDisplay === "none" &&
+        card.imageAfterBorderWidth === "0px" &&
         card.titleLineCount === 2 &&
         card.descLineCount === 2 &&
         card.railTopGap > 0 &&
