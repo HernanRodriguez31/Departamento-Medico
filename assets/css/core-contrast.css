@@ -3904,9 +3904,13 @@ body.ui-clarity .region-accordion {
   }
 }
 
-.orgtree .structure-avatar__img[src*="coord-maurino-new.png"],
-.coordinator-card-tier .coordinator__img[src*="coord-maurino-new.png"] {
+.orgtree .structure-avatar__img[src*="coord-maurino-new.png"] {
   transform: translate(-1.8%, -3.4%) scale(1.065);
+  transform-origin: center;
+}
+
+.coordinator-card-tier .coordinator__img[src*="coord-maurino-new.png"] {
+  transform: translate(1.2%, 1.6%) scale(1.065);
   transform-origin: center;
 }
 
@@ -3915,9 +3919,12 @@ body.ui-clarity .region-accordion {
   transform-origin: center;
 }
 
-.orgtree .structure-avatar[data-has-avatar="1"]:hover .structure-avatar__img[src*="coord-maurino-new.png"],
-.coordinator-card-tier:hover .coordinator__img[src*="coord-maurino-new.png"] {
+.orgtree .structure-avatar[data-has-avatar="1"]:hover .structure-avatar__img[src*="coord-maurino-new.png"] {
   transform: translate(-1.8%, -3.4%) scale(1.095);
+}
+
+.coordinator-card-tier:hover .coordinator__img[src*="coord-maurino-new.png"] {
+  transform: translate(1.2%, 1.6%) scale(1.095);
 }
 
 @media (prefers-reduced-motion: reduce) {
