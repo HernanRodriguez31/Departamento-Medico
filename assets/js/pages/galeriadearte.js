@@ -250,7 +250,7 @@ const renderPost = (post) => {
   article.innerHTML = `
     <header class="art-post__header">
       <span class="art-avatar" data-author-avatar data-author-uid="${escapeHtml(post.createdByUid)}" data-author-name="${escapeHtml(post.createdByName)}">
-        <img class="art-avatar__img" data-author-avatar-img src="${TRANSPARENT_PIXEL}" alt="" hidden />
+        <img class="art-avatar__img" data-avatar-img src="${TRANSPARENT_PIXEL}" alt="" hidden />
         <span data-avatar-fallback="initials">${escapeHtml(post.createdByName.slice(0, 2).toUpperCase())}</span>
       </span>
       <div class="art-post__identity">
@@ -260,8 +260,12 @@ const renderPost = (post) => {
       ${
         canManage
           ? `<div class="art-post__owner-actions" aria-label="Acciones de publicación">
-              <button class="art-owner-action" type="button" data-post-action="edit">Editar</button>
-              <button class="art-owner-action art-owner-action--delete" type="button" data-post-action="delete">Eliminar</button>
+              <button class="art-owner-action" type="button" data-post-action="edit" aria-label="Editar publicación" title="Editar publicación">
+                <i data-lucide="pencil" aria-hidden="true"></i>
+              </button>
+              <button class="art-owner-action art-owner-action--delete" type="button" data-post-action="delete" aria-label="Eliminar publicación" title="Eliminar publicación">
+                <i data-lucide="trash-2" aria-hidden="true"></i>
+              </button>
             </div>`
           : ""
       }
@@ -316,8 +320,12 @@ const renderComment = (comment) => {
         ${
           canManage
             ? `<span class="art-comment__actions" aria-label="Acciones del comentario">
-                <button class="art-comment-action" type="button" data-comment-action="edit">Editar</button>
-                <button class="art-comment-action art-comment-action--delete" type="button" data-comment-action="delete">Eliminar</button>
+                <button class="art-comment-action" type="button" data-comment-action="edit" aria-label="Editar comentario" title="Editar comentario">
+                  <i data-lucide="pencil" aria-hidden="true"></i>
+                </button>
+                <button class="art-comment-action art-comment-action--delete" type="button" data-comment-action="delete" aria-label="Eliminar comentario" title="Eliminar comentario">
+                  <i data-lucide="trash-2" aria-hidden="true"></i>
+                </button>
               </span>`
             : ""
         }
@@ -445,6 +453,7 @@ const subscribeComments = (postId, article) => {
         list.innerHTML = comments.length
           ? comments.map(renderComment).join("")
           : '<div class="art-empty">Sin comentarios todavía.</div>';
+        if (window.lucide) window.lucide.createIcons();
       }
       countEls.forEach((el) => {
         el.textContent = String(comments.length);

@@ -19,6 +19,12 @@ const expectNoHorizontalOverflow = async (page) => {
   expect(overflow).toBeLessThanOrEqual(2);
 };
 
+const expectIconOnlyAction = async (locator, iconClass) => {
+  await expect(locator.locator(`svg.${iconClass}`)).toHaveCount(1);
+  const visibleText = await locator.evaluate((button) => button.textContent.trim());
+  expect(visibleText).toBe("");
+};
+
 test("art gallery page lists, uploads, likes and comments on art posts", async ({ page }, testInfo) => {
   const uploadTitle = `Obra Playwright ${testInfo.project.name}`;
   const consoleErrors = [];
@@ -58,10 +64,26 @@ test("art gallery page lists, uploads, likes and comments on art posts", async (
     .toBe("/index.html?dmEmulators=1");
 
   await expect(page.locator("#art-gallery-heading")).toHaveText("Galería de Arte");
+  await expect(page.locator(".art-gallery-subtitle")).toHaveText(
+    "Un muro colaborativo para compartir obras, registrar su contexto y conversar sobre la mirada artística de cada publicación."
+  );
+  if ((page.viewportSize()?.width || 0) >= 1000) {
+    const subtitleLines = await page.locator(".art-gallery-subtitle").evaluate((node) => {
+      const rect = node.getBoundingClientRect();
+      const styles = window.getComputedStyle(node);
+      return Math.round(rect.height / parseFloat(styles.lineHeight));
+    });
+    expect(subtitleLines).toBeLessThanOrEqual(1);
+  }
   await expect(page.locator("#art-gallery-upload")).toBeVisible();
   await expect.poll(() => page.locator(".art-post").count(), { timeout: 30_000 }).toBeGreaterThanOrEqual(2);
   await expect(page.getByText("Horizonte Verde")).toBeVisible();
   await expect(page.getByText("Retrato de Guardia")).toBeVisible();
+  const ownedSeedPost = page.locator(".art-post").filter({ hasText: "Horizonte Verde" }).first();
+  const ownedSeedAvatar = ownedSeedPost.locator(".art-avatar").first();
+  await expect(ownedSeedAvatar.locator(".art-avatar__img")).toBeVisible({ timeout: 30_000 });
+  await expect(ownedSeedAvatar.locator(".art-avatar__img")).toHaveAttribute("src", /avatar-leila\.png/);
+  await expect(ownedSeedAvatar.locator("[data-avatar-fallback='initials']")).toBeHidden();
   const otherPost = page.locator(".art-post").filter({ hasText: "Obra Ajena QA" }).first();
   await expect(otherPost).toBeVisible();
   await expect(otherPost.locator("[data-post-action]")).toHaveCount(0);
@@ -91,6 +113,10 @@ test("art gallery page lists, uploads, likes and comments on art posts", async (
   const firstPost = page.locator(".art-post").filter({ hasText: uploadTitle }).first();
   await expect(firstPost.locator('[data-post-action="edit"]')).toBeVisible();
   await expect(firstPost.locator('[data-post-action="delete"]')).toBeVisible();
+  await expectIconOnlyAction(firstPost.locator('[data-post-action="edit"]'), "lucide-pencil");
+  await expectIconOnlyAction(firstPost.locator('[data-post-action="delete"]'), "lucide-trash-2");
+  await expect(firstPost.locator(".art-avatar__img")).toBeVisible({ timeout: 30_000 });
+  await expect(firstPost.locator(".art-avatar__img")).toHaveAttribute("src", /avatar-leila\.png/);
 
   const editedTitle = `${uploadTitle} editada`;
   await firstPost.locator('[data-post-action="edit"]').click();
@@ -124,6 +150,8 @@ test("art gallery page lists, uploads, likes and comments on art posts", async (
   const ownComment = editedPost.locator(".art-comment").filter({ hasText: "Comentario QA sobre la obra." }).first();
   await expect(ownComment.locator('[data-comment-action="edit"]')).toBeVisible();
   await expect(ownComment.locator('[data-comment-action="delete"]')).toBeVisible();
+  await expectIconOnlyAction(ownComment.locator('[data-comment-action="edit"]'), "lucide-pencil");
+  await expectIconOnlyAction(ownComment.locator('[data-comment-action="delete"]'), "lucide-trash-2");
 
   await ownComment.locator('[data-comment-action="edit"]').click();
   await expect(page.locator("#art-comment-edit-modal")).toBeVisible();

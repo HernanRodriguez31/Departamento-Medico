@@ -64,6 +64,7 @@ const seed = async () => {
     {
       nombre: DISPLAY_NAME,
       email: QA_EMAIL,
+      avatarUrl: "/assets/images/avatar-leila.png",
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     },

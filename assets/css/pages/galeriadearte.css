@@ -200,6 +200,10 @@ body.art-gallery-page {
   margin-bottom: 2rem;
 }
 
+.art-gallery-hero > div {
+  min-width: 0;
+}
+
 .art-gallery-kicker {
   margin: 0 0 0.45rem;
   color: #79b84a;
@@ -219,11 +223,12 @@ body.art-gallery-page {
 }
 
 .art-gallery-subtitle {
-  max-width: 58rem;
+  max-width: none;
   margin: 1rem 0 0;
   color: #64748b;
-  font-size: 1.05rem;
-  line-height: 1.65;
+  font-size: 0.98rem;
+  line-height: 1.45;
+  white-space: nowrap;
 }
 
 .art-gallery-upload {
@@ -289,17 +294,24 @@ body.art-gallery-page {
 .art-owner-action,
 .art-comment-action {
   display: inline-flex;
-  min-height: 2.05rem;
+  width: 2.15rem;
+  height: 2.15rem;
+  min-height: 0;
   align-items: center;
   justify-content: center;
-  padding: 0 0.7rem;
+  padding: 0;
   border: 1px solid rgba(213, 226, 194, 0.95);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.96);
   color: #64748b;
-  font-size: 0.78rem;
-  font-weight: 850;
   cursor: pointer;
+}
+
+.art-owner-action svg,
+.art-comment-action svg {
+  width: 0.94rem;
+  height: 0.94rem;
+  stroke-width: 2.35;
 }
 
 .art-owner-action:hover,
@@ -847,6 +859,12 @@ body.art-gallery-page {
     align-items: start;
   }
 
+  .art-gallery-subtitle {
+    font-size: 0.98rem;
+    line-height: 1.55;
+    white-space: normal;
+  }
+
   .art-gallery-title {
     font-size: clamp(2.1rem, 12vw, 3.3rem);
   }
@@ -864,7 +882,7 @@ body.art-gallery-page {
   }
 
   .art-post__owner-actions {
-    width: 100%;
+    width: auto;
     justify-content: flex-end;
   }
 
