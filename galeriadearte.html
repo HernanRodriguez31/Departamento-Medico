@@ -29,7 +29,7 @@
     />
     <link rel="stylesheet" href="/assets/css/pages/index.css?v=20260502-portal-hover-state-1" />
     <link rel="stylesheet" href="/assets/css/core-contrast.css?v=20260502-committee-border-align-1" />
-    <link rel="stylesheet" href="/assets/css/pages/galeriadearte.css?v=20260503-art-gallery-frame-like-preload-1" />
+    <link rel="stylesheet" href="/assets/css/pages/galeriadearte.css?v=20260503-art-gallery-like-tooltip-1" />
   </head>
   <body class="art-gallery-page ui-clarity">
     <div id="app">
@@ -184,7 +184,8 @@
           </section>
           <div class="art-gallery-return">
             <a id="art-gallery-return-home" class="art-gallery-return__button" href="/index.html">
-              Regresar a Página de Inicio
+              <i data-lucide="arrow-left" aria-hidden="true"></i>
+              <span>Regresar a Página de Inicio</span>
             </a>
           </div>
         </div>
@@ -424,7 +425,7 @@
       installFirebaseGlobals();
     </script>
     <script type="module" src="/assets/js/common/notifications.js"></script>
-    <script type="module" src="/assets/js/pages/galeriadearte.js?v=20260503-art-gallery-frame-like-preload-1"></script>
+    <script type="module" src="/assets/js/pages/galeriadearte.js?v=20260503-art-gallery-like-tooltip-1"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {

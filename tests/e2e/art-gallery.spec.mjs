@@ -43,6 +43,34 @@ test("art gallery page lists, uploads, likes and comments on art posts", async (
   await expect(page.locator(".art-gallery-header__logo img[alt='Brisa Salud y Bienestar']")).toBeVisible();
   await expect(page.locator(".art-gallery-header__brand")).toHaveText("Departamento Médico");
   await expect(page.locator(".art-gallery-header__brand")).toHaveCSS("color", "rgb(121, 184, 74)");
+  if ((page.viewportSize()?.width || 0) >= 1000) {
+    const headerBrandMetrics = await page.evaluate(() => {
+      const header = document.querySelector(".art-gallery-header")?.getBoundingClientRect();
+      const logo = document.querySelector(".art-gallery-header__logo")?.getBoundingClientRect();
+      const brand = document.querySelector(".art-gallery-header__brand")?.getBoundingClientRect();
+      const rightControls = [...document.querySelectorAll(".art-gallery-header__actions > *")]
+        .map((node) => node.getBoundingClientRect())
+        .filter((rect) => rect.width > 0 && rect.height > 0);
+      const styles = document.querySelector(".art-gallery-header__brand")
+        ? window.getComputedStyle(document.querySelector(".art-gallery-header__brand"))
+        : null;
+      if (!header || !logo || !brand || !rightControls.length || !styles) return null;
+      const controlsLeft = Math.min(...rightControls.map((rect) => rect.left));
+      return {
+        centerXDiff: Math.abs(brand.left + brand.width / 2 - (header.left + header.width / 2)),
+        centerYDiff: Math.abs(brand.top + brand.height / 2 - (header.top + header.height / 2)),
+        fontSize: parseFloat(styles.fontSize),
+        logoGap: brand.left - logo.right,
+        actionsGap: controlsLeft - brand.right,
+      };
+    });
+    expect(headerBrandMetrics).not.toBeNull();
+    expect(headerBrandMetrics.centerXDiff).toBeLessThanOrEqual(3);
+    expect(headerBrandMetrics.centerYDiff).toBeLessThanOrEqual(3);
+    expect(headerBrandMetrics.fontSize).toBeGreaterThanOrEqual(30);
+    expect(headerBrandMetrics.logoGap).toBeGreaterThanOrEqual(8);
+    expect(headerBrandMetrics.actionsGap).toBeGreaterThanOrEqual(8);
+  }
   await expect(page.locator(".art-gallery-header [data-dm-user-menu]")).toBeVisible();
   await expect(page.locator("#user-panel-dropdown")).toBeHidden();
   await expect(page.locator(".dm-avatar-modal")).toHaveCount(0);
@@ -54,6 +82,22 @@ test("art gallery page lists, uploads, likes and comments on art posts", async (
   });
   expect(headerGap).toBeGreaterThanOrEqual(20);
   await expect(page.locator("#art-gallery-return-home")).toHaveText("Regresar a Página de Inicio");
+  await expect(page.locator("#art-gallery-return-home svg.lucide-arrow-left")).toHaveCount(1);
+  const returnButtonStyles = await page.locator("#art-gallery-return-home").evaluate((link) => {
+    const styles = window.getComputedStyle(link);
+    return {
+      alignItems: styles.alignItems,
+      borderRadius: parseFloat(styles.borderRadius),
+      display: styles.display,
+      gap: styles.gap,
+      minHeight: parseFloat(styles.minHeight),
+    };
+  });
+  expect(["inline-flex", "flex"]).toContain(returnButtonStyles.display);
+  expect(returnButtonStyles.alignItems).toBe("center");
+  expect(returnButtonStyles.borderRadius).toBeGreaterThanOrEqual(40);
+  expect(returnButtonStyles.gap).not.toBe("normal");
+  expect(returnButtonStyles.minHeight).toBeGreaterThanOrEqual(48);
   await expect
     .poll(() =>
       page.locator("#art-gallery-return-home").evaluate((link) => {
@@ -170,9 +214,35 @@ test("art gallery page lists, uploads, likes and comments on art posts", async (
   await likeButton.click();
   await expect(editedPost.locator("[data-like-count]")).toHaveText("1", { timeout: 30_000 });
   await expect(likeButton.locator(".art-like-tooltip")).toContainText("Dra. Mobile QA", { timeout: 30_000 });
-  await expect(likeButton).toHaveAttribute("title", /Dra\. Mobile QA/);
+  await expect
+    .poll(() => likeButton.evaluate((button) => button.hasAttribute("title")))
+    .toBe(false);
+  await expect(likeButton).toHaveAttribute("aria-describedby", /art-like-tooltip-/);
   await likeButton.hover();
   await expect(likeButton.locator(".art-like-tooltip")).toBeVisible();
+  const tooltipMetrics = await likeButton.evaluate((button) => {
+    const tooltip = button.querySelector(".art-like-tooltip");
+    const post = button.closest(".art-post");
+    if (!tooltip || !post) return null;
+    const tooltipRect = tooltip.getBoundingClientRect();
+    const postRect = post.getBoundingClientRect();
+    const buttonRect = button.getBoundingClientRect();
+    const styles = window.getComputedStyle(tooltip);
+    return {
+      left: tooltipRect.left,
+      right: tooltipRect.right,
+      top: tooltipRect.top,
+      buttonTop: buttonRect.top,
+      postLeft: postRect.left,
+      viewportWidth: window.innerWidth,
+      zIndex: Number.parseInt(styles.zIndex, 10) || 0,
+    };
+  });
+  expect(tooltipMetrics).not.toBeNull();
+  expect(tooltipMetrics.left).toBeGreaterThanOrEqual(tooltipMetrics.postLeft - 1);
+  expect(tooltipMetrics.right).toBeLessThanOrEqual(tooltipMetrics.viewportWidth - 8);
+  expect(tooltipMetrics.top).toBeLessThan(tooltipMetrics.buttonTop);
+  expect(tooltipMetrics.zIndex).toBeGreaterThanOrEqual(80);
   await expectNoHorizontalOverflow(page);
 
   await editedPost.locator('[data-action="comments"]').click();

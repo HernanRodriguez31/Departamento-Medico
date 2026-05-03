@@ -246,26 +246,30 @@ const formatLikeNames = (names = []) => {
 const renderLikeTooltip = (post) => {
   const text = formatLikeNames(post?.likedNames);
   if (!text) return "";
-  return `<span class="art-like-tooltip" role="tooltip">${escapeHtml(text)}</span>`;
+  return `<span class="art-like-tooltip" id="art-like-tooltip-${escapeHtml(post.id)}" role="tooltip">${escapeHtml(text)}</span>`;
 };
 
 const syncLikeTooltip = (button, names = []) => {
   if (!button) return;
   const text = formatLikeNames(names);
   let tooltip = $(".art-like-tooltip", button);
+  button.removeAttribute("title");
   if (!text) {
     tooltip?.remove();
-    button.removeAttribute("title");
+    button.removeAttribute("aria-describedby");
     return;
   }
+  const postId = button.closest(".art-post")?.dataset?.postId || "current";
+  const tooltipId = `art-like-tooltip-${postId}`;
   if (!tooltip) {
     tooltip = document.createElement("span");
     tooltip.className = "art-like-tooltip";
     tooltip.setAttribute("role", "tooltip");
     button.appendChild(tooltip);
   }
+  tooltip.id = tooltipId;
   tooltip.textContent = text;
-  button.title = text;
+  button.setAttribute("aria-describedby", tooltipId);
 };
 
 const renderBrief = (post, canManage) => {
@@ -378,7 +382,7 @@ const renderPost = (post, postIndex = 0) => {
       ${post.longDescription ? `<p class="art-post__long">${escapeHtml(post.longDescription)}</p>` : ""}
     </div>
     <footer class="art-actions">
-      <button class="art-action art-action--like${liked ? " is-active" : ""}" type="button" data-action="like" aria-pressed="${liked ? "true" : "false"}" aria-label="${escapeHtml(likeLabel)}" ${likeTooltipText ? `title="${escapeHtml(likeTooltipText)}"` : ""}>
+      <button class="art-action art-action--like${liked ? " is-active" : ""}" type="button" data-action="like" aria-pressed="${liked ? "true" : "false"}" aria-label="${escapeHtml(likeLabel)}" ${likeTooltipText ? `aria-describedby="art-like-tooltip-${escapeHtml(post.id)}"` : ""}>
         <span class="art-heart" aria-hidden="true">♥</span>
         <span data-like-count>${post.likesCount}</span>
         ${renderLikeTooltip(post)}
