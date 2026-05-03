@@ -295,6 +295,39 @@ const decodeHtmlEntities = (value = "") =>
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">");
 
+const stripHtmlToText = (html = "") =>
+  decodeHtmlEntities(
+    String(html || "")
+      .replace(/<script\b[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style\b[\s\S]*?<\/style>/gi, " ")
+      .replace(/<noscript\b[\s\S]*?<\/noscript>/gi, " ")
+      .replace(/<!--[\s\S]*?-->/g, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+  ).slice(0, 12000);
+
+const extractAbstractText = (html = "") => {
+  const candidates = [];
+  const abstractBlockRegex =
+    /<(section|div|article)\b[^>]*(?:id|class)=["'][^"']*(abstract|summary)[^"']*["'][^>]*>([\s\S]*?)<\/\1>/gi;
+  let match = abstractBlockRegex.exec(html);
+  while (match && candidates.length < 3) {
+    const text = stripHtmlToText(match[3]);
+    if (text) candidates.push(text);
+    match = abstractBlockRegex.exec(html);
+  }
+  return candidates.join("\n").slice(0, 8000);
+};
+
+const extractPublicArticleText = (html = "") => {
+  const abstractText = extractAbstractText(html);
+  const bodyText = stripHtmlToText(html);
+  return [abstractText, bodyText]
+    .filter(Boolean)
+    .join("\n\n")
+    .slice(0, 14000);
+};
+
 const getHtmlAttr = (tag, attr) => {
   const match = tag.match(new RegExp(`${attr}\\s*=\\s*["']([^"']*)["']`, "i"));
   return match ? decodeHtmlEntities(match[1]) : "";
@@ -366,6 +399,7 @@ const buildMetadataOnlyArticle = (url, metadata = {}) => ({
 const extractScientificMetadata = (url, html = "") => {
   const meta = extractMetadataMap(html);
   const jsonLd = extractJsonLd(html);
+  const publicText = extractPublicArticleText(html);
   const title =
     meta.citation_title ||
     meta["dc.title"] ||
@@ -403,6 +437,7 @@ const extractScientificMetadata = (url, html = "") => {
     publicationDate,
     description,
     doi: meta.citation_doi || "",
+    publicText,
     warnings
   };
 };
@@ -463,7 +498,15 @@ const callOpenAiForArticleExtraction = async (url, metadata, apiKey) => {
     JSON.stringify({
       officialUrl: url.href,
       sourceDomain: url.hostname,
-      metadata
+      metadata: {
+        title: metadata.title,
+        sourceName: metadata.sourceName,
+        publicationDate: metadata.publicationDate,
+        description: metadata.description,
+        doi: metadata.doi,
+        warnings: metadata.warnings
+      },
+      publicText: cleanString(metadata.publicText).slice(0, 14000)
     })
   ].join("\n");
 
@@ -1233,7 +1276,16 @@ const extractScientificArticleHandler = async (req, res) => {
     return res.status(429).json({ ok: false, error: "rate_limited" });
   }
 
-  const body = req.body && typeof req.body === "object" ? req.body : {};
+  let body = {};
+  if (req.body && typeof req.body === "object") {
+    body = req.body;
+  } else if (typeof req.body === "string") {
+    try {
+      body = JSON.parse(req.body);
+    } catch (e) {
+      body = {};
+    }
+  }
   const articleUrl = parseArticleUrl(body.url);
   if (!articleUrl) {
     logExtraction(400, { error: "invalid_url" });

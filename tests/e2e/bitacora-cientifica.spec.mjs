@@ -25,6 +25,33 @@ test("scientific logbook renders as operational hub with modals and article crea
     if (message.type() === "error") consoleErrors.push(message.text());
   });
   page.on("pageerror", (error) => consoleErrors.push(error.message));
+  await page.route("**/api/extractScientificArticle", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        extractionStatus: "ai_draft",
+        article: {
+          title: articleTitle,
+          sourceName: "PubMed / MEDLINE",
+          officialUrl: "https://pubmed.ncbi.nlm.nih.gov/123456/",
+          sourceDomain: "pubmed.ncbi.nlm.nih.gov",
+          studyType: "Ensayo clínico",
+          evidenceType: "Investigación clínica",
+          publicationDate: "2026-05-03",
+          studyLocation: "Contexto hospitalario",
+          executiveSummary: "Resumen generado por IA desde Playwright.",
+          clinicalQuestion: "Pregunta clínica generada por IA.",
+          mainResult: "Resultado principal generado por IA.",
+          tags: ["QA", "Lectura crítica", "PubMed", "IA"],
+          accessType: "Resumen disponible",
+          extractionConfidence: 0.82,
+          warnings: ["Revisar antes de guardar."]
+        }
+      })
+    });
+  });
 
   await page.goto(LOGIN_URL);
   await expect(page.locator("#login-form")).toBeVisible();
@@ -56,15 +83,20 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(page.locator("#bitacora-heading")).toHaveText("Bitácora Científica");
   await expect(page.locator(".bitacora-intro-segment")).toHaveCount(1);
   await expect(page.locator(".bitacora-publications-segment")).toHaveCount(1);
-  await expect(page.locator(".bitacora-intro-segment")).toContainText(
-    "Evidencia médica curada para lectura crítica"
-  );
+  await expect(page.locator(".bitacora-breadcrumb")).toHaveText("Portal");
+  await expect(page.locator(".bitacora-intro-segment")).not.toContainText("Evidencia médica curada");
+  await expect(page.locator(".bitacora-intro-segment")).not.toContainText("Centralización de publicaciones");
   const sourcesTrigger = page.getByRole("button", { name: "Fuentes recomendadas" });
   await expect(sourcesTrigger).toBeVisible();
   await expect(page.locator(".bitacora-publications-panel")).toBeVisible();
   await expect(page.locator(".bitacora-publications-panel")).toHaveCSS("background-color", /rgba?|rgb/);
   await expect(page.locator("#bitacora-publicaciones-title")).toHaveText("Publicaciones científicas");
   await expect(page.getByRole("button", { name: "Agregar artículo" })).toBeVisible();
+  await expect(page.locator(".bitacora-filters-card")).toHaveCount(0);
+  await expect(page.locator("#bitacora-search")).toHaveCount(0);
+  await expect(page.locator("#bitacora-filter-evidence")).toHaveCount(0);
+  await expect(page.locator("#bitacora-reset")).toHaveCount(0);
+  await expect(page.locator(".bitacora-publications-panel")).not.toContainText("Los preprints");
 
   await expect(page.locator(".bitacora-editorial-model")).toHaveCount(0);
   await expect(page.locator(".bitacora-value-strip")).toHaveCount(0);
@@ -75,8 +107,13 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(page.locator("body")).not.toContainText("Advertencia sobre preprints y evidencia");
   await expect(page.locator(".scientific-source-card:visible")).toHaveCount(0);
 
-  await expect.poll(() => page.locator(".bitacora-post").count(), { timeout: 30_000 }).toBeGreaterThanOrEqual(3);
+  await expect.poll(() => page.locator(".bitacora-post").count(), { timeout: 30_000 }).toBe(1);
+  await expect(page.locator("#bitacora-results-count")).toHaveText("0 artículos agregados");
   await expect(page.locator(".bitacora-post").first()).toHaveCSS("background-color", /rgba?|rgb/);
+  await expect(page.locator(".bitacora-post").first()).toContainText("Ejemplo de artículo científico");
+  await page.getByRole("button", { name: "Quitar ejemplo" }).click();
+  await expect(page.locator(".bitacora-post")).toHaveCount(0);
+  await expect(page.locator("#bitacora-empty")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 
   await sourcesTrigger.click();
@@ -247,60 +284,48 @@ test("scientific logbook renders as operational hub with modals and article crea
   await articleModal.getByLabel("URL del artículo o paper").fill("https://pubmed.ncbi.nlm.nih.gov/123456/");
   await expect(articleModal.locator("#article-domain-detected")).toContainText("pubmed.ncbi.nlm.nih.gov");
   await articleModal.getByRole("button", { name: "Analizar enlace con IA" }).click();
-  await expect(articleModal.locator("#article-ai-status")).toContainText(/Borrador|endpoint seguro|manual|Analizando/i, {
+  await expect(articleModal.locator("#article-ai-status")).toContainText("Datos cargados por IA", {
     timeout: 30_000
   });
-
-  await articleModal.getByLabel("Título").fill(articleTitle);
-  await articleModal.getByLabel("Fuente / revista / sitio científico").fill("PubMed / MEDLINE");
-  await articleModal.getByLabel("Enlace oficial").fill("https://pubmed.ncbi.nlm.nih.gov/123456/");
-  await articleModal.getByLabel("Tipo de estudio").fill("Ensayo clínico");
-  await articleModal.getByLabel("Tipo de evidencia").fill("Investigación clínica");
-  await articleModal.getByLabel("Fecha de publicación").fill("2026-05-03");
-  await articleModal.getByLabel("Lugar / contexto del estudio").fill("Contexto hospitalario");
-  await articleModal.getByLabel("Resumen ejecutivo").fill("Resumen manual cargado desde Playwright.");
-  await articleModal.getByLabel("Pregunta que busca responder").fill("Pregunta clínica de prueba.");
-  await articleModal.getByLabel("Resultado principal").fill("Resultado principal de prueba.");
-  await articleModal.getByLabel("Etiquetas").fill("QA, Lectura crítica, PubMed, Extra");
+  await expect(articleModal.getByLabel("Título")).toHaveValue(articleTitle);
+  await expect(articleModal.getByLabel("Fuente / revista / sitio científico")).toHaveValue("PubMed / MEDLINE");
+  await expect(articleModal.getByLabel("Tipo de estudio")).toHaveValue("Ensayo clínico");
+  await expect(articleModal.getByLabel("Tipo de evidencia")).toHaveValue("Investigación clínica");
+  await expect(articleModal.getByLabel("Resumen ejecutivo")).toHaveValue("Resumen generado por IA desde Playwright.");
   await articleModal.getByLabel("Comentario breve del usuario").fill("Comentario interno de prueba.");
   await articleModal.getByRole("button", { name: "Guardar artículo" }).click();
   await expect(articleModal).toBeHidden({ timeout: 30_000 });
 
   const newPost = page.locator(".bitacora-post").filter({ hasText: articleTitle }).first();
   await expect(newPost).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator(".bitacora-post")).toHaveCount(1);
+  await expect(page.locator("#bitacora-results-count")).toHaveText("1 artículo agregado");
   await expect(newPost).toContainText("Pendiente de revisión");
   await expect(newPost).toContainText("Dra. Mobile QA");
-  await expect(newPost).toContainText("Resumen manual cargado desde Playwright.");
+  await expect(newPost).toContainText("Resumen generado por IA desde Playwright.");
   await expect(newPost.locator(".bitacora-tag")).toHaveCount(4);
 
   await newPost.getByRole("button", { name: "Leer análisis" }).click();
   await expect(newPost.getByRole("button", { name: "Ocultar análisis" })).toHaveAttribute("aria-expanded", "true");
   await expect(newPost.locator(".bitacora-analysis")).toBeVisible();
-  await expect(newPost.locator(".bitacora-analysis")).toContainText("Pregunta clínica de prueba.");
+  await expect(newPost.locator(".bitacora-analysis")).toContainText("Pregunta clínica generada por IA.");
   await newPost.getByRole("button", { name: "Ocultar análisis" }).click();
   await expect(newPost.getByRole("button", { name: "Leer análisis" })).toHaveAttribute("aria-expanded", "false");
   await expect(newPost.locator(".bitacora-analysis")).toBeHidden();
 
-  await page.locator("#bitacora-reset").click();
-  await page.locator("#bitacora-search").fill(articleTitle);
-  await expect(page.locator(".bitacora-post")).toHaveCount(1);
-  await expect(page.locator(".bitacora-post")).toContainText(articleTitle);
-  await page.locator("#bitacora-reset").click();
-  await page.locator("#bitacora-filter-evidence").selectOption("Investigación clínica");
-  await expect(page.locator(".bitacora-post").filter({ hasText: articleTitle })).toHaveCount(1);
-  await page.locator("#bitacora-reset").click();
-  await page.locator("#bitacora-filter-status").selectOption("pending_review");
-  await expect(page.locator(".bitacora-post").filter({ hasText: articleTitle })).toHaveCount(1);
-  await page.locator("#bitacora-reset").click();
-  await page.locator("#bitacora-search").fill("sin resultados para auditoria");
+  page.once("dialog", (dialog) => dialog.accept());
+  await newPost.getByRole("button", { name: "Eliminar" }).click();
   await expect(page.locator(".bitacora-post")).toHaveCount(0);
   await expect(page.locator("#bitacora-empty")).toBeVisible();
-  await page.locator("#bitacora-reset").click();
+  await expect(page.locator("#bitacora-results-count")).toHaveText("0 artículos agregados");
 
-  await page.locator("#art-gallery-return-home").scrollIntoViewIfNeeded();
-  await expect(page.locator("#scroll-up")).toHaveClass(/show-scroll/);
-  await page.locator("#scroll-up").click();
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThanOrEqual(20);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const reachedScrollThreshold = await page.evaluate(() => window.scrollY > 420);
+  if (reachedScrollThreshold) {
+    await expect(page.locator("#scroll-up")).toHaveClass(/show-scroll/);
+    await page.locator("#scroll-up").click();
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThanOrEqual(20);
+  }
   await expectNoHorizontalOverflow(page);
 
   if ((page.viewportSize()?.width || 0) >= 1024) {

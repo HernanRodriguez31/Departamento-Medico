@@ -1,6 +1,8 @@
 import {
   addDoc,
   collection,
+  deleteDoc,
+  doc,
   onSnapshot,
   orderBy,
   query,
@@ -198,9 +200,27 @@ export function createBitacoraArticleRepository({ db, auth } = {}) {
     return localArticle;
   };
 
+  const deleteArticle = async (articleId = "") => {
+    const id = cleanString(articleId);
+    if (!id) return;
+    const user = auth?.currentUser;
+    if (!user) {
+      throw new Error("AUTH_REQUIRED");
+    }
+
+    if (db && mode === "firestore") {
+      await deleteDoc(doc(db, COLLECTION_NAME, id));
+      return;
+    }
+
+    memoryArticles = memoryArticles.filter((article) => article.id !== id);
+    emitMemory();
+  };
+
   return {
     subscribe,
     createArticle,
+    deleteArticle,
     getMode: () => mode
   };
 }

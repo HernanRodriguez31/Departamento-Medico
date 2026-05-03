@@ -696,6 +696,12 @@ service cloud.firestore {
         && request.resource.data.createdAt == resource.data.createdAt;
     }
 
+    function isBitacoraArticleOwner(data) {
+      return signedIn()
+        && data.createdBy is map
+        && data.createdBy.uid == request.auth.uid;
+    }
+
     // CAMBIO AQUI: Solo permitimos LEER la configuración (el candado cerrado)
     match /configuracion/{document=**} {
       allow read: if true;
@@ -808,7 +814,7 @@ service cloud.firestore {
       allow read: if signedIn();
       allow create: if validBitacoraArticleCreate();
       allow update: if validBitacoraArticleAdminUpdate();
-      allow delete: if isAdmin();
+      allow delete: if isBitacoraArticleOwner(resource.data) || isAdmin();
     }
 
     match /dm_posts/{postId} {

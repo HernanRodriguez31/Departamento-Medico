@@ -2,6 +2,10 @@ import { getFirebase } from "../common/firebaseClient.js";
 import { initUserMenu } from "../common/user-menu.js?v=20260430-orgtree-avatars-1";
 import { requireAuth } from "../shared/authGate.js";
 import { initSessionGuard } from "../shared/sessionGuard.js?v=20260305-session-1";
+import {
+  doc,
+  getDoc
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { BITACORA_POSTS } from "../data/bitacora-posts.js";
 import { NATIONAL_SELECTED_SOURCE_IDS, SCIENTIFIC_SOURCES } from "../data/scientific-sources.js";
 import { createBitacoraArticleRepository } from "../services/bitacora-article-repository.js";
@@ -79,6 +83,8 @@ const state = {
   userArticles: [],
   repositoryMode: "firestore",
   currentUser: null,
+  isAdmin: false,
+  demoDismissed: false,
   activeModal: null,
   activeModalTrigger: null,
   articleDraftMeta: {
@@ -186,6 +192,7 @@ const renderStaticPost = (post) => ({
   publicationDate: post.publicationDate || "",
   createdAt: toDate(post.createdAt) || toDate(post.reviewedAt),
   createdAtLabel: post.reviewedAt || "",
+  createdByUid: post.createdBy?.uid || "",
   createdByName: post.createdBy?.displayName || post.reviewer || "Departamento Médico",
   evidenceType: post.evidenceType || "Plantilla editorial",
   studyType: post.studyDesign || post.evidenceType || "",
@@ -214,6 +221,7 @@ const renderUserArticle = (article) => ({
   publicationDate: article.publicationDate,
   createdAt: article.createdAt,
   createdAtLabel: formatDateTime(article.createdAt),
+  createdByUid: article.createdBy?.uid || "",
   createdByName: article.createdBy?.displayName || article.createdBy?.email || "Usuario",
   evidenceType: article.evidenceType || article.studyType || "Pendiente",
   studyType: article.studyType,
@@ -234,7 +242,11 @@ const renderUserArticle = (article) => ({
 
 const staticPosts = BITACORA_POSTS.map(renderStaticPost);
 
-const getAllPosts = () => [...state.userArticles.map(renderUserArticle), ...staticPosts];
+const getAllPosts = () => {
+  const userPosts = state.userArticles.map(renderUserArticle);
+  if (userPosts.length || state.demoDismissed) return userPosts;
+  return [...userPosts, ...staticPosts];
+};
 
 const getSearchText = (post) =>
   normalizeText(
@@ -345,6 +357,14 @@ const renderTrace = (post) => `
   </dl>
 `;
 
+const canDeleteArticle = (post) =>
+  Boolean(
+    post &&
+      !post.isTemplate &&
+      state.currentUser &&
+      (state.isAdmin || (post.createdByUid && post.createdByUid === state.currentUser.uid))
+  );
+
 const renderAnalysis = (post, analysisId, expanded) => `
   <div id="${analysisId}" class="bitacora-analysis bitacora-analysis-panel" ${expanded ? "" : "hidden"}>
     <div class="bitacora-analysis__grid">
@@ -418,6 +438,16 @@ const renderPost = (post) => {
             ? `<a class="bitacora-btn bitacora-btn--secondary" href="${escapeHtml(originalUrl)}" target="_blank" rel="noopener noreferrer">Ver fuente original</a>`
             : ""
         }
+        ${
+          post.isTemplate
+            ? `<button class="bitacora-btn bitacora-btn--secondary" type="button" data-bitacora-action="dismiss-demo">Quitar ejemplo</button>`
+            : ""
+        }
+        ${
+          canDeleteArticle(post)
+            ? `<button class="bitacora-btn bitacora-btn--danger" type="button" data-bitacora-action="delete-article">Eliminar</button>`
+            : ""
+        }
       </div>
       ${renderAnalysis(post, analysisId, expanded)}
     </article>
@@ -426,16 +456,15 @@ const renderPost = (post) => {
 
 const updateResultCount = (count) => {
   if (!els.count) return;
-  els.count.textContent =
-    count === 1 ? "1 publicación encontrada" : `${count} publicaciones encontradas`;
+  els.count.textContent = count === 1 ? "1 artículo agregado" : `${count} artículos agregados`;
 };
 
 const updatePersistenceNote = () => {
   if (!els.persistenceNote) return;
   els.persistenceNote.textContent =
     state.repositoryMode === "memory"
-      ? "Modo local: el artículo no se persistirá al recargar. Los preprints y resúmenes automáticos requieren revisión crítica."
-      : "Los preprints y resúmenes automáticos requieren revisión crítica antes de modificar conductas clínicas o protocolos.";
+      ? "Modo local: los artículos se conservarán solo durante esta sesión."
+      : "";
 };
 
 const renderFilterOptions = () => {
@@ -467,7 +496,7 @@ const renderPosts = () => {
   const filtered = sortPosts(getAllPosts().filter(matchesFilters));
   els.posts.innerHTML = filtered.map(renderPost).join("");
   if (els.empty) els.empty.hidden = filtered.length > 0;
-  updateResultCount(filtered.length);
+  updateResultCount(state.userArticles.length);
   updatePersistenceNote();
   if (window.lucide) window.lucide.createIcons();
 };
@@ -796,19 +825,18 @@ const handleAnalyzeArticle = async () => {
   try {
     const result = await requestArticleExtraction(validation.href, { auth });
     if (result.error) {
-      setArticleError(els.articleUrlError, result.error);
-      setAiStatus("");
+      fillArticleFromExtraction(result.article || {});
+      state.articleDraftMeta.extractionStatus = result.extractionStatus || "failed";
+      setAiStatus(result.error);
       return;
     }
     fillArticleFromExtraction(result.article || {});
     state.articleDraftMeta.extractionStatus = result.extractionStatus || "manual";
     if (result.ok && result.extractionStatus === "ai_draft") {
-      setAiStatus("Borrador automático generado. Revisá los campos antes de guardar.");
+      setAiStatus("Datos cargados por IA. Revisar antes de guardar.");
       return;
     }
-    setAiStatus(
-      "El análisis automático requiere configurar un endpoint seguro de IA. Completá los campos manualmente o configurá el servicio de extracción."
-    );
+    setAiStatus(result.message || "No se pudo completar con IA. Revisá o completá los campos manualmente.");
   } finally {
     setAnalyzeBusy(false);
   }
@@ -857,6 +885,61 @@ const setSaveBusy = (button, busy) => {
   button.disabled = busy;
   button.dataset.originalText = button.dataset.originalText || button.textContent.trim();
   button.textContent = busy ? "Guardando..." : button.dataset.originalText;
+};
+
+const setActionBusy = (button, busy, busyText = "Procesando...") => {
+  if (!button) return;
+  button.disabled = busy;
+  button.dataset.originalText = button.dataset.originalText || button.textContent.trim();
+  button.textContent = busy ? busyText : button.dataset.originalText;
+};
+
+const confirmArticleDeletion = async (post) => {
+  const title = post?.title || "este artículo";
+  if (window.Swal?.fire) {
+    const result = await window.Swal.fire({
+      title: "Eliminar artículo",
+      text: `Se quitará "${title}" de la Bitácora.`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Eliminar",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#b91c1c"
+    });
+    return Boolean(result.isConfirmed);
+  }
+  return window.confirm(`Eliminar "${title}" de la Bitácora?`);
+};
+
+const showArticleActionError = (message) => {
+  if (window.Swal?.fire) {
+    window.Swal.fire("No se pudo completar", message, "error");
+    return;
+  }
+  window.alert(message);
+};
+
+const handleDeleteArticle = async (postId, button) => {
+  const post = getAllPosts().find((item) => item.id === postId);
+  if (!post || !repository || !canDeleteArticle(post)) return;
+  const confirmed = await confirmArticleDeletion(post);
+  if (!confirmed) return;
+  setActionBusy(button, true, "Eliminando...");
+  try {
+    await repository.deleteArticle(post.id);
+    state.userArticles = state.userArticles.filter((article) => article.id !== post.id);
+    if (state.expandedPostId === post.id) state.expandedPostId = "";
+    renderFilterOptions();
+    renderPosts();
+  } catch (error) {
+    const message =
+      error?.message === "AUTH_REQUIRED"
+        ? "La sesión no está activa. Iniciá sesión nuevamente."
+        : "No se pudo eliminar el artículo. Verificá permisos o conexión.";
+    showArticleActionError(message);
+  } finally {
+    setActionBusy(button, false);
+  }
 };
 
 const handleArticleSubmit = async (event) => {
@@ -947,11 +1030,23 @@ const bindEvents = () => {
   els.filters?.addEventListener("submit", (event) => event.preventDefault());
 
   els.posts?.addEventListener("click", (event) => {
-    const toggle = event.target.closest('[data-bitacora-action="toggle-analysis"]');
-    if (!toggle) return;
+    const actionButton = event.target.closest("[data-bitacora-action]");
+    if (!actionButton) return;
     const post = event.target.closest(".bitacora-post");
     const postId = post?.dataset?.postId || "";
     if (!postId) return;
+    const action = actionButton.dataset.bitacoraAction;
+    if (action === "dismiss-demo") {
+      state.demoDismissed = true;
+      state.expandedPostId = "";
+      renderPosts();
+      return;
+    }
+    if (action === "delete-article") {
+      handleDeleteArticle(postId, actionButton);
+      return;
+    }
+    if (action !== "toggle-analysis") return;
     state.expandedPostId = state.expandedPostId === postId ? "" : postId;
     renderPosts();
     const restored = $(`.bitacora-post[data-post-id="${escapeSelector(postId)}"]`);
@@ -1018,10 +1113,28 @@ const initArticleRepository = () => {
   );
 };
 
+const resolveAdminStatus = async (user) => {
+  if (!user || !db) return false;
+  try {
+    const token = await user.getIdTokenResult();
+    if (token?.claims?.admin === true) return true;
+  } catch (error) {
+    console.warn("[Bitácora] No se pudo leer el claim admin.", error);
+  }
+  try {
+    const snap = await getDoc(doc(db, "admin_whitelist", user.uid));
+    return snap.exists();
+  } catch (error) {
+    console.warn("[Bitácora] No se pudo leer admin_whitelist.", error);
+    return false;
+  }
+};
+
 const boot = async () => {
   const currentUser = await requireAuth(auth);
   if (!currentUser) return;
   state.currentUser = currentUser;
+  state.isAdmin = await resolveAdminStatus(currentUser);
   initSessionGuard({ auth, db });
   initUserMenu({ variant: "desktop" });
   initReturnHomeLink();

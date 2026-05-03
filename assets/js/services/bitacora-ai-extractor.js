@@ -1,4 +1,6 @@
 const DEFAULT_ENDPOINT = "/api/extractScientificArticle";
+const PUBLISHED_FUNCTION_ENDPOINT =
+  "https://us-central1-departamento-medico-brisa.cloudfunctions.net/extractScientificArticle";
 
 const KNOWN_SOURCE_NAMES = new Map([
   ["pubmed.ncbi.nlm.nih.gov", "PubMed / MEDLINE"],
@@ -61,6 +63,9 @@ export const validateArticleUrl = (value = "") => {
 const buildManualFallback = (urlInfo, status = "not_configured", message = "") => ({
   ok: false,
   extractionStatus: status,
+  error:
+    message ||
+    "No se pudo completar con IA. Revisá o completá los campos manualmente.",
   article: {
     title: "",
     sourceName: urlInfo.sourceName,
@@ -76,12 +81,51 @@ const buildManualFallback = (urlInfo, status = "not_configured", message = "") =
     tags: [],
     accessType: "Pendiente",
     extractionConfidence: 0,
-    warnings: [
-      message ||
-        "El análisis automático requiere configurar un endpoint seguro de IA. Completá los campos manualmente o configurá el servicio de extracción."
-    ]
+    warnings: [message || "No se pudo completar con IA."]
   }
 });
+
+const resolveExtractionEndpoint = (endpoint) => {
+  if (endpoint) return endpoint;
+  if (typeof window === "undefined") return DEFAULT_ENDPOINT;
+  if (window.BITACORA_AI_EXTRACT_ENDPOINT) return window.BITACORA_AI_EXTRACT_ENDPOINT;
+
+  const host = window.location.hostname;
+  const port = window.location.port;
+  const isLocalHost = host === "localhost" || host === "127.0.0.1";
+  const isFirebaseEmulator = isLocalHost && port === "5002";
+  if (isLocalHost && !isFirebaseEmulator) {
+    return PUBLISHED_FUNCTION_ENDPOINT;
+  }
+  return DEFAULT_ENDPOINT;
+};
+
+const getEndpointErrorMessage = (status, payload) => {
+  const code = payload?.error || "";
+  if (status === 401 || code === "auth_required" || code === "auth_invalid") {
+    return "Iniciá sesión nuevamente para usar el análisis con IA.";
+  }
+  if (status === 404 || status === 405) {
+    return "El servicio de IA no está publicado en este entorno.";
+  }
+  if (status === 429 || code === "rate_limited") {
+    return "Límite de análisis alcanzado. Probá nuevamente en un minuto.";
+  }
+  if (code === "missing_openai_api_key") {
+    return "Falta configurar OPENAI_API_KEY para completar el análisis.";
+  }
+  return "No se pudo completar con IA. Revisá o completá los campos manualmente.";
+};
+
+const getExtractionStatusMessage = (status, article) => {
+  if (status === "not_configured") {
+    return article?.warnings?.[0] || "Falta configurar OPENAI_API_KEY para completar el análisis.";
+  }
+  if (status === "failed") {
+    return article?.warnings?.[0] || "La IA no pudo completar el análisis. Revisá los campos.";
+  }
+  return "";
+};
 
 const normalizeExtractionArticle = (input = {}, urlInfo) => ({
   title: cleanString(input.title),
@@ -114,10 +158,7 @@ export async function requestArticleExtraction(url, { auth, endpoint } = {}) {
     };
   }
 
-  const resolvedEndpoint =
-    endpoint ||
-    (typeof window !== "undefined" && window.BITACORA_AI_EXTRACT_ENDPOINT) ||
-    DEFAULT_ENDPOINT;
+  const resolvedEndpoint = resolveExtractionEndpoint(endpoint);
 
   if (!resolvedEndpoint) {
     return buildManualFallback(validation);
@@ -160,8 +201,7 @@ export async function requestArticleExtraction(url, { auth, endpoint } = {}) {
       return buildManualFallback(
         validation,
         status,
-        payload?.error ||
-          "El análisis automático no está disponible. Completá los campos manualmente."
+        getEndpointErrorMessage(response.status, payload)
       );
     }
 
@@ -182,6 +222,7 @@ export async function requestArticleExtraction(url, { auth, endpoint } = {}) {
     return {
       ok: true,
       extractionStatus,
+      message: getExtractionStatusMessage(extractionStatus, article),
       article: {
         ...article,
         warnings: article.warnings.length
@@ -193,7 +234,7 @@ export async function requestArticleExtraction(url, { auth, endpoint } = {}) {
     return buildManualFallback(
       validation,
       "not_configured",
-      "El análisis automático requiere configurar un endpoint seguro de IA. Completá los campos manualmente o configurá el servicio de extracción."
+      "No se pudo conectar con el servicio de IA desde este entorno."
     );
   }
 }

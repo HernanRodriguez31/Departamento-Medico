@@ -366,7 +366,7 @@ test("bitacoraArticles allow authenticated reads and valid own creates only", as
   );
 });
 
-test("bitacoraArticles updates and deletes are admin-only", async () => {
+test("bitacoraArticles updates are admin-only and deletes allow owner or admin", async () => {
   const ownerDb = authedDb("user-a");
   const otherDb = authedDb("user-b");
   const adminDb = authedAdminDb("admin-a");
@@ -378,14 +378,24 @@ test("bitacoraArticles updates and deletes are admin-only", async () => {
     })
   );
   await assertFails(deleteDoc(doc(otherDb, "bitacoraArticles", "article-a")));
+  await assertSucceeds(deleteDoc(doc(ownerDb, "bitacoraArticles", "article-a")));
+
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "bitacoraArticles", "article-admin-delete"), {
+      ...validBitacoraPayload("user-b"),
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    });
+  });
+
   await assertSucceeds(
-    updateDoc(doc(adminDb, "bitacoraArticles", "article-a"), {
+    updateDoc(doc(adminDb, "bitacoraArticles", "article-admin-delete"), {
       title: "Artículo aprobado",
       status: "published",
       updatedAt: Timestamp.now()
     })
   );
-  await assertSucceeds(deleteDoc(doc(adminDb, "bitacoraArticles", "article-a")));
+  await assertSucceeds(deleteDoc(doc(adminDb, "bitacoraArticles", "article-admin-delete")));
 });
 
 test("authenticated user can create valid own multi-day calendar event", async () => {

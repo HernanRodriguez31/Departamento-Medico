@@ -34,7 +34,7 @@
     <link rel="stylesheet" href="/assets/css/pages/index.css?v=20260502-portal-hover-state-1" />
     <link rel="stylesheet" href="/assets/css/core-contrast.css?v=20260502-committee-border-align-1" />
     <link rel="stylesheet" href="/assets/css/pages/galeriadearte.css?v=20260503-art-gallery-like-tooltip-1" />
-    <link rel="stylesheet" href="/assets/css/pages/bitacora-cientifica.css?v=20260503-sources-modal-clean-1" />
+    <link rel="stylesheet" href="/assets/css/pages/bitacora-cientifica.css?v=20260503-bitacora-slim-ai-delete-1" />
   </head>
   <body class="art-gallery-page bitacora-page ui-clarity">
     <div id="app">
@@ -167,14 +167,8 @@
       <main class="art-gallery-main bitacora-main">
         <div class="art-gallery-shell bitacora-shell">
           <section class="bitacora-intro-segment" aria-labelledby="bitacora-heading">
-            <p class="bitacora-breadcrumb">Portal · Bitácora Científica</p>
+            <p class="bitacora-breadcrumb">Portal</p>
             <h1 class="art-gallery-title bitacora-title" id="bitacora-heading">Bitácora Científica</h1>
-            <h2 class="bitacora-intro__subtitle">
-              Evidencia médica curada para lectura crítica, actualización profesional y trazabilidad a fuentes oficiales.
-            </h2>
-            <p class="bitacora-intro__text">
-              Centralización de publicaciones científicas, papers comentados y recursos confiables para la práctica clínica, la salud ocupacional y la gestión sanitaria.
-            </p>
             <button
               type="button"
               class="bitacora-sources-trigger"
@@ -195,9 +189,7 @@
             <div class="bitacora-publications-panel">
               <div class="bitacora-publications-header">
                 <div>
-                  <p class="bitacora-eyebrow">Lecturas y papers</p>
                   <h2 id="bitacora-publicaciones-title">Publicaciones científicas</h2>
-                  <p>Artículos cargados por el equipo médico para lectura crítica y seguimiento.</p>
                 </div>
                 <button class="bitacora-add-article-button" type="button" data-open-add-article>
                   <i data-lucide="plus-circle" aria-hidden="true"></i>
@@ -205,51 +197,13 @@
                 </button>
               </div>
 
-              <form class="bitacora-filters-card" role="search" aria-label="Filtrar publicaciones científicas">
-                <label class="bitacora-field" for="bitacora-search">
-                  <span>Buscar</span>
-                  <input
-                    id="bitacora-search"
-                    type="search"
-                    placeholder="Título, fuente, etiqueta o pregunta"
-                    autocomplete="off"
-                  />
-                </label>
-                <label class="bitacora-field" for="bitacora-filter-evidence">
-                  <span>Tipo de evidencia</span>
-                  <select id="bitacora-filter-evidence"></select>
-                </label>
-                <label class="bitacora-field" for="bitacora-filter-source">
-                  <span>Fuente</span>
-                  <select id="bitacora-filter-source"></select>
-                </label>
-                <label class="bitacora-field" for="bitacora-filter-status">
-                  <span>Estado</span>
-                  <select id="bitacora-filter-status"></select>
-                </label>
-                <label class="bitacora-field bitacora-field--sort" for="bitacora-sort">
-                  <span>Orden</span>
-                  <select id="bitacora-sort">
-                    <option value="recent">Más recientes</option>
-                    <option value="source">Fuente</option>
-                    <option value="evidence">Tipo de evidencia</option>
-                  </select>
-                </label>
-                <button id="bitacora-reset" class="bitacora-btn bitacora-btn--secondary" type="button">
-                  Limpiar filtros
-                </button>
-              </form>
-
               <div class="bitacora-publications-meta">
                 <span id="bitacora-results-count" class="bitacora-results-count" aria-live="polite"></span>
-                <p>
-                  Los preprints y resúmenes automáticos requieren revisión crítica antes de modificar conductas clínicas o protocolos.
-                </p>
               </div>
 
               <div id="bitacora-posts" class="bitacora-posts-list"></div>
               <div id="bitacora-empty" class="bitacora-empty" hidden>
-                No hay publicaciones que coincidan con los filtros seleccionados.
+                No hay artículos cargados.
               </div>
             </div>
           </section>
@@ -372,7 +326,7 @@
                   </button>
                 </div>
                 <p id="article-url-help" class="bitacora-help">
-                  El análisis automático requiere un endpoint seguro. Si no está disponible, podés completar los campos manualmente.
+                  Usá un enlace oficial. La IA completará los datos disponibles para revisión.
                 </p>
                 <p id="article-domain-detected" class="bitacora-domain-detected" aria-live="polite"></p>
                 <p id="article-url-error" class="bitacora-form-error" hidden></p>
@@ -464,9 +418,6 @@
                     <dd>Pendiente de revisión</dd>
                   </div>
                 </dl>
-                <p class="bitacora-ai-warning">
-                  El resumen automático debe ser revisado por el equipo médico antes de utilizarse como referencia.
-                </p>
                 <p id="article-form-error" class="bitacora-form-error" hidden></p>
               </section>
             </div>
@@ -532,7 +483,7 @@
       installFirebaseGlobals();
     </script>
     <script type="module" src="/assets/js/common/notifications.js"></script>
-    <script type="module" src="/assets/js/pages/bitacora-cientifica.js?v=20260503-sources-modal-clean-1"></script>
+    <script type="module" src="/assets/js/pages/bitacora-cientifica.js?v=20260503-bitacora-slim-ai-delete-1"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
