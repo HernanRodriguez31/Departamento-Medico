@@ -169,6 +169,9 @@ const readImageMeta = (file) =>
 const mapPost = (docSnap) => {
   const data = docSnap.data() || {};
   const likedBy = Array.isArray(data.likedBy) ? data.likedBy : [];
+  const likedNames = Array.isArray(data.likedNames)
+    ? data.likedNames.map((value) => cleanString(value, 120)).filter(Boolean)
+    : [];
   const likesCount = likedBy.length || (Number.isFinite(data.likesCount) ? data.likesCount : 0);
   return {
     id: docSnap.id,
@@ -190,6 +193,7 @@ const mapPost = (docSnap) => {
     createdAt: data.createdAt,
     updatedAt: data.updatedAt,
     likedBy,
+    likedNames,
     likesCount,
     commentCount: Number.isFinite(data.commentCount) ? data.commentCount : 0,
   };
@@ -219,6 +223,92 @@ const renderMeta = (post) => {
   `;
 };
 
+const getImageRatioValue = (post) => {
+  const width = Number(post?.imageWidth) || 0;
+  const height = Number(post?.imageHeight) || 0;
+  if (width > 0 && height > 0) return `${Math.round(width)} / ${Math.round(height)}`;
+  if (post?.imageAspect === "portrait") return "4 / 5";
+  if (post?.imageAspect === "square") return "1 / 1";
+  return "4 / 3";
+};
+
+const formatLikeNames = (names = []) => {
+  const uniqueNames = [...new Set(names.map((name) => cleanString(name, 120)).filter(Boolean))];
+  if (!uniqueNames.length) return "";
+  if (uniqueNames.length === 1) return `Le gusta a ${uniqueNames[0]}`;
+  if (uniqueNames.length === 2) return `Le gusta a ${uniqueNames[0]} y ${uniqueNames[1]}`;
+  const visibleNames = uniqueNames.slice(0, 4);
+  const extraCount = uniqueNames.length - visibleNames.length;
+  const suffix = extraCount > 0 ? ` y ${extraCount} más` : "";
+  return `Le gusta a ${visibleNames.join(", ")}${suffix}`;
+};
+
+const renderLikeTooltip = (post) => {
+  const text = formatLikeNames(post?.likedNames);
+  if (!text) return "";
+  return `<span class="art-like-tooltip" role="tooltip">${escapeHtml(text)}</span>`;
+};
+
+const syncLikeTooltip = (button, names = []) => {
+  if (!button) return;
+  const text = formatLikeNames(names);
+  let tooltip = $(".art-like-tooltip", button);
+  if (!text) {
+    tooltip?.remove();
+    button.removeAttribute("title");
+    return;
+  }
+  if (!tooltip) {
+    tooltip = document.createElement("span");
+    tooltip.className = "art-like-tooltip";
+    tooltip.setAttribute("role", "tooltip");
+    button.appendChild(tooltip);
+  }
+  tooltip.textContent = text;
+  button.title = text;
+};
+
+const renderBrief = (post, canManage) => {
+  if (!post.briefDescription) return "";
+  return `
+    <div class="art-post__brief-row">
+      <p class="art-post__brief">${escapeHtml(post.briefDescription)}</p>
+      ${
+        canManage
+          ? `<button class="art-brief-edit" type="button" data-post-action="edit-brief" aria-label="Editar descripción breve" title="Editar descripción breve">
+              <i data-lucide="pencil" aria-hidden="true"></i>
+            </button>`
+          : ""
+      }
+    </div>
+  `;
+};
+
+const hydratePostImage = (article) => {
+  const image = $(".art-frame__image", article);
+  const media = $(".art-frame__media", article);
+  if (!image || !media) return;
+  const markLoaded = () => {
+    const width = image.naturalWidth || 0;
+    const height = image.naturalHeight || 0;
+    if (width > 0 && height > 0) {
+      media.style.setProperty("--art-image-ratio", `${width} / ${height}`);
+    }
+    media.classList.remove("is-loading");
+    media.classList.add("is-loaded");
+  };
+  const markError = () => {
+    media.classList.remove("is-loading");
+    media.classList.add("has-error");
+  };
+  if (image.complete && image.naturalWidth) {
+    markLoaded();
+    return;
+  }
+  image.addEventListener("load", markLoaded, { once: true });
+  image.addEventListener("error", markError, { once: true });
+};
+
 const getOwnerUid = (item) => item?.createdByUid || item?.authorUid || "";
 
 const canManageItem = (item) =>
@@ -241,9 +331,13 @@ const resolveAdminStatus = async (user) => {
   }
 };
 
-const renderPost = (post) => {
+const renderPost = (post, postIndex = 0) => {
   const liked = currentUser && post.likedBy.includes(currentUser.uid);
   const canManage = canManageItem(post);
+  const isPriorityImage = postIndex < 2;
+  const fetchPriority = isPriorityImage ? ' fetchpriority="high"' : "";
+  const likeLabel = liked ? "Quitar me gusta" : "Dar me gusta";
+  const likeTooltipText = formatLikeNames(post.likedNames);
   const article = document.createElement("article");
   article.className = "art-post";
   article.dataset.postId = post.id;
@@ -272,19 +366,22 @@ const renderPost = (post) => {
     </header>
     <div class="art-frame-shell">
       <figure class="art-frame art-frame--${escapeHtml(post.imageAspect)}">
-        <img class="art-frame__image" src="${escapeHtml(post.thumbUrl)}" data-full="${escapeHtml(post.imageUrl)}" alt="${escapeHtml(post.title)}" loading="lazy" decoding="async" />
+        <span class="art-frame__media is-loading" style="--art-image-ratio: ${getImageRatioValue(post)};">
+          <img class="art-frame__image" src="${escapeHtml(post.thumbUrl)}" data-full="${escapeHtml(post.imageUrl)}" alt="${escapeHtml(post.title)}" loading="${isPriorityImage ? "eager" : "lazy"}"${fetchPriority} decoding="async" />
+        </span>
       </figure>
     </div>
     <div class="art-post__content">
       <h2 class="art-post__title">${escapeHtml(post.title)}</h2>
-      ${post.briefDescription ? `<p class="art-post__brief">${escapeHtml(post.briefDescription)}</p>` : ""}
+      ${renderBrief(post, canManage)}
       ${renderMeta(post)}
       ${post.longDescription ? `<p class="art-post__long">${escapeHtml(post.longDescription)}</p>` : ""}
     </div>
     <footer class="art-actions">
-      <button class="art-action art-action--like${liked ? " is-active" : ""}" type="button" data-action="like" aria-pressed="${liked ? "true" : "false"}">
+      <button class="art-action art-action--like${liked ? " is-active" : ""}" type="button" data-action="like" aria-pressed="${liked ? "true" : "false"}" aria-label="${escapeHtml(likeLabel)}" ${likeTooltipText ? `title="${escapeHtml(likeTooltipText)}"` : ""}>
         <span class="art-heart" aria-hidden="true">♥</span>
         <span data-like-count>${post.likesCount}</span>
+        ${renderLikeTooltip(post)}
       </button>
       <button class="art-action" type="button" data-action="comments" aria-expanded="false">
         <span aria-hidden="true">💬</span>
@@ -303,6 +400,7 @@ const renderPost = (post) => {
     </section>
   `;
   hydrateAvatars(article).catch(() => {});
+  hydratePostImage(article);
   return article;
 };
 
@@ -411,9 +509,10 @@ const loadPosts = async ({ reset = false } = {}) => {
     const q = lastDoc ? query(...base, startAfter(lastDoc)) : query(...base);
     const snap = await getDocs(q);
     const posts = snap.docs.map(mapPost).filter((post) => post.imageUrl);
-    posts.forEach((post) => {
+    const existingCount = els.feed.children.length;
+    posts.forEach((post, index) => {
       postsById.set(post.id, post);
-      els.feed.appendChild(renderPost(post));
+      els.feed.appendChild(renderPost(post, existingCount + index));
     });
     hydrateAvatars(els.feed).catch(() => {});
     if (snap.docs.length) lastDoc = snap.docs[snap.docs.length - 1];
@@ -486,9 +585,20 @@ const handleLike = async (article) => {
   try {
     const result = await toggleCarouselLikeForCurrentUser(postId);
     if (!result.ok) throw new Error(result.reason || "like_failed");
+    const likedBy = Array.isArray(result.likedBy) ? result.likedBy : [];
+    const likedNames = Array.isArray(result.likedNames) ? result.likedNames : [];
+    const post = postsById.get(postId);
+    if (post) {
+      post.likedBy = likedBy;
+      post.likedNames = likedNames;
+      post.likesCount = result.likesCount || 0;
+      postsById.set(postId, post);
+    }
     button.classList.toggle("is-active", Boolean(result.liked));
     button.setAttribute("aria-pressed", String(Boolean(result.liked)));
+    button.setAttribute("aria-label", result.liked ? "Quitar me gusta" : "Dar me gusta");
     if (count) count.textContent = String(result.likesCount || 0);
+    syncLikeTooltip(button, likedNames);
   } catch (error) {
     console.error("[Galería de Arte] No se pudo alternar like", error);
   } finally {
@@ -544,7 +654,7 @@ const setEditFieldValue = (selector, value = "") => {
   if (field) field.value = value || "";
 };
 
-const openPostEditModal = (postId) => {
+const openPostEditModal = (postId, options = {}) => {
   const post = postsById.get(postId);
   if (!post || !canManageItem(post) || !els.editModal) return;
   editPostId = postId;
@@ -558,7 +668,11 @@ const openPostEditModal = (postId) => {
   setEditError("");
   els.editModal.hidden = false;
   els.editModal.setAttribute("aria-hidden", "false");
-  $("#art-edit-title")?.focus();
+  const focusTarget = options.focusBrief ? $("#art-edit-brief") : $("#art-edit-title");
+  window.setTimeout(() => {
+    focusTarget?.focus();
+    if (options.focusBrief && typeof focusTarget?.select === "function") focusTarget.select();
+  }, 0);
 };
 
 const closePostEditModal = () => {
@@ -994,6 +1108,7 @@ const bindEvents = () => {
     const postAction = event.target.closest("[data-post-action]");
     if (postAction) {
       if (postAction.dataset.postAction === "edit") openPostEditModal(postId);
+      if (postAction.dataset.postAction === "edit-brief") openPostEditModal(postId, { focusBrief: true });
       if (postAction.dataset.postAction === "delete") handlePostDelete(postId);
       return;
     }

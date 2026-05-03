@@ -64,6 +64,10 @@ test("art gallery page lists, uploads, likes and comments on art posts", async (
     .toBe("/index.html?dmEmulators=1");
 
   await expect(page.locator("#art-gallery-heading")).toHaveText("Galería de Arte");
+  const titleFont = await page.locator("#art-gallery-heading").evaluate((node) => {
+    return window.getComputedStyle(node).fontFamily;
+  });
+  expect(titleFont).toMatch(/Cinzel Decorative|Cormorant Garamond|Georgia|serif/i);
   await expect(page.locator(".art-gallery-subtitle")).toHaveText(
     "Un muro colaborativo para compartir obras, registrar su contexto y conversar sobre la mirada artística de cada publicación."
   );
@@ -90,6 +94,22 @@ test("art gallery page lists, uploads, likes and comments on art posts", async (
   await expect(page.getByText("Publicacion QA 1")).toHaveCount(0);
   await expect.poll(() => page.locator(".art-frame--landscape").count(), { timeout: 30_000 }).toBeGreaterThanOrEqual(1);
   await expect.poll(() => page.locator(".art-frame--portrait").count(), { timeout: 30_000 }).toBeGreaterThanOrEqual(1);
+  await expect(page.locator(".art-frame__image").first()).toHaveAttribute("loading", "eager");
+  await expect(page.locator(".art-frame__image").first()).toHaveAttribute("fetchpriority", "high");
+  await expect(ownedSeedPost.locator(".art-frame__media").first()).toHaveClass(/is-loaded/, { timeout: 30_000 });
+  const seededImageChrome = await ownedSeedPost.locator(".art-frame__image").first().evaluate((img) => {
+    const styles = window.getComputedStyle(img);
+    const imgBox = img.getBoundingClientRect();
+    const mediaBox = img.closest(".art-frame__media")?.getBoundingClientRect();
+    return {
+      borderTopWidth: styles.borderTopWidth,
+      widthDiff: mediaBox ? Math.abs(mediaBox.width - imgBox.width) : 999,
+      heightDiff: mediaBox ? Math.abs(mediaBox.height - imgBox.height) : 999,
+    };
+  });
+  expect(seededImageChrome.borderTopWidth).toBe("0px");
+  expect(seededImageChrome.widthDiff).toBeLessThanOrEqual(1);
+  expect(seededImageChrome.heightDiff).toBeLessThanOrEqual(1);
   await expectNoHorizontalOverflow(page);
 
   await page.locator("#art-gallery-upload").click();
@@ -113,10 +133,20 @@ test("art gallery page lists, uploads, likes and comments on art posts", async (
   const firstPost = page.locator(".art-post").filter({ hasText: uploadTitle }).first();
   await expect(firstPost.locator('[data-post-action="edit"]')).toBeVisible();
   await expect(firstPost.locator('[data-post-action="delete"]')).toBeVisible();
+  await expect(firstPost.locator('[data-post-action="edit-brief"]')).toBeVisible();
   await expectIconOnlyAction(firstPost.locator('[data-post-action="edit"]'), "lucide-pencil");
   await expectIconOnlyAction(firstPost.locator('[data-post-action="delete"]'), "lucide-trash-2");
+  await expectIconOnlyAction(firstPost.locator('[data-post-action="edit-brief"]'), "lucide-pencil");
   await expect(firstPost.locator(".art-avatar__img")).toBeVisible({ timeout: 30_000 });
   await expect(firstPost.locator(".art-avatar__img")).toHaveAttribute("src", /avatar-leila\.png/);
+  await expect(firstPost.locator(".art-frame__media")).toHaveClass(/is-loaded/, { timeout: 30_000 });
+  await expect(firstPost.locator(".art-frame__image")).toHaveCSS("border-top-width", "0px");
+
+  await firstPost.locator('[data-post-action="edit-brief"]').click();
+  await expect(page.locator("#art-edit-modal")).toBeVisible();
+  await expect(page.locator("#art-edit-brief")).toBeFocused();
+  await page.locator("#art-edit-close").click();
+  await expect(page.locator("#art-edit-modal")).toBeHidden();
 
   const editedTitle = `${uploadTitle} editada`;
   await firstPost.locator('[data-post-action="edit"]').click();
@@ -136,8 +166,13 @@ test("art gallery page lists, uploads, likes and comments on art posts", async (
   await expect(page.getByText(editedTitle)).toBeVisible({ timeout: 30_000 });
   const editedPost = page.locator(".art-post").filter({ hasText: editedTitle }).first();
 
-  await editedPost.locator('[data-action="like"]').click();
+  const likeButton = editedPost.locator('[data-action="like"]');
+  await likeButton.click();
   await expect(editedPost.locator("[data-like-count]")).toHaveText("1", { timeout: 30_000 });
+  await expect(likeButton.locator(".art-like-tooltip")).toContainText("Dra. Mobile QA", { timeout: 30_000 });
+  await expect(likeButton).toHaveAttribute("title", /Dra\. Mobile QA/);
+  await likeButton.hover();
+  await expect(likeButton.locator(".art-like-tooltip")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 
   await editedPost.locator('[data-action="comments"]').click();
