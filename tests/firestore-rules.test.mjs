@@ -701,6 +701,61 @@ test("dm_carousel blocks direct updates to derived like fields while preserving 
   );
 });
 
+test("dm_carousel allows authenticated art gallery posts with scoped metadata", async () => {
+  const ownerDb = authedDb("user-a");
+
+  await assertSucceeds(
+    setDoc(doc(ownerDb, "dm_carousel", "art-post-a"), {
+      type: "art_gallery",
+      title: "Obra QA",
+      text: "Descripción breve",
+      briefDescription: "Descripción breve",
+      longDescription: "Descripción ampliada de la obra.",
+      artAuthor: "Autora QA",
+      artYear: "2026",
+      artWorkType: "Óleo",
+      artLocation: "Neuquén",
+      imageUrl: "https://example.test/obra.jpg",
+      imagePath: "dm_carousel/user-a/obra.jpg",
+      thumbUrl: "https://example.test/obra.jpg",
+      imageAspect: "landscape",
+      imageWidth: 1200,
+      imageHeight: 800,
+      authorUid: "user-a",
+      authorName: "Dr. Usuario A",
+      createdByUid: "user-a",
+      createdByName: "Dr. Usuario A",
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+      likesCount: 0,
+      likedBy: [],
+      likedNames: [],
+      commentCount: 0
+    })
+  );
+
+  await assertFails(
+    setDoc(doc(unauthedDb(), "dm_carousel", "art-post-guest"), {
+      type: "art_gallery",
+      title: "Obra invitada",
+      imageUrl: "https://example.test/obra.jpg",
+      authorUid: "guest",
+      createdAt: Timestamp.now()
+    })
+  );
+
+  await assertFails(
+    setDoc(doc(ownerDb, "dm_carousel", "art-post-extra"), {
+      type: "art_gallery",
+      title: "Obra con campo no permitido",
+      imageUrl: "https://example.test/obra.jpg",
+      authorUid: "user-a",
+      createdAt: Timestamp.now(),
+      galleryType: "art"
+    })
+  );
+});
+
 test("dm_carousel comments still allow legit comment create delete and block direct like-map updates", async () => {
   const ownerDb = authedDb("user-a");
   const otherDb = authedDb("user-b");
@@ -720,6 +775,18 @@ test("dm_carousel comments still allow legit comment create delete and block dir
         "user-b": "Dr. Usuario B",
         "user-a": "Dr. Usuario A"
       }
+    })
+  );
+  await assertSucceeds(
+    updateDoc(doc(authedDb("user-a"), "dm_carousel", "post-a", "comments", "comment-a"), {
+      text: "Comentario editado",
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertFails(
+    updateDoc(doc(otherDb, "dm_carousel", "post-a", "comments", "comment-a"), {
+      text: "Edición ajena",
+      updatedAt: Timestamp.now()
     })
   );
   await assertSucceeds(

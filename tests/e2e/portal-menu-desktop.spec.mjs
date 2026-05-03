@@ -100,14 +100,8 @@ test("desktop portal cube opens three accessible actions", async ({ page }) => {
   await expect(page.locator("#btn-portal")).toHaveAttribute("aria-expanded", "true");
 
   await page.locator("#portal-gallery").click();
-  await page.waitForFunction(() => {
-    const target = document.querySelector("#carrete");
-    const header = document.querySelector("#header");
-    if (!target) return false;
-    const expectedTop = (header?.getBoundingClientRect().height || 0) + 16;
-    return Math.abs(target.getBoundingClientRect().top - expectedTop) <= 28;
-  });
-  await expect(page.locator("#btn-portal")).toHaveAttribute("aria-expanded", "false");
+  await page.waitForURL(/\/galeriadearte(\?dmEmulators=1)?$/, { timeout: 30_000 });
+  await expect(page.locator("#art-gallery-heading")).toHaveText("Galería de Arte");
 
   const criticalErrors = consoleErrors.filter(
     (text) => !/favicon|net::ERR_ABORTED|ResizeObserver loop|Could not reach Cloud Firestore backend/i.test(text)

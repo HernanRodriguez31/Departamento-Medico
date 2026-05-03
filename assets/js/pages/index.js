@@ -1066,7 +1066,10 @@ async function initCarouselModule() {
         q = query(collection(db, POSTS_COLLECTION), orderBy("createdAt", "desc"), startAfter(lastPostDoc), limit(PAGE_SIZE));
       }
       const snap = await getDocs(q);
-      const incoming = snap.docs.map(mapPostDoc).filter((s) => s.imageUrl || s.text || s.title);
+      const incoming = snap.docs
+        .map(mapPostDoc)
+        .filter((s) => s.type !== "art_gallery")
+        .filter((s) => s.imageUrl || s.text || s.title);
       mergePosts(incoming, { reset });
       if (snap.docs.length > 0) {
         lastPostDoc = snap.docs[snap.docs.length - 1];
@@ -2810,6 +2813,16 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
     if (!action) return;
     if (action.getAttribute("aria-disabled") === "true") {
       event?.preventDefault();
+      return;
+    }
+    if (action.dataset.portalAction === "gallery" && action.tagName === "A") {
+      const params = new URLSearchParams(window.location.search || "");
+      const href = action.getAttribute("href") || "";
+      if (params.get("dmEmulators") === "1" && href.startsWith("/")) {
+        event?.preventDefault();
+        window.location.href = `${href}?dmEmulators=1`;
+      }
+      closePortalMenu();
       return;
     }
     if (action.dataset.portalAction === "gallery") {

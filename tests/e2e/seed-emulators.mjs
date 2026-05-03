@@ -20,6 +20,9 @@ const PROJECT_ID = process.env.FIREBASE_PROJECT_ID || "departamento-medico-brisa
 const QA_EMAIL = process.env.MOBILE_QA_EMAIL || "mobile.qa@departamento-medico.test";
 const QA_PASSWORD = process.env.MOBILE_QA_PASSWORD || "MobileQa!12345";
 const DISPLAY_NAME = "Dra. Mobile QA";
+const OTHER_EMAIL = process.env.ART_GALLERY_OTHER_EMAIL || "arte.otro@departamento-medico.test";
+const OTHER_PASSWORD = process.env.ART_GALLERY_OTHER_PASSWORD || "OtherQa!12345";
+const OTHER_DISPLAY_NAME = "Dr. Otro Arte";
 
 const app = initializeApp({
   apiKey: "fake-emulator-key",
@@ -36,14 +39,19 @@ const db = getFirestore(app);
 connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
 connectFirestoreEmulator(db, "127.0.0.1", 8080);
 
-const signInOrCreateUser = async () => {
+const signInOrCreateUser = async ({
+  email = QA_EMAIL,
+  password = QA_PASSWORD,
+  displayName = DISPLAY_NAME
+} = {}) => {
   try {
-    const credential = await createUserWithEmailAndPassword(auth, QA_EMAIL, QA_PASSWORD);
-    await updateProfile(credential.user, { displayName: DISPLAY_NAME });
+    const credential = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(credential.user, { displayName });
     return credential.user;
   } catch (error) {
     if (error?.code !== "auth/email-already-in-use") throw error;
-    const credential = await signInWithEmailAndPassword(auth, QA_EMAIL, QA_PASSWORD);
+    const credential = await signInWithEmailAndPassword(auth, email, password);
+    await updateProfile(credential.user, { displayName }).catch(() => {});
     return credential.user;
   }
 };
@@ -85,6 +93,97 @@ const seed = async () => {
       likesCount: 0
     });
   }
+
+  const artPosts = [
+    {
+      title: "Horizonte Verde",
+      briefDescription: "Paisaje horizontal sembrado para validar la Galería de Arte.",
+      imageAspect: "landscape",
+      imageWidth: 1200,
+      imageHeight: 760
+    },
+    {
+      title: "Retrato de Guardia",
+      briefDescription: "Obra vertical sembrada para probar el marco adaptable.",
+      imageAspect: "portrait",
+      imageWidth: 760,
+      imageHeight: 1200
+    }
+  ];
+
+  for (const [index, post] of artPosts.entries()) {
+    await addDoc(postsRef, {
+      type: "art_gallery",
+      title: post.title,
+      text: post.briefDescription,
+      briefDescription: post.briefDescription,
+      longDescription: "Descripción ampliada de prueba para la auditoría visual y funcional.",
+      artAuthor: index === 0 ? "Equipo QA" : "Dra. Mobile QA",
+      artYear: "2026",
+      artWorkType: index === 0 ? "Acrílico" : "Fotografía",
+      artLocation: index === 0 ? "Buenos Aires" : "Neuquén",
+      imageUrl: "/assets/images/og-dto-medico.jpg",
+      thumbUrl: "/assets/images/og-dto-medico.jpg",
+      imagePath: `dm_carousel/${user.uid}/art-qa-${index + 1}.jpg`,
+      imageAspect: post.imageAspect,
+      imageWidth: post.imageWidth,
+      imageHeight: post.imageHeight,
+      authorUid: user.uid,
+      authorName: DISPLAY_NAME,
+      createdByUid: user.uid,
+      createdByName: DISPLAY_NAME,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      likedBy: [],
+      likedNames: [],
+      likesCount: 0,
+      commentCount: 0
+    });
+  }
+
+  const otherUser = await signInOrCreateUser({
+    email: OTHER_EMAIL,
+    password: OTHER_PASSWORD,
+    displayName: OTHER_DISPLAY_NAME
+  });
+  await setDoc(
+    doc(db, "usuarios", otherUser.uid),
+    {
+      nombre: OTHER_DISPLAY_NAME,
+      email: OTHER_EMAIL,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    },
+    { merge: true }
+  );
+  await addDoc(postsRef, {
+    type: "art_gallery",
+    title: "Obra Ajena QA",
+    text: "Publicación de otro usuario para validar acciones de propietario.",
+    briefDescription: "Publicación de otro usuario para validar acciones de propietario.",
+    longDescription: "Esta obra no debe mostrar acciones de edición ni borrado al usuario QA principal.",
+    artAuthor: "Equipo QA Externo",
+    artYear: "2026",
+    artWorkType: "Collage",
+    artLocation: "Comodoro Rivadavia",
+    imageUrl: "/assets/images/og-dto-medico.jpg",
+    thumbUrl: "/assets/images/og-dto-medico.jpg",
+    imagePath: `dm_carousel/${otherUser.uid}/art-other-qa.jpg`,
+    imageAspect: "square",
+    imageWidth: 900,
+    imageHeight: 900,
+    authorUid: otherUser.uid,
+    authorName: OTHER_DISPLAY_NAME,
+    createdByUid: otherUser.uid,
+    createdByName: OTHER_DISPLAY_NAME,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    likedBy: [],
+    likedNames: [],
+    likesCount: 0,
+    commentCount: 0
+  });
+  await signInWithEmailAndPassword(auth, QA_EMAIL, QA_PASSWORD);
 
   const messagesRef = collection(
     db,

@@ -6,18 +6,48 @@ const normalizeHash = (value) => {
   return value.startsWith("#") ? value : `#${value}`;
 };
 
-export const resolveNextHash = (fallbackHash = "") => {
+const SAFE_PATHS = new Set([
+  "/",
+  "/index.html",
+  "/app/",
+  "/app/index.html",
+  "/galeriadearte",
+  "/galeriadearte.html"
+]);
+
+const normalizeSafePath = (value) => {
+  if (!value || !value.startsWith("/")) return "";
+  try {
+    const target = new URL(value, window.location.origin);
+    if (target.origin !== window.location.origin) return "";
+    if (!SAFE_PATHS.has(target.pathname)) return "";
+    return `${target.pathname}${target.hash || ""}`;
+  } catch (e) {
+    return "";
+  }
+};
+
+export const resolveNextTarget = (fallbackHash = "") => {
   const params = new URLSearchParams(window.location.search);
   if (params.has("next")) {
     const raw = params.get("next") || "";
     if (!raw) return window.location.hash || fallbackHash;
+    const safePath = normalizeSafePath(raw);
+    if (safePath) return safePath;
     return normalizeHash(raw);
+  }
+  const currentPath = window.location.pathname || "";
+  if (currentPath && !["/", "/index.html", "/app/", "/app/index.html", "/login.html"].includes(currentPath)) {
+    const safePath = normalizeSafePath(`${currentPath}${window.location.hash || ""}`);
+    if (safePath) return safePath;
   }
   return window.location.hash || fallbackHash;
 };
 
+export const resolveNextHash = resolveNextTarget;
+
 export const buildLoginRedirectUrl = (fallbackHash = "") => {
-  const nextHash = resolveNextHash(fallbackHash);
+  const nextHash = resolveNextTarget(fallbackHash);
   const params = new URLSearchParams();
   if (nextHash) params.set("next", nextHash);
   const currentParams = new URLSearchParams(window.location.search || "");

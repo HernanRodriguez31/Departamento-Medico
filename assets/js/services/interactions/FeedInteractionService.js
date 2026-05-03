@@ -1,4 +1,5 @@
 import {
+  connectFunctionsEmulator,
   getFunctions,
   httpsCallable,
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
@@ -13,14 +14,27 @@ const REGISTER_HOME_VISIT_FUNCTION = "registerHomeVisit";
 let toggleCarouselLikeCallable = null;
 let toggleCarouselCommentLikeCallable = null;
 let registerHomeVisitCallable = null;
+let functionsInstance = null;
+let functionsEmulatorConnected = false;
 
 const cleanString = (value) => (typeof value === "string" ? value.trim() : "");
 const cleanCount = (value) =>
   Number.isFinite(value) && value >= 0 ? Math.trunc(value) : 0;
 
 const getFunctionsInstance = () => {
+  if (functionsInstance) return functionsInstance;
   const { app } = getFirebase();
-  return getFunctions(app, FUNCTIONS_REGION);
+  functionsInstance = getFunctions(app, FUNCTIONS_REGION);
+  try {
+    const target = typeof window !== "undefined" ? window : null;
+    const params = new URLSearchParams(target?.location?.search || "");
+    const isLocal = ["localhost", "127.0.0.1", "::1"].includes(target?.location?.hostname || "");
+    if (!functionsEmulatorConnected && isLocal && params.get("dmEmulators") === "1") {
+      connectFunctionsEmulator(functionsInstance, "127.0.0.1", 5001);
+      functionsEmulatorConnected = true;
+    }
+  } catch (e) {}
+  return functionsInstance;
 };
 
 const getToggleCarouselLikeCallable = () => {

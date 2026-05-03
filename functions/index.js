@@ -4,6 +4,7 @@
  */
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
+const { FieldValue } = require("firebase-admin/firestore");
 const cors = require("cors")({ origin: true });
 const {
   HttpsError,
@@ -224,7 +225,7 @@ const syncCarouselLikeAggregates = async (postId) => {
     buildCarouselLikeAggregate(likesSnap.docs)
   );
   await postRef.set(
-    { ...aggregates, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+    { ...aggregates, updatedAt: FieldValue.serverTimestamp() },
     { merge: true }
   );
   return aggregates;
@@ -235,8 +236,8 @@ const createNotificationDoc = async (payload = {}) => {
   try {
     const ref = await db.collection(NOTIFICATIONS_COLLECTION).add({
       ...payload,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
       read: false,
       readAt: null,
     });
@@ -295,8 +296,8 @@ const upsertChatNotificationDoc = async ({
         title: "Nuevo mensaje",
         body: PUSH_MESSAGE_BODY,
         peerUid: fromUid,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
         read: false,
         readAt: null,
       },
@@ -340,8 +341,8 @@ const removeInvalidPushTokens = async (uid, tokens = []) => {
   try {
     await db.doc(`${PUSH_TOKENS_COLLECTION}/${uid}`).set(
       {
-        tokens: admin.firestore.FieldValue.arrayRemove(...invalidTokens),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        tokens: FieldValue.arrayRemove(...invalidTokens),
+        updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true }
     );
@@ -436,8 +437,8 @@ exports.registerPushToken = onCall(async (request) => {
   try {
     await db.doc(`${PUSH_TOKENS_COLLECTION}/${uid}`).set(
       {
-        tokens: admin.firestore.FieldValue.arrayUnion(token),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        tokens: FieldValue.arrayUnion(token),
+        updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true }
     );
@@ -519,7 +520,7 @@ exports.toggleCarouselLike = onCall(async (request) => {
         trx.set(likeRef, {
           authorUid: uid,
           authorName: result.actorName,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdAt: FieldValue.serverTimestamp(),
         });
       } else {
         trx.delete(likeRef);
@@ -529,7 +530,7 @@ exports.toggleCarouselLike = onCall(async (request) => {
         postRef,
         {
           ...buildCarouselLikeAggregatePatch(result),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
         },
         { merge: true }
       );

@@ -1478,6 +1478,7 @@ async function initCarouselModule() {
         const removedIds = [];
         snap.docChanges().forEach((change) => {
           const post = mapPostDoc(change.doc);
+          if (post.type === "art_gallery") return;
           if (change.type === "added") {
             if (postsById.has(post.id) || renderedPostIds.has(post.id)) {
               updatedPosts.push(post);
@@ -1580,7 +1581,10 @@ async function initCarouselModule() {
         q = query(collection(db, POSTS_COLLECTION), orderBy("createdAt", "desc"), startAfter(lastPostDoc), limit(PAGE_SIZE));
       }
       const snap = await getDocs(q);
-      const incoming = snap.docs.map(mapPostDoc).filter((s) => s.imageUrl || s.text || s.title);
+      const incoming = snap.docs
+        .map(mapPostDoc)
+        .filter((s) => s.type !== "art_gallery")
+        .filter((s) => s.imageUrl || s.text || s.title);
       const incomingIds = new Set(incoming.map((post) => post.id));
       const preservedOptimistic =
         reset && silent
