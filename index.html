@@ -147,7 +147,7 @@
     />
     <link
       rel="stylesheet"
-      href="assets/css/pages/index.css?v=20260428-desktop-orgtree-header-line-wrap-1"
+      href="assets/css/pages/index.css?v=20260502-portal-hover-state-1"
     />
     <link
       rel="stylesheet"
@@ -2566,15 +2566,62 @@
                 </div>
               </div>
               <div class="portal-submenu" id="portal-bubble" aria-hidden="true">
+                <button
+                  type="button"
+                  class="portal-link"
+                  id="portal-gallery"
+                  data-portal-action="gallery"
+                  data-target="#carrete"
+                  aria-label="Galería de Arte"
+                >
+                  <span class="portal-link__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" focusable="false">
+                      <rect x="4" y="5" width="16" height="14" rx="2.4"></rect>
+                      <path d="M7.5 16.5l3.2-3.2 2.2 2.2 2.8-3 2.8 4"></path>
+                      <circle cx="9" cy="9" r="1.15"></circle>
+                    </svg>
+                  </span>
+                  <span class="portal-link__tooltip" aria-hidden="true"
+                    >Galería de Arte</span
+                  >
+                </button>
                 <a
                   href="https://brisasaludybienestar.com/"
                   target="_blank"
                   rel="noopener noreferrer"
                   class="portal-link"
                   id="portal-action"
+                  data-portal-action="operativa"
+                  aria-label="Gestión operativa"
                 >
-                  <i class="fa-solid fa-globe"></i>
+                  <span class="portal-link__icon" aria-hidden="true">
+                    <i class="fa-solid fa-globe"></i>
+                  </span>
+                  <span class="portal-link__tooltip" aria-hidden="true"
+                    >Gestión operativa</span
+                  >
                 </a>
+                <button
+                  type="button"
+                  class="portal-link portal-link--disabled"
+                  id="portal-logbook"
+                  data-portal-action="bitacora"
+                  aria-label="Bitácora Científica"
+                  aria-disabled="true"
+                >
+                  <span class="portal-link__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" focusable="false">
+                      <path d="M6.5 4.5h8.8a2.2 2.2 0 0 1 2.2 2.2v12.8H8.2a2.7 2.7 0 0 1-2.7-2.7V5.5a1 1 0 0 1 1-1Z"></path>
+                      <path d="M8.2 19.5a2.7 2.7 0 0 1 0-5.4h9.3"></path>
+                      <path d="M10 8h4"></path>
+                      <path d="M10 11h2.6"></path>
+                      <path d="M15.8 8.4l1.7 1.7"></path>
+                    </svg>
+                  </span>
+                  <span class="portal-link__tooltip" aria-hidden="true"
+                    >Bitácora Científica</span
+                  >
+                </button>
               </div>
             </div>
 
@@ -6237,7 +6284,7 @@
       </script>
       <script
         type="module"
-        src="assets/js/pages/index.js?v=20260430-orgtree-avatars-1"
+        src="assets/js/pages/index.js?v=20260502-portal-hover-state-1"
       ></script>
       <script type="module">
         import {

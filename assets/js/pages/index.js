@@ -2664,7 +2664,7 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
   const portalWrapper = document.getElementById("portal-wrapper");
   const portalButton = document.getElementById("btn-portal");
   const portalBubble = document.getElementById("portal-bubble");
-  const portalAction = document.getElementById("portal-action");
+  const portalActions = portalBubble ? Array.from(portalBubble.querySelectorAll(".portal-link")) : [];
 
   // Keep original placement so we can restore when leaving desktop
   const originalParent = fab?.parentElement || null;
@@ -2711,6 +2711,7 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
   let activeCubeIndex = 0;
   let keyboardNavActive = false;
   let suppressAiFocusOpen = false;
+  let suppressPortalFocusOpen = false;
 
   const refreshNavCubes = () => {
     navCubes = Array.from(sidebar.querySelectorAll(".dm-cube"));
@@ -2723,6 +2724,11 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
   const isPortalCube = (btn) => btn && btn.id === "btn-portal";
   const getAssistantShell = () => assistantShell || window.__dmAssistantShell;
   const isAssistantMenuOpen = () => Boolean(getAssistantShell()?.state?.pickerOpen);
+  const focusPortalAction = (index = 0) => {
+    if (!portalActions.length) return;
+    const safeIndex = (index + portalActions.length) % portalActions.length;
+    portalActions[safeIndex]?.focus({ preventScroll: true });
+  };
   const showPortalBubble = () => {
     if (!portalWrapper || !portalBubble) return;
     portalWrapper.classList.add("is-open");
@@ -2780,9 +2786,7 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
     return href ? /^https?:/i.test(href) : false;
   };
 
-  const scrollToCubeTarget = (btn) => {
-    if (isExternalCube(btn)) return;
-    const targetSel = btn.getAttribute("data-target") || "";
+  const scrollToTargetSelector = (targetSel) => {
     if (!targetSel || targetSel === "#top") {
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
@@ -2795,6 +2799,26 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
     const y = target.getBoundingClientRect().top + window.pageYOffset - headerH - 16;
 
     window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
+  };
+
+  const scrollToCubeTarget = (btn) => {
+    if (isExternalCube(btn)) return;
+    scrollToTargetSelector(btn.getAttribute("data-target") || "");
+  };
+
+  const activatePortalAction = (action, event) => {
+    if (!action) return;
+    if (action.getAttribute("aria-disabled") === "true") {
+      event?.preventDefault();
+      return;
+    }
+    if (action.dataset.portalAction === "gallery") {
+      event?.preventDefault();
+      scrollToTargetSelector(action.getAttribute("data-target") || "#carrete");
+      closePortalMenu();
+      return;
+    }
+    closePortalMenu();
   };
 
   const clearCubeSelection = ({ closePicker = false } = {}) => {
@@ -2879,9 +2903,6 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
             event.preventDefault();
             event.stopPropagation();
             togglePortalMenu();
-            if (portalWrapper?.classList.contains("is-open")) {
-              portalAction?.focus({ preventScroll: true });
-            }
             return;
           }
           if (isAssistantCube(btn)) {
@@ -2944,33 +2965,69 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
   }
 
   if (portalWrapper && portalButton && portalBubble) {
-    portalWrapper.addEventListener("focusin", openPortalMenu);
+    const markPortalMouseIntent = () => {
+      if (!mq.matches) return;
+      suppressPortalFocusOpen = true;
+      window.setTimeout(() => {
+        suppressPortalFocusOpen = false;
+      }, 0);
+    };
+    portalButton.addEventListener("pointerdown", markPortalMouseIntent);
+    portalButton.addEventListener("mousedown", markPortalMouseIntent);
+    portalWrapper.addEventListener("focusin", () => {
+      if (suppressPortalFocusOpen) {
+        suppressPortalFocusOpen = false;
+        return;
+      }
+      openPortalMenu();
+    });
     portalWrapper.addEventListener("focusout", () => {
       window.setTimeout(() => {
         if (!portalWrapper.contains(document.activeElement)) closePortalMenu();
       }, 0);
     });
     portalButton.addEventListener("keydown", (event) => {
-      if (event.key === "ArrowRight" || event.key === "Enter") {
+      if (event.key === "ArrowRight" || event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         closeAllMenus();
         openPortalMenu();
-        portalAction?.focus({ preventScroll: true });
+        focusPortalAction(0);
       }
     });
   }
 
-  if (portalAction && portalButton) {
-    portalAction.addEventListener("keydown", (event) => {
-      if (event.key === "ArrowLeft") {
-        event.preventDefault();
-        portalButton.focus({ preventScroll: true });
-        return;
-      }
-      if (event.key === "Enter") return;
-    });
-    portalAction.addEventListener("click", (event) => {
-      event.stopPropagation();
+  if (portalActions.length && portalButton) {
+    portalActions.forEach((action, index) => {
+      action.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowLeft") {
+          event.preventDefault();
+          portalButton.focus({ preventScroll: true });
+          return;
+        }
+        if (event.key === "Escape") {
+          event.preventDefault();
+          closePortalMenu();
+          suppressPortalFocusOpen = true;
+          portalButton.focus({ preventScroll: true });
+          return;
+        }
+        if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+          event.preventDefault();
+          event.stopPropagation();
+          focusPortalAction(index + (event.key === "ArrowDown" ? 1 : -1));
+          return;
+        }
+        if (
+          (event.key === "Enter" || event.key === " ") &&
+          action.getAttribute("aria-disabled") === "true"
+        ) {
+          event.preventDefault();
+        }
+      });
+      action.addEventListener("click", (event) => {
+        event.stopPropagation();
+        activatePortalAction(action, event);
+      });
     });
   }
 

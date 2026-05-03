@@ -4424,15 +4424,16 @@ body.dm-modal-open .brisa-chat-panel {
   box-shadow: none;
   z-index: 5;
   display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.58rem;
 }
 
-.nav-item-wrapper.is-open .portal-submenu,
-.nav-item-wrapper:focus-within .portal-submenu {
-  display: block;
+.nav-item-wrapper.is-open .portal-submenu {
+  display: flex;
 }
 
-/* CÍRCULO PERFECTO PARA EL PORTAL */
-#portal-action {
+.portal-link {
   width: 50px !important;
   height: 50px !important;
   border-radius: 50% !important;
@@ -4446,14 +4447,21 @@ body.dm-modal-open .brisa-chat-panel {
   color: #7AB800;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
     0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  transition: all 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease,
+    background-color 0.2s ease;
   text-decoration: none;
   outline: none;
   box-sizing: border-box;
+  appearance: none;
+  position: relative;
+  cursor: pointer;
 }
 
-#portal-action:hover,
-#portal-action:focus {
+.portal-link:hover,
+.portal-link:focus-visible {
   border-color: #7AB800 !important;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
     0 4px 6px -2px rgba(0, 0, 0, 0.05);
@@ -4461,9 +4469,58 @@ body.dm-modal-open .brisa-chat-panel {
   outline: none;
 }
 
-#portal-action i {
+.portal-link--disabled {
+  cursor: default;
+}
+
+.portal-link__icon {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+}
+
+.portal-link__icon i {
   font-size: 24px !important;
   color: #7AB800;
+}
+
+.portal-link__icon svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.9;
+}
+
+.portal-link__tooltip {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%) translateX(-4px);
+  padding: 0.38rem 0.58rem;
+  border-radius: 999px;
+  border: 1px solid rgba(122, 184, 0, 0.2);
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+  color: #1f2937;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s ease;
+}
+
+.portal-link:hover .portal-link__tooltip,
+.portal-link:focus-visible .portal-link__tooltip {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
 }
 
 #btn-portal:focus,
