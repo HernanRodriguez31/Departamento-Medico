@@ -51,10 +51,13 @@ const LIKE_META_DOC = "like_notification";
 const APP_FEED_ROUTE = "/app/#/feed";
 const AI_RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const AI_RATE_LIMIT_MAX = 20;
+const ARTICLE_EXTRACTION_RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const ARTICLE_EXTRACTION_RATE_LIMIT_MAX = 8;
 const PUSH_MESSAGE_BODY = "Tienes un nuevo mensaje";
 const PUSH_ACTIVITY_BODY = "Hay nueva actividad en la aplicación";
 const PUSH_NOTIFICATION_BODY = "Tienes una nueva notificación";
 const aiRateLimitByUid = new Map();
+const articleExtractionRateLimitByUid = new Map();
 
 function extractTextFromContent(content) {
   if (!content) return "";
@@ -123,6 +126,18 @@ function allowAiRequest(uid) {
   recent.push(now);
   aiRateLimitByUid.set(uid, recent);
   return recent.length <= AI_RATE_LIMIT_MAX;
+}
+
+function allowArticleExtractionRequest(uid) {
+  if (!uid) return false;
+  const now = Date.now();
+  const windowStart = now - ARTICLE_EXTRACTION_RATE_LIMIT_WINDOW_MS;
+  const recent = (articleExtractionRateLimitByUid.get(uid) || []).filter(
+    (ts) => ts > windowStart
+  );
+  recent.push(now);
+  articleExtractionRateLimitByUid.set(uid, recent);
+  return recent.length <= ARTICLE_EXTRACTION_RATE_LIMIT_MAX;
 }
 
 function extractOutputTextFromResponsesApi(data) {
@@ -205,6 +220,287 @@ const normalizePushData = (data = {}) => {
     normalized[key] = value === null ? "" : String(value);
   });
   return normalized;
+};
+
+const isAllowedWebOrigin = (origin = "") =>
+  /^https:\/\/departamento-medico-brisa\.(web\.app|firebaseapp\.com)$/.test(origin) ||
+  /^https:\/\/([a-z0-9-]+\.)*brisasaludybienestar\.com$/i.test(origin) ||
+  /^https?:\/\/localhost:\d+$/i.test(origin) ||
+  /^https?:\/\/127\.0\.0\.1:\d+$/i.test(origin);
+
+const setCorsHeaders = (req, res) => {
+  const origin = req.get("origin") || "";
+  if (origin && isAllowedWebOrigin(origin)) {
+    res.set("Access-Control-Allow-Origin", origin);
+    res.set("Vary", "Origin");
+  }
+  res.set("Access-Control-Allow-Methods", "POST,OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type,Authorization");
+};
+
+const verifyBearerUid = async (req) => {
+  const authHeader = req.get("Authorization") || "";
+  const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i);
+  if (!tokenMatch) return null;
+  const decoded = await admin.auth().verifyIdToken(tokenMatch[1]);
+  return decoded?.uid || null;
+};
+
+const isPrivateIPv4 = (host) => {
+  const parts = host.split(".").map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part))) return false;
+  const [a, b] = parts;
+  return (
+    a === 10 ||
+    a === 127 ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    (a === 169 && b === 254) ||
+    a === 0
+  );
+};
+
+const isBlockedArticleHost = (hostname = "") => {
+  const host = hostname.toLowerCase();
+  if (!host || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) {
+    return true;
+  }
+  if (host === "::1" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80")) {
+    return true;
+  }
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host) && isPrivateIPv4(host)) {
+    return true;
+  }
+  return false;
+};
+
+const parseArticleUrl = (value) => {
+  try {
+    const url = new URL(cleanString(value));
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    if (url.username || url.password) return null;
+    if (isBlockedArticleHost(url.hostname)) return null;
+    return url;
+  } catch (e) {
+    return null;
+  }
+};
+
+const decodeHtmlEntities = (value = "") =>
+  cleanString(value)
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
+
+const getHtmlAttr = (tag, attr) => {
+  const match = tag.match(new RegExp(`${attr}\\s*=\\s*["']([^"']*)["']`, "i"));
+  return match ? decodeHtmlEntities(match[1]) : "";
+};
+
+const extractMetadataMap = (html = "") => {
+  const meta = {};
+  const tags = html.match(/<meta\b[^>]*>/gi) || [];
+  tags.forEach((tag) => {
+    const key = (getHtmlAttr(tag, "name") || getHtmlAttr(tag, "property")).toLowerCase();
+    const content = getHtmlAttr(tag, "content");
+    if (key && content && !meta[key]) meta[key] = content;
+  });
+  return meta;
+};
+
+const extractTitleTag = (html = "") => {
+  const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  return match ? decodeHtmlEntities(match[1].replace(/\s+/g, " ")) : "";
+};
+
+const pickJsonLdValue = (jsonLd, keys = []) => {
+  const queue = Array.isArray(jsonLd) ? [...jsonLd] : [jsonLd];
+  while (queue.length) {
+    const item = queue.shift();
+    if (!item || typeof item !== "object") continue;
+    for (const key of keys) {
+      if (typeof item[key] === "string" && item[key].trim()) return item[key].trim();
+      if (Array.isArray(item[key]) && typeof item[key][0] === "string") return item[key][0].trim();
+    }
+    Object.values(item).forEach((value) => {
+      if (Array.isArray(value)) queue.push(...value);
+      else if (value && typeof value === "object") queue.push(value);
+    });
+  }
+  return "";
+};
+
+const extractJsonLd = (html = "") => {
+  const scripts = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>[\s\S]*?<\/script>/gi) || [];
+  for (const script of scripts.slice(0, 5)) {
+    const raw = script.replace(/^<script[^>]*>/i, "").replace(/<\/script>$/i, "").trim();
+    if (!raw) continue;
+    try {
+      return JSON.parse(raw);
+    } catch (e) {}
+  }
+  return null;
+};
+
+const buildMetadataOnlyArticle = (url, metadata = {}) => ({
+  title: cleanString(metadata.title),
+  sourceName: cleanString(metadata.sourceName),
+  officialUrl: url.href,
+  sourceDomain: url.hostname,
+  studyType: "",
+  evidenceType: "",
+  publicationDate: cleanString(metadata.publicationDate),
+  studyLocation: "",
+  executiveSummary: cleanString(metadata.description),
+  clinicalQuestion: "",
+  mainResult: "",
+  tags: [],
+  accessType: "Pendiente",
+  extractionConfidence: metadata.title || metadata.description ? 0.3 : 0.1,
+  warnings: metadata.warnings || []
+});
+
+const extractScientificMetadata = (url, html = "") => {
+  const meta = extractMetadataMap(html);
+  const jsonLd = extractJsonLd(html);
+  const title =
+    meta.citation_title ||
+    meta["dc.title"] ||
+    meta["og:title"] ||
+    pickJsonLdValue(jsonLd, ["headline", "name"]) ||
+    extractTitleTag(html);
+  const sourceName =
+    meta.citation_journal_title ||
+    meta["og:site_name"] ||
+    pickJsonLdValue(jsonLd, ["publisher", "isPartOf"]) ||
+    url.hostname.replace(/^www\./, "");
+  const publicationDate =
+    meta.citation_publication_date ||
+    meta["article:published_time"] ||
+    meta["dc.date"] ||
+    meta.date ||
+    pickJsonLdValue(jsonLd, ["datePublished", "dateCreated"]);
+  const description =
+    meta.citation_abstract ||
+    meta["dc.description"] ||
+    meta["og:description"] ||
+    meta.description ||
+    pickJsonLdValue(jsonLd, ["description", "abstract"]);
+  const warnings = [];
+  if (!title) warnings.push("No se pudo detectar título desde los metadatos públicos.");
+  if (!description) warnings.push("No se pudo detectar resumen público; completar manualmente.");
+  if (!publicationDate) warnings.push("No se pudo detectar fecha de publicación.");
+  if (/preprint|medrxiv|biorxiv/i.test(`${url.hostname} ${title} ${description}`)) {
+    warnings.push("La fuente parece corresponder a preprint o contenido no revisado por pares.");
+  }
+
+  return {
+    title,
+    sourceName,
+    publicationDate,
+    description,
+    doi: meta.citation_doi || "",
+    warnings
+  };
+};
+
+const parseJsonObjectFromText = (text = "") => {
+  const clean = cleanString(text);
+  if (!clean) return null;
+  try {
+    return JSON.parse(clean);
+  } catch (e) {}
+  const match = clean.match(/\{[\s\S]*\}/);
+  if (!match) return null;
+  try {
+    return JSON.parse(match[0]);
+  } catch (e) {
+    return null;
+  }
+};
+
+const normalizeAiArticleOutput = (url, metadata, input = {}) => {
+  const fallback = buildMetadataOnlyArticle(url, metadata);
+  const article = {
+    ...fallback,
+    title: cleanString(input.title) || fallback.title,
+    sourceName: cleanString(input.sourceName) || fallback.sourceName,
+    officialUrl: cleanString(input.officialUrl) || fallback.officialUrl,
+    sourceDomain: cleanString(input.sourceDomain) || fallback.sourceDomain,
+    studyType: cleanString(input.studyType),
+    evidenceType: cleanString(input.evidenceType),
+    publicationDate: cleanString(input.publicationDate) || fallback.publicationDate,
+    studyLocation: cleanString(input.studyLocation),
+    executiveSummary: cleanString(input.executiveSummary) || fallback.executiveSummary,
+    clinicalQuestion: cleanString(input.clinicalQuestion),
+    mainResult: cleanString(input.mainResult),
+    tags: Array.isArray(input.tags)
+      ? input.tags.map(cleanString).filter(Boolean).slice(0, 12)
+      : [],
+    accessType: cleanString(input.accessType) || "Pendiente",
+    extractionConfidence: Number.isFinite(Number(input.extractionConfidence))
+      ? Math.max(0, Math.min(1, Number(input.extractionConfidence)))
+      : 0.45,
+    warnings: Array.isArray(input.warnings)
+      ? input.warnings.map(cleanString).filter(Boolean).slice(0, 8)
+      : fallback.warnings
+  };
+  if (!article.warnings.length) {
+    article.warnings.push("El resumen automático debe ser revisado por el equipo médico.");
+  }
+  return article;
+};
+
+const callOpenAiForArticleExtraction = async (url, metadata, apiKey) => {
+  if (!apiKey) return null;
+  const prompt = [
+    "Estructurá metadatos públicos de un artículo científico para una bitácora médica interna.",
+    "No inventes datos. Si no está explícito en los metadatos, devolvé string vacío.",
+    "Respondé solo JSON con las claves: title, sourceName, officialUrl, sourceDomain, studyType, evidenceType, publicationDate, studyLocation, executiveSummary, clinicalQuestion, mainResult, tags, accessType, extractionConfidence, warnings.",
+    JSON.stringify({
+      officialUrl: url.href,
+      sourceDomain: url.hostname,
+      metadata
+    })
+  ].join("\n");
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      temperature: 0.1,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content:
+            "Sos un extractor conservador de metadatos biomédicos. Nunca inventes resultados clínicos."
+        },
+        { role: "user", content: prompt }
+      ]
+    })
+  });
+
+  const raw = await response.text();
+  if (!response.ok) return null;
+  let data = null;
+  try {
+    data = JSON.parse(raw);
+  } catch (e) {
+    data = null;
+  }
+  const text =
+    typeof data?.choices?.[0]?.message?.content === "string"
+      ? data.choices[0].message.content
+      : "";
+  return parseJsonObjectFromText(text);
 };
 
 const buildCarouselLikeRef = ({ postId, uid }) =>
@@ -899,6 +1195,130 @@ exports.onPostLikeCreated_v2 = onDocumentCreated(
   }
 );
 
+const extractScientificArticleHandler = async (req, res) => {
+  const startedAt = Date.now();
+  let uid = null;
+
+  const logExtraction = (status, extra = {}) => {
+    functions.logger.info("extractScientificArticle", {
+      uid,
+      status,
+      timestamp: new Date().toISOString(),
+      durationMs: Date.now() - startedAt,
+      ...extra,
+    });
+  };
+
+  setCorsHeaders(req, res);
+  if (req.method === "OPTIONS") return res.status(204).send("");
+  if (req.method !== "POST") {
+    logExtraction(405, { error: "method_not_allowed" });
+    return res.status(405).json({ ok: false, error: "method_not_allowed" });
+  }
+
+  try {
+    uid = await verifyBearerUid(req);
+  } catch (error) {
+    logExtraction(401, { error: "invalid_auth" });
+    return res.status(401).json({ ok: false, error: "auth_invalid" });
+  }
+
+  if (!uid) {
+    logExtraction(401, { error: "missing_auth" });
+    return res.status(401).json({ ok: false, error: "auth_required" });
+  }
+
+  if (!allowArticleExtractionRequest(uid)) {
+    logExtraction(429, { error: "rate_limited" });
+    return res.status(429).json({ ok: false, error: "rate_limited" });
+  }
+
+  const body = req.body && typeof req.body === "object" ? req.body : {};
+  const articleUrl = parseArticleUrl(body.url);
+  if (!articleUrl) {
+    logExtraction(400, { error: "invalid_url" });
+    return res.status(400).json({ ok: false, error: "invalid_url" });
+  }
+
+  let html = "";
+  let fetchWarning = "";
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 9000);
+    const response = await fetch(articleUrl.href, {
+      method: "GET",
+      redirect: "follow",
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "DepartamentoMedicoBrisa/1.0 scientific-metadata-extractor",
+        Accept: "text/html,application/xhtml+xml"
+      }
+    });
+    clearTimeout(timeout);
+    const contentType = response.headers.get("content-type") || "";
+    if (!response.ok) {
+      fetchWarning = `La fuente respondió HTTP ${response.status}.`;
+    } else if (!/html|xml|text/i.test(contentType)) {
+      fetchWarning = "La fuente no devolvió HTML procesable.";
+    } else {
+      const raw = await response.text();
+      html = raw.slice(0, 450000);
+    }
+  } catch (error) {
+    fetchWarning = "No se pudo leer la página pública del artículo.";
+  }
+
+  const metadata = extractScientificMetadata(articleUrl, html);
+  if (fetchWarning) metadata.warnings.push(fetchWarning);
+  const fallbackArticle = buildMetadataOnlyArticle(articleUrl, metadata);
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    fallbackArticle.warnings.push(
+      "No se configuró OPENAI_API_KEY; se completaron solo metadatos públicos disponibles."
+    );
+    logExtraction(200, { extractionStatus: "not_configured", domain: articleUrl.hostname });
+    return res.status(200).json({
+      ok: true,
+      extractionStatus: "not_configured",
+      article: fallbackArticle
+    });
+  }
+
+  try {
+    const aiDraft = await callOpenAiForArticleExtraction(articleUrl, metadata, apiKey);
+    if (!aiDraft) {
+      fallbackArticle.warnings.push(
+        "No se pudo estructurar con IA; se completaron solo metadatos públicos disponibles."
+      );
+      logExtraction(200, { extractionStatus: "failed", domain: articleUrl.hostname });
+      return res.status(200).json({
+        ok: true,
+        extractionStatus: "failed",
+        article: fallbackArticle
+      });
+    }
+
+    const article = normalizeAiArticleOutput(articleUrl, metadata, aiDraft);
+    logExtraction(200, { extractionStatus: "ai_draft", domain: articleUrl.hostname });
+    return res.status(200).json({
+      ok: true,
+      extractionStatus: "ai_draft",
+      article
+    });
+  } catch (error) {
+    fallbackArticle.warnings.push(
+      "La IA no pudo completar la extracción; revisar y completar manualmente."
+    );
+    logExtraction(200, { extractionStatus: "failed", domain: articleUrl.hostname });
+    return res.status(200).json({
+      ok: true,
+      extractionStatus: "failed",
+      article: fallbackArticle
+    });
+  }
+};
+
 const aiChatHandler = async (req, res) => {
     const startedAt = Date.now();
     let uid = null;
@@ -1205,6 +1625,11 @@ const aiChatHandler = async (req, res) => {
 exports.aiChat = onRequest(
   { secrets: ["OPENAI_API_KEY", "GEMINI_API_KEY"] },
   aiChatHandler
+);
+
+exports.extractScientificArticle = onRequest(
+  { secrets: ["OPENAI_API_KEY"] },
+  extractScientificArticleHandler
 );
 
 exports.aiChat_v2 = onRequest(

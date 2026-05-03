@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "brisa-root-";
-const CACHE_VERSION = "v100";
+const CACHE_VERSION = "v109";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const OFFLINE_URL = "/offline.html";
 const PRECACHE_URLS = [
@@ -7,14 +7,29 @@ const PRECACHE_URLS = [
   "/index.html",
   "/galeriadearte",
   "/galeriadearte.html",
+  "/bitacora-cientifica",
+  "/bitacora-cientifica.html",
   OFFLINE_URL,
   "/css/style.css?v=20260428-desktop-orgtree-eyebrow-plus-1",
   "/assets/css/pages/index.css?v=20260502-portal-hover-state-1",
   "/assets/css/pages/galeriadearte.css?v=20260503-art-gallery-like-tooltip-1",
+  "/assets/css/pages/bitacora-cientifica.css?v=20260503-sources-modal-clean-1",
   "/css/structure.css?v=20260502-specialists-lorena-popup-card-1",
   "/assets/css/core-contrast.css?v=20260502-committee-border-align-1",
   "/assets/js/pages/index.js?v=20260502-art-gallery-page-1",
   "/assets/js/pages/galeriadearte.js?v=20260503-art-gallery-like-tooltip-1",
+  "/assets/js/pages/bitacora-cientifica.js?v=20260503-sources-modal-clean-1",
+  "/assets/js/data/bitacora-posts.js",
+  "/assets/js/data/scientific-sources.js",
+  "/assets/js/services/bitacora-article-repository.js",
+  "/assets/js/services/bitacora-ai-extractor.js",
+  "/assets/images/BMJ.png",
+  "/assets/images/Lancet.png",
+  "/assets/images/LILACS.png",
+  "/assets/images/Mayo%20Clinic.png",
+  "/assets/images/Scielo.png",
+  "/assets/images/RAMR.png",
+  "/assets/images/Rev%20Arg%20Medicina.png",
   "/js/app.js?v=20260502-neuquen-veronica-rodriguez-1",
   "/js/chat.js?v=20260428-chat-read-receipts-1",
   "/assets/js/common/firebaseClient.js",
@@ -89,6 +104,8 @@ const normalizeRouteUrl = (route) => {
       "/index.html",
       "/galeriadearte",
       "/galeriadearte.html",
+      "/bitacora-cientifica",
+      "/bitacora-cientifica.html",
       "/app/",
       "/app/index.html",
       "/open.html"

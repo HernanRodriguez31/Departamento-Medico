@@ -12,7 +12,9 @@ const SAFE_PATHS = new Set([
   "/app/",
   "/app/index.html",
   "/galeriadearte",
-  "/galeriadearte.html"
+  "/galeriadearte.html",
+  "/bitacora-cientifica",
+  "/bitacora-cientifica.html"
 ]);
 
 const normalizeSafePath = (value) => {

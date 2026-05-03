@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Bitácora Científica | Departamento Médico</title>
+    <meta
+      name="description"
+      content="Lecturas críticas, publicaciones científicas, papers comentados y fuentes médicas confiables para actualización profesional."
+    />
+    <meta
+      name="keywords"
+      content="bitácora científica, departamento médico, evidencia médica, papers médicos, salud ocupacional, medicina basada en evidencia, revisiones sistemáticas, guías clínicas"
+    />
+    <meta name="theme-color" content="#7AB800" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/assets/icons/favicon-16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cormorant+Garamond:wght@600;700&family=Inter:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/variables.css?v=20260306-network-bg-1" />
+    <link rel="stylesheet" href="/css/style.css?v=20260428-desktop-orgtree-eyebrow-plus-1" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link rel="stylesheet" href="/assets/css/pages/index.css?v=20260502-portal-hover-state-1" />
+    <link rel="stylesheet" href="/assets/css/core-contrast.css?v=20260502-committee-border-align-1" />
+    <link rel="stylesheet" href="/assets/css/pages/galeriadearte.css?v=20260503-art-gallery-like-tooltip-1" />
+    <link rel="stylesheet" href="/assets/css/pages/bitacora-cientifica.css?v=20260503-sources-modal-clean-1" />
+  </head>
+  <body class="art-gallery-page bitacora-page ui-clarity">
+    <div id="app">
+      <header class="art-gallery-header" id="header">
+        <div class="art-gallery-header__container">
+          <a href="/index.html" class="art-gallery-header__logo" aria-label="Brisa Salud y Bienestar">
+            <img
+              src="/assets/images/logo-brisa-transparent.png"
+              alt="Brisa Salud y Bienestar"
+              width="200"
+              height="85"
+              decoding="async"
+            />
+          </a>
+          <div class="art-gallery-header__brand">Departamento Médico</div>
+          <div class="art-gallery-header__actions">
+            <div class="nav-notifications">
+              <button
+                id="dm-notif-btn"
+                class="dm-notif-btn"
+                type="button"
+                aria-label="Notificaciones"
+                aria-haspopup="menu"
+                aria-expanded="false"
+              >
+                <i data-lucide="bell"></i>
+                <span id="dm-notif-badge" class="dm-notif-badge" hidden>0</span>
+              </button>
+              <span
+                id="dm-msg-indicator"
+                class="dm-msg-indicator"
+                aria-label="Mensajes no leídos"
+              >
+                <span id="dm-msg-badge" class="dm-msg-badge">0</span>
+              </span>
+              <div
+                id="dm-notif-dropdown"
+                class="dm-notif-dropdown"
+                role="menu"
+                aria-label="Notificaciones"
+                hidden
+              >
+                <div class="dm-notif-dropdown__header">
+                  <span class="dm-notif-dropdown__title">Notificaciones</span>
+                  <button id="dm-notif-markall" class="dm-notif-dropdown__markall" type="button">
+                    Marcar leídas
+                  </button>
+                </div>
+                <div id="dm-notif-list" class="dm-notif-list"></div>
+                <div class="dm-notif-dropdown__footer">
+                  <span class="dm-notif-dropdown__hint">Solo se muestran las últimas 12.</span>
+                </div>
+              </div>
+            </div>
+            <div class="user-panel" data-dm-user-menu data-variant="desktop">
+              <button
+                id="user-panel-trigger"
+                class="user-panel-trigger"
+                data-dm-user-trigger
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded="false"
+              >
+                <span class="user-panel-icon" data-dm-user-avatar>
+                  <img
+                    class="user-avatar-img"
+                    data-dm-user-avatar-img
+                    src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="
+                    alt="Avatar"
+                    loading="lazy"
+                    decoding="async"
+                    hidden
+                  />
+                  <span class="user-avatar-initials" data-dm-user-avatar-initials>DM</span>
+                </span>
+                <span id="user-display-name" class="user-name" data-dm-user-trigger-name>Dr. …</span>
+                <span id="user-info-trigger" class="ui-info" aria-label="Información usuario">i</span>
+              </button>
+              <div
+                id="user-panel-dropdown"
+                class="user-panel-dropdown"
+                data-dm-user-dropdown
+                role="menu"
+                hidden
+              >
+                <div class="user-menu__row user-menu__row--primary">
+                  <span class="user-menu__avatar" data-dm-user-avatar>
+                    <img
+                      class="user-avatar-img"
+                      data-dm-user-avatar-img
+                      src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="
+                      alt="Avatar"
+                      loading="lazy"
+                      decoding="async"
+                      hidden
+                    />
+                    <span class="user-avatar-initials" data-dm-user-avatar-initials>DM</span>
+                  </span>
+                  <span id="user-panel-info" class="user-menu__user" data-dm-user-fullname>Usuario</span>
+                </div>
+                <div class="user-menu__row user-menu__row--subtle" data-dm-user-notif-toggle-row>
+                  <span class="user-menu__label">Notificaciones</span>
+                  <label class="push-switch">
+                    <input
+                      id="push-toggle-menu"
+                      type="checkbox"
+                      aria-label="Notificaciones"
+                      data-dm-user-notif-toggle
+                      data-dm-user-notif-external="1"
+                    />
+                    <span class="push-slider"></span>
+                  </label>
+                  <span id="push-info-trigger" class="ui-info" aria-label="Información de notificaciones">i</span>
+                </div>
+                <div class="user-menu__row user-menu__row--subtle user-menu__row--photo" data-dm-user-avatar-upload-row>
+                  <span class="user-menu__label">Cambiar imagen de perfil</span>
+                  <label class="user-menu__action" for="profile-photo-input">Agregar</label>
+                  <input id="profile-photo-input" type="file" accept="image/*" data-dm-user-avatar-input hidden />
+                </div>
+                <div id="push-toggle-hint" class="push-toggle-hint"></div>
+                <button id="user-panel-logout" class="user-menu__logout" type="button" data-dm-user-logout>
+                  Cerrar sesión
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main class="art-gallery-main bitacora-main">
+        <div class="art-gallery-shell bitacora-shell">
+          <section class="bitacora-intro-segment" aria-labelledby="bitacora-heading">
+            <p class="bitacora-breadcrumb">Portal · Bitácora Científica</p>
+            <h1 class="art-gallery-title bitacora-title" id="bitacora-heading">Bitácora Científica</h1>
+            <h2 class="bitacora-intro__subtitle">
+              Evidencia médica curada para lectura crítica, actualización profesional y trazabilidad a fuentes oficiales.
+            </h2>
+            <p class="bitacora-intro__text">
+              Centralización de publicaciones científicas, papers comentados y recursos confiables para la práctica clínica, la salud ocupacional y la gestión sanitaria.
+            </p>
+            <button
+              type="button"
+              class="bitacora-sources-trigger"
+              data-open-scientific-sources
+              aria-haspopup="dialog"
+              aria-controls="scientific-sources-modal"
+            >
+              <i data-lucide="library" aria-hidden="true"></i>
+              <span>Fuentes recomendadas</span>
+            </button>
+          </section>
+
+          <section
+            class="bitacora-publications-segment"
+            id="publicaciones"
+            aria-labelledby="bitacora-publicaciones-title"
+          >
+            <div class="bitacora-publications-panel">
+              <div class="bitacora-publications-header">
+                <div>
+                  <p class="bitacora-eyebrow">Lecturas y papers</p>
+                  <h2 id="bitacora-publicaciones-title">Publicaciones científicas</h2>
+                  <p>Artículos cargados por el equipo médico para lectura crítica y seguimiento.</p>
+                </div>
+                <button class="bitacora-add-article-button" type="button" data-open-add-article>
+                  <i data-lucide="plus-circle" aria-hidden="true"></i>
+                  <span>Agregar artículo</span>
+                </button>
+              </div>
+
+              <form class="bitacora-filters-card" role="search" aria-label="Filtrar publicaciones científicas">
+                <label class="bitacora-field" for="bitacora-search">
+                  <span>Buscar</span>
+                  <input
+                    id="bitacora-search"
+                    type="search"
+                    placeholder="Título, fuente, etiqueta o pregunta"
+                    autocomplete="off"
+                  />
+                </label>
+                <label class="bitacora-field" for="bitacora-filter-evidence">
+                  <span>Tipo de evidencia</span>
+                  <select id="bitacora-filter-evidence"></select>
+                </label>
+                <label class="bitacora-field" for="bitacora-filter-source">
+                  <span>Fuente</span>
+                  <select id="bitacora-filter-source"></select>
+                </label>
+                <label class="bitacora-field" for="bitacora-filter-status">
+                  <span>Estado</span>
+                  <select id="bitacora-filter-status"></select>
+                </label>
+                <label class="bitacora-field bitacora-field--sort" for="bitacora-sort">
+                  <span>Orden</span>
+                  <select id="bitacora-sort">
+                    <option value="recent">Más recientes</option>
+                    <option value="source">Fuente</option>
+                    <option value="evidence">Tipo de evidencia</option>
+                  </select>
+                </label>
+                <button id="bitacora-reset" class="bitacora-btn bitacora-btn--secondary" type="button">
+                  Limpiar filtros
+                </button>
+              </form>
+
+              <div class="bitacora-publications-meta">
+                <span id="bitacora-results-count" class="bitacora-results-count" aria-live="polite"></span>
+                <p>
+                  Los preprints y resúmenes automáticos requieren revisión crítica antes de modificar conductas clínicas o protocolos.
+                </p>
+              </div>
+
+              <div id="bitacora-posts" class="bitacora-posts-list"></div>
+              <div id="bitacora-empty" class="bitacora-empty" hidden>
+                No hay publicaciones que coincidan con los filtros seleccionados.
+              </div>
+            </div>
+          </section>
+
+          <div class="art-gallery-return">
+            <a id="art-gallery-return-home" class="art-gallery-return__button" href="/index.html">
+              <i data-lucide="arrow-left" aria-hidden="true"></i>
+              <span>Regresar a Página de Inicio</span>
+            </a>
+          </div>
+        </div>
+      </main>
+
+      <div
+        id="scientific-sources-modal"
+        class="bitacora-modal bitacora-modal--sources"
+        aria-hidden="true"
+        hidden
+      >
+        <div
+          class="bitacora-modal__dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="scientific-sources-title"
+          aria-describedby="scientific-sources-description"
+          tabindex="-1"
+        >
+          <div class="bitacora-modal__header">
+            <div>
+              <h2 id="scientific-sources-title">Fuentes científicas recomendadas</h2>
+              <p id="scientific-sources-description">
+                Recursos confiables para búsqueda, lectura crítica y seguimiento de literatura biomédica.
+              </p>
+            </div>
+            <button type="button" class="bitacora-modal__close" data-close-modal aria-label="Cerrar">
+              <i data-lucide="x" aria-hidden="true"></i>
+            </button>
+          </div>
+          <div class="bitacora-modal__body">
+            <div class="scientific-sources-segmented" role="group" aria-label="Tipo de fuentes científicas">
+              <button
+                type="button"
+                class="scientific-sources-segmented__button is-active"
+                data-source-scope="international"
+                aria-pressed="true"
+              >
+                <span aria-hidden="true">🌐</span>
+                <span>Fuentes Internacionales</span>
+              </button>
+              <button
+                type="button"
+                class="scientific-sources-segmented__button"
+                data-source-scope="national"
+                aria-pressed="false"
+              >
+                <span aria-hidden="true">🇦🇷</span>
+                <span>Fuentes Nacionales</span>
+              </button>
+            </div>
+            <div class="scientific-sources-modal-toolbar">
+              <label class="bitacora-field scientific-sources-modal-toolbar__search" for="scientific-sources-search">
+                <span>Buscar fuente</span>
+                <input
+                  id="scientific-sources-search"
+                  type="search"
+                  placeholder="Nombre o categoría"
+                  autocomplete="off"
+                />
+              </label>
+            </div>
+            <div id="bitacora-sources" class="scientific-sources-directory"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="add-article-modal" class="bitacora-modal bitacora-modal--article" aria-hidden="true" hidden>
+        <div
+          class="bitacora-modal__dialog bitacora-modal__dialog--wide"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="add-article-title"
+          aria-describedby="add-article-description"
+          tabindex="-1"
+        >
+          <div class="bitacora-modal__header">
+            <div>
+              <h2 id="add-article-title">Agregar artículo científico</h2>
+              <p id="add-article-description">
+                Pegá el enlace oficial del artículo. El sistema intentará extraer los datos principales y podrás revisarlos antes de guardar.
+              </p>
+            </div>
+            <button type="button" class="bitacora-modal__close" data-close-modal aria-label="Cerrar">
+              <i data-lucide="x" aria-hidden="true"></i>
+            </button>
+          </div>
+
+          <form id="bitacora-add-article-form" class="bitacora-article-form" novalidate>
+            <div class="bitacora-modal__body bitacora-article-form__body">
+              <section class="bitacora-form-zone" aria-labelledby="article-link-zone-title">
+                <div class="bitacora-form-zone__header">
+                  <h3 id="article-link-zone-title">Link del artículo</h3>
+                  <p>Usar preferentemente enlaces oficiales: DOI, PubMed, PMC, revista científica o repositorio institucional.</p>
+                </div>
+                <div class="bitacora-url-row">
+                  <label class="bitacora-field" for="article-url">
+                    <span>URL del artículo o paper</span>
+                    <input
+                      id="article-url"
+                      name="articleUrl"
+                      type="url"
+                      inputmode="url"
+                      placeholder="https://..."
+                      aria-describedby="article-url-help article-url-error article-domain-detected"
+                      required
+                    />
+                  </label>
+                  <button type="button" class="bitacora-btn bitacora-btn--primary" data-analyze-article>
+                    <i data-lucide="sparkles" aria-hidden="true"></i>
+                    <span>Analizar enlace con IA</span>
+                  </button>
+                </div>
+                <p id="article-url-help" class="bitacora-help">
+                  El análisis automático requiere un endpoint seguro. Si no está disponible, podés completar los campos manualmente.
+                </p>
+                <p id="article-domain-detected" class="bitacora-domain-detected" aria-live="polite"></p>
+                <p id="article-url-error" class="bitacora-form-error" hidden></p>
+                <p id="article-ai-status" class="bitacora-ai-status" aria-live="polite"></p>
+              </section>
+
+              <section class="bitacora-form-zone" aria-labelledby="article-data-zone-title">
+                <div class="bitacora-form-zone__header">
+                  <h3 id="article-data-zone-title">Datos del artículo</h3>
+                  <p>Revisá y completá la información antes de guardar.</p>
+                </div>
+                <div class="bitacora-form-grid">
+                  <label class="bitacora-field bitacora-field--wide" for="article-title">
+                    <span>Título</span>
+                    <input id="article-title" name="title" type="text" required />
+                  </label>
+                  <label class="bitacora-field" for="article-source-name">
+                    <span>Fuente / revista / sitio científico</span>
+                    <input id="article-source-name" name="sourceName" type="text" />
+                  </label>
+                  <label class="bitacora-field" for="article-official-url">
+                    <span>Enlace oficial</span>
+                    <input id="article-official-url" name="officialUrl" type="url" inputmode="url" required />
+                  </label>
+                  <label class="bitacora-field" for="article-study-type">
+                    <span>Tipo de estudio</span>
+                    <input id="article-study-type" name="studyType" type="text" />
+                  </label>
+                  <label class="bitacora-field" for="article-evidence-type">
+                    <span>Tipo de evidencia</span>
+                    <input id="article-evidence-type" name="evidenceType" type="text" />
+                  </label>
+                  <label class="bitacora-field" for="article-publication-date">
+                    <span>Fecha de publicación</span>
+                    <input id="article-publication-date" name="publicationDate" type="text" placeholder="AAAA-MM-DD o texto de la fuente" />
+                  </label>
+                  <label class="bitacora-field" for="article-study-location">
+                    <span>Lugar / contexto del estudio</span>
+                    <input id="article-study-location" name="studyLocation" type="text" />
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-executive-summary">
+                    <span>Resumen ejecutivo</span>
+                    <textarea id="article-executive-summary" name="executiveSummary" rows="4"></textarea>
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-clinical-question">
+                    <span>Pregunta que busca responder</span>
+                    <textarea id="article-clinical-question" name="clinicalQuestion" rows="3"></textarea>
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-main-result">
+                    <span>Resultado principal</span>
+                    <textarea id="article-main-result" name="mainResult" rows="3"></textarea>
+                  </label>
+                  <label class="bitacora-field" for="article-tags">
+                    <span>Etiquetas</span>
+                    <input id="article-tags" name="tags" type="text" placeholder="Separadas por coma" />
+                  </label>
+                  <label class="bitacora-field" for="article-access-type">
+                    <span>Acceso</span>
+                    <select id="article-access-type" name="accessType">
+                      <option value="Pendiente">Pendiente</option>
+                      <option value="Open access">Open access</option>
+                      <option value="Suscripción">Suscripción</option>
+                      <option value="Resumen disponible">Resumen disponible</option>
+                    </select>
+                  </label>
+                </div>
+              </section>
+
+              <section class="bitacora-form-zone" aria-labelledby="article-trace-zone-title">
+                <div class="bitacora-form-zone__header">
+                  <h3 id="article-trace-zone-title">Trazabilidad interna</h3>
+                  <p>La carga queda asociada al usuario autenticado y nace como pendiente de revisión.</p>
+                </div>
+                <label class="bitacora-field bitacora-field--wide" for="article-user-comment">
+                  <span>Comentario breve del usuario</span>
+                  <textarea id="article-user-comment" name="userComment" rows="3"></textarea>
+                </label>
+                <dl class="bitacora-form-audit">
+                  <div>
+                    <dt>Cargado por</dt>
+                    <dd id="article-created-by">Usuario autenticado</dd>
+                  </div>
+                  <div>
+                    <dt>Fecha y hora</dt>
+                    <dd id="article-created-at">Ahora</dd>
+                  </div>
+                  <div>
+                    <dt>Estado inicial</dt>
+                    <dd>Pendiente de revisión</dd>
+                  </div>
+                </dl>
+                <p class="bitacora-ai-warning">
+                  El resumen automático debe ser revisado por el equipo médico antes de utilizarse como referencia.
+                </p>
+                <p id="article-form-error" class="bitacora-form-error" hidden></p>
+              </section>
+            </div>
+
+            <div class="bitacora-modal__actions">
+              <button type="button" class="bitacora-btn bitacora-btn--secondary" data-close-modal>Cancelar</button>
+              <button type="submit" class="bitacora-btn bitacora-btn--secondary" data-save-status="draft">
+                Guardar como borrador
+              </button>
+              <button type="submit" class="bitacora-btn bitacora-btn--primary" data-save-status="pending_review">
+                Guardar artículo
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <footer class="footer">
+        <div class="container footer__container">
+          <div class="footer__logos">
+            <img
+              src="/assets/images/logo-brisa-transparent.png"
+              alt="Brisa Salud y Bienestar"
+              class="footer__logo-img"
+              width="900"
+              height="500"
+              loading="lazy"
+              decoding="async"
+            />
+          </div>
+          <p class="footer__copy">
+            &copy; 2026 <span class="footer__brand">Brisa Salud y Bienestar</span>. Todos
+            los derechos reservados.
+          </p>
+          <span class="footer__version">v1.4.00.2</span>
+        </div>
+      </footer>
+
+      <a href="#" class="scrollup" id="scroll-up" aria-label="Volver arriba">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="scrollup__icon"
+        >
+          <path d="m18 15-6-6-6 6" />
+        </svg>
+      </a>
+    </div>
+
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <script>
+      if (window.lucide) window.lucide.createIcons();
+    </script>
+    <script type="module">
+      import { installFirebaseGlobals } from "/assets/js/common/firebase-bootstrap.js";
+      installFirebaseGlobals();
+    </script>
+    <script type="module" src="/assets/js/common/notifications.js"></script>
+    <script type="module" src="/assets/js/pages/bitacora-cientifica.js?v=20260503-sources-modal-clean-1"></script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("/service-worker.js").catch(() => {});
+        });
+      }
+    </script>
+  </body>
+</html>

@@ -46,8 +46,16 @@
         "function": "aiChat"
       },
       {
+        "source": "/api/extractScientificArticle",
+        "function": "extractScientificArticle"
+      },
+      {
         "source": "/galeriadearte",
         "destination": "/galeriadearte.html"
+      },
+      {
+        "source": "/bitacora-cientifica",
+        "destination": "/bitacora-cientifica.html"
       }
     ],
     "headers": [
@@ -106,6 +114,15 @@
       },
       {
         "source": "/galeriadearte",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, max-age=0, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/bitacora-cientifica",
         "headers": [
           {
             "key": "Cache-Control",

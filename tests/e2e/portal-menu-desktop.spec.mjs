@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 const QA_EMAIL = process.env.MOBILE_QA_EMAIL || "mobile.qa@departamento-medico.test";
 const QA_PASSWORD = process.env.MOBILE_QA_PASSWORD || "MobileQa!12345";
-const PORTAL_URL = "/index.html?desktop=1&dmEmulators=1#kpi";
+const PORTAL_URL = "/index.html?dmEmulators=1#kpi";
 const LOGIN_URL = `/login.html?dmEmulators=1&next=${encodeURIComponent(PORTAL_URL)}`;
 
 const submitLogin = async (page) => {
@@ -42,7 +42,7 @@ test("desktop portal cube opens three accessible actions", async ({ page }) => {
   await page.goto(LOGIN_URL);
   await expect(page.locator("#login-form")).toBeVisible();
   await submitLogin(page);
-  await page.waitForURL(/\/index\.html\?desktop=1&dmEmulators=1#kpi$/, { timeout: 30_000 });
+  await page.waitForURL(/\/index\.html\?dmEmulators=1#kpi$/, { timeout: 30_000 });
 
   await expect(page.locator(".dm-desktop-sidebar")).toBeVisible();
   await openPortalMenu(page);
@@ -50,12 +50,12 @@ test("desktop portal cube opens three accessible actions", async ({ page }) => {
   const actions = page.locator("#portal-bubble .portal-link");
   await expect(actions.nth(0)).toHaveAttribute("aria-label", "Galería de Arte");
   await expect(actions.nth(1)).toHaveAttribute("aria-label", "Gestión operativa");
-  await expect(actions.nth(2)).toHaveAttribute("aria-label", "Bitácora Científica");
+  await expect(actions.nth(2)).toHaveAttribute("aria-label", "Abrir Bitácora Científica");
   await expect(page.locator("#portal-action")).toHaveAttribute(
     "href",
     "https://brisasaludybienestar.com/"
   );
-  await expect(page.locator("#portal-logbook")).toHaveAttribute("aria-disabled", "true");
+  await expect(page.locator("#portal-logbook")).toHaveAttribute("href", "/bitacora-cientifica");
 
   await expect(page.locator("#portal-gallery")).not.toBeFocused();
   await expectTooltipHidden(page.locator("#portal-gallery"));
@@ -91,17 +91,15 @@ test("desktop portal cube opens three accessible actions", async ({ page }) => {
   await expect(page.locator("#portal-bubble")).toHaveAttribute("aria-hidden", "true");
 
   await openPortalMenu(page);
-  const beforeDisabled = await page.evaluate(() => ({ href: location.href, scrollY: window.scrollY }));
-  await page.locator("#portal-logbook").click({ force: true });
-  await page.waitForTimeout(200);
-  const afterDisabled = await page.evaluate(() => ({ href: location.href, scrollY: window.scrollY }));
-  expect(afterDisabled.href).toBe(beforeDisabled.href);
-  expect(Math.abs(afterDisabled.scrollY - beforeDisabled.scrollY)).toBeLessThanOrEqual(2);
-  await expect(page.locator("#btn-portal")).toHaveAttribute("aria-expanded", "true");
-
   await page.locator("#portal-gallery").click();
   await page.waitForURL(/\/galeriadearte(\?dmEmulators=1)?$/, { timeout: 30_000 });
   await expect(page.locator("#art-gallery-heading")).toHaveText("Galería de Arte");
+
+  await page.goto(PORTAL_URL);
+  await openPortalMenu(page);
+  await page.locator("#portal-logbook").click();
+  await page.waitForURL(/\/bitacora-cientifica\?dmEmulators=1$/, { timeout: 30_000 });
+  await expect(page.locator("#bitacora-heading")).toHaveText("Bitácora Científica");
 
   const criticalErrors = consoleErrors.filter(
     (text) => !/favicon|net::ERR_ABORTED|ResizeObserver loop|Could not reach Cloud Firestore backend/i.test(text)

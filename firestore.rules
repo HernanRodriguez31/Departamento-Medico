@@ -12,7 +12,10 @@ service cloud.firestore {
     function isAdmin() {
       return signedIn()
         && (
-          request.auth.token.admin == true
+          (
+            request.auth.token.keys().hasAny(["admin"])
+            && request.auth.token.admin == true
+          )
           || exists(/databases/$(database)/documents/admin_whitelist/$(request.auth.uid))
         );
     }
@@ -547,6 +550,152 @@ service cloud.firestore {
         && validCalendarMinutes(request.resource.data);
     }
 
+    function validBitacoraStatus(data) {
+      return data.status is string
+        && (
+          data.status == "pending_review"
+          || data.status == "published"
+          || data.status == "draft"
+        );
+    }
+
+    function validBitacoraCreateStatus(data) {
+      return data.status is string
+        && (
+          data.status == "pending_review"
+          || data.status == "draft"
+        );
+    }
+
+    function validBitacoraExtractionStatus(data) {
+      return data.extractionStatus is string
+        && (
+          data.extractionStatus == "manual"
+          || data.extractionStatus == "ai_draft"
+          || data.extractionStatus == "failed"
+          || data.extractionStatus == "not_configured"
+        );
+    }
+
+    function validBitacoraCreatedByShape(data) {
+      return data.createdBy is map
+        && data.createdBy.keys().hasOnly(["uid", "displayName", "email", "photoURL"])
+        && data.createdBy.keys().hasAll(["uid", "displayName", "email"])
+        && data.createdBy.uid is string
+        && data.createdBy.displayName is string
+        && data.createdBy.email is string
+        && data.createdBy.displayName.size() > 0
+        && data.createdBy.displayName.size() <= 160
+        && data.createdBy.email.size() <= 240
+        && (
+          !data.createdBy.keys().hasAny(["photoURL"])
+          || data.createdBy.photoURL is string
+        );
+    }
+
+    function validBitacoraArticleData(data) {
+      return data.keys().hasOnly([
+          "title",
+          "sourceName",
+          "sourceDomain",
+          "officialUrl",
+          "studyType",
+          "evidenceType",
+          "publicationDate",
+          "studyLocation",
+          "executiveSummary",
+          "clinicalQuestion",
+          "mainResult",
+          "tags",
+          "accessType",
+          "userComment",
+          "status",
+          "extractionStatus",
+          "extractionConfidence",
+          "extractionWarnings",
+          "createdBy",
+          "createdAt",
+          "updatedAt"
+        ])
+        && data.keys().hasAll([
+          "title",
+          "sourceName",
+          "sourceDomain",
+          "officialUrl",
+          "studyType",
+          "evidenceType",
+          "publicationDate",
+          "studyLocation",
+          "executiveSummary",
+          "clinicalQuestion",
+          "mainResult",
+          "tags",
+          "accessType",
+          "userComment",
+          "status",
+          "extractionStatus",
+          "extractionWarnings",
+          "createdBy",
+          "createdAt",
+          "updatedAt"
+        ])
+        && data.title is string
+        && data.title.size() > 0
+        && data.title.size() <= 500
+        && data.sourceName is string
+        && data.sourceName.size() <= 180
+        && data.sourceDomain is string
+        && data.sourceDomain.size() <= 180
+        && data.officialUrl is string
+        && data.officialUrl.size() > 0
+        && data.officialUrl.size() <= 1200
+        && data.studyType is string
+        && data.studyType.size() <= 180
+        && data.evidenceType is string
+        && data.evidenceType.size() <= 180
+        && data.publicationDate is string
+        && data.publicationDate.size() <= 80
+        && data.studyLocation is string
+        && data.studyLocation.size() <= 260
+        && data.executiveSummary is string
+        && data.executiveSummary.size() <= 8000
+        && data.clinicalQuestion is string
+        && data.clinicalQuestion.size() <= 3000
+        && data.mainResult is string
+        && data.mainResult.size() <= 4000
+        && data.tags is list
+        && data.tags.size() <= 12
+        && data.accessType is string
+        && data.accessType.size() <= 80
+        && data.userComment is string
+        && data.userComment.size() <= 4000
+        && validBitacoraStatus(data)
+        && validBitacoraExtractionStatus(data)
+        && data.extractionWarnings is list
+        && data.extractionWarnings.size() <= 8
+        && (
+          !data.keys().hasAny(["extractionConfidence"])
+          || data.extractionConfidence is number
+        )
+        && validBitacoraCreatedByShape(data)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function validBitacoraArticleCreate() {
+      return signedIn()
+        && validBitacoraArticleData(request.resource.data)
+        && validBitacoraCreateStatus(request.resource.data)
+        && request.resource.data.createdBy.uid == request.auth.uid;
+    }
+
+    function validBitacoraArticleAdminUpdate() {
+      return isAdmin()
+        && validBitacoraArticleData(request.resource.data)
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt;
+    }
+
     // CAMBIO AQUI: Solo permitimos LEER la configuración (el candado cerrado)
     match /configuracion/{document=**} {
       allow read: if true;
@@ -653,6 +802,13 @@ service cloud.firestore {
         allow update: if false;
         allow delete: if false;
       }
+    }
+
+    match /bitacoraArticles/{articleId} {
+      allow read: if signedIn();
+      allow create: if validBitacoraArticleCreate();
+      allow update: if validBitacoraArticleAdminUpdate();
+      allow delete: if isAdmin();
     }
 
     match /dm_posts/{postId} {

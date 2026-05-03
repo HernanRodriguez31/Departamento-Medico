@@ -2815,12 +2815,14 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
       event?.preventDefault();
       return;
     }
-    if (action.dataset.portalAction === "gallery" && action.tagName === "A") {
+    if (action.tagName === "A") {
       const params = new URLSearchParams(window.location.search || "");
       const href = action.getAttribute("href") || "";
       if (params.get("dmEmulators") === "1" && href.startsWith("/")) {
         event?.preventDefault();
-        window.location.href = `${href}?dmEmulators=1`;
+        const target = new URL(href, window.location.origin);
+        target.searchParams.set("dmEmulators", "1");
+        window.location.href = `${target.pathname}${target.search}${target.hash}`;
       }
       closePortalMenu();
       return;

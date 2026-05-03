@@ -131,6 +131,32 @@ beforeEach(async () => {
         updatedAt: Timestamp.now()
       }
     );
+    await setDoc(doc(db, "bitacoraArticles", "article-a"), {
+      title: "Artículo sembrado",
+      sourceName: "PubMed / MEDLINE",
+      sourceDomain: "pubmed.ncbi.nlm.nih.gov",
+      officialUrl: "https://pubmed.ncbi.nlm.nih.gov/123456/",
+      studyType: "Ensayo clínico",
+      evidenceType: "Investigación clínica",
+      publicationDate: "2026-05-03",
+      studyLocation: "Contexto hospitalario",
+      executiveSummary: "Resumen interno.",
+      clinicalQuestion: "Pregunta clínica.",
+      mainResult: "Resultado principal.",
+      tags: ["QA", "PubMed"],
+      accessType: "Resumen disponible",
+      userComment: "Comentario interno.",
+      status: "pending_review",
+      extractionStatus: "manual",
+      extractionWarnings: [],
+      createdBy: {
+        uid: "user-a",
+        displayName: "Dr. Usuario A",
+        email: "user-a@test.local"
+      },
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    });
   });
 });
 
@@ -142,6 +168,33 @@ const authedDb = (uid) => testEnv.authenticatedContext(uid).firestore();
 const authedAdminDb = (uid) =>
   testEnv.authenticatedContext(uid, { admin: true }).firestore();
 const unauthedDb = () => testEnv.unauthenticatedContext().firestore();
+
+const validBitacoraPayload = (uid = "user-b") => ({
+  title: "Artículo nuevo",
+  sourceName: "PubMed / MEDLINE",
+  sourceDomain: "pubmed.ncbi.nlm.nih.gov",
+  officialUrl: "https://pubmed.ncbi.nlm.nih.gov/789/",
+  studyType: "Cohorte",
+  evidenceType: "Investigación clínica",
+  publicationDate: "2026-05-03",
+  studyLocation: "Contexto laboral",
+  executiveSummary: "Resumen para revisión.",
+  clinicalQuestion: "Pregunta de revisión.",
+  mainResult: "Resultado documentado.",
+  tags: ["QA", "Evidencia"],
+  accessType: "Open access",
+  userComment: "Comentario del usuario.",
+  status: "pending_review",
+  extractionStatus: "manual",
+  extractionWarnings: [],
+  createdBy: {
+    uid,
+    displayName: "Dr. Usuario B",
+    email: "user-b@test.local"
+  },
+  createdAt: Timestamp.now(),
+  updatedAt: Timestamp.now()
+});
 
 test("pushTokens blocks client writes", async () => {
   await assertFails(
@@ -277,6 +330,62 @@ test("authenticated user can create valid own calendar event", async () => {
       }
     )
   );
+});
+
+test("bitacoraArticles allow authenticated reads and valid own creates only", async () => {
+  await assertSucceeds(getDoc(doc(authedDb("user-a"), "bitacoraArticles", "article-a")));
+  await assertSucceeds(getDocs(query(collection(authedDb("user-b"), "bitacoraArticles"), limit(10))));
+  await assertFails(getDoc(doc(unauthedDb(), "bitacoraArticles", "article-a")));
+
+  await assertSucceeds(
+    setDoc(doc(authedDb("user-b"), "bitacoraArticles", "article-b"), validBitacoraPayload("user-b"))
+  );
+  await assertSucceeds(
+    setDoc(doc(authedDb("user-b"), "bitacoraArticles", "article-draft"), {
+      ...validBitacoraPayload("user-b"),
+      status: "draft"
+    })
+  );
+  await assertFails(
+    setDoc(doc(unauthedDb(), "bitacoraArticles", "article-guest"), validBitacoraPayload("guest"))
+  );
+  await assertFails(
+    setDoc(doc(authedDb("user-b"), "bitacoraArticles", "article-forged"), validBitacoraPayload("user-a"))
+  );
+  await assertFails(
+    setDoc(doc(authedDb("user-b"), "bitacoraArticles", "article-published"), {
+      ...validBitacoraPayload("user-b"),
+      status: "published"
+    })
+  );
+  await assertFails(
+    setDoc(doc(authedDb("user-b"), "bitacoraArticles", "article-extra"), {
+      ...validBitacoraPayload("user-b"),
+      unsafeHtml: "<script>"
+    })
+  );
+});
+
+test("bitacoraArticles updates and deletes are admin-only", async () => {
+  const ownerDb = authedDb("user-a");
+  const otherDb = authedDb("user-b");
+  const adminDb = authedAdminDb("admin-a");
+
+  await assertFails(
+    updateDoc(doc(ownerDb, "bitacoraArticles", "article-a"), {
+      status: "published",
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertFails(deleteDoc(doc(otherDb, "bitacoraArticles", "article-a")));
+  await assertSucceeds(
+    updateDoc(doc(adminDb, "bitacoraArticles", "article-a"), {
+      title: "Artículo aprobado",
+      status: "published",
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertSucceeds(deleteDoc(doc(adminDb, "bitacoraArticles", "article-a")));
 });
 
 test("authenticated user can create valid own multi-day calendar event", async () => {
