@@ -590,6 +590,10 @@ body.bitacora-modal-open {
   width: min(68rem, 100%);
 }
 
+.bitacora-modal--article .bitacora-modal__dialog {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
 .bitacora-modal--sources .bitacora-modal__dialog {
   grid-template-rows: auto minmax(0, 1fr);
   max-height: min(88vh, 56rem);
@@ -902,12 +906,16 @@ body.bitacora-modal-open {
 
 .bitacora-article-form {
   display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
   min-height: 0;
+  overflow: hidden;
 }
 
 .bitacora-article-form__body {
   display: grid;
   gap: 0.9rem;
+  min-height: 0;
+  overflow: auto;
 }
 
 .bitacora-form-zone {

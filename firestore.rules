@@ -572,6 +572,7 @@ service cloud.firestore {
         && (
           data.extractionStatus == "manual"
           || data.extractionStatus == "ai_draft"
+          || data.extractionStatus == "metadata_only"
           || data.extractionStatus == "failed"
           || data.extractionStatus == "not_configured"
         );

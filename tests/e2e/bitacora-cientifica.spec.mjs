@@ -20,12 +20,36 @@ const expectNoHorizontalOverflow = async (page) => {
 
 test("scientific logbook renders as operational hub with modals and article creation", async ({ page }, testInfo) => {
   const articleTitle = `Artículo QA Bitácora ${testInfo.project.name}`;
+  const extractionRequests = [];
   const consoleErrors = [];
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
   });
   page.on("pageerror", (error) => consoleErrors.push(error.message));
   await page.route("**/api/extractScientificArticle", async (route) => {
+    const request = route.request();
+    const payload = request.postDataJSON();
+    extractionRequests.push({
+      url: payload?.url || "",
+      authorization: request.headers().authorization || ""
+    });
+    if (payload?.url === "https://example.org/partial") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          extractionStatus: "metadata_only",
+          article: {
+            sourceName: "Revista parcial",
+            officialUrl: "https://example.org/partial",
+            sourceDomain: "example.org",
+            warnings: ["Se cargaron metadatos básicos. Completá los datos clínicos antes de guardar."]
+          }
+        })
+      });
+      return;
+    }
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -281,6 +305,32 @@ test("scientific logbook renders as operational hub with modals and article crea
   await articleModal.getByRole("button", { name: "Analizar enlace con IA" }).click();
   await expect(articleModal.locator("#article-url-error")).toContainText("URL", { timeout: 10_000 });
 
+  const saveArticleButton = articleModal.getByRole("button", { name: "Guardar artículo" });
+  await expect(saveArticleButton).toBeVisible();
+  await articleModal.locator(".bitacora-article-form__body").evaluate((node) => {
+    node.scrollTop = node.scrollHeight;
+  });
+  await expect(saveArticleButton).toBeVisible();
+  const saveButtonInsideModal = await saveArticleButton.evaluate((button) => {
+    const buttonRect = button.getBoundingClientRect();
+    const dialogRect = button.closest(".bitacora-modal__dialog").getBoundingClientRect();
+    return buttonRect.top >= dialogRect.top && buttonRect.bottom <= dialogRect.bottom;
+  });
+  expect(saveButtonInsideModal).toBe(true);
+
+  await articleModal.getByLabel("URL del artículo o paper").fill("https://example.org/partial");
+  await articleModal.getByRole("button", { name: "Analizar enlace con IA" }).click();
+  await expect(articleModal.locator("#article-ai-status")).not.toContainText("Datos cargados por IA", {
+    timeout: 10_000
+  });
+  await expect(articleModal.locator("#article-ai-status")).toContainText("metadatos básicos");
+  await expect(articleModal.getByLabel("Fuente / revista / sitio científico")).toHaveValue("Revista parcial");
+  await expect(articleModal.getByLabel("Título")).toHaveValue("");
+  await saveArticleButton.click();
+  await expect(articleModal.locator("#article-form-error")).toContainText("Ingresá el título");
+  await expect(page.locator(".bitacora-post")).toHaveCount(0);
+  await expect(page.locator("#bitacora-results-count")).toHaveText("0 artículos agregados");
+
   await articleModal.getByLabel("URL del artículo o paper").fill("https://pubmed.ncbi.nlm.nih.gov/123456/");
   await expect(articleModal.locator("#article-domain-detected")).toContainText("pubmed.ncbi.nlm.nih.gov");
   await articleModal.getByRole("button", { name: "Analizar enlace con IA" }).click();
@@ -291,9 +341,18 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(articleModal.getByLabel("Fuente / revista / sitio científico")).toHaveValue("PubMed / MEDLINE");
   await expect(articleModal.getByLabel("Tipo de estudio")).toHaveValue("Ensayo clínico");
   await expect(articleModal.getByLabel("Tipo de evidencia")).toHaveValue("Investigación clínica");
+  await expect(articleModal.getByLabel("Fecha de publicación")).toHaveValue("2026-05-03");
+  await expect(articleModal.getByLabel("Pregunta que busca responder")).toHaveValue("Pregunta clínica generada por IA.");
+  await expect(articleModal.getByLabel("Resultado principal")).toHaveValue("Resultado principal generado por IA.");
+  await expect(articleModal.getByLabel("Etiquetas")).toHaveValue("QA, Lectura crítica, PubMed, IA");
+  await expect(articleModal.getByLabel("Acceso")).toHaveValue("Resumen disponible");
   await expect(articleModal.getByLabel("Resumen ejecutivo")).toHaveValue("Resumen generado por IA desde Playwright.");
+  expect(extractionRequests).toHaveLength(2);
+  expect(extractionRequests[0].url).toBe("https://example.org/partial");
+  expect(extractionRequests[1].url).toBe("https://pubmed.ncbi.nlm.nih.gov/123456/");
+  expect(extractionRequests.every((entry) => /^Bearer\s+/.test(entry.authorization))).toBe(true);
   await articleModal.getByLabel("Comentario breve del usuario").fill("Comentario interno de prueba.");
-  await articleModal.getByRole("button", { name: "Guardar artículo" }).click();
+  await saveArticleButton.click();
   await expect(articleModal).toBeHidden({ timeout: 30_000 });
 
   const newPost = page.locator(".bitacora-post").filter({ hasText: articleTitle }).first();
@@ -301,9 +360,15 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(page.locator(".bitacora-post")).toHaveCount(1);
   await expect(page.locator("#bitacora-results-count")).toHaveText("1 artículo agregado");
   await expect(newPost).toContainText("Pendiente de revisión");
+  await expect(newPost).toContainText("Borrador automático");
   await expect(newPost).toContainText("Dra. Mobile QA");
   await expect(newPost).toContainText("Resumen generado por IA desde Playwright.");
   await expect(newPost.locator(".bitacora-tag")).toHaveCount(4);
+  await expect(newPost.getByRole("link", { name: "Ver fuente original" })).toHaveAttribute(
+    "href",
+    "https://pubmed.ncbi.nlm.nih.gov/123456/"
+  );
+  await expect(newPost.getByRole("link", { name: "Ver fuente original" })).toHaveAttribute("target", "_blank");
 
   await newPost.getByRole("button", { name: "Leer análisis" }).click();
   await expect(newPost.getByRole("button", { name: "Ocultar análisis" })).toHaveAttribute("aria-expanded", "true");
@@ -316,6 +381,7 @@ test("scientific logbook renders as operational hub with modals and article crea
   page.once("dialog", (dialog) => dialog.accept());
   await newPost.getByRole("button", { name: "Eliminar" }).click();
   await expect(page.locator(".bitacora-post")).toHaveCount(0);
+  await expect(page.locator("body")).not.toContainText(articleTitle);
   await expect(page.locator("#bitacora-empty")).toBeVisible();
   await expect(page.locator("#bitacora-results-count")).toHaveText("0 artículos agregados");
 

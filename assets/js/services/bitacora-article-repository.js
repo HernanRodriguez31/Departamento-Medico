@@ -12,7 +12,7 @@ import {
 const COLLECTION_NAME = "bitacoraArticles";
 
 const STATUS_VALUES = new Set(["pending_review", "published", "draft"]);
-const EXTRACTION_STATUS_VALUES = new Set(["manual", "ai_draft", "failed", "not_configured"]);
+const EXTRACTION_STATUS_VALUES = new Set(["manual", "ai_draft", "metadata_only", "failed", "not_configured"]);
 
 const cleanString = (value = "") => String(value || "").trim();
 

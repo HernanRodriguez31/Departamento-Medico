@@ -346,6 +346,12 @@ test("bitacoraArticles allow authenticated reads and valid own creates only", as
       status: "draft"
     })
   );
+  await assertSucceeds(
+    setDoc(doc(authedDb("user-b"), "bitacoraArticles", "article-metadata-only"), {
+      ...validBitacoraPayload("user-b"),
+      extractionStatus: "metadata_only"
+    })
+  );
   await assertFails(
     setDoc(doc(unauthedDb(), "bitacoraArticles", "article-guest"), validBitacoraPayload("guest"))
   );

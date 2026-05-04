@@ -28,6 +28,15 @@ const {
   toggleCommentLikedByMap,
   normalizeCounterValue,
 } = require("./feed/integrity");
+const {
+  buildMetadataOnlyArticle,
+  buildOpenAiArticleExtractionPayload,
+  extractScientificMetadata,
+  getAiDraftQuality,
+  hasMetadataContent,
+  normalizeAiArticleOutput,
+  parseJsonObjectFromText,
+} = require("./scientificArticleExtraction");
 
 // Inicializacion
 admin.initializeApp();
@@ -286,229 +295,9 @@ const parseArticleUrl = (value) => {
   }
 };
 
-const decodeHtmlEntities = (value = "") =>
-  cleanString(value)
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&apos;/g, "'")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">");
-
-const stripHtmlToText = (html = "") =>
-  decodeHtmlEntities(
-    String(html || "")
-      .replace(/<script\b[\s\S]*?<\/script>/gi, " ")
-      .replace(/<style\b[\s\S]*?<\/style>/gi, " ")
-      .replace(/<noscript\b[\s\S]*?<\/noscript>/gi, " ")
-      .replace(/<!--[\s\S]*?-->/g, " ")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\s+/g, " ")
-  ).slice(0, 12000);
-
-const extractAbstractText = (html = "") => {
-  const candidates = [];
-  const abstractBlockRegex =
-    /<(section|div|article)\b[^>]*(?:id|class)=["'][^"']*(abstract|summary)[^"']*["'][^>]*>([\s\S]*?)<\/\1>/gi;
-  let match = abstractBlockRegex.exec(html);
-  while (match && candidates.length < 3) {
-    const text = stripHtmlToText(match[3]);
-    if (text) candidates.push(text);
-    match = abstractBlockRegex.exec(html);
-  }
-  return candidates.join("\n").slice(0, 8000);
-};
-
-const extractPublicArticleText = (html = "") => {
-  const abstractText = extractAbstractText(html);
-  const bodyText = stripHtmlToText(html);
-  return [abstractText, bodyText]
-    .filter(Boolean)
-    .join("\n\n")
-    .slice(0, 14000);
-};
-
-const getHtmlAttr = (tag, attr) => {
-  const match = tag.match(new RegExp(`${attr}\\s*=\\s*["']([^"']*)["']`, "i"));
-  return match ? decodeHtmlEntities(match[1]) : "";
-};
-
-const extractMetadataMap = (html = "") => {
-  const meta = {};
-  const tags = html.match(/<meta\b[^>]*>/gi) || [];
-  tags.forEach((tag) => {
-    const key = (getHtmlAttr(tag, "name") || getHtmlAttr(tag, "property")).toLowerCase();
-    const content = getHtmlAttr(tag, "content");
-    if (key && content && !meta[key]) meta[key] = content;
-  });
-  return meta;
-};
-
-const extractTitleTag = (html = "") => {
-  const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  return match ? decodeHtmlEntities(match[1].replace(/\s+/g, " ")) : "";
-};
-
-const pickJsonLdValue = (jsonLd, keys = []) => {
-  const queue = Array.isArray(jsonLd) ? [...jsonLd] : [jsonLd];
-  while (queue.length) {
-    const item = queue.shift();
-    if (!item || typeof item !== "object") continue;
-    for (const key of keys) {
-      if (typeof item[key] === "string" && item[key].trim()) return item[key].trim();
-      if (Array.isArray(item[key]) && typeof item[key][0] === "string") return item[key][0].trim();
-    }
-    Object.values(item).forEach((value) => {
-      if (Array.isArray(value)) queue.push(...value);
-      else if (value && typeof value === "object") queue.push(value);
-    });
-  }
-  return "";
-};
-
-const extractJsonLd = (html = "") => {
-  const scripts = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>[\s\S]*?<\/script>/gi) || [];
-  for (const script of scripts.slice(0, 5)) {
-    const raw = script.replace(/^<script[^>]*>/i, "").replace(/<\/script>$/i, "").trim();
-    if (!raw) continue;
-    try {
-      return JSON.parse(raw);
-    } catch (e) {}
-  }
-  return null;
-};
-
-const buildMetadataOnlyArticle = (url, metadata = {}) => ({
-  title: cleanString(metadata.title),
-  sourceName: cleanString(metadata.sourceName),
-  officialUrl: url.href,
-  sourceDomain: url.hostname,
-  studyType: "",
-  evidenceType: "",
-  publicationDate: cleanString(metadata.publicationDate),
-  studyLocation: "",
-  executiveSummary: cleanString(metadata.description),
-  clinicalQuestion: "",
-  mainResult: "",
-  tags: [],
-  accessType: "Pendiente",
-  extractionConfidence: metadata.title || metadata.description ? 0.3 : 0.1,
-  warnings: metadata.warnings || []
-});
-
-const extractScientificMetadata = (url, html = "") => {
-  const meta = extractMetadataMap(html);
-  const jsonLd = extractJsonLd(html);
-  const publicText = extractPublicArticleText(html);
-  const title =
-    meta.citation_title ||
-    meta["dc.title"] ||
-    meta["og:title"] ||
-    pickJsonLdValue(jsonLd, ["headline", "name"]) ||
-    extractTitleTag(html);
-  const sourceName =
-    meta.citation_journal_title ||
-    meta["og:site_name"] ||
-    pickJsonLdValue(jsonLd, ["publisher", "isPartOf"]) ||
-    url.hostname.replace(/^www\./, "");
-  const publicationDate =
-    meta.citation_publication_date ||
-    meta["article:published_time"] ||
-    meta["dc.date"] ||
-    meta.date ||
-    pickJsonLdValue(jsonLd, ["datePublished", "dateCreated"]);
-  const description =
-    meta.citation_abstract ||
-    meta["dc.description"] ||
-    meta["og:description"] ||
-    meta.description ||
-    pickJsonLdValue(jsonLd, ["description", "abstract"]);
-  const warnings = [];
-  if (!title) warnings.push("No se pudo detectar título desde los metadatos públicos.");
-  if (!description) warnings.push("No se pudo detectar resumen público; completar manualmente.");
-  if (!publicationDate) warnings.push("No se pudo detectar fecha de publicación.");
-  if (/preprint|medrxiv|biorxiv/i.test(`${url.hostname} ${title} ${description}`)) {
-    warnings.push("La fuente parece corresponder a preprint o contenido no revisado por pares.");
-  }
-
-  return {
-    title,
-    sourceName,
-    publicationDate,
-    description,
-    doi: meta.citation_doi || "",
-    publicText,
-    warnings
-  };
-};
-
-const parseJsonObjectFromText = (text = "") => {
-  const clean = cleanString(text);
-  if (!clean) return null;
-  try {
-    return JSON.parse(clean);
-  } catch (e) {}
-  const match = clean.match(/\{[\s\S]*\}/);
-  if (!match) return null;
-  try {
-    return JSON.parse(match[0]);
-  } catch (e) {
-    return null;
-  }
-};
-
-const normalizeAiArticleOutput = (url, metadata, input = {}) => {
-  const fallback = buildMetadataOnlyArticle(url, metadata);
-  const article = {
-    ...fallback,
-    title: cleanString(input.title) || fallback.title,
-    sourceName: cleanString(input.sourceName) || fallback.sourceName,
-    officialUrl: cleanString(input.officialUrl) || fallback.officialUrl,
-    sourceDomain: cleanString(input.sourceDomain) || fallback.sourceDomain,
-    studyType: cleanString(input.studyType),
-    evidenceType: cleanString(input.evidenceType),
-    publicationDate: cleanString(input.publicationDate) || fallback.publicationDate,
-    studyLocation: cleanString(input.studyLocation),
-    executiveSummary: cleanString(input.executiveSummary) || fallback.executiveSummary,
-    clinicalQuestion: cleanString(input.clinicalQuestion),
-    mainResult: cleanString(input.mainResult),
-    tags: Array.isArray(input.tags)
-      ? input.tags.map(cleanString).filter(Boolean).slice(0, 12)
-      : [],
-    accessType: cleanString(input.accessType) || "Pendiente",
-    extractionConfidence: Number.isFinite(Number(input.extractionConfidence))
-      ? Math.max(0, Math.min(1, Number(input.extractionConfidence)))
-      : 0.45,
-    warnings: Array.isArray(input.warnings)
-      ? input.warnings.map(cleanString).filter(Boolean).slice(0, 8)
-      : fallback.warnings
-  };
-  if (!article.warnings.length) {
-    article.warnings.push("El resumen automático debe ser revisado por el equipo médico.");
-  }
-  return article;
-};
-
 const callOpenAiForArticleExtraction = async (url, metadata, apiKey) => {
   if (!apiKey) return null;
-  const prompt = [
-    "Estructurá metadatos públicos de un artículo científico para una bitácora médica interna.",
-    "No inventes datos. Si no está explícito en los metadatos, devolvé string vacío.",
-    "Respondé solo JSON con las claves: title, sourceName, officialUrl, sourceDomain, studyType, evidenceType, publicationDate, studyLocation, executiveSummary, clinicalQuestion, mainResult, tags, accessType, extractionConfidence, warnings.",
-    JSON.stringify({
-      officialUrl: url.href,
-      sourceDomain: url.hostname,
-      metadata: {
-        title: metadata.title,
-        sourceName: metadata.sourceName,
-        publicationDate: metadata.publicationDate,
-        description: metadata.description,
-        doi: metadata.doi,
-        warnings: metadata.warnings
-      },
-      publicText: cleanString(metadata.publicText).slice(0, 14000)
-    })
-  ].join("\n");
+  const extractionPayload = buildOpenAiArticleExtractionPayload(url, metadata);
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -519,15 +308,8 @@ const callOpenAiForArticleExtraction = async (url, metadata, apiKey) => {
     body: JSON.stringify({
       model: "gpt-4o-mini",
       temperature: 0.1,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content:
-            "Sos un extractor conservador de metadatos biomédicos. Nunca inventes resultados clínicos."
-        },
-        { role: "user", content: prompt }
-      ]
+      response_format: extractionPayload.response_format,
+      messages: extractionPayload.messages
     })
   });
 
@@ -568,6 +350,51 @@ const syncCarouselLikeAggregates = async (postId) => {
     { merge: true }
   );
   return aggregates;
+};
+
+const fetchArticlePublicHtml = async (articleUrl) => {
+  let currentUrl = articleUrl;
+  for (let redirectCount = 0; redirectCount <= 4; redirectCount += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 9000);
+    try {
+      const response = await fetch(currentUrl.href, {
+        method: "GET",
+        redirect: "manual",
+        signal: controller.signal,
+        headers: {
+          "User-Agent": "DepartamentoMedicoBrisa/1.0 scientific-metadata-extractor",
+          Accept: "text/html,application/xhtml+xml"
+        }
+      });
+
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get("location") || "";
+        if (!location) {
+          return { html: "", warning: "La fuente redirigió sin destino procesable." };
+        }
+        const nextUrl = parseArticleUrl(new URL(location, currentUrl.href).href);
+        if (!nextUrl) {
+          return { html: "", warning: "La fuente redirigió a una URL no permitida." };
+        }
+        currentUrl = nextUrl;
+        continue;
+      }
+
+      const contentType = response.headers.get("content-type") || "";
+      if (!response.ok) {
+        return { html: "", warning: `La fuente respondió HTTP ${response.status}.` };
+      }
+      if (!/html|xml|text/i.test(contentType)) {
+        return { html: "", warning: "La fuente no devolvió HTML procesable." };
+      }
+      const raw = await response.text();
+      return { html: raw.slice(0, 450000), warning: "", finalUrl: currentUrl.href };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  return { html: "", warning: "La fuente superó el límite de redirecciones." };
 };
 
 const createNotificationDoc = async (payload = {}) => {
@@ -1295,27 +1122,9 @@ const extractScientificArticleHandler = async (req, res) => {
   let html = "";
   let fetchWarning = "";
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 9000);
-    const response = await fetch(articleUrl.href, {
-      method: "GET",
-      redirect: "follow",
-      signal: controller.signal,
-      headers: {
-        "User-Agent": "DepartamentoMedicoBrisa/1.0 scientific-metadata-extractor",
-        Accept: "text/html,application/xhtml+xml"
-      }
-    });
-    clearTimeout(timeout);
-    const contentType = response.headers.get("content-type") || "";
-    if (!response.ok) {
-      fetchWarning = `La fuente respondió HTTP ${response.status}.`;
-    } else if (!/html|xml|text/i.test(contentType)) {
-      fetchWarning = "La fuente no devolvió HTML procesable.";
-    } else {
-      const raw = await response.text();
-      html = raw.slice(0, 450000);
-    }
+    const fetched = await fetchArticlePublicHtml(articleUrl);
+    html = fetched.html || "";
+    fetchWarning = fetched.warning || "";
   } catch (error) {
     fetchWarning = "No se pudo leer la página pública del artículo.";
   }
@@ -1329,10 +1138,17 @@ const extractScientificArticleHandler = async (req, res) => {
     fallbackArticle.warnings.push(
       "No se configuró OPENAI_API_KEY; se completaron solo metadatos públicos disponibles."
     );
-    logExtraction(200, { extractionStatus: "not_configured", domain: articleUrl.hostname });
+    const status = hasMetadataContent(fallbackArticle) ? "metadata_only" : "not_configured";
+    logExtraction(200, {
+      extractionStatus: status,
+      domain: articleUrl.hostname,
+      htmlLength: html.length,
+      publicTextLength: cleanString(metadata.publicText).length,
+      detectedFieldCount: 0
+    });
     return res.status(200).json({
       ok: true,
-      extractionStatus: "not_configured",
+      extractionStatus: status,
       article: fallbackArticle
     });
   }
@@ -1343,16 +1159,54 @@ const extractScientificArticleHandler = async (req, res) => {
       fallbackArticle.warnings.push(
         "No se pudo estructurar con IA; se completaron solo metadatos públicos disponibles."
       );
-      logExtraction(200, { extractionStatus: "failed", domain: articleUrl.hostname });
+      const status = hasMetadataContent(fallbackArticle) ? "metadata_only" : "failed";
+      logExtraction(200, {
+        extractionStatus: status,
+        domain: articleUrl.hostname,
+        htmlLength: html.length,
+        publicTextLength: cleanString(metadata.publicText).length,
+        detectedFieldCount: 0
+      });
       return res.status(200).json({
         ok: true,
-        extractionStatus: "failed",
+        extractionStatus: status,
         article: fallbackArticle
       });
     }
 
     const article = normalizeAiArticleOutput(articleUrl, metadata, aiDraft);
-    logExtraction(200, { extractionStatus: "ai_draft", domain: articleUrl.hostname });
+    const quality = getAiDraftQuality(aiDraft);
+    if (!quality.isUseful) {
+      article.warnings.push(
+        "La IA no detectó suficientes datos clínicos; se completaron solo metadatos públicos disponibles."
+      );
+      const metadataArticle = {
+        ...fallbackArticle,
+        warnings: article.warnings,
+        extractionConfidence: Math.min(article.extractionConfidence || 0.25, 0.35)
+      };
+      const status = hasMetadataContent(metadataArticle) ? "metadata_only" : "failed";
+      logExtraction(200, {
+        extractionStatus: status,
+        domain: articleUrl.hostname,
+        htmlLength: html.length,
+        publicTextLength: cleanString(metadata.publicText).length,
+        ...quality
+      });
+      return res.status(200).json({
+        ok: true,
+        extractionStatus: status,
+        article: metadataArticle
+      });
+    }
+
+    logExtraction(200, {
+      extractionStatus: "ai_draft",
+      domain: articleUrl.hostname,
+      htmlLength: html.length,
+      publicTextLength: cleanString(metadata.publicText).length,
+      ...quality
+    });
     return res.status(200).json({
       ok: true,
       extractionStatus: "ai_draft",
@@ -1362,10 +1216,17 @@ const extractScientificArticleHandler = async (req, res) => {
     fallbackArticle.warnings.push(
       "La IA no pudo completar la extracción; revisar y completar manualmente."
     );
-    logExtraction(200, { extractionStatus: "failed", domain: articleUrl.hostname });
+    const status = hasMetadataContent(fallbackArticle) ? "metadata_only" : "failed";
+    logExtraction(200, {
+      extractionStatus: status,
+      domain: articleUrl.hostname,
+      htmlLength: html.length,
+      publicTextLength: cleanString(metadata.publicText).length,
+      detectedFieldCount: 0
+    });
     return res.status(200).json({
       ok: true,
-      extractionStatus: "failed",
+      extractionStatus: status,
       article: fallbackArticle
     });
   }

@@ -30,6 +30,25 @@ const normalizeTags = (value = []) =>
     .filter(Boolean)
     .slice(0, 12);
 
+const firstText = (input = {}, keys = []) => {
+  for (const key of keys) {
+    const value = input?.[key];
+    if (typeof value === "string" && value.trim()) return cleanString(value);
+    if (Array.isArray(value)) {
+      const first = value.find((entry) => typeof entry === "string" && entry.trim());
+      if (first) return cleanString(first);
+    }
+    if (value && typeof value === "object") {
+      for (const nestedKey of ["name", "title", "headline"]) {
+        if (typeof value[nestedKey] === "string" && value[nestedKey].trim()) {
+          return cleanString(value[nestedKey]);
+        }
+      }
+    }
+  }
+  return "";
+};
+
 export const inferSourceNameFromDomain = (domain = "") => {
   const cleanDomain = cleanString(domain).toLowerCase();
   if (!cleanDomain) return "";
@@ -118,6 +137,9 @@ const getEndpointErrorMessage = (status, payload) => {
 };
 
 const getExtractionStatusMessage = (status, article) => {
+  if (status === "metadata_only") {
+    return article?.warnings?.[0] || "Se cargaron metadatos básicos. Completá los datos clínicos antes de guardar.";
+  }
   if (status === "not_configured") {
     return article?.warnings?.[0] || "Falta configurar OPENAI_API_KEY para completar el análisis.";
   }
@@ -128,24 +150,40 @@ const getExtractionStatusMessage = (status, article) => {
 };
 
 const normalizeExtractionArticle = (input = {}, urlInfo) => ({
-  title: cleanString(input.title),
-  sourceName: cleanString(input.sourceName) || urlInfo.sourceName,
-  officialUrl: cleanString(input.officialUrl) || urlInfo.href,
-  sourceDomain: cleanString(input.sourceDomain) || urlInfo.domain,
-  studyType: cleanString(input.studyType),
-  evidenceType: cleanString(input.evidenceType),
-  publicationDate: cleanString(input.publicationDate),
-  studyLocation: cleanString(input.studyLocation),
-  executiveSummary: cleanString(input.executiveSummary),
-  clinicalQuestion: cleanString(input.clinicalQuestion),
-  mainResult: cleanString(input.mainResult),
-  tags: normalizeTags(input.tags),
-  accessType: cleanString(input.accessType) || "Pendiente",
-  extractionConfidence: Number.isFinite(Number(input.extractionConfidence))
-    ? Math.max(0, Math.min(1, Number(input.extractionConfidence)))
+  title: firstText(input, ["title", "titulo", "articleTitle", "headline"]),
+  sourceName:
+    firstText(input, ["sourceName", "source", "journal", "journalTitle", "revista", "fuente", "publisher"]) ||
+    urlInfo.sourceName,
+  officialUrl: urlInfo.href,
+  sourceDomain: urlInfo.domain,
+  studyType: firstText(input, ["studyType", "typeOfStudy", "study_design", "studyDesign", "tipoEstudio", "tipo_de_estudio", "design"]),
+  evidenceType: firstText(input, ["evidenceType", "typeOfEvidence", "evidence_level", "evidenceLevel", "tipoEvidencia", "tipo_de_evidencia"]),
+  publicationDate: firstText(input, ["publicationDate", "publishedAt", "publication_date", "datePublished", "fechaPublicacion", "fecha_de_publicacion"]),
+  studyLocation: firstText(input, ["studyLocation", "location", "studyCountry", "setting", "lugar", "contexto"]),
+  executiveSummary: firstText(input, ["executiveSummary", "summary", "abstract", "resumen", "resumenEjecutivo", "resumen_ejecutivo"]),
+  clinicalQuestion: firstText(input, ["clinicalQuestion", "question", "researchQuestion", "preguntaClinica", "pregunta_clinica", "pregunta"]),
+  mainResult: firstText(input, ["mainResult", "result", "results", "findings", "conclusion", "resultadoPrincipal", "resultado_principal", "mainFinding"]),
+  tags: normalizeTags(input.tags || input.keywords || input.etiquetas || input.palabrasClave || input.palabras_clave),
+  accessType: firstText(input, ["accessType", "access", "acceso", "availability"]) || "Pendiente",
+  extractionConfidence: Number.isFinite(Number(input.extractionConfidence ?? input.confidence ?? input.confianza))
+    ? Math.max(0, Math.min(1, Number(input.extractionConfidence ?? input.confidence ?? input.confianza)))
     : 0,
-  warnings: normalizeTags(input.warnings || input.extractionWarnings)
+  warnings: normalizeTags(input.warnings || input.extractionWarnings || input.advertencias)
 });
+
+const hasUsefulAiDraft = (article = {}) =>
+  Boolean(
+    cleanString(article.executiveSummary).length >= 24 ||
+      cleanString(article.clinicalQuestion).length >= 24 ||
+      cleanString(article.mainResult).length >= 24 ||
+      article.studyType ||
+      article.evidenceType ||
+      article.studyLocation ||
+      (Array.isArray(article.tags) && article.tags.length >= 2)
+  );
+
+const hasMetadataDraft = (article = {}) =>
+  Boolean(article.title || article.executiveSummary || article.publicationDate);
 
 export async function requestArticleExtraction(url, { auth, endpoint } = {}) {
   const validation = validateArticleUrl(url);
@@ -206,18 +244,12 @@ export async function requestArticleExtraction(url, { auth, endpoint } = {}) {
     }
 
     const article = normalizeExtractionArticle(payload.article || payload, validation);
-    const hasStructuredDraft = Boolean(
-      article.title ||
-        article.executiveSummary ||
-        article.clinicalQuestion ||
-        article.mainResult ||
-        article.evidenceType ||
-        article.studyType
-    );
-
-    const extractionStatus =
-      payload.extractionStatus ||
-      (hasStructuredDraft ? "ai_draft" : "not_configured");
+    const backendStatus = cleanString(payload.extractionStatus);
+    const usefulAiDraft = hasUsefulAiDraft(article);
+    let extractionStatus = backendStatus || (usefulAiDraft ? "ai_draft" : "metadata_only");
+    if (extractionStatus === "ai_draft" && !usefulAiDraft) {
+      extractionStatus = hasMetadataDraft(article) ? "metadata_only" : "failed";
+    }
 
     return {
       ok: true,

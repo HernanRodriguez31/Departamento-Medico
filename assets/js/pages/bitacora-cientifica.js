@@ -34,6 +34,7 @@ const STATUS_LABELS = {
 };
 const EXTRACTION_LABELS = {
   ai_draft: "Borrador automático",
+  metadata_only: "Metadatos básicos",
   failed: "Extracción fallida",
   not_configured: "IA no configurada"
 };
