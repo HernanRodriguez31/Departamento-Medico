@@ -527,6 +527,8 @@ test("document OpenAI payload uses strict schema and Spanish anti-hallucination 
   assert.ok(payload.messages[0].content.includes("No inventes datos"));
   assert.ok(payload.response_format.json_schema.schema.required.includes("objectiveEs"));
   assert.ok(payload.response_format.json_schema.schema.required.includes("mainMessageEs"));
+  assert.ok(payload.response_format.json_schema.schema.required.includes("studyDesignEs"));
+  assert.ok(payload.response_format.json_schema.schema.required.includes("studyContextEs"));
   assert.equal(payload.response_format.json_schema.schema.required.includes("clinicalQuestionEs"), false);
 });
 
@@ -570,7 +572,11 @@ References
     cardSummaryEs: "Presenta el HEARTS Quality Framework para fortalecer la calidad de atención en hipertensión y riesgo cardiovascular en atención primaria.",
     executiveSummaryEs: "El documento describe un marco regional para institucionalizar y escalar HEARTS en las Américas. Integra evidencia, experiencia de países y consenso experto para mejorar protocolos, equipos, dispositivos, medicamentos, monitoreo y gobernanza en atención primaria.",
     objectiveEs: "Describir y fundamentar un marco de calidad para institucionalizar y escalar HEARTS en las Américas.",
-    methodologyEs: "Health Policy basado en implementación regional, evidencia internacional, experiencia de países y consenso experto.",
+    studyDesignEs: "Health Policy basado en implementación regional, evidencia internacional, experiencia de países y consenso experto.",
+    studyContextEs: "Marco desarrollado para países de las Américas, con foco en atención primaria, hipertensión y riesgo cardiovascular.",
+    studyPopulationEs: "Personas adultas con hipertensión o riesgo cardiovascular atendidas en redes de atención primaria.",
+    studyLocationEs: "Américas / América Latina y el Caribe.",
+    studyPeriodEs: "Implementación regional y desarrollo del marco entre 2016 y 2025.",
     mainMessageEs: "La mejora sostenida del control de hipertensión requiere protocolos estandarizados, equipos capacitados, dispositivos validados, medicamentos esenciales, monitoreo continuo y gobernanza sanitaria.",
     keyPointsEs: [
       "HEARTS se implementa regionalmente en atención primaria.",
@@ -606,6 +612,10 @@ References
   assert.equal(result.extractionStatus, "ai_draft");
   assert.equal(result.article.articleType, "Health Policy");
   assert.equal(result.article.objectiveEs.length > 0, true);
+  assert.equal(result.article.studyDesignEs.length > 0, true);
+  assert.equal(result.article.studyContextEs.length > 0, true);
+  assert.equal(result.article.studyLocationEs.length > 0, true);
+  assert.equal(result.article.methodologyEs, result.article.studyDesignEs);
   assert.equal(result.article.mainMessageEs.length > 0, true);
   assert.equal(result.article.keyPointsEs.length >= 3 && result.article.keyPointsEs.length <= 5, true);
   assert.deepEqual(result.article.tags.slice(0, 3), ["Hipertensión", "Riesgo cardiovascular", "Atención primaria"]);
@@ -634,7 +644,11 @@ test("document AI output is normalized and empty output is not ai_draft", async 
     cardSummaryEs: "Ficha breve en español para revisión del equipo médico.",
     executiveSummaryEs: "Resumen ejecutivo en español basado exclusivamente en el texto aportado.",
     objectiveEs: "Presentar un marco que fortalece la gestión de hipertensión en atención primaria.",
-    methodologyEs: "Síntesis documental de implementación regional.",
+    studyDesignEs: "Síntesis documental de implementación regional.",
+    studyContextEs: "Documento de implementación regional en atención primaria.",
+    studyPopulationEs: "Equipos y sistemas de atención primaria.",
+    studyLocationEs: "Américas.",
+    studyPeriodEs: "",
     mainMessageEs: "El documento organiza indicadores y objetivos de calidad para atención primaria.",
     keyPointsEs: ["Calidad", "Atención primaria", "Gestión sanitaria"],
     limitationsEs: "No especifica resultados clínicos individuales.",
@@ -686,7 +700,11 @@ test("document AI falls back to secondary model when configured model fails", as
     cardSummaryEs: "Resumen breve en español para validar el fallback.",
     executiveSummaryEs: "Resumen ejecutivo en español basado en evidencia real del documento.",
     objectiveEs: "Validar el funcionamiento del modelo documental secundario.",
-    methodologyEs: "Prueba de fallback con structured outputs.",
+    studyDesignEs: "Prueba de fallback con structured outputs.",
+    studyContextEs: "Documento de prueba con evidencia textual suficiente.",
+    studyPopulationEs: "",
+    studyLocationEs: "",
+    studyPeriodEs: "2026",
     mainMessageEs: "El sistema puede continuar si falla el modelo configurado.",
     keyPointsEs: ["Fallback", "Structured outputs", "Validación"],
     localApplicabilityEs: "",
@@ -731,7 +749,11 @@ test("document resolver processes pasted text, rejects short text and handles PD
     cardSummaryEs: "Resumen breve en español para la tarjeta científica.",
     executiveSummaryEs: "Resumen ejecutivo en español basado en el documento aportado.",
     objectiveEs: "Describir qué propósito científico aborda el documento.",
-    methodologyEs: "Metodología descrita en el documento.",
+    studyDesignEs: "Metodología descrita en el documento.",
+    studyContextEs: "Documento con resumen, metodología, resultados y conclusiones.",
+    studyPopulationEs: "",
+    studyLocationEs: "",
+    studyPeriodEs: "2026",
     mainMessageEs: "Mensaje principal derivado del texto aportado.",
     keyPointsEs: ["Punto clave uno", "Punto clave dos", "Punto clave tres"],
     limitationsEs: "",

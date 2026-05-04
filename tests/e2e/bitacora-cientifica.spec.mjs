@@ -54,20 +54,27 @@ test("scientific logbook renders as operational hub with modals and article crea
           originalLanguage: "en",
           articleType: "Artículo científico",
           studyType: "Revisión narrativa",
+          studyDesignEs: "Revisión narrativa documentada en español.",
+          studyContextEs: isTextMode
+            ? "Documento aportado para revisión editorial del equipo médico."
+            : "Documento PDF revisado por IA en backend.",
+          studyPopulationEs: "Población indicada por el documento de prueba.",
+          studyLocationEs: "Contexto QA.",
+          studyPeriodEs: "2026",
           evidenceType: "Revisión científica",
           accessType: "Pendiente",
           cardSummaryEs: isTextMode
-            ? "Resumen breve en español desde texto pegado."
+            ? "Resumen breve en español desde documento aportado."
             : "Resumen breve en español desde PDF.",
           executiveSummaryEs: isTextMode
-            ? "Resumen ejecutivo en español generado desde texto pegado."
+            ? "Resumen ejecutivo en español generado desde documento aportado."
             : "Resumen ejecutivo en español generado desde PDF.",
           abstractSummaryEs: "Abstract sintetizado y traducido al español.",
           objectiveEs: "Objetivo o pregunta sintetizada en español.",
           clinicalQuestionEs: "Objetivo o pregunta sintetizada en español.",
           mainMessageEs: "Mensaje principal en español.",
           mainResultEs: "Mensaje principal en español.",
-          methodologyEs: "Metodología resumida en español.",
+          methodologyEs: "Revisión narrativa documentada en español.",
           keyPointsEs: ["Punto clave uno", "Punto clave dos", "Punto clave tres"],
           limitationsEs: "Limitaciones sintetizadas en español.",
           localApplicabilityEs: "Aplicabilidad local para revisión del equipo.",
@@ -282,7 +289,7 @@ test("scientific logbook renders as operational hub with modals and article crea
   expect(bodyBackground).not.toBe("none");
 
   await expect(page.locator("h1")).toHaveCount(1);
-  await expect(page.locator("#bitacora-heading")).toHaveText("Bitácora Científica");
+  await expect(page.locator("#bitacora-heading")).toHaveText("Bitácora de Ciencia Médica");
   await expect(page.locator(".bitacora-intro-segment")).toHaveCount(1);
   await expect(page.locator(".bitacora-publications-segment")).toHaveCount(1);
   await expect(page.locator(".bitacora-breadcrumb")).toHaveText("Portal");
@@ -292,7 +299,7 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(sourcesTrigger).toBeVisible();
   await expect(page.locator(".bitacora-publications-panel")).toBeVisible();
   await expect(page.locator(".bitacora-publications-panel")).toHaveCSS("background-color", /rgba?|rgb/);
-  await expect(page.locator("#bitacora-publicaciones-title")).toHaveText("Publicaciones científicas");
+  await expect(page.locator("#bitacora-publicaciones-title")).toHaveText("Publicaciones recomendadas");
   await expect(page.getByRole("button", { name: "Agregar artículo" })).toBeVisible();
   await expect(page.locator(".bitacora-filters-card")).toHaveCount(0);
   await expect(page.locator("#bitacora-search")).toHaveCount(0);
@@ -478,8 +485,8 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(articleModal.getByRole("tab", { name: "Desde PDF" })).toBeVisible();
   await expect(articleModal.getByRole("tab", { name: "Texto pegado" })).toBeVisible();
   await expect(articleModal.getByRole("tab", { name: "Datos manuales" })).toBeVisible();
-  await expect(articleModal).toContainText("Cargado por");
-  await expect(articleModal).toContainText("Pendiente de revisión");
+  await expect(articleModal).not.toContainText("Cargado por");
+  await expect(articleModal).not.toContainText("Pendiente de revisión");
 
   const saveArticleButton = articleModal.getByRole("button", { name: "Guardar artículo" });
   await expect(saveArticleButton).toBeVisible();
@@ -498,7 +505,7 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(articleModal).toBeHidden({ timeout: 30_000 });
   const incompleteDraft = page.locator(".bitacora-post").filter({ hasText: "Borrador científico sin título" }).first();
   await expect(incompleteDraft).toBeVisible({ timeout: 30_000 });
-  await expect(incompleteDraft).toContainText("Borrador incompleto");
+  await expect(incompleteDraft).not.toContainText("Borrador incompleto");
   page.once("dialog", (dialog) => dialog.accept());
   await incompleteDraft.getByRole("button", { name: "Eliminar" }).click();
   await expect(page.locator(".bitacora-post")).toHaveCount(0);
@@ -506,11 +513,15 @@ test("scientific logbook renders as operational hub with modals and article crea
   await page.getByRole("button", { name: "Agregar artículo" }).click();
   await expect(articleModal).toBeVisible();
 
-  await articleModal.locator("#article-pdf-input").setInputFiles({
+  const fileChooserPromise = page.waitForEvent("filechooser");
+  await articleModal.locator("[data-select-pdf]").click();
+  const fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles({
     name: "paper-qa.pdf",
     mimeType: "application/pdf",
     buffer: Buffer.from("%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF")
   });
+  await articleModal.locator("#article-pdf-official-url").fill("https://doi.org/10.1000/documento");
   await expect(articleModal.locator("#article-pdf-file")).toBeVisible();
   await expect(articleModal.locator("#article-pdf-name")).toHaveText("paper-qa.pdf");
   await articleModal.getByRole("button", { name: "Analizar PDF con IA" }).click();
@@ -528,12 +539,20 @@ test("scientific logbook renders as operational hub with modals and article crea
 
   const pdfPost = page.locator(".bitacora-post").filter({ hasText: "PDF QA Bitácora" }).first();
   await expect(pdfPost).toBeVisible({ timeout: 30_000 });
-  await expect(pdfPost).toContainText("PDF");
+  await expect(pdfPost).not.toContainText("Pendiente de revisión");
+  await expect(pdfPost).not.toContainText("Borrador automático");
+  await expect(pdfPost).not.toContainText("Metadatos básicos");
+  await expect(pdfPost).not.toContainText("Extracción fallida");
   await expect(pdfPost).toContainText("Resumen breve en español desde PDF.");
   await expect(pdfPost.getByRole("button", { name: "Ver PDF" })).toBeVisible();
+  await expect(pdfPost.getByRole("link", { name: "Ver fuente original" })).toHaveAttribute("href", "https://doi.org/10.1000/documento");
   await pdfPost.getByRole("button", { name: "Leer análisis" }).click();
   await expect(pdfPost.locator(".bitacora-analysis")).toContainText("Objetivo o pregunta sintetizada en español.");
   await expect(pdfPost.locator(".bitacora-analysis")).toContainText("Mensaje principal en español.");
+  await page.locator("#bitacora-publicaciones-title").scrollIntoViewIfNeeded();
+  await page.locator("#bitacora-publicaciones-title").click();
+  await expect(pdfPost.locator(".bitacora-analysis")).toBeHidden();
+  await pdfPost.scrollIntoViewIfNeeded();
   page.once("dialog", (dialog) => dialog.accept());
   await pdfPost.getByRole("button", { name: "Eliminar" }).click();
   await expect(page.locator(".bitacora-post")).toHaveCount(0);
@@ -550,13 +569,13 @@ test("scientific logbook renders as operational hub with modals and article crea
     timeout: 30_000
   });
   await expect(articleModal.getByLabel("Título")).toHaveValue("Texto QA traducido");
-  await expect(articleModal.getByLabel("Resumen ejecutivo")).toHaveValue("Resumen ejecutivo en español generado desde texto pegado.");
+  await expect(articleModal.getByLabel("Resumen ejecutivo")).toHaveValue("Resumen ejecutivo en español generado desde documento aportado.");
   await expect(articleModal.locator("#article-advanced-zone")).toBeHidden();
   await articleModal.getByRole("button", { name: "Guardar como borrador" }).click();
   await expect(articleModal).toBeHidden({ timeout: 30_000 });
   const textDraft = page.locator(".bitacora-post").filter({ hasText: "Texto QA traducido" }).first();
   await expect(textDraft).toBeVisible({ timeout: 30_000 });
-  await expect(textDraft).toContainText("Texto pegado");
+  await expect(textDraft).not.toContainText("Texto pegado");
   page.once("dialog", (dialog) => dialog.accept());
   await textDraft.getByRole("button", { name: "Eliminar" }).click();
   await expect(page.locator(".bitacora-post")).toHaveCount(0);
@@ -564,13 +583,14 @@ test("scientific logbook renders as operational hub with modals and article crea
   await page.getByRole("button", { name: "Agregar artículo" }).click();
   await expect(articleModal).toBeVisible();
   await articleModal.getByRole("tab", { name: "Datos manuales" }).click();
-  await expect(articleModal.getByLabel("URL del artículo o paper")).toBeVisible();
+  const manualUrlInput = articleModal.locator("#article-tab-manual").getByLabel("URL oficial del artículo", { exact: true });
+  await expect(manualUrlInput).toBeVisible();
 
-  await articleModal.getByLabel("URL del artículo o paper").fill("javascript:alert(1)");
+  await manualUrlInput.fill("javascript:alert(1)");
   await articleModal.getByRole("button", { name: "Analizar enlace con IA" }).click();
   await expect(articleModal.locator("#article-url-error")).toContainText("URL", { timeout: 10_000 });
 
-  await articleModal.getByLabel("URL del artículo o paper").fill("https://example.org/partial");
+  await manualUrlInput.fill("https://example.org/partial");
   await articleModal.getByRole("button", { name: "Analizar enlace con IA" }).click();
   await expect(articleModal.locator("#article-ai-status")).not.toContainText("Datos cargados por IA", {
     timeout: 10_000
@@ -583,20 +603,20 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(page.locator(".bitacora-post")).toHaveCount(0);
   await expect(page.locator("#bitacora-results-count")).toHaveText("0 artículos agregados");
 
-  await articleModal.getByLabel("URL del artículo o paper").fill("https://example.org/auth");
+  await manualUrlInput.fill("https://example.org/auth");
   await articleModal.getByRole("button", { name: "Analizar enlace con IA" }).click();
   await expect(articleModal.locator("#article-ai-status")).toContainText("Necesitás iniciar sesión para analizar enlaces.", {
     timeout: 10_000
   });
 
   await articleModal.getByLabel("Título").fill("Título manual preservado");
-  await articleModal.getByLabel("URL del artículo o paper").fill("https://example.org/failed");
+  await manualUrlInput.fill("https://example.org/failed");
   await articleModal.getByRole("button", { name: "Analizar enlace con IA" }).click();
   await expect(articleModal.locator("#article-ai-status")).toContainText("No se pudo extraer información suficiente", {
     timeout: 10_000
   });
   await expect(articleModal.getByLabel("Título")).toHaveValue("Título manual preservado");
-  await articleModal.getByLabel("URL del artículo o paper").fill("https://pubmed.ncbi.nlm.nih.gov/123456/");
+  await manualUrlInput.fill("https://pubmed.ncbi.nlm.nih.gov/123456/");
   await expect(articleModal.locator("#article-domain-detected")).toContainText("pubmed.ncbi.nlm.nih.gov");
   await articleModal.getByRole("button", { name: "Analizar enlace con IA" }).click();
   await expect(articleModal.locator("#article-ai-status")).toContainText("Borrador cargado por IA", {
@@ -633,9 +653,9 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(newPost).toBeVisible({ timeout: 30_000 });
   await expect(page.locator(".bitacora-post")).toHaveCount(1);
   await expect(page.locator("#bitacora-results-count")).toHaveText("1 artículo agregado");
-  await expect(newPost).toContainText("Pendiente de revisión");
-  await expect(newPost).toContainText("Borrador automático");
-  await expect(newPost).toContainText("Dra. Mobile QA");
+  await expect(newPost).not.toContainText("Pendiente de revisión");
+  await expect(newPost).not.toContainText("Borrador automático");
+  await expect(newPost).not.toContainText("Dra. Mobile QA");
   await expect(newPost).toContainText("Resumen generado por IA desde Playwright.");
   await expect(newPost.locator(".bitacora-tag")).toHaveCount(4);
   await expect(newPost.getByRole("link", { name: "Ver fuente original" })).toHaveAttribute(
@@ -648,6 +668,11 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(newPost.getByRole("button", { name: "Ocultar análisis" })).toHaveAttribute("aria-expanded", "true");
   await expect(newPost.locator(".bitacora-analysis")).toBeVisible();
   await expect(newPost.locator(".bitacora-analysis")).toContainText("Pregunta clínica generada por IA.");
+  await expect(newPost.locator(".bitacora-analysis")).not.toContainText("Confianza");
+  await expect(newPost.locator(".bitacora-analysis")).not.toContainText("Usuario");
+  await page.keyboard.press("Escape");
+  await expect(newPost.locator(".bitacora-analysis")).toBeHidden();
+  await newPost.getByRole("button", { name: "Leer análisis" }).click();
   await newPost.getByRole("button", { name: "Ocultar análisis" }).click();
   await expect(newPost.getByRole("button", { name: "Leer análisis" })).toHaveAttribute("aria-expanded", "false");
   await expect(newPost.locator(".bitacora-analysis")).toBeHidden();

@@ -192,6 +192,11 @@ const validBitacoraPayload = (uid = "user-b") => ({
   originalLanguage: "en",
   articleType: "Artículo científico",
   studyLocation: "Contexto laboral",
+  studyDesignEs: "Cohorte con metodología resumida del documento.",
+  studyContextEs: "Contexto sanitario y población descritos por el documento.",
+  studyPopulationEs: "Trabajadores evaluados por el equipo clínico.",
+  studyLocationEs: "Argentina.",
+  studyPeriodEs: "2026",
   cardSummaryEs: "Resumen breve de tarjeta para revisión institucional.",
   executiveSummary: "Resumen para revisión.",
   executiveSummaryEs: "Resumen ejecutivo en español para revisión.",
@@ -214,6 +219,8 @@ const validBitacoraPayload = (uid = "user-b") => ({
   extractionSource: "pdf",
   originalFileName: "articulo.pdf",
   storagePath: `bitacora/article-documents/${uid}/articulo.pdf`,
+  fileSize: 1048576,
+  documentContentType: "application/pdf",
   contentHash: "a".repeat(64),
   pageCount: 8,
   status: "pending_review",
@@ -391,6 +398,8 @@ test("bitacoraArticles allow authenticated reads and valid own creates only", as
       extractionSource: "pasted_text",
       storagePath: "",
       originalFileName: "",
+      fileSize: 0,
+      documentContentType: "",
       pageCount: 0
     })
   );
@@ -409,6 +418,11 @@ test("bitacoraArticles allow authenticated reads and valid own creates only", as
       mainMessageEs: "",
       mainResult: "",
       mainResultEs: "",
+      studyDesignEs: "",
+      studyContextEs: "",
+      studyPopulationEs: "",
+      studyLocationEs: "",
+      studyPeriodEs: "",
       methodologyEs: "",
       evidenceType: "",
       studyType: "",
@@ -429,6 +443,8 @@ test("bitacoraArticles allow authenticated reads and valid own creates only", as
       mainMessageEs: "",
       mainResult: "",
       mainResultEs: "",
+      studyDesignEs: "",
+      studyContextEs: "",
       methodologyEs: ""
     })
   );

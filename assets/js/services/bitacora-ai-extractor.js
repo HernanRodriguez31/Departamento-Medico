@@ -72,6 +72,32 @@ export const inferSourceNameFromDomain = (domain = "") => {
   return cleanDomain.replace(/^www\./, "").split(".").slice(0, 2).join(".");
 };
 
+const isPrivateHostname = (hostname = "") => {
+  const cleanHostname = cleanString(hostname).toLowerCase().replace(/^\[|\]$/g, "");
+  if (
+    cleanHostname === "localhost" ||
+    cleanHostname === "::1" ||
+    cleanHostname.endsWith(".localhost") ||
+    cleanHostname.endsWith(".local") ||
+    cleanHostname.endsWith(".internal")
+  ) {
+    return true;
+  }
+  const ipv4 = cleanHostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!ipv4) return false;
+  const parts = ipv4.slice(1).map(Number);
+  if (parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return true;
+  const [first, second] = parts;
+  return (
+    first === 0 ||
+    first === 10 ||
+    first === 127 ||
+    (first === 169 && second === 254) ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168)
+  );
+};
+
 export const validateArticleUrl = (value = "") => {
   try {
     const url = new URL(cleanString(value));
@@ -82,14 +108,7 @@ export const validateArticleUrl = (value = "") => {
       };
     }
     const hostname = url.hostname.toLowerCase();
-    const isLocalHost =
-      hostname === "localhost" ||
-      hostname === "127.0.0.1" ||
-      hostname === "0.0.0.0" ||
-      hostname.endsWith(".localhost") ||
-      hostname.endsWith(".local") ||
-      hostname.endsWith(".internal");
-    if (isLocalHost) {
+    if (isPrivateHostname(hostname)) {
       return {
         ok: false,
         message: "Ingresá una URL pública del artículo científico."
@@ -324,7 +343,12 @@ const normalizeDocumentArticle = (input = {}) => {
     clinicalQuestionEs: objectiveEs,
     mainMessageEs,
     mainResultEs: mainMessageEs,
-    methodologyEs: firstText(input, ["methodologyEs", "methodology", "methods", "metodologia"]),
+    studyDesignEs: firstText(input, ["studyDesignEs", "studyDesign", "designEs", "methodologyEs", "methodology", "methods", "metodologia"]),
+    studyContextEs: firstText(input, ["studyContextEs", "studyContext", "contextoEstudio", "contextEs"]),
+    studyPopulationEs: firstText(input, ["studyPopulationEs", "studyPopulation", "populationEs", "poblacion"]),
+    studyLocationEs: firstText(input, ["studyLocationEs", "studyLocation", "locationEs", "lugar"]),
+    studyPeriodEs: firstText(input, ["studyPeriodEs", "studyPeriod", "periodEs", "periodo"]),
+    methodologyEs: firstText(input, ["methodologyEs", "methodology", "methods", "metodologia", "studyDesignEs", "studyDesign"]),
     keyPointsEs: normalizeTags(input.keyPointsEs || input.keyPoints || input.puntosClave).slice(0, 5),
     limitationsEs: firstText(input, ["limitationsEs", "limitations", "limitaciones"]),
     localApplicabilityEs: firstText(input, ["localApplicabilityEs", "localApplicability", "aplicabilidadLocal"]),
@@ -341,7 +365,8 @@ const normalizeDocumentArticle = (input = {}) => {
 const hasUsefulDocumentDraft = (article = {}) => {
   const usefulFieldCount = [
     cleanString(article.objectiveEs || article.clinicalQuestionEs).length >= 24,
-    cleanString(article.methodologyEs).length >= 24,
+    cleanString(article.studyDesignEs || article.methodologyEs).length >= 24,
+    cleanString(article.studyContextEs).length >= 24,
     cleanString(article.mainMessageEs || article.mainResultEs).length >= 24,
     Boolean(cleanString(article.evidenceType)),
     Array.isArray(article.keyPointsEs) && article.keyPointsEs.length >= 3

@@ -13,13 +13,13 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { BITACORA_POSTS } from "../data/bitacora-posts.js";
 import { NATIONAL_SELECTED_SOURCE_IDS, SCIENTIFIC_SOURCES } from "../data/scientific-sources.js";
-import { createBitacoraArticleRepository } from "../services/bitacora-article-repository.js?v=20260504-bitacora-editorial-agent-1";
+import { createBitacoraArticleRepository } from "../services/bitacora-article-repository.js?v=20260504-bitacora-final-polish-1";
 import {
   inferSourceNameFromDomain,
   requestArticleExtraction,
   requestArticleDocumentExtraction,
   validateArticleUrl
-} from "../services/bitacora-ai-extractor.js?v=20260504-bitacora-editorial-agent-1";
+} from "../services/bitacora-ai-extractor.js?v=20260504-bitacora-final-polish-1";
 
 const { auth, db, storage } = getFirebase();
 
@@ -82,6 +82,7 @@ const els = {
   pdfFile: $("#article-pdf-file"),
   pdfName: $("#article-pdf-name"),
   pdfSize: $("#article-pdf-size"),
+  pdfOfficialUrl: $("#article-pdf-official-url"),
   selectPdfButton: $("[data-select-pdf]"),
   removePdfButton: $("[data-remove-pdf]"),
   analyzePdfButton: $("[data-analyze-pdf]"),
@@ -138,6 +139,8 @@ const state = {
     pii: "",
     originalFileName: "",
     storagePath: "",
+    fileSize: 0,
+    documentContentType: "",
     contentHash: "",
     pageCount: 0,
     sourcePages: [],
@@ -302,6 +305,11 @@ const renderUserArticle = (article) => ({
   publicationDate: article.publicationDate,
   originalLanguage: article.originalLanguage,
   articleType: article.articleType,
+  studyDesignEs: article.studyDesignEs || article.methodologyEs,
+  studyContextEs: article.studyContextEs,
+  studyPopulationEs: article.studyPopulationEs,
+  studyLocationEs: article.studyLocationEs || article.studyLocation,
+  studyPeriodEs: article.studyPeriodEs,
   createdAt: article.createdAt,
   createdAtLabel: formatDateTime(article.createdAt),
   createdByUid: article.createdBy?.uid || "",
@@ -330,6 +338,8 @@ const renderUserArticle = (article) => ({
   studyLocation: article.studyLocation,
   originalFileName: article.originalFileName,
   storagePath: article.storagePath,
+  fileSize: article.fileSize,
+  documentContentType: article.documentContentType,
   contentHash: article.contentHash,
   pageCount: article.pageCount,
   sourcePages: article.sourcePages || [],
@@ -359,6 +369,11 @@ const getSearchText = (post) =>
       post.executiveSummary,
       post.objectiveEs,
       post.clinicalQuestion,
+      post.studyDesignEs,
+      post.studyContextEs,
+      post.studyPopulationEs,
+      post.studyLocationEs,
+      post.studyPeriodEs,
       post.mainMessageEs,
       post.mainResult,
       post.userComment,
@@ -397,12 +412,6 @@ const renderTags = (items = [], limit = 3) => {
   ].join("");
 };
 
-const getStatusBadgeClass = (post) => {
-  if (post.status === "draft") return "bitacora-badge--draft";
-  if (post.status === "template") return "bitacora-badge--template";
-  return "bitacora-badge--status";
-};
-
 const hasMeaningfulAnalysisValue = (value = "") => {
   const clean = normalizeText(value);
   return Boolean(
@@ -411,44 +420,6 @@ const hasMeaningfulAnalysisValue = (value = "") => {
       clean !== normalizeText("Pendiente") &&
       clean !== normalizeText("Artículo cargado para revisión interna.")
   );
-};
-
-const isIncompleteDraft = (post) =>
-  post.status === "draft" &&
-  ![
-    post.executiveSummary,
-    post.cardSummaryEs,
-    post.objectiveEs,
-    post.clinicalQuestion,
-    post.mainMessageEs,
-    post.mainResult,
-    post.methodologyEs,
-    post.studyType,
-    post.evidenceType
-  ].some(hasMeaningfulAnalysisValue);
-
-const renderBadges = (post) => {
-  const statusLabel = isIncompleteDraft(post)
-    ? "Borrador incompleto"
-    : STATUS_LABELS[post.status] || "Pendiente de revisión";
-  const badges = [
-    `<span class="bitacora-badge ${getStatusBadgeClass(post)}">${escapeHtml(statusLabel)}</span>`
-  ];
-  if (post.extractionSource && EXTRACTION_SOURCE_LABELS[post.extractionSource]) {
-    badges.push(
-      `<span class="bitacora-badge bitacora-badge--source">${escapeHtml(
-        EXTRACTION_SOURCE_LABELS[post.extractionSource]
-      )}</span>`
-    );
-  }
-  if (post.extractionStatus && EXTRACTION_LABELS[post.extractionStatus]) {
-    badges.push(
-      `<span class="bitacora-badge bitacora-badge--ai">${escapeHtml(
-        EXTRACTION_LABELS[post.extractionStatus]
-      )}</span>`
-    );
-  }
-  return badges.join("");
 };
 
 const renderAnalysisBlock = (analysisId, suffix, title, content) => {
@@ -474,44 +445,35 @@ const renderAnalysisListBlock = (analysisId, suffix, title, items = []) => {
   `;
 };
 
-const renderWarnings = (warnings = []) => {
-  const cleanWarnings = warnings.map((warning) => String(warning || "").trim()).filter(Boolean);
-  if (!cleanWarnings.length) return "";
+const renderBibliography = (analysisId, post) => {
+  const authors = Array.isArray(post.authors) ? post.authors.filter(Boolean) : [];
+  const authorLabel = authors.length > 3 ? `${authors.slice(0, 3).join(", ")} et al.` : authors.join(", ");
+  const rows = [
+    ["Revista / fuente", post.journal || post.sourceName],
+    ["Fecha de publicación", formatDateOnly(post.publicationDate)],
+    ["DOI", post.doi],
+    ["Autores principales", authorLabel],
+    ["URL oficial", ensureWebUrl(post.officialUrl)]
+  ].filter(([, value]) => hasMeaningfulAnalysisValue(value));
+  if (!rows.length) return "";
   return `
-    <div class="bitacora-analysis__warnings" role="note">
-      ${cleanWarnings.map((warning) => `<p>${escapeHtml(warning)}</p>`).join("")}
-    </div>
+    <section aria-labelledby="${analysisId}-bibliography">
+      <h3 id="${analysisId}-bibliography">Datos bibliográficos</h3>
+      <dl class="bitacora-analysis__compact-list">
+        ${rows
+          .map(
+            ([label, value]) => `
+              <div>
+                <dt>${escapeHtml(label)}</dt>
+                <dd>${escapeHtml(value)}</dd>
+              </div>
+            `
+          )
+          .join("")}
+      </dl>
+    </section>
   `;
 };
-
-const renderTrace = (post) => `
-  <dl class="bitacora-trace">
-    <div>
-      <dt>Fuente oficial</dt>
-      <dd>${escapeHtml(getSafeField(post.officialUrl))}</dd>
-    </div>
-    <div>
-      <dt>Usuario</dt>
-      <dd>${escapeHtml(getSafeField(post.createdByName))}</dd>
-    </div>
-    <div>
-      <dt>Fecha y hora</dt>
-      <dd>${escapeHtml(getSafeField(post.createdAtLabel || formatDateTime(post.createdAt)))}</dd>
-    </div>
-    <div>
-      <dt>Estado</dt>
-      <dd>${escapeHtml(STATUS_LABELS[post.status] || "Pendiente de revisión")}</dd>
-    </div>
-    <div>
-      <dt>Documento</dt>
-      <dd>${escapeHtml(getSafeField(post.originalFileName || EXTRACTION_SOURCE_LABELS[post.extractionSource] || ""))}</dd>
-    </div>
-    <div>
-      <dt>Confianza</dt>
-      <dd>${post.extractionConfidence == null ? "No especificado" : `${Math.round(Number(post.extractionConfidence) * 100)}%`}</dd>
-    </div>
-  </dl>
-`;
 
 const canDeleteArticle = (post) =>
   Boolean(
@@ -523,42 +485,49 @@ const canDeleteArticle = (post) =>
 
 const renderAnalysis = (post, analysisId, expanded) => `
   <div id="${analysisId}" class="bitacora-analysis bitacora-analysis-panel" ${expanded ? "" : "hidden"}>
+    <section class="bitacora-analysis__lead" aria-labelledby="${analysisId}-quick">
+      <h3 id="${analysisId}-quick">Lectura rápida</h3>
+      ${hasMeaningfulAnalysisValue(post.executiveSummary || post.summary) ? `<p>${escapeHtml(post.executiveSummary || post.summary)}</p>` : ""}
+      ${hasMeaningfulAnalysisValue(post.mainMessageEs || post.mainResult) ? `<p class="bitacora-analysis__main-message">${escapeHtml(post.mainMessageEs || post.mainResult)}</p>` : ""}
+    </section>
     <div class="bitacora-analysis__grid">
-      ${renderAnalysisBlock(analysisId, "summary", "Resumen ejecutivo", post.executiveSummary || post.summary)}
-      ${renderAnalysisBlock(analysisId, "question", "Objetivo / pregunta", post.objectiveEs || post.clinicalQuestion)}
-      ${renderAnalysisBlock(analysisId, "methodology", "Método o tipo de documento", post.methodologyEs || post.studyType || post.articleType)}
-      ${renderAnalysisBlock(analysisId, "result", "Mensaje principal", post.mainMessageEs || post.mainResult)}
+      ${renderAnalysisBlock(analysisId, "question", "Objetivo", post.objectiveEs || post.clinicalQuestion)}
+      ${renderAnalysisBlock(analysisId, "design", "Diseño / metodología", post.studyDesignEs || post.methodologyEs || post.studyType || post.articleType)}
+      ${renderAnalysisBlock(analysisId, "context", "Dónde y población", post.studyContextEs)}
+      ${renderAnalysisBlock(analysisId, "population", "Población", post.studyPopulationEs)}
+      ${renderAnalysisBlock(analysisId, "location", "Lugar / región", post.studyLocationEs || post.studyLocation)}
+      ${renderAnalysisBlock(analysisId, "period", "Período / año", post.studyPeriodEs)}
       ${renderAnalysisListBlock(analysisId, "keypoints", "Puntos clave", post.keyPointsEs)}
       ${renderAnalysisBlock(analysisId, "local", "Aplicabilidad local", post.localApplicabilityEs)}
       ${renderAnalysisBlock(analysisId, "occupational", "Relevancia para salud ocupacional / gestión sanitaria", post.occupationalHealthRelevanceEs)}
       ${renderAnalysisBlock(analysisId, "limitations", "Limitaciones", post.limitationsEs)}
-      ${renderAnalysisBlock(analysisId, "bibliography", "Datos bibliográficos", [post.journal, post.doi, (post.authors || []).join(", ")].filter(Boolean).join(" · "))}
+      ${renderBibliography(analysisId, post)}
     </div>
-    ${renderWarnings(post.extractionWarnings)}
-    ${renderTrace(post)}
   </div>
 `;
 
-const renderPostMeta = (post) => `
-  <dl class="bitacora-post-card__meta">
-    <div>
-      <dt>Publicación</dt>
-      <dd>${escapeHtml(getSafeField(formatDateOnly(post.publicationDate)))}</dd>
-    </div>
-    <div>
-      <dt>Carga</dt>
-      <dd>${escapeHtml(getSafeField(post.createdAtLabel || formatDateTime(post.createdAt)))}</dd>
-    </div>
-    <div>
-      <dt>Cargado por</dt>
-      <dd>${escapeHtml(getSafeField(post.createdByName))}</dd>
-    </div>
-    <div>
-      <dt>Acceso</dt>
-      <dd>${escapeHtml(getSafeField(post.accessType))}</dd>
-    </div>
-  </dl>
-`;
+const renderPostMeta = (post) => {
+  const rows = [
+    ["Publicación", formatDateOnly(post.publicationDate)],
+    ["Tipo", post.evidenceType || post.articleType || post.studyDesignEs],
+    ["Acceso", post.accessType]
+  ].filter(([, value]) => hasMeaningfulAnalysisValue(value));
+  if (!rows.length) return "";
+  return `
+    <dl class="bitacora-post-card__meta">
+      ${rows
+        .map(
+          ([label, value]) => `
+            <div>
+              <dt>${escapeHtml(label)}</dt>
+              <dd>${escapeHtml(value)}</dd>
+            </div>
+          `
+        )
+        .join("")}
+    </dl>
+  `;
+};
 
 const renderPost = (post) => {
   const expanded = state.expandedPostId === post.id;
@@ -570,9 +539,12 @@ const renderPost = (post) => {
       <div class="bitacora-post-card__inner">
         <div class="bitacora-post-card__header">
           <div class="bitacora-post-card__eyebrow">
-            <span>${escapeHtml(post.sourceName || "Fuente pendiente")}</span>
-            <span>${escapeHtml(post.evidenceType || "Tipo pendiente")}</span>
-            ${renderBadges(post)}
+            <span class="bitacora-post-card__source">${escapeHtml(post.sourceName || post.journal || "Fuente pendiente")}</span>
+            ${
+              hasMeaningfulAnalysisValue(post.evidenceType || post.articleType)
+                ? `<span class="bitacora-post-card__type">${escapeHtml(post.evidenceType || post.articleType)}</span>`
+                : ""
+            }
           </div>
           <h3 class="bitacora-post-card__title">${escapeHtml(post.title || "Artículo sin título")}</h3>
         </div>
@@ -862,6 +834,8 @@ const resetArticleDraftMeta = () => {
     pii: "",
     originalFileName: "",
     storagePath: "",
+    fileSize: 0,
+    documentContentType: "",
     contentHash: "",
     pageCount: 0,
     sourcePages: [],
@@ -996,6 +970,8 @@ const hasArticleEvidenceField = () =>
     $("#article-card-summary")?.value,
     $("#article-clinical-question")?.value,
     $("#article-main-result")?.value,
+    $("#article-study-design")?.value,
+    $("#article-study-context")?.value,
     $("#article-methodology")?.value,
     $("#article-study-type")?.value,
     $("#article-evidence-type")?.value
@@ -1010,7 +986,7 @@ const validateArticleBeforeSave = (requestedStatus = "pending_review") => {
   }
   setArticleError(els.articleUrlError, "");
 
-  const officialUrl = $("#article-official-url")?.value || urlValidation.href;
+  const officialUrl = $("#article-official-url")?.value || els.pdfOfficialUrl?.value || els.pastedUrl?.value || urlValidation.href;
   const officialValidation = validateOptionalArticleUrl(officialUrl);
   if (!officialValidation.ok) {
     setArticleError(els.articleFormError, "El enlace oficial debe ser una URL válida.");
@@ -1067,26 +1043,33 @@ const fillArticleFromExtraction = (article = {}, rawEvidence = null) => {
   const sourceName = article.sourceName || article.journal || "";
   const objective = article.objectiveEs || article.clinicalQuestionEs || article.clinicalQuestion || "";
   const mainMessage = article.mainMessageEs || article.mainResultEs || article.mainResult || "";
+  const studyDesign = article.studyDesignEs || article.methodologyEs || article.studyType || "";
+  const doiUrl = article.doi ? `https://doi.org/${String(article.doi).replace(/^https?:\/\/doi\.org\//i, "")}` : "";
   const fieldMap = {
     "article-title": article.title,
     "article-source-name": sourceName,
     "article-journal": article.journal,
     "article-authors": (article.authors || []).join(", "),
-    "article-official-url": article.officialUrl,
+    "article-official-url": article.officialUrl || doiUrl,
     "article-doi": article.doi,
     "article-type": article.articleType,
-    "article-study-type": article.studyType,
+    "article-study-type": article.studyType || studyDesign,
     "article-evidence-type": article.evidenceType,
     "article-publication-date": article.publicationDate,
     "article-original-language": article.originalLanguage,
-    "article-study-location": article.studyLocation,
+    "article-study-location": article.studyLocation || article.studyLocationEs,
     "article-card-summary": article.cardSummaryEs,
     "article-executive-summary": article.executiveSummaryEs || article.executiveSummary,
     "article-abstract-summary": article.abstractSummaryEs,
     "article-clinical-question": objective,
+    "article-study-design": studyDesign,
+    "article-study-context": article.studyContextEs,
     "article-main-result": mainMessage,
-    "article-methodology": article.methodologyEs,
+    "article-methodology": studyDesign,
     "article-key-points": (article.keyPointsEs || []).join("\n"),
+    "article-study-population": article.studyPopulationEs,
+    "article-study-location-es": article.studyLocationEs || article.studyLocation,
+    "article-study-period": article.studyPeriodEs,
     "article-limitations": article.limitationsEs,
     "article-local-applicability": article.localApplicabilityEs,
     "article-occupational-relevance": article.occupationalHealthRelevanceEs,
@@ -1113,6 +1096,8 @@ const fillArticleFromExtraction = (article = {}, rawEvidence = null) => {
   state.articleDraftMeta.extractionWarnings = article.warnings || [];
   state.articleDraftMeta.contentHash = rawEvidence?.contentHash || state.articleDraftMeta.contentHash;
   state.articleDraftMeta.pageCount = rawEvidence?.pageCount || state.articleDraftMeta.pageCount;
+  state.articleDraftMeta.fileSize = rawEvidence?.fileSize || state.articleDraftMeta.fileSize;
+  state.articleDraftMeta.documentContentType = rawEvidence?.documentContentType || state.articleDraftMeta.documentContentType;
   state.articleDraftMeta.sourcePages = article.sourcePages || state.articleDraftMeta.sourcePages || [];
   state.articleDraftMeta.rawEvidence = rawEvidence || state.articleDraftMeta.rawEvidence;
   setAiWarnings(article.warnings || []);
@@ -1209,13 +1194,15 @@ const validatePdfFile = (file) => {
   return "";
 };
 
-const setSelectedPdfFile = (file) => {
+const handleDocumentFileSelected = (file) => {
   const error = validatePdfFile(file);
   if (error) {
     setArticleError(els.articleFormError, error);
     return false;
   }
   state.selectedPdfFile = file;
+  state.articleDraftMeta.fileSize = file.size || 0;
+  state.articleDraftMeta.documentContentType = file.type || "application/pdf";
   setArticleError(els.articleFormError, "");
   if (els.pdfFile) els.pdfFile.hidden = false;
   if (els.pdfName) els.pdfName.textContent = file.name;
@@ -1225,6 +1212,8 @@ const setSelectedPdfFile = (file) => {
 
 const clearSelectedPdfFile = () => {
   state.selectedPdfFile = null;
+  state.articleDraftMeta.fileSize = 0;
+  state.articleDraftMeta.documentContentType = "";
   if (els.pdfInput) els.pdfInput.value = "";
   if (els.pdfFile) els.pdfFile.hidden = true;
   if (els.pdfName) els.pdfName.textContent = "";
@@ -1265,6 +1254,12 @@ const applyDocumentExtractionResult = (result, source) => {
   if (result.rawEvidence?.pageCount) {
     state.articleDraftMeta.pageCount = result.rawEvidence.pageCount;
   }
+  if (result.rawEvidence?.fileSize) {
+    state.articleDraftMeta.fileSize = result.rawEvidence.fileSize;
+  }
+  if (result.rawEvidence?.documentContentType) {
+    state.articleDraftMeta.documentContentType = result.rawEvidence.documentContentType;
+  }
   if (result.extractionStatus === "ai_draft") {
     setAiStatus(result.message || "Ficha generada por IA. Revisá la información antes de guardar.");
   } else if (result.extractionStatus === "metadata_only") {
@@ -1290,6 +1285,8 @@ const handleAnalyzePdf = async () => {
     const storagePath = await uploadSelectedPdf();
     state.articleDraftMeta.storagePath = storagePath;
     state.articleDraftMeta.originalFileName = state.selectedPdfFile.name;
+    state.articleDraftMeta.fileSize = state.selectedPdfFile.size || 0;
+    state.articleDraftMeta.documentContentType = state.selectedPdfFile.type || "application/pdf";
     state.articleDraftMeta.extractionSource = "pdf";
     setAiStatus("Extrayendo texto…");
     const result = await requestArticleDocumentExtraction(
@@ -1297,7 +1294,7 @@ const handleAnalyzePdf = async () => {
         mode: "pdf",
         storagePath,
         originalFileName: state.selectedPdfFile.name,
-        officialUrl: $("#article-official-url")?.value || els.articleUrl?.value || ""
+        officialUrl: $("#article-official-url")?.value || els.pdfOfficialUrl?.value || els.articleUrl?.value || ""
       },
       { auth }
     );
@@ -1343,7 +1340,7 @@ const handlePdfDrop = (event) => {
   event.preventDefault();
   els.pdfDropzone?.classList.remove("is-dragover");
   const file = event.dataTransfer?.files?.[0] || null;
-  if (file) setSelectedPdfFile(file);
+  if (file) handleDocumentFileSelected(file);
 };
 
 const handleViewPdf = async (postId, button) => {
@@ -1366,7 +1363,13 @@ const handleViewPdf = async (postId, button) => {
 };
 
 const buildArticlePayload = (status) => {
-  const officialUrl = ($("#article-official-url")?.value || els.articleUrl?.value || "").trim();
+  const officialUrl = (
+    $("#article-official-url")?.value ||
+    els.pdfOfficialUrl?.value ||
+    els.pastedUrl?.value ||
+    els.articleUrl?.value ||
+    ""
+  ).trim();
   const urlInfo = validateOptionalArticleUrl(officialUrl);
   const sourceDomain = urlInfo.ok
     ? urlInfo.domain
@@ -1376,6 +1379,8 @@ const buildArticlePayload = (status) => {
     (sourceDomain ? inferSourceNameFromDomain(sourceDomain) : "");
   const objective = $("#article-clinical-question")?.value || "";
   const mainMessage = $("#article-main-result")?.value || "";
+  const studyDesign = $("#article-study-design")?.value || $("#article-methodology")?.value || "";
+  const studyLocationEs = $("#article-study-location-es")?.value || $("#article-study-location")?.value || "";
 
   return {
     title: $("#article-title")?.value || (status === "draft" ? "Borrador científico sin título" : ""),
@@ -1390,11 +1395,16 @@ const buildArticlePayload = (status) => {
     nctId: state.articleDraftMeta.nctId || "",
     pii: state.articleDraftMeta.pii || "",
     articleType: $("#article-type")?.value || "",
-    studyType: $("#article-study-type")?.value || "",
+    studyType: $("#article-study-type")?.value || studyDesign,
     evidenceType: $("#article-evidence-type")?.value || "",
     publicationDate: $("#article-publication-date")?.value || "",
     originalLanguage: $("#article-original-language")?.value || "",
-    studyLocation: $("#article-study-location")?.value || "",
+    studyLocation: studyLocationEs,
+    studyDesignEs: studyDesign,
+    studyContextEs: $("#article-study-context")?.value || "",
+    studyPopulationEs: $("#article-study-population")?.value || "",
+    studyLocationEs,
+    studyPeriodEs: $("#article-study-period")?.value || "",
     cardSummaryEs: $("#article-card-summary")?.value || "",
     executiveSummary: $("#article-executive-summary")?.value || "",
     executiveSummaryEs: $("#article-executive-summary")?.value || "",
@@ -1405,7 +1415,7 @@ const buildArticlePayload = (status) => {
     mainMessageEs: mainMessage,
     mainResult: mainMessage,
     mainResultEs: mainMessage,
-    methodologyEs: $("#article-methodology")?.value || "",
+    methodologyEs: studyDesign,
     keyPointsEs: splitLines($("#article-key-points")?.value || ""),
     limitationsEs: $("#article-limitations")?.value || "",
     localApplicabilityEs: $("#article-local-applicability")?.value || "",
@@ -1417,6 +1427,8 @@ const buildArticlePayload = (status) => {
     extractionSource: state.articleDraftMeta.extractionSource || "manual",
     originalFileName: state.articleDraftMeta.originalFileName || "",
     storagePath: state.articleDraftMeta.storagePath || "",
+    fileSize: state.articleDraftMeta.fileSize || 0,
+    documentContentType: state.articleDraftMeta.documentContentType || "",
     contentHash: state.articleDraftMeta.contentHash || "",
     pageCount: state.articleDraftMeta.pageCount || 0,
     status,
@@ -1534,6 +1546,12 @@ const resetFilters = () => {
   renderPosts();
 };
 
+const collapseOpenAnalysis = () => {
+  if (!state.expandedPostId) return;
+  state.expandedPostId = "";
+  renderPosts();
+};
+
 const initReturnHomeLink = () => {
   const link = els.returnHome;
   if (!link) return;
@@ -1609,6 +1627,20 @@ const bindEvents = () => {
     restored?.querySelector('[data-bitacora-action="toggle-analysis"]')?.focus({ preventScroll: true });
   });
 
+  document.addEventListener("click", (event) => {
+    if (!state.expandedPostId) return;
+    if (event.target.closest("[data-bitacora-action='toggle-analysis']")) return;
+    const openCard = $(`.bitacora-post[data-post-id="${escapeSelector(state.expandedPostId)}"]`);
+    if (openCard?.contains(event.target)) return;
+    collapseOpenAnalysis();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !state.activeModal && state.expandedPostId) {
+      collapseOpenAnalysis();
+    }
+  });
+
   els.sourceScopeButtons.forEach((button) => {
     button.addEventListener("click", () => {
       const nextScope = normalizeSourceScope(button.dataset.sourceScope);
@@ -1649,8 +1681,14 @@ const bindEvents = () => {
   els.articleTabs.forEach((button) => {
     button.addEventListener("click", () => setArticleTab(button.dataset.articleTab));
   });
-  els.selectPdfButton?.addEventListener("click", () => els.pdfInput?.click());
-  els.pdfDropzone?.addEventListener("click", () => els.pdfInput?.click());
+  els.selectPdfButton?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    els.pdfInput?.click();
+  });
+  els.pdfDropzone?.addEventListener("click", (event) => {
+    if (event.target.closest("[data-select-pdf]")) return;
+    els.pdfInput?.click();
+  });
   els.pdfDropzone?.addEventListener("keydown", (event) => {
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
@@ -1672,13 +1710,20 @@ const bindEvents = () => {
   els.pdfDropzone?.addEventListener("drop", handlePdfDrop);
   els.pdfInput?.addEventListener("change", (event) => {
     const file = event.target.files?.[0] || null;
-    if (file) setSelectedPdfFile(file);
+    if (file) handleDocumentFileSelected(file);
   });
   els.removePdfButton?.addEventListener("click", clearSelectedPdfFile);
   els.analyzePdfButton?.addEventListener("click", handleAnalyzePdf);
   els.analyzeTextButton?.addEventListener("click", handleAnalyzePastedText);
   els.pastedUrl?.addEventListener("change", () => {
     const validation = validateOptionalArticleUrl(els.pastedUrl?.value || "");
+    if (validation.ok && validation.href) {
+      setFieldValue("article-official-url", validation.href, { overwrite: false });
+      setFieldValue("article-source-name", validation.sourceName, { overwrite: false });
+    }
+  });
+  els.pdfOfficialUrl?.addEventListener("change", () => {
+    const validation = validateOptionalArticleUrl(els.pdfOfficialUrl?.value || "");
     if (validation.ok && validation.href) {
       setFieldValue("article-official-url", validation.href, { overwrite: false });
       setFieldValue("article-source-name", validation.sourceName, { overwrite: false });

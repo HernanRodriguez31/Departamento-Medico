@@ -58,7 +58,11 @@ const DOCUMENT_AI_ARTICLE_KEYS = [
   "cardSummaryEs",
   "executiveSummaryEs",
   "objectiveEs",
-  "methodologyEs",
+  "studyDesignEs",
+  "studyContextEs",
+  "studyPopulationEs",
+  "studyLocationEs",
+  "studyPeriodEs",
   "mainMessageEs",
   "keyPointsEs",
   "localApplicabilityEs",
@@ -72,6 +76,7 @@ const DOCUMENT_AI_ARTICLE_KEYS = [
 const DOCUMENT_ARTICLE_KEYS = [
   ...DOCUMENT_AI_ARTICLE_KEYS,
   "studyType",
+  "methodologyEs",
   "abstractSummaryEs",
   "clinicalQuestionEs",
   "mainResultEs",
@@ -413,6 +418,11 @@ const buildEmptyArticle = () => ({
   clinicalQuestionEs: "",
   mainMessageEs: "",
   mainResultEs: "",
+  studyDesignEs: "",
+  studyContextEs: "",
+  studyPopulationEs: "",
+  studyLocationEs: "",
+  studyPeriodEs: "",
   methodologyEs: "",
   keyPointsEs: [],
   limitationsEs: "",
@@ -430,6 +440,7 @@ const buildRawEvidence = (packet = {}) => ({
   detectedLanguage: packet.detectedLanguage || "und",
   pageCount: packet.pageCount || 0,
   fileSize: packet.fileSize || 0,
+  documentContentType: packet.documentContentType || "",
   textLength: packet.textLength || 0,
   contentHash: packet.contentHash || "",
   storagePath: packet.storagePath || "",
@@ -479,7 +490,12 @@ const normalizeAiDocumentOutput = (input = {}, packet = {}) => {
     input.mainMessageEs || input.mainMessage || input.messageEs || input.mainResultEs || input.mainResult
   );
   article.mainResultEs = article.mainMessageEs;
-  article.methodologyEs = cleanString(input.methodologyEs);
+  article.studyDesignEs = cleanString(input.studyDesignEs || input.studyDesign || input.designEs || input.methodologyEs);
+  article.studyContextEs = cleanString(input.studyContextEs || input.studyContext || input.contextoEstudio);
+  article.studyPopulationEs = cleanString(input.studyPopulationEs || input.studyPopulation || input.populationEs);
+  article.studyLocationEs = cleanString(input.studyLocationEs || input.studyLocation || input.locationEs || metadata.studyLocation);
+  article.studyPeriodEs = cleanString(input.studyPeriodEs || input.studyPeriod || input.periodEs);
+  article.methodologyEs = article.studyDesignEs;
   article.keyPointsEs = normalizeList(input.keyPointsEs, 5);
   article.limitationsEs = cleanString(input.limitationsEs);
   article.localApplicabilityEs = cleanString(input.localApplicabilityEs);
@@ -510,7 +526,8 @@ const validateStructuredAIOutput = (article = {}) => {
 const scoreDocumentArticle = (article = {}) => {
   const useful = [
     cleanString(article.objectiveEs || article.clinicalQuestionEs).length >= 24,
-    cleanString(article.methodologyEs).length >= 24,
+    cleanString(article.studyDesignEs || article.methodologyEs).length >= 24,
+    cleanString(article.studyContextEs).length >= 24,
     cleanString(article.mainMessageEs || article.mainResultEs).length >= 24,
     Boolean(cleanString(article.evidenceType)),
     Array.isArray(article.keyPointsEs) && article.keyPointsEs.length >= 3
@@ -562,6 +579,8 @@ const buildDocumentExtractionResponse = ({ extractionStatus, article, rawEvidenc
     originalFileName: "",
     detectedLanguage: "und",
     pageCount: 0,
+    fileSize: 0,
+    documentContentType: "",
     textLength: 0,
     detectedFields: [],
     extractedSections: [],
@@ -607,9 +626,25 @@ const buildOpenAiDocumentPayload = (packet = {}, { model = "" } = {}) => ({
             type: "string",
             description: "Objetivo, pregunta o propósito principal del documento."
           },
-          methodologyEs: {
+          studyDesignEs: {
             type: "string",
-            description: "Tipo de documento, enfoque metodológico o base de elaboración."
+            description: "Diseño real del estudio o tipo de documento: ensayo clínico, cohorte, revisión, guía, consenso, health policy, marco de implementación, informe técnico u otro si corresponde."
+          },
+          studyContextEs: {
+            type: "string",
+            description: "Resumen breve de dónde, cuándo y en qué población/contexto se realizó o se basa el trabajo."
+          },
+          studyPopulationEs: {
+            type: "string",
+            description: "Población estudiada, población objetivo o actores/sistemas abordados. Dejar vacío o indicar no especificado si no hay evidencia."
+          },
+          studyLocationEs: {
+            type: "string",
+            description: "País, región, continente, institución, red sanitaria o ámbito explícito o claramente sustentado."
+          },
+          studyPeriodEs: {
+            type: "string",
+            description: "Período, año de recolección, implementación, revisión o publicación si está sustentado por el documento."
           },
           mainMessageEs: {
             type: "string",
@@ -643,7 +678,7 @@ const buildOpenAiDocumentPayload = (packet = {}, { model = "" } = {}) => ({
     {
       role: "system",
       content:
-        "Sos un agente experto en lectura crítica inicial y comunicación científica médica para una Bitácora Científica institucional. Tu tarea es transformar evidencia real extraída de un PDF o texto científico en una ficha breve y clara en español. Respondé exclusivamente JSON válido conforme al schema. Todo texto editorial debe estar en español. Conservá título oficial, DOI, autores, revista e instituciones tal como aparecen. No inventes datos. No inventes DOI, autores, fuente, fecha ni resultados numéricos. No uses conocimiento externo. Sí podés sintetizar, traducir y ordenar ideas presentes en el documento. Si el documento no es un ensayo clínico, no lo fuerces a formato PICO. Para guías, consensos, health policy o marcos de implementación, completá objectiveEs como propósito del documento. Para documentos de política sanitaria, mainMessageEs debe resumir el mensaje central, no un resultado clínico. No dejes campos editoriales vacíos si el Summary, Introduction, Methods, Results, Discussion o Conclusion aportan información suficiente. No traduzcas literalmente todo el documento. La ficha debe orientar al lector sin reemplazar la lectura del paper. El resumen de tarjeta debe ser breve, no más de 280 caracteres. El resumen ejecutivo debe ser claro, máximo 120 palabras. keyPointsEs debe contener 3 a 5 puntos breves. tags deben estar en español, salvo nombres propios como HEARTS, OPS u OMS. Si falta información real, dejá el campo vacío y agregá warning. No emitas recomendaciones clínicas directas ni cambios de protocolo."
+        "Sos un agente experto en comunicación científica médica, lectura crítica inicial y síntesis editorial para una Bitácora Científica institucional. Tu tarea es transformar evidencia real extraída de un PDF o texto pegado en una ficha breve, clara y útil en español para médicos y equipos de salud. Respondé exclusivamente JSON válido conforme al schema. Todo texto editorial debe estar en español. Conservá título oficial, DOI, autores, revista e instituciones tal como aparecen. No inventes datos. No inventes DOI, autores, fecha, resultados, población, país ni período. No uses conocimiento externo. Sí podés sintetizar, traducir y ordenar ideas presentes en el documento. No traduzcas literalmente todo el paper. La ficha debe orientar al lector para decidir si quiere leer el artículo completo. El resumen breve debe ser corto y no superar 280 caracteres. El resumen ejecutivo debe ser claro, máximo 100 a 120 palabras. El mensaje principal debe ser una frase o párrafo corto. Los puntos clave deben ser 3 a 5, breves y accionables. Identificá el tipo real de estudio o documento con precisión. Si es un estudio clínico, indicá si es prospectivo, retrospectivo, transversal, cohorte, caso-control, ensayo clínico, multicéntrico u otro solo cuando esté sustentado. Si no es estudio clínico, no lo fuerces: clasificalo como guía, consenso, health policy, marco de implementación, revisión, informe técnico u otro tipo real. Siempre intentá extraer dónde y población: país/región, ámbito, población o contexto. Si no está especificado, dejá el campo vacío o indicá 'No especificado en el documento'. No hagas recomendaciones clínicas directas, no cambies protocolos institucionales y no presentes conclusiones como conducta obligatoria. Tags en español, salvo nombres propios como HEARTS, OPS u OMS."
     },
     {
       role: "user",
@@ -766,6 +801,7 @@ const resolveScientificArticleDocument = async (input = {}, {
   let text = "";
   let pageCount = 0;
   let fileSize = 0;
+  let documentContentType = "";
   let storagePath = "";
   const ingestionStart = now();
   const officialUrl = validatePublicUrl(input.officialUrl);
@@ -801,6 +837,7 @@ const resolveScientificArticleDocument = async (input = {}, {
     text = pdfResult.text;
     pageCount = pdfResult.pageCount;
     fileSize = pdfResult.fileSize;
+    documentContentType = pdfResult.contentType || "application/pdf";
   } else {
     text = cleanLongText(input.pastedText || "");
     if (text.length < MIN_DOCUMENT_TEXT_LENGTH) {
@@ -832,6 +869,7 @@ const resolveScientificArticleDocument = async (input = {}, {
   agentDurations.metadataMs = now() - metadataStart;
   agentDurations.structureMs = 0;
   packet.fileSize = fileSize;
+  packet.documentContentType = documentContentType || (mode === "pdf" ? "application/pdf" : "text/plain");
   packet.warnings = warnings;
   packet.agentDurations = agentDurations;
 

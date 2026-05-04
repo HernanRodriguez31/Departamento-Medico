@@ -593,107 +593,8 @@ service cloud.firestore {
         );
     }
 
-    function validBitacoraArticleData(data) {
-      return data.keys().hasOnly([
-          "title",
-          "sourceName",
-          "journal",
-          "authors",
-          "sourceDomain",
-          "officialUrl",
-          "doi",
-          "pmid",
-          "pmcid",
-          "nctId",
-          "pii",
-          "studyType",
-          "evidenceType",
-          "publicationDate",
-          "originalLanguage",
-          "articleType",
-          "studyLocation",
-          "cardSummaryEs",
-          "executiveSummary",
-          "executiveSummaryEs",
-          "abstractSummaryEs",
-          "objectiveEs",
-          "clinicalQuestion",
-          "clinicalQuestionEs",
-          "mainMessageEs",
-          "mainResult",
-          "mainResultEs",
-          "methodologyEs",
-          "keyPointsEs",
-          "limitationsEs",
-          "localApplicabilityEs",
-          "occupationalHealthRelevanceEs",
-          "tags",
-          "accessType",
-          "userComment",
-          "sourcePages",
-          "extractionSource",
-          "originalFileName",
-          "storagePath",
-          "contentHash",
-          "pageCount",
-          "status",
-          "extractionStatus",
-          "extractionConfidence",
-          "extractionWarnings",
-          "createdBy",
-          "createdAt",
-          "updatedAt"
-        ])
-        && data.keys().hasAll([
-          "title",
-          "sourceName",
-          "journal",
-          "authors",
-          "sourceDomain",
-          "officialUrl",
-          "doi",
-          "pmid",
-          "pmcid",
-          "nctId",
-          "pii",
-          "studyType",
-          "evidenceType",
-          "publicationDate",
-          "originalLanguage",
-          "articleType",
-          "studyLocation",
-          "cardSummaryEs",
-          "executiveSummary",
-          "executiveSummaryEs",
-          "abstractSummaryEs",
-          "objectiveEs",
-          "clinicalQuestion",
-          "clinicalQuestionEs",
-          "mainMessageEs",
-          "mainResult",
-          "mainResultEs",
-          "methodologyEs",
-          "keyPointsEs",
-          "limitationsEs",
-          "localApplicabilityEs",
-          "occupationalHealthRelevanceEs",
-          "tags",
-          "accessType",
-          "userComment",
-          "sourcePages",
-          "extractionSource",
-          "originalFileName",
-          "storagePath",
-          "contentHash",
-          "pageCount",
-          "status",
-          "extractionStatus",
-          "extractionWarnings",
-          "createdBy",
-          "createdAt",
-          "updatedAt"
-        ])
-        && data.title is string
+    function validBitacoraBibliographicFields(data) {
+      return data.title is string
         && data.title.size() <= 500
         && data.sourceName is string
         && data.sourceName.size() <= 180
@@ -726,8 +627,24 @@ service cloud.firestore {
         && data.articleType is string
         && data.articleType.size() <= 160
         && data.studyLocation is string
-        && data.studyLocation.size() <= 260
-        && data.cardSummaryEs is string
+        && data.studyLocation.size() <= 260;
+    }
+
+    function validBitacoraContextFields(data) {
+      return data.studyDesignEs is string
+        && data.studyDesignEs.size() <= 3000
+        && data.studyContextEs is string
+        && data.studyContextEs.size() <= 3000
+        && data.studyPopulationEs is string
+        && data.studyPopulationEs.size() <= 2600
+        && data.studyLocationEs is string
+        && data.studyLocationEs.size() <= 1200
+        && data.studyPeriodEs is string
+        && data.studyPeriodEs.size() <= 600;
+    }
+
+    function validBitacoraEditorialFields(data) {
+      return data.cardSummaryEs is string
         && data.cardSummaryEs.size() <= 700
         && data.executiveSummary is string
         && data.executiveSummary.size() <= 8000
@@ -764,36 +681,52 @@ service cloud.firestore {
         && data.userComment is string
         && data.userComment.size() <= 4000
         && data.sourcePages is list
-        && data.sourcePages.size() <= 20
-        && validBitacoraExtractionSource(data)
+        && data.sourcePages.size() <= 20;
+    }
+
+    function validBitacoraDocumentFields(data) {
+      return validBitacoraExtractionSource(data)
         && data.originalFileName is string
         && data.originalFileName.size() <= 180
         && data.storagePath is string
         && data.storagePath.size() <= 500
+        && data.fileSize is number
+        && data.fileSize >= 0
+        && data.fileSize <= 20971520
+        && data.documentContentType is string
+        && data.documentContentType.size() <= 120
         && data.contentHash is string
         && data.contentHash.size() <= 128
         && data.pageCount is number
-        && data.pageCount >= 0
-        && validBitacoraStatus(data)
-        && validBitacoraExtractionStatus(data)
-        && (
-          data.status == "draft"
-          || (
-            data.title.size() > 0
-            && (data.sourceName.size() > 0 || data.journal.size() > 0)
-            && (data.cardSummaryEs.size() > 0 || data.executiveSummaryEs.size() > 0 || data.executiveSummary.size() > 0)
-            && (
-              data.executiveSummaryEs.size() > 0
-              || data.objectiveEs.size() > 0
-              || data.clinicalQuestionEs.size() > 0
-              || data.mainMessageEs.size() > 0
-              || data.mainResultEs.size() > 0
-              || data.methodologyEs.size() > 0
-              || data.studyType.size() > 0
-              || data.evidenceType.size() > 0
-            )
+        && data.pageCount >= 0;
+    }
+
+    function validBitacoraFinalCompleteness(data) {
+      return data.status == "draft"
+        || (
+          data.title.size() > 0
+          && (data.sourceName.size() > 0 || data.journal.size() > 0)
+          && (data.cardSummaryEs.size() > 0 || data.executiveSummaryEs.size() > 0 || data.executiveSummary.size() > 0)
+          && (
+            data.executiveSummaryEs.size() > 0
+            || data.objectiveEs.size() > 0
+            || data.clinicalQuestionEs.size() > 0
+            || data.mainMessageEs.size() > 0
+            || data.mainResultEs.size() > 0
+            || data.studyDesignEs.size() > 0
+            || data.studyContextEs.size() > 0
+            || data.methodologyEs.size() > 0
+            || data.studyType.size() > 0
+            || data.evidenceType.size() > 0
           )
-        )
+        );
+    }
+
+    function validBitacoraWorkflowFields(data) {
+      return validBitacoraStatus(data)
+        && validBitacoraExtractionStatus(data)
+        && validBitacoraFinalCompleteness(data)
+        && !data.keys().hasAny(["unsafeHtml", "html", "rawHtml", "script"])
         && data.extractionWarnings is list
         && data.extractionWarnings.size() <= 8
         && (
@@ -803,6 +736,14 @@ service cloud.firestore {
         && validBitacoraCreatedByShape(data)
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
+    }
+
+    function validBitacoraArticleData(data) {
+      return validBitacoraBibliographicFields(data)
+        && validBitacoraContextFields(data)
+        && validBitacoraEditorialFields(data)
+        && validBitacoraDocumentFields(data)
+        && validBitacoraWorkflowFields(data);
     }
 
     function validBitacoraArticleCreate() {
