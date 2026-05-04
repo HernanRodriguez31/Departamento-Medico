@@ -600,6 +600,11 @@ service cloud.firestore {
           "sourceName",
           "sourceDomain",
           "officialUrl",
+          "doi",
+          "pmid",
+          "pmcid",
+          "nctId",
+          "pii",
           "studyType",
           "evidenceType",
           "publicationDate",
@@ -623,6 +628,11 @@ service cloud.firestore {
           "sourceName",
           "sourceDomain",
           "officialUrl",
+          "doi",
+          "pmid",
+          "pmcid",
+          "nctId",
+          "pii",
           "studyType",
           "evidenceType",
           "publicationDate",
@@ -650,6 +660,16 @@ service cloud.firestore {
         && data.officialUrl is string
         && data.officialUrl.size() > 0
         && data.officialUrl.size() <= 1200
+        && data.doi is string
+        && data.doi.size() <= 240
+        && data.pmid is string
+        && data.pmid.size() <= 32
+        && data.pmcid is string
+        && data.pmcid.size() <= 32
+        && data.nctId is string
+        && data.nctId.size() <= 32
+        && data.pii is string
+        && data.pii.size() <= 80
         && data.studyType is string
         && data.studyType.size() <= 180
         && data.evidenceType is string

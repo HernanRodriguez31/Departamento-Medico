@@ -8,12 +8,12 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { BITACORA_POSTS } from "../data/bitacora-posts.js";
 import { NATIONAL_SELECTED_SOURCE_IDS, SCIENTIFIC_SOURCES } from "../data/scientific-sources.js";
-import { createBitacoraArticleRepository } from "../services/bitacora-article-repository.js";
+import { createBitacoraArticleRepository } from "../services/bitacora-article-repository.js?v=20260504-bitacora-resolver-1";
 import {
   inferSourceNameFromDomain,
   requestArticleExtraction,
   validateArticleUrl
-} from "../services/bitacora-ai-extractor.js";
+} from "../services/bitacora-ai-extractor.js?v=20260504-bitacora-resolver-1";
 
 const { auth, db } = getFirebase();
 
@@ -64,6 +64,11 @@ const els = {
   articleUrlError: $("#article-url-error"),
   articleDomain: $("#article-domain-detected"),
   articleAiStatus: $("#article-ai-status"),
+  articleAiWarnings: $("#article-ai-warnings"),
+  assistedZone: $("#article-assisted-zone"),
+  assistedToggle: $("#article-assisted-toggle"),
+  assistedFields: $("#article-assisted-fields"),
+  assistedAnalyzeButton: $("[data-analyze-assisted-article]"),
   articleFormError: $("#article-form-error"),
   articleCreatedBy: $("#article-created-by"),
   articleCreatedAt: $("#article-created-at"),
@@ -92,7 +97,13 @@ const state = {
     extractionStatus: "manual",
     extractionConfidence: null,
     extractionWarnings: [],
-    sourceDomain: ""
+    sourceDomain: "",
+    doi: "",
+    pmid: "",
+    pmcid: "",
+    nctId: "",
+    pii: "",
+    rawEvidence: null
   }
 };
 
@@ -219,6 +230,11 @@ const renderUserArticle = (article) => ({
   sourceName: article.sourceName,
   sourceDomain: article.sourceDomain,
   officialUrl: article.officialUrl,
+  doi: article.doi,
+  pmid: article.pmid,
+  pmcid: article.pmcid,
+  nctId: article.nctId,
+  pii: article.pii,
   publicationDate: article.publicationDate,
   createdAt: article.createdAt,
   createdAtLabel: formatDateTime(article.createdAt),
@@ -304,11 +320,22 @@ const getStatusBadgeClass = (post) => {
   return "bitacora-badge--status";
 };
 
+const isIncompleteDraft = (post) =>
+  post.status === "draft" &&
+  ![
+    post.executiveSummary,
+    post.clinicalQuestion,
+    post.mainResult,
+    post.studyType,
+    post.evidenceType
+  ].some((value) => String(value || "").trim() && normalizeText(value) !== normalizeText(COMPLETION_FALLBACK));
+
 const renderBadges = (post) => {
+  const statusLabel = isIncompleteDraft(post)
+    ? "Borrador incompleto"
+    : STATUS_LABELS[post.status] || "Pendiente de revisión";
   const badges = [
-    `<span class="bitacora-badge ${getStatusBadgeClass(post)}">${escapeHtml(
-      STATUS_LABELS[post.status] || "Pendiente de revisión"
-    )}</span>`
+    `<span class="bitacora-badge ${getStatusBadgeClass(post)}">${escapeHtml(statusLabel)}</span>`
   ];
   if (post.extractionStatus && EXTRACTION_LABELS[post.extractionStatus]) {
     badges.push(
@@ -690,7 +717,13 @@ const resetArticleDraftMeta = () => {
     extractionStatus: "manual",
     extractionConfidence: null,
     extractionWarnings: [],
-    sourceDomain: ""
+    sourceDomain: "",
+    doi: "",
+    pmid: "",
+    pmcid: "",
+    nctId: "",
+    pii: "",
+    rawEvidence: null
   };
 };
 
@@ -702,6 +735,20 @@ const setArticleError = (element, message = "") => {
 
 const setAiStatus = (message = "") => {
   if (els.articleAiStatus) els.articleAiStatus.textContent = message;
+};
+
+const setAiWarnings = (warnings = []) => {
+  if (!els.articleAiWarnings) return;
+  const cleanWarnings = Array.from(new Set((warnings || []).map((warning) => String(warning || "").trim()).filter(Boolean))).slice(0, 8);
+  els.articleAiWarnings.hidden = !cleanWarnings.length;
+  els.articleAiWarnings.innerHTML = cleanWarnings.map((warning) => `<p>${escapeHtml(warning)}</p>`).join("");
+};
+
+const setAssistedModeVisible = (visible, expanded = false) => {
+  if (!els.assistedZone || !els.assistedToggle || !els.assistedFields) return;
+  els.assistedZone.hidden = !visible;
+  els.assistedToggle.setAttribute("aria-expanded", visible && expanded ? "true" : "false");
+  els.assistedFields.hidden = !(visible && expanded);
 };
 
 const setFieldValue = (id, value = "", { overwrite = true } = {}) => {
@@ -721,6 +768,8 @@ const resetArticleForm = () => {
   setArticleError(els.articleUrlError, "");
   setArticleError(els.articleFormError, "");
   setAiStatus("");
+  setAiWarnings([]);
+  setAssistedModeVisible(false);
   if (els.articleDomain) els.articleDomain.textContent = "";
   setFieldValue("article-access-type", "Pendiente");
   syncArticleAudit();
@@ -747,7 +796,16 @@ const syncUrlDerivedFields = () => {
   return validation;
 };
 
-const validateArticleBeforeSave = () => {
+const hasArticleEvidenceField = () =>
+  [
+    $("#article-executive-summary")?.value,
+    $("#article-clinical-question")?.value,
+    $("#article-main-result")?.value,
+    $("#article-study-type")?.value,
+    $("#article-evidence-type")?.value
+  ].some((value) => String(value || "").trim());
+
+const validateArticleBeforeSave = (requestedStatus = "pending_review") => {
   const urlValidation = syncUrlDerivedFields();
   if (!urlValidation.ok) {
     setArticleError(els.articleUrlError, urlValidation.message);
@@ -765,9 +823,31 @@ const validateArticleBeforeSave = () => {
   }
 
   const title = ($("#article-title")?.value || "").trim();
+  const sourceName = ($("#article-source-name")?.value || "").trim();
   if (!title) {
     setArticleError(els.articleFormError, "Ingresá el título del artículo antes de guardar.");
     $("#article-title")?.focus();
+    return null;
+  }
+  if (requestedStatus === "draft") {
+    setArticleError(els.articleFormError, "");
+    return {
+      urlInfo: officialValidation,
+      title
+    };
+  }
+
+  if (!sourceName) {
+    setArticleError(els.articleFormError, "Ingresá la fuente o revista antes de guardar el artículo.");
+    $("#article-source-name")?.focus();
+    return null;
+  }
+  if (!hasArticleEvidenceField()) {
+    setArticleError(
+      els.articleFormError,
+      "Para guardar como artículo, agregá resumen, pregunta, resultado, tipo de estudio o tipo de evidencia. Podés guardarlo como borrador si está incompleto."
+    );
+    $("#article-executive-summary")?.focus();
     return null;
   }
 
@@ -778,7 +858,7 @@ const validateArticleBeforeSave = () => {
   };
 };
 
-const fillArticleFromExtraction = (article = {}) => {
+const fillArticleFromExtraction = (article = {}, rawEvidence = null) => {
   const fieldMap = {
     "article-title": article.title,
     "article-source-name": article.sourceName,
@@ -799,8 +879,15 @@ const fillArticleFromExtraction = (article = {}) => {
   });
 
   state.articleDraftMeta.sourceDomain = article.sourceDomain || state.articleDraftMeta.sourceDomain;
+  state.articleDraftMeta.doi = article.doi || state.articleDraftMeta.doi;
+  state.articleDraftMeta.pmid = article.pmid || state.articleDraftMeta.pmid;
+  state.articleDraftMeta.pmcid = article.pmcid || state.articleDraftMeta.pmcid;
+  state.articleDraftMeta.nctId = article.nctId || state.articleDraftMeta.nctId;
+  state.articleDraftMeta.pii = article.pii || state.articleDraftMeta.pii;
   state.articleDraftMeta.extractionConfidence = article.extractionConfidence ?? null;
   state.articleDraftMeta.extractionWarnings = article.warnings || [];
+  state.articleDraftMeta.rawEvidence = rawEvidence || state.articleDraftMeta.rawEvidence;
+  setAiWarnings(article.warnings || []);
 };
 
 const setAnalyzeBusy = (busy) => {
@@ -810,9 +897,53 @@ const setAnalyzeBusy = (busy) => {
     const label = $("span", button);
     if (label) label.textContent = busy ? "Analizando..." : "Analizar enlace con IA";
   });
+  if (els.assistedAnalyzeButton) {
+    els.assistedAnalyzeButton.disabled = busy;
+    els.assistedAnalyzeButton.setAttribute("aria-busy", busy ? "true" : "false");
+    const label = $("span", els.assistedAnalyzeButton);
+    if (label) label.textContent = busy ? "Analizando..." : "Analizar datos pegados";
+  }
 };
 
-const handleAnalyzeArticle = async () => {
+const applyExtractionResult = (result) => {
+  fillArticleFromExtraction(result.article || {}, result.rawEvidence || null);
+  state.articleDraftMeta.extractionStatus = result.extractionStatus || "manual";
+  const shouldShowAssisted =
+    result.extractionStatus === "failed" ||
+    (result.article?.warnings || []).some((warning) => /bloque|captcha|limita|403/i.test(warning));
+  setAssistedModeVisible(shouldShowAssisted, shouldShowAssisted);
+  if (result.extractionStatus === "ai_draft") {
+    setAiStatus(result.message || "Borrador cargado por IA. Revisá la información antes de guardar.");
+    return;
+  }
+  if (result.extractionStatus === "metadata_only") {
+    setAiStatus(
+      result.message ||
+        "Se detectaron metadatos básicos, pero no contenido científico suficiente. Completá el análisis manualmente."
+    );
+    return;
+  }
+  if (result.extractionStatus === "not_configured") {
+    setAiStatus(result.error || result.message || "El servicio de IA no está configurado en backend.");
+    return;
+  }
+  setAiStatus(
+    result.error ||
+      result.message ||
+      "No se pudo extraer información suficiente desde esta URL. Probá con DOI, PubMed, PMC, PDF open access o completá manualmente."
+  );
+};
+
+const getAssistedEvidence = () => ({
+  doi: $("#article-assisted-doi")?.value || "",
+  pmid: $("#article-assisted-pmid")?.value || "",
+  pmcid: $("#article-assisted-pmcid")?.value || "",
+  pastedTitle: $("#article-assisted-title")?.value || "",
+  pastedSource: $("#article-assisted-source")?.value || "",
+  pastedAbstract: $("#article-assisted-abstract")?.value || ""
+});
+
+const handleAnalyzeArticle = async (evidence = {}) => {
   const validation = syncUrlDerivedFields();
   if (!validation.ok) {
     setArticleError(els.articleUrlError, validation.message);
@@ -822,25 +953,11 @@ const handleAnalyzeArticle = async () => {
   setArticleError(els.articleUrlError, "");
   setArticleError(els.articleFormError, "");
   setAnalyzeBusy(true);
-  setAiStatus("Analizando enlace...");
+  setAiWarnings([]);
+  setAiStatus(Object.values(evidence).some((value) => String(value || "").trim()) ? "Consultando fuentes bibliográficas..." : "Analizando enlace científico...");
   try {
-    const result = await requestArticleExtraction(validation.href, { auth });
-    if (result.error) {
-      fillArticleFromExtraction(result.article || {});
-      state.articleDraftMeta.extractionStatus = result.extractionStatus || "failed";
-      setAiStatus(result.error);
-      return;
-    }
-    fillArticleFromExtraction(result.article || {});
-    state.articleDraftMeta.extractionStatus = result.extractionStatus || "manual";
-    if (result.ok && result.extractionStatus === "ai_draft") {
-      setAiStatus(result.message || "Borrador cargado por IA. Revisá la información antes de guardar.");
-      return;
-    }
-    setAiStatus(
-      result.message ||
-        "No se pudo extraer información suficiente desde la página. Podés completar el artículo manualmente."
-    );
+    const result = await requestArticleExtraction(validation.href, { auth, evidence });
+    applyExtractionResult(result);
   } finally {
     setAnalyzeBusy(false);
   }
@@ -861,6 +978,11 @@ const buildArticlePayload = (status) => {
     sourceName,
     sourceDomain,
     officialUrl,
+    doi: state.articleDraftMeta.doi || $("#article-assisted-doi")?.value || "",
+    pmid: state.articleDraftMeta.pmid || $("#article-assisted-pmid")?.value || "",
+    pmcid: state.articleDraftMeta.pmcid || $("#article-assisted-pmcid")?.value || "",
+    nctId: state.articleDraftMeta.nctId || "",
+    pii: state.articleDraftMeta.pii || "",
     studyType: $("#article-study-type")?.value || "",
     evidenceType: $("#article-evidence-type")?.value || "",
     publicationDate: $("#article-publication-date")?.value || "",
@@ -950,7 +1072,7 @@ const handleArticleSubmit = async (event) => {
   event.preventDefault();
   const submitter = event.submitter;
   const requestedStatus = submitter?.dataset?.saveStatus === "draft" ? "draft" : "pending_review";
-  const validation = validateArticleBeforeSave();
+  const validation = validateArticleBeforeSave(requestedStatus);
   if (!validation || !repository) return;
   setSaveBusy(submitter, true);
   try {
@@ -1095,8 +1217,13 @@ const bindEvents = () => {
     syncUrlDerivedFields();
   });
   els.analyzeButtons.forEach((button) => {
-    button.addEventListener("click", handleAnalyzeArticle);
+    button.addEventListener("click", () => handleAnalyzeArticle());
   });
+  els.assistedToggle?.addEventListener("click", () => {
+    const expanded = els.assistedToggle.getAttribute("aria-expanded") === "true";
+    setAssistedModeVisible(true, !expanded);
+  });
+  els.assistedAnalyzeButton?.addEventListener("click", () => handleAnalyzeArticle(getAssistedEvidence()));
   els.addArticleForm?.addEventListener("submit", handleArticleSubmit);
 };
 

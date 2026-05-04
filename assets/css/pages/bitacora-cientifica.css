@@ -1026,6 +1026,56 @@ body.bitacora-modal-open {
   font-weight: 760;
 }
 
+.bitacora-ai-warning[hidden] {
+  display: none;
+}
+
+.bitacora-ai-warning p {
+  margin: 0;
+}
+
+.bitacora-ai-warning p + p {
+  margin-top: 0.34rem;
+}
+
+.bitacora-assisted-zone[hidden] {
+  display: none;
+}
+
+.bitacora-assisted-zone__toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 0;
+  background: transparent;
+  color: var(--bitacora-ink);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 850;
+  text-align: left;
+}
+
+.bitacora-assisted-zone__toggle svg {
+  width: 1rem;
+  height: 1rem;
+  transition: transform 0.18s ease;
+}
+
+.bitacora-assisted-zone__toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.bitacora-assisted-zone__fields {
+  display: grid;
+  gap: 0.72rem;
+}
+
+.bitacora-assisted-zone__fields[hidden] {
+  display: none;
+}
+
 @keyframes bitacora-panel-in {
   from {
     opacity: 0;

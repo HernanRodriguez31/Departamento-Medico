@@ -39,6 +39,7 @@ const {
   hasMetadataContent,
   logInternalAudit,
   normalizeAiArticleOutput,
+  resolveScientificArticle,
   scoreExtractionCompleteness,
   validateScientificUrl,
 } = require("./scientificArticleExtraction");
@@ -1008,185 +1009,90 @@ const extractScientificArticleHandler = async (req, res) => {
     });
   }
 
-  let body = {};
-  if (req.body && typeof req.body === "object") {
-    body = req.body;
-  } else if (typeof req.body === "string") {
-    try {
-      body = JSON.parse(req.body);
-    } catch (e) {
-      body = {};
-    }
-  }
-  const urlValidation = validateScientificUrl(body.url);
-  if (!urlValidation.ok) {
-    logExtraction(400, { error: urlValidation.code });
-    return res.status(400).json({
-      ok: false,
-      error: { code: urlValidation.code, message: urlValidation.message }
-    });
-  }
-
-  const articleUrl = urlValidation.url;
-  let fetched = {
-    html: "",
-    finalUrl: articleUrl.href,
-    statusCode: 0,
-    contentType: "",
-    warnings: ["No se pudo leer la página pública del artículo."],
-    usedSources: []
-  };
   try {
-    fetched = await fetchScientificPage(articleUrl);
-  } catch (error) {
-    fetched.warnings = ["No se pudo leer la página pública del artículo."];
-  }
-
-  const htmlSignals = extractHtmlSignals(fetched.html || "", articleUrl, fetched);
-  const evidencePacket = buildEvidencePacket(htmlSignals, articleUrl, fetched);
-  const rawEvidence = buildRawEvidence(evidencePacket);
-  const fallbackArticle = buildMetadataOnlyArticle(articleUrl, evidencePacket.detectedMetadata, evidencePacket);
-  const apiKey = process.env.OPENAI_API_KEY;
-  const auditBase = {
-    domain: articleUrl.hostname,
-    httpStatus: fetched.statusCode || 0,
-    contentLength: rawEvidence.contentLength,
-    metadataFieldsDetected: rawEvidence.metadataFieldsDetected,
-    usedSources: rawEvidence.usedSources,
-    hasAccessLimit: Boolean(evidencePacket.pageSignals?.hasAccessLimit)
-  };
-
-  if (!apiKey) {
-    fallbackArticle.warnings.push(
-      "No se configuró OPENAI_API_KEY; se completaron solo metadatos públicos disponibles."
-    );
-    const status = "not_configured";
-    logExtraction(200, {
-      ...auditBase,
-      extractionStatus: status,
-      completedFields: scoreExtractionCompleteness(fallbackArticle).completedFields,
-      confidence: fallbackArticle.extractionConfidence,
-      warnings: fallbackArticle.warnings
-    });
-    return res.status(200).json(buildExtractionResponse({
-      extractionStatus: status,
-      article: fallbackArticle,
-      rawEvidence,
-      error: status === "not_configured"
-        ? { code: "missing_openai_api_key", message: "El servicio de IA no está configurado en backend." }
-        : undefined
-    }));
-  }
-
-  if (!evidencePacket.pageSignals?.hasScientificContent && !evidencePacket.detectedMetadata?.description) {
-    fallbackArticle.warnings = Array.from(
-      new Set([
-        ...(fallbackArticle.warnings || []),
-        "No se envió contenido a IA porque la página no expuso texto científico suficiente."
-      ])
-    ).slice(0, 8);
-    const status = hasMetadataContent(fallbackArticle) ? "metadata_only" : "failed";
-    logExtraction(200, {
-      ...auditBase,
-      extractionStatus: status,
-      completedFields: scoreExtractionCompleteness(fallbackArticle).completedFields,
-      confidence: fallbackArticle.extractionConfidence,
-      warnings: fallbackArticle.warnings
-    });
-    return res.status(200).json(buildExtractionResponse({
-      extractionStatus: status,
-      article: fallbackArticle,
-      rawEvidence,
-      error: status === "failed"
-        ? { code: "insufficient_public_content", message: "No se pudo extraer información suficiente desde la página." }
-        : undefined
-    }));
-  }
-
-  try {
-    const aiResult = await callArticleExtractionAI(evidencePacket, { apiKey });
-    if (!aiResult.ok) {
-      fallbackArticle.warnings.push(
-        "No se pudo estructurar con IA; se completaron solo metadatos públicos disponibles."
-      );
-      const status = hasMetadataContent(fallbackArticle) ? "metadata_only" : "failed";
-      logExtraction(200, {
-        ...auditBase,
-        extractionStatus: status,
-        error: aiResult.error?.code || "ai_failed",
-        completedFields: scoreExtractionCompleteness(fallbackArticle).completedFields,
-        confidence: fallbackArticle.extractionConfidence,
-        warnings: fallbackArticle.warnings
-      });
-      return res.status(200).json(buildExtractionResponse({
-        extractionStatus: status,
-        article: fallbackArticle,
-        rawEvidence,
-        error: aiResult.error || { code: "ai_failed", message: "La IA no pudo completar la extracción." }
-      }));
+    let body = {};
+    if (req.body && typeof req.body === "object") {
+      body = req.body;
+    } else if (typeof req.body === "string") {
+      try {
+        body = JSON.parse(req.body);
+      } catch (e) {
+        body = {};
+      }
     }
 
-    const article = normalizeAiArticleOutput(articleUrl, evidencePacket, aiResult.article);
-    article.warnings = Array.from(new Set([...(evidencePacket.warnings || []), ...(article.warnings || [])])).slice(0, 8);
-    const quality = scoreExtractionCompleteness(article);
-    if (!quality.isUseful) {
-      article.warnings.push(
-        "La IA no detectó suficientes datos clínicos; se completaron solo metadatos públicos disponibles."
-      );
-      const metadataArticle = {
-        ...fallbackArticle,
-        warnings: article.warnings,
-        extractionConfidence: Math.min(article.extractionConfidence || 0.25, 0.35)
-      };
-      const status = hasMetadataContent(metadataArticle) ? "metadata_only" : "failed";
-      logExtraction(200, {
-        ...auditBase,
-        extractionStatus: status,
-        completedFields: quality.completedFields,
-        usefulFieldCount: quality.usefulFieldCount,
-        confidence: metadataArticle.extractionConfidence,
-        warnings: metadataArticle.warnings
+    const result = await resolveScientificArticle(body, {
+      apiKey: process.env.OPENAI_API_KEY,
+      unpaywallEmail: process.env.UNPAYWALL_EMAIL,
+      elsevierApiKey: process.env.ELSEVIER_API_KEY,
+      ncbiEmail: process.env.UNPAYWALL_EMAIL
+    });
+
+    if (result.statusCode === 400) {
+      logExtraction(400, { error: result.error?.code || "invalid_url" });
+      return res.status(400).json({
+        ok: false,
+        error: result.error || { code: "invalid_url", message: "La URL del artículo no es válida." }
       });
-      return res.status(200).json(buildExtractionResponse({
-        extractionStatus: status,
-        article: metadataArticle,
-        rawEvidence,
-        error: status === "failed"
-          ? { code: "insufficient_ai_fields", message: "La IA no detectó suficientes datos útiles." }
-          : undefined
-      }));
     }
 
+    const rawEvidence = result.rawEvidence || {};
+    const quality = scoreExtractionCompleteness(result.article || {});
     logExtraction(200, {
-      ...auditBase,
-      extractionStatus: "ai_draft",
+      domain: result.article?.sourceDomain || "",
+      extractionStatus: result.extractionStatus,
+      attemptedResolvers: rawEvidence.attemptedResolvers || rawEvidence.usedSources || [],
+      successfulResolvers: rawEvidence.successfulResolvers || [],
+      failedResolvers: rawEvidence.failedResolvers || [],
+      blockedResolvers: rawEvidence.blockedResolvers || [],
+      contentLength: rawEvidence.scientificTextLength || rawEvidence.contentLength || 0,
+      metadataFieldsDetected: rawEvidence.metadataFieldsDetected || [],
+      identifiersDetected: rawEvidence.identifiersDetected || {},
       completedFields: quality.completedFields,
       usefulFieldCount: quality.usefulFieldCount,
-      confidence: article.extractionConfidence,
-      warnings: article.warnings
+      confidence: result.article?.extractionConfidence || 0,
+      warnings: result.article?.warnings || [],
+      error: result.error?.code
     });
-    return res.status(200).json(buildExtractionResponse({
-      extractionStatus: "ai_draft",
-      article,
-      rawEvidence
-    }));
+    return res.status(200).json(result);
   } catch (error) {
-    fallbackArticle.warnings.push(
-      "La IA no pudo completar la extracción; revisar y completar manualmente."
-    );
-    const status = hasMetadataContent(fallbackArticle) ? "metadata_only" : "failed";
     logExtraction(200, {
-      ...auditBase,
-      extractionStatus: status,
       error: "unexpected_extraction_error",
-      completedFields: scoreExtractionCompleteness(fallbackArticle).completedFields,
-      confidence: fallbackArticle.extractionConfidence,
-      warnings: fallbackArticle.warnings
+      message: cleanString(error?.message).slice(0, 160)
     });
     return res.status(200).json(buildExtractionResponse({
-      extractionStatus: status,
-      article: fallbackArticle,
-      rawEvidence,
+      extractionStatus: "failed",
+      article: {
+        title: "",
+        sourceName: "",
+        sourceDomain: "",
+        officialUrl: "",
+        doi: "",
+        pmid: "",
+        pmcid: "",
+        nctId: "",
+        pii: "",
+        studyType: "",
+        evidenceType: "",
+        publicationDate: "",
+        studyLocation: "",
+        executiveSummary: "",
+        clinicalQuestion: "",
+        mainResult: "",
+        tags: [],
+        accessType: "Pendiente",
+        extractionConfidence: 0,
+        warnings: ["La extracción no pudo completarse; revisar y completar manualmente."]
+      },
+      rawEvidence: {
+        attemptedResolvers: [],
+        successfulResolvers: [],
+        failedResolvers: [],
+        blockedResolvers: [],
+        metadataFieldsDetected: [],
+        scientificTextLength: 0,
+        identifiersDetected: { doi: "", pmid: "", pmcid: "", nctId: "", pii: "" }
+      },
       error: { code: "unexpected_extraction_error", message: "La IA no pudo completar la extracción." }
     }));
   }

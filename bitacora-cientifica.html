@@ -34,7 +34,7 @@
     <link rel="stylesheet" href="/assets/css/pages/index.css?v=20260502-portal-hover-state-1" />
     <link rel="stylesheet" href="/assets/css/core-contrast.css?v=20260502-committee-border-align-1" />
     <link rel="stylesheet" href="/assets/css/pages/galeriadearte.css?v=20260503-art-gallery-like-tooltip-1" />
-    <link rel="stylesheet" href="/assets/css/pages/bitacora-cientifica.css?v=20260504-bitacora-agent-2" />
+    <link rel="stylesheet" href="/assets/css/pages/bitacora-cientifica.css?v=20260504-bitacora-resolver-1" />
   </head>
   <body class="art-gallery-page bitacora-page ui-clarity">
     <div id="app">
@@ -331,6 +331,60 @@
                 <p id="article-domain-detected" class="bitacora-domain-detected" aria-live="polite"></p>
                 <p id="article-url-error" class="bitacora-form-error" hidden></p>
                 <p id="article-ai-status" class="bitacora-ai-status" aria-live="polite"></p>
+                <div id="article-ai-warnings" class="bitacora-ai-warning" hidden></div>
+              </section>
+
+              <section
+                id="article-assisted-zone"
+                class="bitacora-form-zone bitacora-assisted-zone"
+                aria-labelledby="article-assisted-zone-title"
+                hidden
+              >
+                <button
+                  type="button"
+                  id="article-assisted-toggle"
+                  class="bitacora-assisted-zone__toggle"
+                  aria-expanded="false"
+                  aria-controls="article-assisted-fields"
+                >
+                  <span id="article-assisted-zone-title">El sitio bloqueó la lectura automática</span>
+                  <i data-lucide="chevron-down" aria-hidden="true"></i>
+                </button>
+                <div id="article-assisted-fields" class="bitacora-assisted-zone__fields" hidden>
+                  <p class="bitacora-help">
+                    Podés pegar DOI, PMID, PMCID, título, fuente o abstract visible para completar la carga sin evadir el bloqueo del sitio.
+                  </p>
+                  <div class="bitacora-form-grid">
+                    <label class="bitacora-field" for="article-assisted-doi">
+                      <span>DOI</span>
+                      <input id="article-assisted-doi" name="assistedDoi" type="text" inputmode="url" />
+                    </label>
+                    <label class="bitacora-field" for="article-assisted-pmid">
+                      <span>PMID</span>
+                      <input id="article-assisted-pmid" name="assistedPmid" type="text" inputmode="numeric" />
+                    </label>
+                    <label class="bitacora-field" for="article-assisted-pmcid">
+                      <span>PMCID</span>
+                      <input id="article-assisted-pmcid" name="assistedPmcid" type="text" />
+                    </label>
+                    <label class="bitacora-field" for="article-assisted-title">
+                      <span>Nombre visible del artículo</span>
+                      <input id="article-assisted-title" name="assistedTitle" type="text" />
+                    </label>
+                    <label class="bitacora-field" for="article-assisted-source">
+                      <span>Fuente visible</span>
+                      <input id="article-assisted-source" name="assistedSource" type="text" />
+                    </label>
+                    <label class="bitacora-field bitacora-field--wide" for="article-assisted-abstract">
+                      <span>Abstract / Summary visible</span>
+                      <textarea id="article-assisted-abstract" name="assistedAbstract" rows="4"></textarea>
+                    </label>
+                  </div>
+                  <button type="button" class="bitacora-btn bitacora-btn--secondary" data-analyze-assisted-article>
+                    <i data-lucide="sparkles" aria-hidden="true"></i>
+                    <span>Analizar datos pegados</span>
+                  </button>
+                </div>
               </section>
 
               <section class="bitacora-form-zone" aria-labelledby="article-data-zone-title">
@@ -483,7 +537,7 @@
       installFirebaseGlobals();
     </script>
     <script type="module" src="/assets/js/common/notifications.js"></script>
-    <script type="module" src="/assets/js/pages/bitacora-cientifica.js?v=20260504-bitacora-agent-2"></script>
+    <script type="module" src="/assets/js/pages/bitacora-cientifica.js?v=20260504-bitacora-resolver-1"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {

@@ -8,6 +8,7 @@ const {
   buildOpenAiArticleExtractionPayload,
   buildRawEvidence,
   callArticleExtractionAI,
+  detectScientificIdentifiers,
   extractCitationMetadata,
   extractHtmlSignals,
   extractOpenGraphMetadata,
@@ -18,6 +19,9 @@ const {
   hasMetadataContent,
   normalizeAiArticleOutput,
   parseJsonObjectFromText,
+  parsePmcXml,
+  parsePubMedXml,
+  resolveScientificArticle,
   scoreExtractionCompleteness,
   validateAIArticleSchema,
   validateScientificUrl
@@ -190,11 +194,11 @@ test("normalizeAiArticleOutput accepts aliases but preserves canonical URL and d
     }
   );
 
-  assert.equal(article.title, "Titulo alternativo");
-  assert.equal(article.sourceName, "Revista modelo");
+  assert.equal(article.title, "Official Article Title");
+  assert.equal(article.sourceName, "The Lancet Regional Health - Americas");
   assert.equal(article.officialUrl, articleUrl.href);
   assert.equal(article.sourceDomain, articleUrl.hostname);
-  assert.equal(article.publicationDate, "2026-05-04");
+  assert.equal(article.publicationDate, "2026-05-03");
   assert.equal(article.executiveSummary.startsWith("Resumen ejecutivo"), true);
   assert.deepEqual(article.tags, ["Salud pública", "Epidemiología"]);
   assert.equal(article.extractionConfidence, 1);
@@ -203,7 +207,7 @@ test("normalizeAiArticleOutput accepts aliases but preserves canonical URL and d
 test("schema and scoring prevent false ai_draft responses", () => {
   assert.equal(validateAIArticleSchema(completeAiArticle).ok, true);
   assert.equal(validateAIArticleSchema({ ...completeAiArticle, tags: "salud" }).ok, false);
-  assert.equal(validateAIArticleSchema({ ...completeAiArticle, accessType: "Libre" }).ok, false);
+  assert.equal(validateAIArticleSchema({ ...completeAiArticle, extractionConfidence: "alta" }).ok, false);
 
   assert.equal(getAiDraftQuality({}).isUseful, false);
   assert.equal(getAiDraftQuality({ title: "Only title", sourceName: "Journal" }).isUseful, false);
@@ -211,8 +215,10 @@ test("schema and scoring prevent false ai_draft responses", () => {
     getAiDraftQuality({
       title: "Title",
       sourceName: "Journal",
+      officialUrl: "https://example.org/article",
       executiveSummary: "Resumen en español con suficiente detalle clínico para revisión.",
-      publicationDate: "2026-05-03"
+      publicationDate: "2026-05-03",
+      extractionConfidence: 0.8
     }).isUseful,
     true
   );
@@ -283,4 +289,180 @@ test("parseJsonObjectFromText supports plain JSON and embedded JSON", () => {
     tags: ["x"]
   });
   assert.equal(parseJsonObjectFromText("sin json"), null);
+});
+
+test("detectScientificIdentifiers extracts DOI, PMID, PMCID, NCT and Lancet PII", () => {
+  const identifiers = detectScientificIdentifiers(
+    articleUrl,
+    "PMID: 41438613 PMCID: PMC12719693 DOI 10.1016/j.lana.2025.101311 NCT12345678"
+  );
+  assert.equal(identifiers.pii, "S2667-193X(25)00322-9");
+  assert.equal(identifiers.pmid, "41438613");
+  assert.equal(identifiers.pmcid, "PMC12719693");
+  assert.equal(identifiers.nctId, "NCT12345678");
+  assert.equal(identifiers.doi, "10.1016/j.lana.2025.101311");
+});
+
+test("parsePubMedXml and parsePmcXml extract biomedical metadata", () => {
+  const pubmed = parsePubMedXml(`
+    <PubmedArticle>
+      <MedlineCitation>
+        <PMID>41438613</PMID>
+        <Article>
+          <Journal><Title>Lancet regional health. Americas</Title><JournalIssue><PubDate><Year>2026</Year><Month>Jan</Month></PubDate></JournalIssue></Journal>
+          <ArticleTitle>HEARTS quality title.</ArticleTitle>
+          <ELocationID EIdType="doi">10.1016/j.lana.2025.101311</ELocationID>
+          <Abstract><AbstractText>Public abstract with objective and findings.</AbstractText></Abstract>
+          <PublicationTypeList><PublicationType>Review</PublicationType></PublicationTypeList>
+        </Article>
+        <KeywordList><Keyword>Hypertension</Keyword></KeywordList>
+      </MedlineCitation>
+      <PubmedData><ArticleIdList><ArticleId IdType="pmc">PMC12719693</ArticleId><ArticleId IdType="pii">S2667-193X(25)00322-9</ArticleId></ArticleIdList></PubmedData>
+    </PubmedArticle>
+  `);
+  assert.equal(pubmed.title, "HEARTS quality title.");
+  assert.equal(pubmed.sourceName, "Lancet regional health. Americas");
+  assert.equal(pubmed.publicationDate, "2026-01");
+  assert.equal(pubmed.pmcid, "PMC12719693");
+  assert.equal(pubmed.pii, "S2667-193X(25)00322-9");
+
+  const pmc = parsePmcXml(`
+    <article article-type="review-article">
+      <front><journal-meta><journal-title-group><journal-title>Lancet Regional Health - Americas</journal-title></journal-title-group></journal-meta>
+      <article-meta>
+        <article-id pub-id-type="pmcid">PMC12719693</article-id>
+        <article-id pub-id-type="pmid">41438613</article-id>
+        <article-id pub-id-type="doi">10.1016/j.lana.2025.101311</article-id>
+        <title-group><article-title>HEARTS quality title.</article-title></title-group>
+        <pub-date pub-type="collection"><year>2026</year><month>1</month></pub-date>
+        <abstract><p>PMC summary text.</p></abstract>
+        <kwd-group><kwd>Hypertension</kwd></kwd-group>
+      </article-meta></front>
+    </article>
+  `);
+  assert.equal(pmc.title, "HEARTS quality title.");
+  assert.equal(pmc.sourceName, "Lancet Regional Health - Americas");
+  assert.equal(pmc.abstract, "PMC summary text.");
+  assert.equal(pmc.accessType, "Resumen disponible");
+});
+
+test("resolveScientificArticle continues after publisher 403 and resolves Lancet PII via PubMed", async () => {
+  const calls = [];
+  const fetchImpl = async (url) => {
+    calls.push(String(url));
+    const textResponse = (status, body, contentType = "text/html") => ({
+      ok: status >= 200 && status < 300,
+      status,
+      headers: { get: (name) => (name.toLowerCase() === "content-type" ? contentType : "") },
+      text: async () => body
+    });
+    if (String(url).includes("thelancet.com")) {
+      return textResponse(403, "<html><title>Heath Advance</title><body>Complete this captcha to verify you are human.</body></html>");
+    }
+    if (String(url).includes("esearch.fcgi") && String(url).includes("db=pubmed")) {
+      return textResponse(200, JSON.stringify({ esearchresult: { idlist: ["41438613"] } }), "application/json");
+    }
+    if (String(url).includes("efetch.fcgi") && String(url).includes("db=pubmed")) {
+      return textResponse(200, `
+        <PubmedArticle>
+          <MedlineCitation>
+            <PMID>41438613</PMID>
+            <Article>
+              <Journal><Title>Lancet regional health. Americas</Title><JournalIssue><PubDate><Year>2026</Year><Month>Jan</Month></PubDate></JournalIssue></Journal>
+              <ArticleTitle>HEARTS quality: a policy framework to strengthen hypertension.</ArticleTitle>
+              <ELocationID EIdType="doi">10.1016/j.lana.2025.101311</ELocationID>
+              <Abstract><AbstractText>HEARTS in the Americas is a regional implementation framework with findings for primary health care quality improvement.</AbstractText></Abstract>
+              <PublicationTypeList><PublicationType>Review</PublicationType></PublicationTypeList>
+            </Article>
+          </MedlineCitation>
+          <PubmedData><ArticleIdList><ArticleId IdType="pmc">PMC12719693</ArticleId><ArticleId IdType="pii">S2667-193X(25)00322-9</ArticleId></ArticleIdList></PubmedData>
+        </PubmedArticle>
+      `, "text/xml");
+    }
+    if (String(url).includes("efetch.fcgi") && String(url).includes("db=pmc")) {
+      return textResponse(200, `
+        <article article-type="review-article"><front><journal-meta><journal-title-group><journal-title>The Lancet Regional Health - Americas</journal-title></journal-title-group></journal-meta>
+        <article-meta><article-id pub-id-type="pmcid">PMC12719693</article-id><article-id pub-id-type="pmid">41438613</article-id><article-id pub-id-type="doi">10.1016/j.lana.2025.101311</article-id>
+        <title-group><article-title>HEARTS quality: a policy framework to strengthen hypertension.</article-title></title-group>
+        <abstract><p>PMC public summary with objective, context and findings.</p></abstract><kwd-group><kwd>Hypertension</kwd></kwd-group></article-meta></front></article>
+      `, "text/xml");
+    }
+    if (String(url).includes("api.crossref.org")) {
+      return textResponse(200, JSON.stringify({ message: { title: ["HEARTS quality: a policy framework to strengthen hypertension."], "container-title": ["The Lancet Regional Health - Americas"], DOI: "10.1016/j.lana.2025.101311", issued: { "date-parts": [[2026, 1]] } } }), "application/json");
+    }
+    if (String(url).includes("api.openalex.org")) {
+      return textResponse(200, JSON.stringify({
+        title: "HEARTS quality: a policy framework to strengthen hypertension.",
+        primary_location: { source: { display_name: "The Lancet Regional Health - Americas" } },
+        ids: { doi: "https://doi.org/10.1016/j.lana.2025.101311", pmid: "https://pubmed.ncbi.nlm.nih.gov/41438613", pmcid: "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC12719693" },
+        publication_date: "2026-01-01",
+        type: "article",
+        open_access: { is_oa: true },
+        abstract_inverted_index: { Regional: [0], framework: [1], findings: [2] }
+      }), "application/json");
+    }
+    if (String(url).includes("api.openai.com")) {
+      return textResponse(200, JSON.stringify({
+        choices: [{ message: { content: JSON.stringify({
+          studyType: "Revisión / marco de política sanitaria",
+          evidenceType: "Marco de política sanitaria",
+          studyLocation: "Américas",
+          executiveSummary: "Resumen en español basado en la evidencia pública de PubMed y PMC.",
+          clinicalQuestion: "Qué marco puede fortalecer la calidad del manejo de hipertensión en atención primaria.",
+          mainResult: "El marco HEARTS Quality organiza objetivos e indicadores para fortalecer la implementación regional.",
+          tags: ["hipertensión", "atención primaria", "calidad"],
+          warnings: [],
+          extractionConfidence: 0.86
+        }) } }]
+      }), "application/json");
+    }
+    return textResponse(404, "{}");
+  };
+
+  const result = await resolveScientificArticle({ url: articleUrl.href }, { apiKey: "test-key", fetchImpl });
+  assert.equal(result.extractionStatus, "ai_draft");
+  assert.equal(result.article.pii, "S2667-193X(25)00322-9");
+  assert.equal(result.article.pmid, "41438613");
+  assert.equal(result.article.pmcid, "PMC12719693");
+  assert.equal(result.article.sourceName, "The Lancet Regional Health - Americas");
+  assert.match(result.article.executiveSummary, /español/);
+  assert.ok(result.rawEvidence.blockedResolvers.includes("publisher_html"));
+  assert.ok(result.rawEvidence.successfulResolvers.includes("pubmed"));
+  assert.ok(calls.some((url) => url.includes("esearch.fcgi")));
+});
+
+test("resolveScientificArticle uses pasted abstract as manual evidence with warning", async () => {
+  const fetchImpl = async (url) => ({
+    ok: String(url).includes("api.openai.com"),
+    status: String(url).includes("api.openai.com") ? 200 : 404,
+    headers: { get: () => "application/json" },
+    text: async () =>
+      String(url).includes("api.openai.com")
+        ? JSON.stringify({
+            choices: [{ message: { content: JSON.stringify({
+              studyType: "Estudio observacional",
+              evidenceType: "Investigación clínica",
+              studyLocation: "",
+              executiveSummary: "Resumen en español desde abstract pegado.",
+              clinicalQuestion: "Pregunta sintetizada desde el abstract pegado.",
+              mainResult: "Resultado principal derivado del texto pegado.",
+              tags: ["abstract pegado"],
+              warnings: ["Parte de la evidencia fue aportada manualmente por el usuario."],
+              extractionConfidence: 0.74
+            }) } }]
+          })
+        : "{}"
+  });
+  const result = await resolveScientificArticle(
+    {
+      url: "https://example.org/article",
+      pastedTitle: "Título aportado",
+      pastedSource: "Revista aportada",
+      pastedAbstract: "Objective and findings with enough scientific text to synthesize fields for review."
+    },
+    { apiKey: "test-key", fetchImpl }
+  );
+  assert.equal(result.extractionStatus, "ai_draft");
+  assert.equal(result.article.title, "Título aportado");
+  assert.ok(result.article.warnings.some((warning) => /aportada manualmente/i.test(warning)));
 });

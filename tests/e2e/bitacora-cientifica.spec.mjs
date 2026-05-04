@@ -31,8 +31,51 @@ test("scientific logbook renders as operational hub with modals and article crea
     const payload = request.postDataJSON();
     extractionRequests.push({
       url: payload?.url || "",
+      pastedAbstract: payload?.pastedAbstract || "",
       authorization: request.headers().authorization || ""
     });
+    if (payload?.pastedAbstract) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          extractionStatus: "ai_draft",
+          article: {
+            title: payload.pastedTitle || "Artículo asistido",
+            sourceName: payload.pastedSource || "Fuente asistida",
+            officialUrl: payload.url,
+            sourceDomain: "example.org",
+            doi: payload.doi || "",
+            pmid: payload.pmid || "",
+            pmcid: payload.pmcid || "",
+            nctId: "",
+            pii: "",
+            studyType: "Revisión narrativa",
+            evidenceType: "Artículo científico",
+            publicationDate: "2026-05-04",
+            studyLocation: "Contexto asistido",
+            executiveSummary: "Resumen asistido en español desde datos pegados.",
+            clinicalQuestion: "Pregunta asistida en español.",
+            mainResult: "Resultado asistido en español.",
+            tags: ["Asistido", "IA"],
+            accessType: "Resumen disponible",
+            extractionConfidence: 0.74,
+            warnings: ["Parte de la evidencia fue aportada manualmente por el usuario."]
+          },
+          rawEvidence: {
+            attemptedResolvers: ["manual_evidence"],
+            successfulResolvers: ["manual_evidence"],
+            failedResolvers: [],
+            blockedResolvers: [],
+            metadataFieldsDetected: ["manual_evidence.abstract"],
+            scientificTextLength: payload.pastedAbstract.length,
+            identifiersDetected: { doi: payload.doi || "", pmid: payload.pmid || "", pmcid: payload.pmcid || "", nctId: "", pii: "" }
+          }
+        })
+      });
+      return;
+    }
     if (payload?.url === "https://example.org/partial") {
       await route.fulfill({
         status: 200,
@@ -44,6 +87,11 @@ test("scientific logbook renders as operational hub with modals and article crea
             sourceName: "Revista parcial",
             officialUrl: "https://example.org/partial",
             sourceDomain: "example.org",
+            doi: "",
+            pmid: "",
+            pmcid: "",
+            nctId: "",
+            pii: "",
             warnings: ["Solo se detectaron metadatos básicos. Completá el resto manualmente."]
           }
         })
@@ -76,6 +124,11 @@ test("scientific logbook renders as operational hub with modals and article crea
             sourceName: "",
             officialUrl: "https://example.org/failed",
             sourceDomain: "example.org",
+            doi: "",
+            pmid: "",
+            pmcid: "",
+            nctId: "",
+            pii: "",
             studyType: "",
             evidenceType: "",
             publicationDate: "",
@@ -87,13 +140,18 @@ test("scientific logbook renders as operational hub with modals and article crea
             accessType: "Pendiente",
             extractionConfidence: 0,
             warnings: [
-              "No se pudo extraer información suficiente desde la página. Podés completar el artículo manualmente."
+              "El sitio limita el acceso al contenido público. Se extrajeron solo metadatos disponibles.",
+              "La fuente respondió HTTP 403."
             ]
           },
           rawEvidence: {
+            attemptedResolvers: ["publisher_html", "pubmed"],
+            successfulResolvers: [],
+            failedResolvers: ["pubmed"],
+            blockedResolvers: ["publisher_html"],
             metadataFieldsDetected: [],
-            contentLength: 0,
-            usedSources: ["url"]
+            scientificTextLength: 0,
+            identifiersDetected: { doi: "", pmid: "", pmcid: "", nctId: "", pii: "" }
           }
         })
       });
@@ -110,6 +168,11 @@ test("scientific logbook renders as operational hub with modals and article crea
           sourceName: "PubMed / MEDLINE",
           officialUrl: "https://pubmed.ncbi.nlm.nih.gov/123456/",
           sourceDomain: "pubmed.ncbi.nlm.nih.gov",
+          doi: "10.1000/qa",
+          pmid: "123456",
+          pmcid: "",
+          nctId: "",
+          pii: "",
           studyType: "Ensayo clínico",
           evidenceType: "Investigación clínica",
           publicationDate: "2026-05-03",
@@ -372,7 +435,7 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(articleModal.locator("#article-ai-status")).not.toContainText("Datos cargados por IA", {
     timeout: 10_000
   });
-  await expect(articleModal.locator("#article-ai-status")).toContainText("Solo se detectaron metadatos básicos");
+  await expect(articleModal.locator("#article-ai-status")).toContainText("Se detectaron metadatos básicos");
   await expect(articleModal.getByLabel("Fuente / revista / sitio científico")).toHaveValue("Revista parcial");
   await expect(articleModal.getByLabel("Título")).toHaveValue("");
   await saveArticleButton.click();
@@ -393,6 +456,18 @@ test("scientific logbook renders as operational hub with modals and article crea
     timeout: 10_000
   });
   await expect(articleModal.getByLabel("Título")).toHaveValue("Título manual preservado");
+  await expect(articleModal.locator("#article-assisted-zone")).toBeVisible();
+  await expect(articleModal.getByRole("button", { name: /El sitio bloqueó/ })).toHaveAttribute("aria-expanded", "true");
+  await articleModal.getByLabel("DOI").fill("10.1000/asistido");
+  await articleModal.getByLabel("Nombre visible del artículo").fill("Artículo asistido");
+  await articleModal.getByLabel("Fuente visible").fill("Fuente asistida");
+  await articleModal.getByLabel("Abstract / Summary visible").fill("Texto científico visible pegado con objetivo, resultados y conclusiones para análisis.");
+  await articleModal.getByRole("button", { name: "Analizar datos pegados" }).click();
+  await expect(articleModal.locator("#article-ai-status")).toContainText("Borrador cargado por IA", {
+    timeout: 10_000
+  });
+  await expect(articleModal.getByLabel("Título")).toHaveValue("Artículo asistido");
+  await expect(articleModal.getByLabel("Resumen ejecutivo")).toHaveValue("Resumen asistido en español desde datos pegados.");
 
   await articleModal.getByLabel("URL del artículo o paper").fill("https://pubmed.ncbi.nlm.nih.gov/123456/");
   await expect(articleModal.locator("#article-domain-detected")).toContainText("pubmed.ncbi.nlm.nih.gov");
@@ -410,11 +485,12 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(articleModal.getByLabel("Etiquetas")).toHaveValue("QA, Lectura crítica, PubMed, IA");
   await expect(articleModal.getByLabel("Acceso")).toHaveValue("Resumen disponible");
   await expect(articleModal.getByLabel("Resumen ejecutivo")).toHaveValue("Resumen generado por IA desde Playwright.");
-  expect(extractionRequests).toHaveLength(4);
+  expect(extractionRequests).toHaveLength(5);
   expect(extractionRequests[0].url).toBe("https://example.org/partial");
   expect(extractionRequests[1].url).toBe("https://example.org/auth");
   expect(extractionRequests[2].url).toBe("https://example.org/failed");
-  expect(extractionRequests[3].url).toBe("https://pubmed.ncbi.nlm.nih.gov/123456/");
+  expect(extractionRequests[3].pastedAbstract).toContain("Texto científico visible pegado");
+  expect(extractionRequests[4].url).toBe("https://pubmed.ncbi.nlm.nih.gov/123456/");
   expect(extractionRequests.every((entry) => /^Bearer\s+/.test(entry.authorization))).toBe(true);
   await articleModal.getByLabel("Comentario breve del usuario").fill("Comentario interno de prueba.");
   await saveArticleButton.click();

@@ -26,9 +26,10 @@ const cleanString = (value = "") => String(value || "").trim();
 const AUTH_MESSAGE = "Necesitás iniciar sesión para analizar enlaces.";
 const RATE_LIMIT_MESSAGE = "Se alcanzó el límite de análisis. Reintentá más tarde.";
 const NOT_CONFIGURED_MESSAGE = "El servicio de IA no está configurado en backend.";
-const METADATA_ONLY_MESSAGE = "Solo se detectaron metadatos básicos. Completá el resto manualmente.";
+const METADATA_ONLY_MESSAGE =
+  "Se detectaron metadatos básicos, pero no contenido científico suficiente. Completá el análisis manualmente.";
 const FAILED_MESSAGE =
-  "No se pudo extraer información suficiente desde la página. Podés completar el artículo manualmente.";
+  "No se pudo extraer información suficiente desde esta URL. Probá con DOI, PubMed, PMC, PDF open access o completá manualmente.";
 const AI_DRAFT_MESSAGE = "Borrador cargado por IA. Revisá la información antes de guardar.";
 
 const normalizeTags = (value = []) =>
@@ -111,6 +112,11 @@ const buildManualFallback = (urlInfo, status = "not_configured", message = "") =
     sourceName: urlInfo.sourceName,
     officialUrl: urlInfo.href,
     sourceDomain: urlInfo.domain,
+    doi: "",
+    pmid: "",
+    pmcid: "",
+    nctId: "",
+    pii: "",
     studyType: "",
     evidenceType: "",
     publicationDate: "",
@@ -183,6 +189,11 @@ const normalizeExtractionArticle = (input = {}, urlInfo) => ({
     urlInfo.sourceName,
   officialUrl: urlInfo.href,
   sourceDomain: urlInfo.domain,
+  doi: firstText(input, ["doi", "DOI"]),
+  pmid: firstText(input, ["pmid", "PMID"]).replace(/\D/g, ""),
+  pmcid: firstText(input, ["pmcid", "PMCID"]).toUpperCase().match(/PMC\d+/)?.[0] || "",
+  nctId: firstText(input, ["nctId", "nct_id", "NCT"]).toUpperCase().match(/NCT\d{8}/)?.[0] || "",
+  pii: firstText(input, ["pii", "PII"]),
   studyType: firstText(input, ["studyType", "typeOfStudy", "study_design", "studyDesign", "tipoEstudio", "tipo_de_estudio", "design"]),
   evidenceType: firstText(input, ["evidenceType", "typeOfEvidence", "evidence_level", "evidenceLevel", "tipoEvidencia", "tipo_de_evidencia"]),
   publicationDate: firstText(input, ["publicationDate", "publishedAt", "publication_date", "datePublished", "fechaPublicacion", "fecha_de_publicacion"]),
@@ -207,7 +218,7 @@ const hasCanonicalSource = (article = {}) => {
 };
 
 const hasUsefulAiDraft = (article = {}) => {
-  const hasTitleOrSource = Boolean(cleanString(article.title) || hasCanonicalSource(article));
+  const hasTitleAndSource = Boolean(cleanString(article.title) && hasCanonicalSource(article) && cleanString(article.officialUrl));
   const usefulFieldCount = [
     cleanString(article.executiveSummary).length >= 24,
     cleanString(article.clinicalQuestion).length >= 24,
@@ -216,13 +227,13 @@ const hasUsefulAiDraft = (article = {}) => {
     Boolean(cleanString(article.evidenceType)),
     Boolean(cleanString(article.publicationDate))
   ].filter(Boolean).length;
-  return hasTitleOrSource && usefulFieldCount >= 2;
+  return hasTitleAndSource && usefulFieldCount >= 2 && Number(article.extractionConfidence || 0) >= 0.55;
 };
 
 const hasMetadataDraft = (article = {}) =>
-  Boolean(article.title || hasCanonicalSource(article) || article.publicationDate);
+  Boolean(article.title || hasCanonicalSource(article) || article.publicationDate || article.doi || article.pmid || article.pmcid || article.nctId || article.pii);
 
-export async function requestArticleExtraction(url, { auth, endpoint } = {}) {
+export async function requestArticleExtraction(url, { auth, endpoint, evidence = {} } = {}) {
   const validation = validateArticleUrl(url);
   if (!validation.ok) {
     return {
@@ -261,7 +272,16 @@ export async function requestArticleExtraction(url, { auth, endpoint } = {}) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ url: validation.href })
+      body: JSON.stringify({
+        url: validation.href,
+        doi: cleanString(evidence.doi),
+        pmid: cleanString(evidence.pmid),
+        pmcid: cleanString(evidence.pmcid),
+        nctId: cleanString(evidence.nctId),
+        pastedAbstract: cleanString(evidence.pastedAbstract),
+        pastedTitle: cleanString(evidence.pastedTitle),
+        pastedSource: cleanString(evidence.pastedSource)
+      })
     });
 
     let payload = null;
@@ -293,6 +313,7 @@ export async function requestArticleExtraction(url, { auth, endpoint } = {}) {
       extractionStatus,
       message: getExtractionStatusMessage(extractionStatus),
       rawEvidence: payload.rawEvidence || null,
+      error: payload.error?.message || "",
       article: {
         ...article,
         warnings: article.warnings.length
