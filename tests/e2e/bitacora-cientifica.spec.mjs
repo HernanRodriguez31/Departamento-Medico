@@ -63,14 +63,16 @@ test("scientific logbook renders as operational hub with modals and article crea
             ? "Resumen ejecutivo en español generado desde texto pegado."
             : "Resumen ejecutivo en español generado desde PDF.",
           abstractSummaryEs: "Abstract sintetizado y traducido al español.",
-          clinicalQuestionEs: "Pregunta científica sintetizada en español.",
-          mainResultEs: "Resultado o mensaje principal en español.",
+          objectiveEs: "Objetivo o pregunta sintetizada en español.",
+          clinicalQuestionEs: "Objetivo o pregunta sintetizada en español.",
+          mainMessageEs: "Mensaje principal en español.",
+          mainResultEs: "Mensaje principal en español.",
           methodologyEs: "Metodología resumida en español.",
-          keyPointsEs: ["Punto clave uno", "Punto clave dos"],
+          keyPointsEs: ["Punto clave uno", "Punto clave dos", "Punto clave tres"],
           limitationsEs: "Limitaciones sintetizadas en español.",
           localApplicabilityEs: "Aplicabilidad local para revisión del equipo.",
           occupationalHealthRelevanceEs: "Relevancia para salud ocupacional y gestión sanitaria.",
-          tags: ["PDF", "IA", "Revisión", "QA", "Documento"],
+          tags: ["Documento", "IA", "Revisión", "Gestión sanitaria", "QA"],
           sourcePages: [{ field: "executiveSummaryEs", pages: [1] }],
           extractionConfidence: 0.86,
           warnings: ["Revisión humana obligatoria antes de publicar."]
@@ -515,6 +517,9 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(articleModal.locator("#article-ai-status")).toContainText("Ficha generada por IA", {
     timeout: 30_000
   });
+  await expect(articleModal.locator("#article-preview-zone")).toBeVisible();
+  await expect(articleModal.locator("#article-preview-zone")).toContainText("Vista previa generada");
+  await expect(articleModal.locator("#article-advanced-zone")).toBeHidden();
   await expect(articleModal.getByLabel("Título")).toHaveValue("PDF QA Bitácora");
   await expect(articleModal.getByLabel("Resumen breve para tarjeta")).toHaveValue("Resumen breve en español desde PDF.");
   await expect(articleModal.getByLabel("Resumen ejecutivo")).toHaveValue("Resumen ejecutivo en español generado desde PDF.");
@@ -527,7 +532,8 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(pdfPost).toContainText("Resumen breve en español desde PDF.");
   await expect(pdfPost.getByRole("button", { name: "Ver PDF" })).toBeVisible();
   await pdfPost.getByRole("button", { name: "Leer análisis" }).click();
-  await expect(pdfPost.locator(".bitacora-analysis")).toContainText("Abstract sintetizado y traducido al español.");
+  await expect(pdfPost.locator(".bitacora-analysis")).toContainText("Objetivo o pregunta sintetizada en español.");
+  await expect(pdfPost.locator(".bitacora-analysis")).toContainText("Mensaje principal en español.");
   page.once("dialog", (dialog) => dialog.accept());
   await pdfPost.getByRole("button", { name: "Eliminar" }).click();
   await expect(page.locator(".bitacora-post")).toHaveCount(0);
@@ -545,6 +551,7 @@ test("scientific logbook renders as operational hub with modals and article crea
   });
   await expect(articleModal.getByLabel("Título")).toHaveValue("Texto QA traducido");
   await expect(articleModal.getByLabel("Resumen ejecutivo")).toHaveValue("Resumen ejecutivo en español generado desde texto pegado.");
+  await expect(articleModal.locator("#article-advanced-zone")).toBeHidden();
   await articleModal.getByRole("button", { name: "Guardar como borrador" }).click();
   await expect(articleModal).toBeHidden({ timeout: 30_000 });
   const textDraft = page.locator(".bitacora-post").filter({ hasText: "Texto QA traducido" }).first();
@@ -597,11 +604,12 @@ test("scientific logbook renders as operational hub with modals and article crea
   });
   await expect(articleModal.getByLabel("Título")).toHaveValue(articleTitle);
   await expect(articleModal.locator("#article-source-name")).toHaveValue("PubMed / MEDLINE");
+  await expect(articleModal.getByLabel("Fecha de publicación")).toHaveValue("2026-05-03");
+  await expect(articleModal.getByLabel("Objetivo / pregunta")).toHaveValue("Pregunta clínica generada por IA.");
+  await expect(articleModal.getByLabel("Mensaje principal")).toHaveValue("Resultado principal generado por IA.");
+  await articleModal.getByRole("button", { name: "Editar detalles avanzados" }).click();
   await expect(articleModal.getByLabel("Tipo de estudio")).toHaveValue("Ensayo clínico");
   await expect(articleModal.getByLabel("Tipo de evidencia")).toHaveValue("Investigación clínica");
-  await expect(articleModal.getByLabel("Fecha de publicación")).toHaveValue("2026-05-03");
-  await expect(articleModal.getByLabel("Pregunta que busca responder")).toHaveValue("Pregunta clínica generada por IA.");
-  await expect(articleModal.getByLabel("Resultado o mensaje principal")).toHaveValue("Resultado principal generado por IA.");
   await expect(articleModal.getByLabel("Etiquetas")).toHaveValue("QA, Lectura crítica, PubMed, IA");
   await expect(articleModal.getByLabel("Acceso")).toHaveValue("Resumen disponible");
   await expect(articleModal.getByLabel("Resumen ejecutivo")).toHaveValue("Resumen generado por IA desde Playwright.");

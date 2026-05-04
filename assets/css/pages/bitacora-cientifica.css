@@ -942,6 +942,41 @@ body.bitacora-modal-open {
   background: rgba(248, 250, 252, 0.78);
 }
 
+.bitacora-preview-zone[hidden],
+.bitacora-advanced-zone[hidden] {
+  display: none;
+}
+
+.bitacora-preview-zone {
+  border-color: rgba(122, 184, 0, 0.28);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.bitacora-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.72rem;
+}
+
+.bitacora-preview-grid .bitacora-field textarea {
+  min-height: 4.25rem;
+}
+
+.bitacora-preview-grid .bitacora-field[for="article-card-summary"] textarea {
+  min-height: 3.4rem;
+}
+
+.bitacora-advanced-toggle {
+  justify-self: start;
+}
+
+.bitacora-subsection-title {
+  margin: 0.1rem 0 0;
+  color: var(--bitacora-ink);
+  font-size: 0.9rem;
+  font-weight: 850;
+}
+
 .bitacora-document-tabs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1261,6 +1296,7 @@ body.bitacora-modal-open {
 
   .bitacora-url-row,
   .bitacora-form-grid,
+  .bitacora-preview-grid,
   .bitacora-document-tabs {
     grid-template-columns: 1fr;
   }

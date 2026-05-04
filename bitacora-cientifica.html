@@ -34,7 +34,7 @@
     <link rel="stylesheet" href="/assets/css/pages/index.css?v=20260502-portal-hover-state-1" />
     <link rel="stylesheet" href="/assets/css/core-contrast.css?v=20260502-committee-border-align-1" />
     <link rel="stylesheet" href="/assets/css/pages/galeriadearte.css?v=20260503-art-gallery-like-tooltip-1" />
-    <link rel="stylesheet" href="/assets/css/pages/bitacora-cientifica.css?v=20260504-bitacora-document-agent-1" />
+    <link rel="stylesheet" href="/assets/css/pages/bitacora-cientifica.css?v=20260504-bitacora-editorial-agent-1" />
   </head>
   <body class="art-gallery-page bitacora-page ui-clarity">
     <div id="app">
@@ -381,12 +381,12 @@
               <p id="article-ai-status" class="bitacora-ai-status" aria-live="polite"></p>
               <div id="article-ai-warnings" class="bitacora-ai-warning" hidden></div>
 
-              <section class="bitacora-form-zone" aria-labelledby="article-data-zone-title">
+              <section id="article-preview-zone" class="bitacora-form-zone bitacora-preview-zone" aria-labelledby="article-preview-zone-title" hidden>
                 <div class="bitacora-form-zone__header">
-                  <h3 id="article-data-zone-title">Datos del artículo</h3>
-                  <p>Revisá y completá la información antes de guardar.</p>
+                  <h3 id="article-preview-zone-title">Vista previa generada</h3>
+                  <p>Revisá la ficha breve. Podés editar estos campos antes de guardar.</p>
                 </div>
-                <div class="bitacora-form-grid">
+                <div class="bitacora-preview-grid">
                   <label class="bitacora-field bitacora-field--wide" for="article-title">
                     <span>Título</span>
                     <input id="article-title" name="title" type="text" required />
@@ -395,9 +395,63 @@
                     <span>Fuente / revista / institución</span>
                     <input id="article-source-name" name="sourceName" type="text" />
                   </label>
+                  <label class="bitacora-field" for="article-publication-date">
+                    <span>Fecha de publicación</span>
+                    <input id="article-publication-date" name="publicationDate" type="text" placeholder="AAAA-MM-DD o texto de la fuente" />
+                  </label>
+                  <label class="bitacora-field" for="article-doi">
+                    <span>DOI</span>
+                    <input id="article-doi" name="doi" type="text" />
+                  </label>
+                  <label class="bitacora-field" for="article-type">
+                    <span>Tipo de publicación</span>
+                    <input id="article-type" name="articleType" type="text" />
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-card-summary">
+                    <span>Resumen breve para tarjeta</span>
+                    <textarea id="article-card-summary" name="cardSummaryEs" rows="2"></textarea>
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-executive-summary">
+                    <span>Resumen ejecutivo</span>
+                    <textarea id="article-executive-summary" name="executiveSummary" rows="3"></textarea>
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-clinical-question">
+                    <span>Objetivo / pregunta</span>
+                    <textarea id="article-clinical-question" name="clinicalQuestion" rows="3"></textarea>
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-main-result">
+                    <span>Mensaje principal</span>
+                    <textarea id="article-main-result" name="mainResult" rows="3"></textarea>
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-key-points">
+                    <span>Puntos clave</span>
+                    <textarea id="article-key-points" name="keyPointsEs" rows="3" placeholder="Un punto por línea"></textarea>
+                  </label>
+                </div>
+                <button
+                  id="article-advanced-toggle"
+                  type="button"
+                  class="bitacora-btn bitacora-btn--secondary bitacora-advanced-toggle"
+                  aria-expanded="false"
+                  aria-controls="article-advanced-zone"
+                >
+                  Editar detalles avanzados
+                </button>
+              </section>
+
+              <section id="article-advanced-zone" class="bitacora-form-zone bitacora-advanced-zone" aria-labelledby="article-advanced-zone-title" hidden>
+                <div class="bitacora-form-zone__header">
+                  <h3 id="article-advanced-zone-title">Detalles avanzados</h3>
+                  <p>Campos bibliográficos, trazabilidad y análisis ampliado para revisión editorial.</p>
+                </div>
+                <div class="bitacora-form-grid">
                   <label class="bitacora-field" for="article-journal">
                     <span>Revista</span>
                     <input id="article-journal" name="journal" type="text" />
+                  </label>
+                  <label class="bitacora-field" for="article-evidence-type">
+                    <span>Tipo de evidencia</span>
+                    <input id="article-evidence-type" name="evidenceType" type="text" />
                   </label>
                   <label class="bitacora-field bitacora-field--wide" for="article-authors">
                     <span>Autores</span>
@@ -407,25 +461,9 @@
                     <span>Enlace oficial</span>
                     <input id="article-official-url" name="officialUrl" type="url" inputmode="url" />
                   </label>
-                  <label class="bitacora-field" for="article-doi">
-                    <span>DOI</span>
-                    <input id="article-doi" name="doi" type="text" />
-                  </label>
-                  <label class="bitacora-field" for="article-type">
-                    <span>Tipo de artículo</span>
-                    <input id="article-type" name="articleType" type="text" />
-                  </label>
                   <label class="bitacora-field" for="article-study-type">
                     <span>Tipo de estudio</span>
                     <input id="article-study-type" name="studyType" type="text" />
-                  </label>
-                  <label class="bitacora-field" for="article-evidence-type">
-                    <span>Tipo de evidencia</span>
-                    <input id="article-evidence-type" name="evidenceType" type="text" />
-                  </label>
-                  <label class="bitacora-field" for="article-publication-date">
-                    <span>Fecha de publicación</span>
-                    <input id="article-publication-date" name="publicationDate" type="text" placeholder="AAAA-MM-DD o texto de la fuente" />
                   </label>
                   <label class="bitacora-field" for="article-original-language">
                     <span>Idioma original</span>
@@ -435,33 +473,13 @@
                     <span>Lugar / contexto del estudio</span>
                     <input id="article-study-location" name="studyLocation" type="text" />
                   </label>
-                  <label class="bitacora-field bitacora-field--wide" for="article-card-summary">
-                    <span>Resumen breve para tarjeta</span>
-                    <textarea id="article-card-summary" name="cardSummaryEs" rows="2"></textarea>
-                  </label>
-                  <label class="bitacora-field bitacora-field--wide" for="article-executive-summary">
-                    <span>Resumen ejecutivo</span>
-                    <textarea id="article-executive-summary" name="executiveSummary" rows="4"></textarea>
-                  </label>
                   <label class="bitacora-field bitacora-field--wide" for="article-abstract-summary">
                     <span>Abstract / resumen traducido o sintetizado</span>
-                    <textarea id="article-abstract-summary" name="abstractSummaryEs" rows="4"></textarea>
-                  </label>
-                  <label class="bitacora-field bitacora-field--wide" for="article-clinical-question">
-                    <span>Pregunta que busca responder</span>
-                    <textarea id="article-clinical-question" name="clinicalQuestion" rows="3"></textarea>
-                  </label>
-                  <label class="bitacora-field bitacora-field--wide" for="article-main-result">
-                    <span>Resultado o mensaje principal</span>
-                    <textarea id="article-main-result" name="mainResult" rows="3"></textarea>
+                    <textarea id="article-abstract-summary" name="abstractSummaryEs" rows="3"></textarea>
                   </label>
                   <label class="bitacora-field bitacora-field--wide" for="article-methodology">
                     <span>Metodología</span>
                     <textarea id="article-methodology" name="methodologyEs" rows="3"></textarea>
-                  </label>
-                  <label class="bitacora-field bitacora-field--wide" for="article-key-points">
-                    <span>Puntos clave</span>
-                    <textarea id="article-key-points" name="keyPointsEs" rows="3" placeholder="Un punto por línea"></textarea>
                   </label>
                   <label class="bitacora-field bitacora-field--wide" for="article-limitations">
                     <span>Limitaciones</span>
@@ -488,18 +506,12 @@
                       <option value="Resumen disponible">Resumen disponible</option>
                     </select>
                   </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-user-comment">
+                    <span>Comentario breve del usuario</span>
+                    <textarea id="article-user-comment" name="userComment" rows="3"></textarea>
+                  </label>
                 </div>
-              </section>
-
-              <section class="bitacora-form-zone" aria-labelledby="article-trace-zone-title">
-                <div class="bitacora-form-zone__header">
-                  <h3 id="article-trace-zone-title">Trazabilidad interna</h3>
-                  <p>La carga queda asociada al usuario autenticado y nace como pendiente de revisión.</p>
-                </div>
-                <label class="bitacora-field bitacora-field--wide" for="article-user-comment">
-                  <span>Comentario breve del usuario</span>
-                  <textarea id="article-user-comment" name="userComment" rows="3"></textarea>
-                </label>
+                <h4 class="bitacora-subsection-title">Trazabilidad interna</h4>
                 <dl class="bitacora-form-audit">
                   <div>
                     <dt>Cargado por</dt>
@@ -514,8 +526,8 @@
                     <dd>Pendiente de revisión</dd>
                   </div>
                 </dl>
-                <p id="article-form-error" class="bitacora-form-error" hidden></p>
               </section>
+              <p id="article-form-error" class="bitacora-form-error" hidden></p>
             </div>
 
             <div class="bitacora-modal__actions">
@@ -579,7 +591,7 @@
       installFirebaseGlobals();
     </script>
     <script type="module" src="/assets/js/common/notifications.js"></script>
-    <script type="module" src="/assets/js/pages/bitacora-cientifica.js?v=20260504-bitacora-document-agent-1"></script>
+    <script type="module" src="/assets/js/pages/bitacora-cientifica.js?v=20260504-bitacora-editorial-agent-1"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {

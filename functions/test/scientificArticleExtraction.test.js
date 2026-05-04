@@ -34,6 +34,7 @@ const {
   computeExtractionStatus: computeDocumentExtractionStatus,
   detectDoi: detectDocumentDoi,
   detectLanguage: detectDocumentLanguage,
+  getConfiguredDocumentModels,
   resolveScientificArticleDocument,
   validateStoragePathForUid
 } = require("../scientificArticleDocumentExtraction");
@@ -508,7 +509,7 @@ test("document resolver validates storage ownership and detects PDF/text metadat
   assert.equal(packet.detectedMetadata.sourceName, "The Lancet Regional Health - Americas");
   assert.equal(detectDocumentDoi(text), "10.1016/j.lana.2025.101311");
   assert.equal(detectDocumentLanguage(text), "en");
-  assert.ok(packet.sections.some((section) => /Abstract/i.test(section.heading)));
+  assert.ok(packet.sections.some((section) => /Abstract|Summary/i.test(section.heading)));
 });
 
 test("document OpenAI payload uses strict schema and Spanish anti-hallucination prompt", () => {
@@ -521,8 +522,95 @@ test("document OpenAI payload uses strict schema and Spanish anti-hallucination 
 
   assert.equal(payload.response_format.type, "json_schema");
   assert.equal(payload.response_format.json_schema.strict, true);
-  assert.ok(payload.messages[0].content.includes("Todo texto explicativo debe estar en español"));
+  assert.equal(payload.model, getConfiguredDocumentModels()[0]);
+  assert.ok(payload.messages[0].content.includes("Todo texto editorial debe estar en español"));
   assert.ok(payload.messages[0].content.includes("No inventes datos"));
+  assert.ok(payload.response_format.json_schema.schema.required.includes("objectiveEs"));
+  assert.ok(payload.response_format.json_schema.schema.required.includes("mainMessageEs"));
+  assert.equal(payload.response_format.json_schema.schema.required.includes("clinicalQuestionEs"), false);
+});
+
+test("document resolver treats HEARTS policy PDF summary as ai_draft editorial card", async () => {
+  const heartsText = `
+HEARTS quality: a policy framework to strengthen hypertension and cardiovascular risk management in primary healthcare—insights from HEARTS in the Americas
+The Lancet Regional Health - Americas
+Health Policy
+Esteban Londoño, Reena Gupta, Patrick Van der Stuyft, Martin Heine, Gloria Giraldo, Grace Marie Ku
+Open Access
+1 December 2025
+https://doi.org/10.1016/j.lana.2025.101311
+Summary
+HEARTS in the Americas is the largest-scale implementation of the WHO's global initiative, with 33 countries participating, 28 having adopted standardized clinical pathways, and about 10,000 primary healthcare facilities engaged. Despite progress, fragmented care, limited availability of validated blood pressure devices, restricted access to essential medicines, and weak quality assurance systems continue to hinder hypertension control and cardiovascular risk management. In response, PAHO and participating countries co-developed the HEARTS Quality Framework. Grounded in regional implementation, this model synthesizes global evidence and lessons from Latin America and the Caribbean.
+Keywords
+Americas Hypertension Cardiovascular diseases Primary health care Quality improvement Health systems strengthening
+Introduction
+The document presents the HEARTS Quality Framework as a model to institutionalize and scale quality improvement in primary healthcare for hypertension and cardiovascular risk.
+Methods
+The framework is based on regional implementation experience, global evidence, country lessons and expert consensus.
+Framework
+The quality framework defines standardized protocols, team-based care, validated devices, essential medicines, continuous monitoring, governance and implementation targets.
+Forward view
+Sustained improvements require institutionalization, quality improvement, primary healthcare strengthening and governance for equitable outcomes.
+References
+1. This reference section should not be sent as priority evidence.
+`.repeat(3);
+  let bodySent = "";
+  const aiArticle = {
+    title: "HEARTS quality: a policy framework to strengthen hypertension and cardiovascular risk management in primary healthcare—insights from HEARTS in the Americas",
+    sourceName: "The Lancet Regional Health - Americas",
+    journal: "The Lancet Regional Health - Americas",
+    authors: ["Esteban Londoño", "Reena Gupta", "Patrick Van der Stuyft", "Martin Heine", "Gloria Giraldo", "Grace Marie Ku"],
+    officialUrl: "https://doi.org/10.1016/j.lana.2025.101311",
+    doi: "10.1016/j.lana.2025.101311",
+    publicationDate: "1 December 2025",
+    originalLanguage: "en",
+    articleType: "Health Policy",
+    evidenceType: "Marco de política sanitaria / implementación en salud pública",
+    accessType: "Open access",
+    cardSummaryEs: "Presenta el HEARTS Quality Framework para fortalecer la calidad de atención en hipertensión y riesgo cardiovascular en atención primaria.",
+    executiveSummaryEs: "El documento describe un marco regional para institucionalizar y escalar HEARTS en las Américas. Integra evidencia, experiencia de países y consenso experto para mejorar protocolos, equipos, dispositivos, medicamentos, monitoreo y gobernanza en atención primaria.",
+    objectiveEs: "Describir y fundamentar un marco de calidad para institucionalizar y escalar HEARTS en las Américas.",
+    methodologyEs: "Health Policy basado en implementación regional, evidencia internacional, experiencia de países y consenso experto.",
+    mainMessageEs: "La mejora sostenida del control de hipertensión requiere protocolos estandarizados, equipos capacitados, dispositivos validados, medicamentos esenciales, monitoreo continuo y gobernanza sanitaria.",
+    keyPointsEs: [
+      "HEARTS se implementa regionalmente en atención primaria.",
+      "El marco prioriza calidad, estandarización y monitoreo.",
+      "La gobernanza sanitaria es clave para sostener resultados."
+    ],
+    localApplicabilityEs: "Puede orientar revisión institucional de procesos de atención primaria y gestión de riesgo cardiovascular.",
+    occupationalHealthRelevanceEs: "Aporta criterios de gestión sanitaria poblacional aplicables a programas preventivos y seguimiento de riesgo cardiovascular.",
+    limitationsEs: "Es un marco de política sanitaria; no reemplaza evaluación local ni protocolos institucionales.",
+    tags: ["Hipertensión", "Riesgo cardiovascular", "Atención primaria", "HEARTS", "Mejora de calidad"],
+    warnings: [],
+    extractionConfidence: 0.9
+  };
+  const fetchImpl = async (_url, options) => {
+    bodySent = options.body;
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ choices: [{ message: { content: JSON.stringify(aiArticle) } }] })
+    };
+  };
+
+  const result = await resolveScientificArticleDocument(
+    {
+      mode: "pasted_text",
+      pastedText: heartsText,
+      pastedSource: "The Lancet Regional Health - Americas",
+      officialUrl: "https://doi.org/10.1016/j.lana.2025.101311"
+    },
+    { uid: "user-a", user: { uid: "user-a" }, apiKey: "test-key", fetchImpl }
+  );
+
+  assert.equal(result.extractionStatus, "ai_draft");
+  assert.equal(result.article.articleType, "Health Policy");
+  assert.equal(result.article.objectiveEs.length > 0, true);
+  assert.equal(result.article.mainMessageEs.length > 0, true);
+  assert.equal(result.article.keyPointsEs.length >= 3 && result.article.keyPointsEs.length <= 5, true);
+  assert.deepEqual(result.article.tags.slice(0, 3), ["Hipertensión", "Riesgo cardiovascular", "Atención primaria"]);
+  assert.match(bodySent, /Summary/);
+  assert.doesNotMatch(bodySent, /This reference section should not be sent/);
 });
 
 test("document AI output is normalized and empty output is not ai_draft", async () => {
@@ -541,21 +629,18 @@ test("document AI output is normalized and empty output is not ai_draft", async 
     publicationDate: "",
     originalLanguage: "en",
     articleType: "Artículo científico",
-    studyType: "Marco de política sanitaria",
     evidenceType: "Política sanitaria",
     accessType: "Pendiente",
     cardSummaryEs: "Ficha breve en español para revisión del equipo médico.",
     executiveSummaryEs: "Resumen ejecutivo en español basado exclusivamente en el texto aportado.",
-    abstractSummaryEs: "Resumen del abstract en español.",
-    clinicalQuestionEs: "Qué marco fortalece la gestión de hipertensión en atención primaria.",
-    mainResultEs: "El documento organiza indicadores y objetivos de calidad.",
+    objectiveEs: "Presentar un marco que fortalece la gestión de hipertensión en atención primaria.",
     methodologyEs: "Síntesis documental de implementación regional.",
-    keyPointsEs: ["Calidad", "Atención primaria"],
+    mainMessageEs: "El documento organiza indicadores y objetivos de calidad para atención primaria.",
+    keyPointsEs: ["Calidad", "Atención primaria", "Gestión sanitaria"],
     limitationsEs: "No especifica resultados clínicos individuales.",
     localApplicabilityEs: "Requiere adaptación institucional.",
     occupationalHealthRelevanceEs: "Puede orientar gestión sanitaria poblacional.",
     tags: ["hipertensión", "calidad"],
-    sourcePages: [],
     warnings: [],
     extractionConfidence: 0.86
   };
@@ -580,6 +665,56 @@ test("document AI output is normalized and empty output is not ai_draft", async 
   assert.equal(emptyStatus, "failed");
 });
 
+test("document AI falls back to secondary model when configured model fails", async () => {
+  const packet = buildDocumentEvidencePacket({
+    mode: "pasted_text",
+    text: "Fallback title\nAbstract\nThis scientific document contains summary, methods, findings and conclusions. ".repeat(25),
+    pastedSource: "Fallback Journal"
+  });
+  const article = {
+    title: "Fallback title",
+    sourceName: "Fallback Journal",
+    journal: "Fallback Journal",
+    authors: [],
+    officialUrl: "",
+    doi: "",
+    publicationDate: "2026",
+    originalLanguage: "en",
+    articleType: "Artículo científico",
+    evidenceType: "Revisión",
+    accessType: "Pendiente",
+    cardSummaryEs: "Resumen breve en español para validar el fallback.",
+    executiveSummaryEs: "Resumen ejecutivo en español basado en evidencia real del documento.",
+    objectiveEs: "Validar el funcionamiento del modelo documental secundario.",
+    methodologyEs: "Prueba de fallback con structured outputs.",
+    mainMessageEs: "El sistema puede continuar si falla el modelo configurado.",
+    keyPointsEs: ["Fallback", "Structured outputs", "Validación"],
+    localApplicabilityEs: "",
+    occupationalHealthRelevanceEs: "",
+    limitationsEs: "",
+    tags: ["Validación", "IA"],
+    warnings: [],
+    extractionConfidence: 0.82
+  };
+  const calls = [];
+  const fetchImpl = async (_url, options) => {
+    calls.push(JSON.parse(options.body).model);
+    if (calls.length === 1) {
+      return { ok: false, status: 404, text: async () => JSON.stringify({ error: "missing model" }) };
+    }
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ choices: [{ message: { content: JSON.stringify(article) } }] })
+    };
+  };
+
+  const result = await callDocumentExtractionAI(packet, { apiKey: "test-key", fetchImpl, model: "modelo-no-disponible" });
+  assert.equal(result.ok, true);
+  assert.deepEqual(calls, ["modelo-no-disponible", "gpt-4o-mini"]);
+  assert.equal(result.modelUsed, "gpt-4o-mini");
+});
+
 test("document resolver processes pasted text, rejects short text and handles PDF low text", async () => {
   const aiArticle = {
     title: "Scientific document title",
@@ -591,21 +726,18 @@ test("document resolver processes pasted text, rejects short text and handles PD
     publicationDate: "2026",
     originalLanguage: "en",
     articleType: "Artículo científico",
-    studyType: "Revisión narrativa",
     evidenceType: "Revisión",
     accessType: "Pendiente",
     cardSummaryEs: "Resumen breve en español para la tarjeta científica.",
     executiveSummaryEs: "Resumen ejecutivo en español basado en el documento aportado.",
-    abstractSummaryEs: "Abstract sintetizado en español.",
-    clinicalQuestionEs: "Qué pregunta científica aborda el documento.",
-    mainResultEs: "Resultado principal derivado del texto aportado.",
+    objectiveEs: "Describir qué propósito científico aborda el documento.",
     methodologyEs: "Metodología descrita en el documento.",
-    keyPointsEs: ["Punto clave"],
+    mainMessageEs: "Mensaje principal derivado del texto aportado.",
+    keyPointsEs: ["Punto clave uno", "Punto clave dos", "Punto clave tres"],
     limitationsEs: "",
     localApplicabilityEs: "",
     occupationalHealthRelevanceEs: "",
     tags: ["revisión"],
-    sourcePages: [],
     warnings: [],
     extractionConfidence: 0.78
   };

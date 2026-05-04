@@ -252,17 +252,6 @@ service cloud.firestore {
         && (!hasKey(request.resource.data, "createdByUid") || request.resource.data.createdByUid == request.auth.uid);
     }
 
-    function validLegacyLikeUpdate() {
-      return signedIn()
-        && changedOnly(["likedBy", "likedNames", "likesCount"])
-        && request.resource.data.likedBy is list
-        && request.resource.data.likedNames is list
-        && (
-          request.auth.uid in request.resource.data.likedBy
-          || request.auth.uid in resource.data.likedBy
-        );
-    }
-
     function validLegacyPostContentUpdate() {
       return isOwnedByCurrentUser(resource.data)
         && changedOnly([
@@ -627,8 +616,10 @@ service cloud.firestore {
           "executiveSummary",
           "executiveSummaryEs",
           "abstractSummaryEs",
+          "objectiveEs",
           "clinicalQuestion",
           "clinicalQuestionEs",
+          "mainMessageEs",
           "mainResult",
           "mainResultEs",
           "methodologyEs",
@@ -675,8 +666,10 @@ service cloud.firestore {
           "executiveSummary",
           "executiveSummaryEs",
           "abstractSummaryEs",
+          "objectiveEs",
           "clinicalQuestion",
           "clinicalQuestionEs",
+          "mainMessageEs",
           "mainResult",
           "mainResultEs",
           "methodologyEs",
@@ -742,10 +735,14 @@ service cloud.firestore {
         && data.executiveSummaryEs.size() <= 8000
         && data.abstractSummaryEs is string
         && data.abstractSummaryEs.size() <= 8000
+        && data.objectiveEs is string
+        && data.objectiveEs.size() <= 3000
         && data.clinicalQuestion is string
         && data.clinicalQuestion.size() <= 3000
         && data.clinicalQuestionEs is string
         && data.clinicalQuestionEs.size() <= 3000
+        && data.mainMessageEs is string
+        && data.mainMessageEs.size() <= 4000
         && data.mainResult is string
         && data.mainResult.size() <= 4000
         && data.mainResultEs is string
@@ -787,7 +784,9 @@ service cloud.firestore {
             && (data.cardSummaryEs.size() > 0 || data.executiveSummaryEs.size() > 0 || data.executiveSummary.size() > 0)
             && (
               data.executiveSummaryEs.size() > 0
+              || data.objectiveEs.size() > 0
               || data.clinicalQuestionEs.size() > 0
+              || data.mainMessageEs.size() > 0
               || data.mainResultEs.size() > 0
               || data.methodologyEs.size() > 0
               || data.studyType.size() > 0

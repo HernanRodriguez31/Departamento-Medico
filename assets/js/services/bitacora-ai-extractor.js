@@ -282,50 +282,75 @@ const hasUsefulAiDraft = (article = {}) => {
 const hasMetadataDraft = (article = {}) =>
   Boolean(article.title || hasCanonicalSource(article) || article.publicationDate || article.doi || article.pmid || article.pmcid || article.nctId || article.pii);
 
-const normalizeDocumentArticle = (input = {}) => ({
-  title: firstText(input, ["title", "titulo", "articleTitle", "headline"]),
-  sourceName: firstText(input, ["sourceName", "source", "journal", "journalTitle", "institution", "fuente", "publisher"]),
-  journal: firstText(input, ["journal", "journalTitle", "revista"]),
-  authors: normalizeTags(input.authors || input.author || input.autores),
-  officialUrl: firstText(input, ["officialUrl", "url", "sourceUrl", "enlace"]),
-  doi: firstText(input, ["doi", "DOI"]),
-  publicationDate: firstText(input, ["publicationDate", "publishedAt", "datePublished", "fechaPublicacion"]),
-  originalLanguage: firstText(input, ["originalLanguage", "language", "idioma"]),
-  articleType: firstText(input, ["articleType", "documentType", "tipoArticulo", "tipo_de_articulo"]),
-  studyType: firstText(input, ["studyType", "typeOfStudy", "studyDesign", "tipoEstudio"]),
-  evidenceType: firstText(input, ["evidenceType", "typeOfEvidence", "tipoEvidencia"]),
-  accessType: firstText(input, ["accessType", "access", "acceso"]) || "Pendiente",
-  cardSummaryEs: firstText(input, ["cardSummaryEs", "cardSummary", "resumenBreve", "summaryCard"]),
-  executiveSummaryEs: firstText(input, ["executiveSummaryEs", "executiveSummary", "resumenEjecutivo"]),
-  abstractSummaryEs: firstText(input, ["abstractSummaryEs", "abstractSummary", "abstract", "resumenAbstract"]),
-  clinicalQuestionEs: firstText(input, ["clinicalQuestionEs", "clinicalQuestion", "researchQuestion", "preguntaClinica"]),
-  mainResultEs: firstText(input, ["mainResultEs", "mainResult", "result", "resultadoPrincipal"]),
-  methodologyEs: firstText(input, ["methodologyEs", "methodology", "methods", "metodologia"]),
-  keyPointsEs: normalizeTags(input.keyPointsEs || input.keyPoints || input.puntosClave),
-  limitationsEs: firstText(input, ["limitationsEs", "limitations", "limitaciones"]),
-  localApplicabilityEs: firstText(input, ["localApplicabilityEs", "localApplicability", "aplicabilidadLocal"]),
-  occupationalHealthRelevanceEs: firstText(input, ["occupationalHealthRelevanceEs", "occupationalHealthRelevance", "relevanciaOcupacional"]),
-  tags: normalizeTags(input.tags || input.keywords || input.etiquetas),
-  sourcePages: Array.isArray(input.sourcePages) ? input.sourcePages : [],
-  extractionConfidence: Number.isFinite(Number(input.extractionConfidence ?? input.confidence))
-    ? Math.max(0, Math.min(1, Number(input.extractionConfidence ?? input.confidence)))
-    : 0,
-  warnings: normalizeTags(input.warnings || input.extractionWarnings || input.advertencias)
-});
+const normalizeDocumentArticle = (input = {}) => {
+  const objectiveEs = firstText(input, [
+    "objectiveEs",
+    "objective",
+    "purposeEs",
+    "purpose",
+    "clinicalQuestionEs",
+    "clinicalQuestion",
+    "researchQuestion",
+    "preguntaClinica",
+    "objetivo"
+  ]);
+  const mainMessageEs = firstText(input, [
+    "mainMessageEs",
+    "mainMessage",
+    "messageEs",
+    "mensajePrincipal",
+    "mainResultEs",
+    "mainResult",
+    "result",
+    "resultadoPrincipal"
+  ]);
+  return {
+    title: firstText(input, ["title", "titulo", "articleTitle", "headline"]),
+    sourceName: firstText(input, ["sourceName", "source", "journal", "journalTitle", "institution", "fuente", "publisher"]),
+    journal: firstText(input, ["journal", "journalTitle", "revista"]),
+    authors: normalizeTags(input.authors || input.author || input.autores),
+    officialUrl: firstText(input, ["officialUrl", "url", "sourceUrl", "enlace"]),
+    doi: firstText(input, ["doi", "DOI"]),
+    publicationDate: firstText(input, ["publicationDate", "publishedAt", "datePublished", "fechaPublicacion"]),
+    originalLanguage: firstText(input, ["originalLanguage", "language", "idioma"]),
+    articleType: firstText(input, ["articleType", "documentType", "tipoArticulo", "tipo_de_articulo"]),
+    studyType: firstText(input, ["studyType", "typeOfStudy", "studyDesign", "tipoEstudio"]),
+    evidenceType: firstText(input, ["evidenceType", "typeOfEvidence", "tipoEvidencia"]),
+    accessType: firstText(input, ["accessType", "access", "acceso"]) || "Pendiente",
+    cardSummaryEs: firstText(input, ["cardSummaryEs", "cardSummary", "resumenBreve", "summaryCard"]),
+    executiveSummaryEs: firstText(input, ["executiveSummaryEs", "executiveSummary", "resumenEjecutivo"]),
+    abstractSummaryEs: firstText(input, ["abstractSummaryEs", "abstractSummary", "abstract", "resumenAbstract"]),
+    objectiveEs,
+    clinicalQuestionEs: objectiveEs,
+    mainMessageEs,
+    mainResultEs: mainMessageEs,
+    methodologyEs: firstText(input, ["methodologyEs", "methodology", "methods", "metodologia"]),
+    keyPointsEs: normalizeTags(input.keyPointsEs || input.keyPoints || input.puntosClave).slice(0, 5),
+    limitationsEs: firstText(input, ["limitationsEs", "limitations", "limitaciones"]),
+    localApplicabilityEs: firstText(input, ["localApplicabilityEs", "localApplicability", "aplicabilidadLocal"]),
+    occupationalHealthRelevanceEs: firstText(input, ["occupationalHealthRelevanceEs", "occupationalHealthRelevance", "relevanciaOcupacional"]),
+    tags: normalizeTags(input.tags || input.keywords || input.etiquetas),
+    sourcePages: Array.isArray(input.sourcePages) ? input.sourcePages : [],
+    extractionConfidence: Number.isFinite(Number(input.extractionConfidence ?? input.confidence))
+      ? Math.max(0, Math.min(1, Number(input.extractionConfidence ?? input.confidence)))
+      : 0,
+    warnings: normalizeTags(input.warnings || input.extractionWarnings || input.advertencias)
+  };
+};
 
 const hasUsefulDocumentDraft = (article = {}) => {
   const usefulFieldCount = [
-    cleanString(article.executiveSummaryEs).length >= 24,
-    cleanString(article.clinicalQuestionEs).length >= 24,
-    cleanString(article.mainResultEs).length >= 24,
+    cleanString(article.objectiveEs || article.clinicalQuestionEs).length >= 24,
     cleanString(article.methodologyEs).length >= 24,
+    cleanString(article.mainMessageEs || article.mainResultEs).length >= 24,
     Boolean(cleanString(article.evidenceType)),
-    Boolean(cleanString(article.studyType))
+    Array.isArray(article.keyPointsEs) && article.keyPointsEs.length >= 3
   ].filter(Boolean).length;
   return Boolean(
     cleanString(article.title) &&
       cleanString(article.sourceName || article.journal) &&
       cleanString(article.cardSummaryEs).length >= 20 &&
+      cleanString(article.executiveSummaryEs).length >= 24 &&
       usefulFieldCount >= 2 &&
       Number(article.extractionConfidence || 0) >= 0.55
   );

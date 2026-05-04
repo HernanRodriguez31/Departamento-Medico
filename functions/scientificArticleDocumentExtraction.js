@@ -7,6 +7,8 @@ const MAX_PDF_BYTES = 20 * 1024 * 1024;
 const MIN_DOCUMENT_TEXT_LENGTH = 500;
 const MAX_PASTED_TEXT_CHARS = 80000;
 const MAX_AI_TEXT_CHARS = 22000;
+const DEFAULT_DOCUMENT_EXTRACTION_MODEL = "gpt-5.5";
+const DOCUMENT_EXTRACTION_FALLBACK_MODEL = "gpt-4o-mini";
 const SECTION_HEADINGS = [
   "abstract",
   "summary",
@@ -16,13 +18,24 @@ const SECTION_HEADINGS = [
   "background",
   "methods",
   "methodology",
+  "search strategy",
+  "strategy",
   "métodos",
   "metodos",
   "results",
   "resultados",
+  "findings",
+  "hallazgos",
+  "framework",
+  "quality framework",
+  "implementation",
+  "implementación",
+  "implementacion",
   "discussion",
   "discusión",
   "discusion",
+  "forward view",
+  "view",
   "conclusion",
   "conclusions",
   "conclusiones",
@@ -30,7 +43,7 @@ const SECTION_HEADINGS = [
   "limitaciones"
 ];
 
-const DOCUMENT_ARTICLE_KEYS = [
+const DOCUMENT_AI_ARTICLE_KEYS = [
   "title",
   "sourceName",
   "journal",
@@ -40,26 +53,45 @@ const DOCUMENT_ARTICLE_KEYS = [
   "publicationDate",
   "originalLanguage",
   "articleType",
-  "studyType",
   "evidenceType",
   "accessType",
   "cardSummaryEs",
   "executiveSummaryEs",
+  "objectiveEs",
+  "methodologyEs",
+  "mainMessageEs",
+  "keyPointsEs",
+  "localApplicabilityEs",
+  "occupationalHealthRelevanceEs",
+  "limitationsEs",
+  "tags",
+  "warnings",
+  "extractionConfidence"
+];
+
+const DOCUMENT_ARTICLE_KEYS = [
+  ...DOCUMENT_AI_ARTICLE_KEYS,
+  "studyType",
   "abstractSummaryEs",
   "clinicalQuestionEs",
   "mainResultEs",
-  "methodologyEs",
-  "keyPointsEs",
-  "limitationsEs",
-  "localApplicabilityEs",
-  "occupationalHealthRelevanceEs",
-  "tags",
-  "sourcePages",
-  "extractionConfidence",
-  "warnings"
+  "sourcePages"
 ];
 
 const cleanString = (value = "") => String(value || "").replace(/\s+/g, " ").trim();
+
+const getConfiguredDocumentModels = ({ model = "" } = {}) =>
+  Array.from(
+    new Set(
+      [
+        cleanString(model) ||
+          cleanString(process.env.OPENAI_DOCUMENT_MODEL) ||
+          cleanString(process.env.OPENAI_MODEL) ||
+          DEFAULT_DOCUMENT_EXTRACTION_MODEL,
+        DOCUMENT_EXTRACTION_FALLBACK_MODEL
+      ].filter(Boolean)
+    )
+  );
 
 const cleanLongText = (value = "") =>
   String(value || "")
@@ -209,8 +241,46 @@ const detectKeywords = (text = "") => {
   return match ? normalizeList(match[1], 10) : [];
 };
 
+const isReferencesHeading = (line = "") => /^(references|referencias|bibliography|bibliografía|bibliografia)\s*:?$/i.test(cleanString(line));
+
+const stripReferencesAndDenseTables = (text = "") => {
+  const lines = cleanLongText(text).split(/\n+/);
+  const kept = [];
+  for (const rawLine of lines) {
+    const line = cleanString(rawLine);
+    if (isReferencesHeading(line)) break;
+    const numericTokens = (line.match(/\b\d+(?:[.,]\d+)?\b/g) || []).length;
+    const separators = (line.match(/[|;]/g) || []).length;
+    if (line.length > 260 && numericTokens >= 10 && separators >= 3) continue;
+    kept.push(rawLine);
+  }
+  return cleanLongText(kept.join("\n"));
+};
+
+const normalizeSectionHeading = (heading = "") => {
+  const clean = cleanString(heading).toLowerCase();
+  if (/summary|abstract|resumen/.test(clean)) return "Summary / Abstract";
+  if (/intro|background|antecedentes/.test(clean)) return "Introduction / Background";
+  if (/method|método|metodo|strategy|estrategia/.test(clean)) return "Methodology / Strategy";
+  if (/result|finding|hallazgo|framework|quality|implementation|implementaci/.test(clean)) return "Framework / Findings";
+  if (/discussion|discusi|forward|conclusion|conclusi/.test(clean)) return "Discussion / Forward view / Conclusion";
+  if (/limitation|limitaci/.test(clean)) return "Limitations";
+  return cleanString(heading) || "Texto principal";
+};
+
+const getSectionPriority = (heading = "") => {
+  const normalized = normalizeSectionHeading(heading).toLowerCase();
+  if (normalized.includes("summary") || normalized.includes("abstract")) return 0;
+  if (normalized.includes("introduction") || normalized.includes("background")) return 1;
+  if (normalized.includes("methodology") || normalized.includes("strategy")) return 2;
+  if (normalized.includes("framework") || normalized.includes("findings")) return 3;
+  if (normalized.includes("discussion") || normalized.includes("conclusion") || normalized.includes("forward")) return 4;
+  if (normalized.includes("limitations")) return 5;
+  return 8;
+};
+
 const extractSectionsFromText = (text = "") => {
-  const normalized = cleanLongText(text);
+  const normalized = stripReferencesAndDenseTables(text);
   const lines = normalized.split(/\n+/);
   const sections = [];
   let current = { heading: "Texto principal", text: "" };
@@ -218,17 +288,18 @@ const extractSectionsFromText = (text = "") => {
   for (const rawLine of lines) {
     const line = cleanString(rawLine);
     if (!line) continue;
+    if (isReferencesHeading(line)) break;
     if (headingRegex.test(line) && line.length <= 60) {
       if (cleanString(current.text).length >= 80) sections.push(current);
-      current = { heading: line, text: "" };
+      current = { heading: normalizeSectionHeading(line), text: "" };
       continue;
     }
     current.text += `${line}\n`;
   }
   if (cleanString(current.text).length >= 80) sections.push(current);
-  return sections.slice(0, 12).map((section) => ({
+  return sections.slice(0, 18).map((section) => ({
     heading: cleanString(section.heading),
-    text: cleanLongText(section.text).slice(0, 4500),
+    text: stripReferencesAndDenseTables(section.text).slice(0, getSectionPriority(section.heading) === 0 ? 6500 : 3600),
     pages: []
   }));
 };
@@ -268,15 +339,10 @@ const buildQualitySignals = (sections = [], metadata = {}, text = "") => {
 };
 
 const selectEvidenceTextForAI = (sections = [], fullText = "") => {
-  const priority = ["abstract", "summary", "resumen", "introduction", "introducción", "methods", "métodos", "results", "resultados", "discussion", "conclusion", "conclusiones", "limitations"];
-  const ordered = [...sections].sort((a, b) => {
-    const ai = priority.findIndex((key) => a.heading.toLowerCase().includes(key));
-    const bi = priority.findIndex((key) => b.heading.toLowerCase().includes(key));
-    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-  });
+  const ordered = [...sections].sort((a, b) => getSectionPriority(a.heading) - getSectionPriority(b.heading));
   const combined = ordered.length
-    ? ordered.map((section) => `${section.heading}\n${section.text}`).join("\n\n")
-    : cleanLongText(fullText);
+    ? ordered.map((section) => `${normalizeSectionHeading(section.heading)}\n${section.text}`).join("\n\n")
+    : stripReferencesAndDenseTables(fullText);
   return combined.slice(0, MAX_AI_TEXT_CHARS);
 };
 
@@ -290,8 +356,16 @@ const buildEvidencePacket = ({
   pastedSource = "",
   storagePath = ""
 } = {}) => {
-  const cleanText = cleanLongText(text);
+  const cleanText = stripReferencesAndDenseTables(text);
   const sections = extractSectionsFromText(cleanText);
+  const prioritySections = [...sections]
+    .sort((a, b) => getSectionPriority(a.heading) - getSectionPriority(b.heading))
+    .slice(0, 8)
+    .map((section) => ({
+      ...section,
+      heading: normalizeSectionHeading(section.heading),
+      text: cleanLongText(section.text).slice(0, getSectionPriority(section.heading) === 0 ? 6500 : 3600)
+    }));
   const detectedMetadata = buildDetectedMetadata({ text: cleanText, officialUrl, pastedSource });
   const detectedLanguage = detectLanguage(cleanText);
   const qualitySignals = buildQualitySignals(sections, detectedMetadata, cleanText);
@@ -307,11 +381,11 @@ const buildEvidencePacket = ({
     textLength: cleanText.length,
     contentHash,
     detectedMetadata,
-    sections,
+    sections: prioritySections.length ? prioritySections : sections,
     snippets: [
       {
-        label: "Contenido priorizado",
-        text: selectEvidenceTextForAI(sections, cleanText),
+        label: "Secciones editoriales priorizadas",
+        text: selectEvidenceTextForAI(prioritySections.length ? prioritySections : sections, cleanText),
         pages: []
       }
     ],
@@ -335,7 +409,9 @@ const buildEmptyArticle = () => ({
   cardSummaryEs: "",
   executiveSummaryEs: "",
   abstractSummaryEs: "",
+  objectiveEs: "",
   clinicalQuestionEs: "",
+  mainMessageEs: "",
   mainResultEs: "",
   methodologyEs: "",
   keyPointsEs: [],
@@ -361,7 +437,8 @@ const buildRawEvidence = (packet = {}) => ({
     .filter(([, value]) => (Array.isArray(value) ? value.length : Boolean(value)))
     .map(([key]) => key),
   extractedSections: (packet.sections || []).map((section) => section.heading).slice(0, 16),
-  qualitySignals: packet.qualitySignals || {}
+  qualitySignals: packet.qualitySignals || {},
+  modelUsed: cleanString(packet.modelUsed || "")
 });
 
 const normalizeSourcePages = (value = []) =>
@@ -394,14 +471,20 @@ const normalizeAiDocumentOutput = (input = {}, packet = {}) => {
   article.cardSummaryEs = cleanString(input.cardSummaryEs);
   article.executiveSummaryEs = cleanString(input.executiveSummaryEs);
   article.abstractSummaryEs = cleanString(input.abstractSummaryEs);
-  article.clinicalQuestionEs = cleanString(input.clinicalQuestionEs);
-  article.mainResultEs = cleanString(input.mainResultEs);
+  article.objectiveEs = cleanString(
+    input.objectiveEs || input.objective || input.purposeEs || input.clinicalQuestionEs || input.clinicalQuestion
+  );
+  article.clinicalQuestionEs = article.objectiveEs;
+  article.mainMessageEs = cleanString(
+    input.mainMessageEs || input.mainMessage || input.messageEs || input.mainResultEs || input.mainResult
+  );
+  article.mainResultEs = article.mainMessageEs;
   article.methodologyEs = cleanString(input.methodologyEs);
-  article.keyPointsEs = normalizeList(input.keyPointsEs, 8);
+  article.keyPointsEs = normalizeList(input.keyPointsEs, 5);
   article.limitationsEs = cleanString(input.limitationsEs);
   article.localApplicabilityEs = cleanString(input.localApplicabilityEs);
   article.occupationalHealthRelevanceEs = cleanString(input.occupationalHealthRelevanceEs);
-  article.tags = normalizeList(input.tags?.length ? input.tags : metadata.keywords, 12);
+  article.tags = normalizeList(input.tags?.length ? input.tags : metadata.keywords, 8);
   article.sourcePages = normalizeSourcePages(input.sourcePages);
   article.extractionConfidence = Number.isFinite(Number(input.extractionConfidence))
     ? Math.max(0, Math.min(1, Number(input.extractionConfidence)))
@@ -412,13 +495,12 @@ const normalizeAiDocumentOutput = (input = {}, packet = {}) => {
 
 const validateStructuredAIOutput = (article = {}) => {
   const invalid = [];
-  DOCUMENT_ARTICLE_KEYS.forEach((key) => {
+  DOCUMENT_AI_ARTICLE_KEYS.forEach((key) => {
     if (!(key in article)) invalid.push(key);
   });
   if (!Array.isArray(article.authors)) invalid.push("authors_type");
   if (!Array.isArray(article.keyPointsEs)) invalid.push("keyPointsEs_type");
   if (!Array.isArray(article.tags)) invalid.push("tags_type");
-  if (!Array.isArray(article.sourcePages)) invalid.push("sourcePages_type");
   if (!Array.isArray(article.warnings)) invalid.push("warnings_type");
   if (!ACCESS_TYPES.includes(article.accessType)) invalid.push("accessType");
   if (!Number.isFinite(Number(article.extractionConfidence))) invalid.push("extractionConfidence");
@@ -427,21 +509,22 @@ const validateStructuredAIOutput = (article = {}) => {
 
 const scoreDocumentArticle = (article = {}) => {
   const useful = [
-    cleanString(article.executiveSummaryEs).length >= 32,
-    cleanString(article.clinicalQuestionEs).length >= 24,
-    cleanString(article.mainResultEs).length >= 24,
+    cleanString(article.objectiveEs || article.clinicalQuestionEs).length >= 24,
     cleanString(article.methodologyEs).length >= 24,
+    cleanString(article.mainMessageEs || article.mainResultEs).length >= 24,
     Boolean(cleanString(article.evidenceType)),
-    Boolean(cleanString(article.studyType))
+    Array.isArray(article.keyPointsEs) && article.keyPointsEs.length >= 3
   ].filter(Boolean).length;
   const hasTitle = Boolean(cleanString(article.title));
   const hasSource = Boolean(cleanString(article.sourceName || article.journal));
   const hasCard = cleanString(article.cardSummaryEs).length >= 24;
+  const hasExecutiveSummary = cleanString(article.executiveSummaryEs).length >= 32;
   return {
     usefulFieldCount: useful,
     hasTitle,
     hasSource,
     hasCard,
+    hasExecutiveSummary,
     completedFields: DOCUMENT_ARTICLE_KEYS.filter((key) => {
       const value = article[key];
       return Array.isArray(value) ? value.length > 0 : Boolean(cleanString(value));
@@ -455,6 +538,7 @@ const computeExtractionStatus = (article = {}) => {
     score.hasTitle &&
     score.hasSource &&
     score.hasCard &&
+    score.hasExecutiveSummary &&
     score.usefulFieldCount >= 2 &&
     Number(article.extractionConfidence || 0) >= 0.55
   ) {
@@ -487,18 +571,18 @@ const buildDocumentExtractionResponse = ({ extractionStatus, article, rawEvidenc
   ...(error ? { error } : {})
 });
 
-const buildOpenAiDocumentPayload = (packet = {}) => ({
-  model: "gpt-4o-mini",
+const buildOpenAiDocumentPayload = (packet = {}, { model = "" } = {}) => ({
+  model: cleanString(model) || DEFAULT_DOCUMENT_EXTRACTION_MODEL,
   temperature: 0.1,
   response_format: {
     type: "json_schema",
     json_schema: {
-      name: "scientific_article_document_extraction",
+      name: "scientific_article_editorial_card",
       strict: true,
       schema: {
         type: "object",
         additionalProperties: false,
-        required: DOCUMENT_ARTICLE_KEYS,
+        required: DOCUMENT_AI_ARTICLE_KEYS,
         properties: {
           title: { type: "string" },
           sourceName: { type: "string" },
@@ -509,32 +593,46 @@ const buildOpenAiDocumentPayload = (packet = {}) => ({
           publicationDate: { type: "string" },
           originalLanguage: { type: "string" },
           articleType: { type: "string" },
-          studyType: { type: "string" },
           evidenceType: { type: "string" },
           accessType: { type: "string", enum: ACCESS_TYPES },
-          cardSummaryEs: { type: "string" },
-          executiveSummaryEs: { type: "string" },
-          abstractSummaryEs: { type: "string" },
-          clinicalQuestionEs: { type: "string" },
-          mainResultEs: { type: "string" },
-          methodologyEs: { type: "string" },
-          keyPointsEs: { type: "array", items: { type: "string" } },
-          limitationsEs: { type: "string" },
-          localApplicabilityEs: { type: "string" },
-          occupationalHealthRelevanceEs: { type: "string" },
-          tags: { type: "array", items: { type: "string" } },
-          sourcePages: {
-            type: "array",
-            items: {
-              type: "object",
-              additionalProperties: false,
-              required: ["field", "pages"],
-              properties: {
-                field: { type: "string" },
-                pages: { type: "array", items: { type: "number" } }
-              }
-            }
+          cardSummaryEs: {
+            type: "string",
+            description: "Resumen breve en español, máximo 280 caracteres, para mostrar en la tarjeta cerrada."
           },
+          executiveSummaryEs: {
+            type: "string",
+            description: "Resumen ejecutivo en español, claro y profesional, máximo 120 palabras."
+          },
+          objectiveEs: {
+            type: "string",
+            description: "Objetivo, pregunta o propósito principal del documento."
+          },
+          methodologyEs: {
+            type: "string",
+            description: "Tipo de documento, enfoque metodológico o base de elaboración."
+          },
+          mainMessageEs: {
+            type: "string",
+            description: "Mensaje principal o conclusión práctica del documento."
+          },
+          keyPointsEs: {
+            type: "array",
+            items: { type: "string" },
+            description: "Entre 3 y 5 puntos clave en español."
+          },
+          localApplicabilityEs: {
+            type: "string",
+            description: "Aplicabilidad prudente al contexto clínico, institucional o de gestión."
+          },
+          occupationalHealthRelevanceEs: {
+            type: "string",
+            description: "Relevancia para salud ocupacional o gestión sanitaria, si corresponde."
+          },
+          limitationsEs: {
+            type: "string",
+            description: "Limitaciones del documento o cautelas interpretativas."
+          },
+          tags: { type: "array", items: { type: "string" } },
           warnings: { type: "array", items: { type: "string" } },
           extractionConfidence: { type: "number", minimum: 0, maximum: 1 }
         }
@@ -545,53 +643,73 @@ const buildOpenAiDocumentPayload = (packet = {}) => ({
     {
       role: "system",
       content:
-        "Sos un agente experto en lectura crítica inicial de publicaciones científicas médicas para una Bitácora Científica institucional. Respondé exclusivamente JSON válido conforme al schema. Todo texto explicativo debe estar en español. No inventes datos ni uses conocimiento externo. Conservá títulos oficiales, nombres de revistas, instituciones, autores y DOI tal como aparecen. No hagas recomendaciones clínicas directas ni modifiques protocolos. Si falta información, devolvé string vacío y agregá warning."
+        "Sos un agente experto en lectura crítica inicial y comunicación científica médica para una Bitácora Científica institucional. Tu tarea es transformar evidencia real extraída de un PDF o texto científico en una ficha breve y clara en español. Respondé exclusivamente JSON válido conforme al schema. Todo texto editorial debe estar en español. Conservá título oficial, DOI, autores, revista e instituciones tal como aparecen. No inventes datos. No inventes DOI, autores, fuente, fecha ni resultados numéricos. No uses conocimiento externo. Sí podés sintetizar, traducir y ordenar ideas presentes en el documento. Si el documento no es un ensayo clínico, no lo fuerces a formato PICO. Para guías, consensos, health policy o marcos de implementación, completá objectiveEs como propósito del documento. Para documentos de política sanitaria, mainMessageEs debe resumir el mensaje central, no un resultado clínico. No dejes campos editoriales vacíos si el Summary, Introduction, Methods, Results, Discussion o Conclusion aportan información suficiente. No traduzcas literalmente todo el documento. La ficha debe orientar al lector sin reemplazar la lectura del paper. El resumen de tarjeta debe ser breve, no más de 280 caracteres. El resumen ejecutivo debe ser claro, máximo 120 palabras. keyPointsEs debe contener 3 a 5 puntos breves. tags deben estar en español, salvo nombres propios como HEARTS, OPS u OMS. Si falta información real, dejá el campo vacío y agregá warning. No emitas recomendaciones clínicas directas ni cambios de protocolo."
     },
     {
       role: "user",
-      content: `Analizá este evidencePacket y generá una ficha estructurada para revisión humana:\n${JSON.stringify({
-        ...packet,
+      content: `Analizá el siguiente evidencePacket extraído del documento y generá una ficha editorial científica en español para la Bitácora Científica:\n${JSON.stringify({
+        mode: packet.mode,
+        originalFileName: packet.originalFileName,
+        officialUrl: packet.officialUrl,
+        detectedLanguage: packet.detectedLanguage,
+        pageCount: packet.pageCount,
+        textLength: packet.textLength,
+        detectedMetadata: packet.detectedMetadata,
+        sections: (packet.sections || []).map((section) => ({
+          heading: normalizeSectionHeading(section.heading),
+          text: cleanLongText(section.text).slice(0, getSectionPriority(section.heading) === 0 ? 6500 : 3600),
+          pages: section.pages || []
+        })),
         snippets: (packet.snippets || []).map((snippet) => ({
-          ...snippet,
-          text: cleanLongText(snippet.text).slice(0, MAX_AI_TEXT_CHARS)
-        }))
+          label: snippet.label,
+          text: cleanLongText(snippet.text).slice(0, MAX_AI_TEXT_CHARS),
+          pages: snippet.pages || []
+        })),
+        qualitySignals: packet.qualitySignals
       })}`
     }
   ]
 });
 
-const callDocumentExtractionAI = async (packet = {}, { apiKey = "", fetchImpl = fetch } = {}) => {
+const callDocumentExtractionAI = async (packet = {}, { apiKey = "", fetchImpl = fetch, model = "" } = {}) => {
   if (!apiKey) {
     return { ok: false, error: { code: "missing_openai_api_key", message: "El servicio de IA no está configurado en backend." } };
   }
-  const payload = buildOpenAiDocumentPayload(packet);
-  try {
-    const response = await fetchImpl("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`
-      },
-      body: JSON.stringify(payload)
-    });
-    const raw = await response.text();
-    const data = parseJsonObjectFromText(raw);
-    if (!response.ok) {
-      return { ok: false, error: { code: "openai_error", message: `OpenAI respondió ${response.status}.` } };
+  let lastError = { code: "ai_request_failed", message: "No se pudo conectar con el servicio de IA." };
+  for (const candidateModel of getConfiguredDocumentModels({ model })) {
+    const payload = buildOpenAiDocumentPayload(packet, { model: candidateModel });
+    try {
+      const response = await fetchImpl("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const raw = await response.text();
+      const data = parseJsonObjectFromText(raw);
+      if (!response.ok) {
+        lastError = { code: "openai_error", message: `OpenAI respondió ${response.status}.`, modelUsed: candidateModel };
+        continue;
+      }
+      const content = data?.choices?.[0]?.message?.content || data?.output_text || "";
+      const parsed = typeof content === "string" ? parseJsonObjectFromText(content) : content;
+      if (!parsed || typeof parsed !== "object") {
+        lastError = { code: "invalid_ai_json", message: "La IA no devolvió JSON válido.", modelUsed: candidateModel };
+        continue;
+      }
+      const validation = validateStructuredAIOutput(parsed);
+      if (!validation.ok) {
+        lastError = { code: "invalid_ai_schema", message: "La IA devolvió un schema incompleto.", modelUsed: candidateModel };
+        continue;
+      }
+      return { ok: true, article: parsed, modelUsed: candidateModel };
+    } catch (error) {
+      lastError = { code: "ai_request_failed", message: "No se pudo conectar con el servicio de IA.", modelUsed: candidateModel };
     }
-    const content = data?.choices?.[0]?.message?.content || data?.output_text || "";
-    const parsed = typeof content === "string" ? parseJsonObjectFromText(content) : content;
-    if (!parsed || typeof parsed !== "object") {
-      return { ok: false, error: { code: "invalid_ai_json", message: "La IA no devolvió JSON válido." } };
-    }
-    const validation = validateStructuredAIOutput(parsed);
-    if (!validation.ok) {
-      return { ok: false, error: { code: "invalid_ai_schema", message: "La IA devolvió un schema incompleto." } };
-    }
-    return { ok: true, article: parsed };
-  } catch (error) {
-    return { ok: false, error: { code: "ai_request_failed", message: "No se pudo conectar con el servicio de IA." } };
   }
+  return { ok: false, error: lastError };
 };
 
 const extractPdfTextFromStorage = async ({ bucket, storagePath, pdfParseImpl = pdfParse } = {}) => {
@@ -629,6 +747,7 @@ const resolveScientificArticleDocument = async (input = {}, {
   apiKey = "",
   fetchImpl = fetch,
   pdfParseImpl = pdfParse,
+  documentModel = "",
   now = () => Date.now()
 } = {}) => {
   const startedAt = now();
@@ -764,8 +883,9 @@ const resolveScientificArticleDocument = async (input = {}, {
   }
 
   const aiStart = now();
-  const ai = await callDocumentExtractionAI(packet, { apiKey, fetchImpl });
+  const ai = await callDocumentExtractionAI(packet, { apiKey, fetchImpl, model: documentModel });
   agentDurations.aiMs = now() - aiStart;
+  packet.modelUsed = ai.modelUsed || ai.error?.modelUsed || "";
 
   if (!ai.ok) {
     const article = {
@@ -806,7 +926,10 @@ const resolveScientificArticleDocument = async (input = {}, {
 
 module.exports = {
   ACCESS_TYPES,
+  DOCUMENT_AI_ARTICLE_KEYS,
   DOCUMENT_ARTICLE_KEYS,
+  DEFAULT_DOCUMENT_EXTRACTION_MODEL,
+  DOCUMENT_EXTRACTION_FALLBACK_MODEL,
   MAX_PDF_BYTES,
   MAX_PASTED_TEXT_CHARS,
   MIN_DOCUMENT_TEXT_LENGTH,
@@ -820,6 +943,7 @@ module.exports = {
   detectDoi,
   detectLanguage,
   extractSectionsFromText,
+  getConfiguredDocumentModels,
   normalizeAiDocumentOutput,
   parseJsonObjectFromText,
   resolveScientificArticleDocument,

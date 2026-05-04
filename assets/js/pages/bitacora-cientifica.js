@@ -13,13 +13,13 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { BITACORA_POSTS } from "../data/bitacora-posts.js";
 import { NATIONAL_SELECTED_SOURCE_IDS, SCIENTIFIC_SOURCES } from "../data/scientific-sources.js";
-import { createBitacoraArticleRepository } from "../services/bitacora-article-repository.js?v=20260504-bitacora-document-agent-1";
+import { createBitacoraArticleRepository } from "../services/bitacora-article-repository.js?v=20260504-bitacora-editorial-agent-1";
 import {
   inferSourceNameFromDomain,
   requestArticleExtraction,
   requestArticleDocumentExtraction,
   validateArticleUrl
-} from "../services/bitacora-ai-extractor.js?v=20260504-bitacora-document-agent-1";
+} from "../services/bitacora-ai-extractor.js?v=20260504-bitacora-editorial-agent-1";
 
 const { auth, db, storage } = getFirebase();
 
@@ -94,6 +94,9 @@ const els = {
   articleDomain: $("#article-domain-detected"),
   articleAiStatus: $("#article-ai-status"),
   articleAiWarnings: $("#article-ai-warnings"),
+  previewZone: $("#article-preview-zone"),
+  advancedZone: $("#article-advanced-zone"),
+  advancedToggle: $("#article-advanced-toggle"),
   assistedZone: $("#article-assisted-zone"),
   assistedToggle: $("#article-assisted-toggle"),
   assistedFields: $("#article-assisted-fields"),
@@ -314,8 +317,10 @@ const renderUserArticle = (article) => ({
   cardSummaryEs: article.cardSummaryEs,
   executiveSummary: article.executiveSummaryEs || article.executiveSummary,
   abstractSummaryEs: article.abstractSummaryEs,
-  clinicalQuestion: article.clinicalQuestionEs || article.clinicalQuestion,
-  mainResult: article.mainResultEs || article.mainResult,
+  objectiveEs: article.objectiveEs || article.clinicalQuestionEs || article.clinicalQuestion,
+  clinicalQuestion: article.objectiveEs || article.clinicalQuestionEs || article.clinicalQuestion,
+  mainMessageEs: article.mainMessageEs || article.mainResultEs || article.mainResult,
+  mainResult: article.mainMessageEs || article.mainResultEs || article.mainResult,
   methodologyEs: article.methodologyEs,
   keyPointsEs: article.keyPointsEs || [],
   limitationsEs: article.limitationsEs,
@@ -352,7 +357,9 @@ const getSearchText = (post) =>
       STATUS_LABELS[post.status],
       post.summary,
       post.executiveSummary,
+      post.objectiveEs,
       post.clinicalQuestion,
+      post.mainMessageEs,
       post.mainResult,
       post.userComment,
       ...(post.tags || [])
@@ -411,7 +418,9 @@ const isIncompleteDraft = (post) =>
   ![
     post.executiveSummary,
     post.cardSummaryEs,
+    post.objectiveEs,
     post.clinicalQuestion,
+    post.mainMessageEs,
     post.mainResult,
     post.methodologyEs,
     post.studyType,
@@ -442,16 +451,19 @@ const renderBadges = (post) => {
   return badges.join("");
 };
 
-const renderAnalysisBlock = (analysisId, suffix, title, content) => `
-  <section aria-labelledby="${analysisId}-${suffix}">
-    <h3 id="${analysisId}-${suffix}">${escapeHtml(title)}</h3>
-    <p>${escapeHtml(getSafeField(content))}</p>
-  </section>
-`;
+const renderAnalysisBlock = (analysisId, suffix, title, content) => {
+  if (!hasMeaningfulAnalysisValue(content)) return "";
+  return `
+    <section aria-labelledby="${analysisId}-${suffix}">
+      <h3 id="${analysisId}-${suffix}">${escapeHtml(title)}</h3>
+      <p>${escapeHtml(String(content || "").trim())}</p>
+    </section>
+  `;
+};
 
 const renderAnalysisListBlock = (analysisId, suffix, title, items = []) => {
   const cleanItems = (Array.isArray(items) ? items : []).map((item) => String(item || "").trim()).filter(Boolean);
-  if (!cleanItems.length) return renderAnalysisBlock(analysisId, suffix, title, "");
+  if (!cleanItems.length) return "";
   return `
     <section aria-labelledby="${analysisId}-${suffix}">
       <h3 id="${analysisId}-${suffix}">${escapeHtml(title)}</h3>
@@ -513,17 +525,14 @@ const renderAnalysis = (post, analysisId, expanded) => `
   <div id="${analysisId}" class="bitacora-analysis bitacora-analysis-panel" ${expanded ? "" : "hidden"}>
     <div class="bitacora-analysis__grid">
       ${renderAnalysisBlock(analysisId, "summary", "Resumen ejecutivo", post.executiveSummary || post.summary)}
-      ${renderAnalysisBlock(analysisId, "abstract", "Abstract / resumen en español", post.abstractSummaryEs)}
-      ${renderAnalysisBlock(analysisId, "question", "Pregunta que busca responder", post.clinicalQuestion)}
-      ${renderAnalysisBlock(analysisId, "methodology", "Metodología / tipo de estudio", post.methodologyEs || post.studyType)}
-      ${renderAnalysisBlock(analysisId, "result", "Resultado o mensaje principal", post.mainResult)}
+      ${renderAnalysisBlock(analysisId, "question", "Objetivo / pregunta", post.objectiveEs || post.clinicalQuestion)}
+      ${renderAnalysisBlock(analysisId, "methodology", "Método o tipo de documento", post.methodologyEs || post.studyType || post.articleType)}
+      ${renderAnalysisBlock(analysisId, "result", "Mensaje principal", post.mainMessageEs || post.mainResult)}
       ${renderAnalysisListBlock(analysisId, "keypoints", "Puntos clave", post.keyPointsEs)}
-      ${renderAnalysisBlock(analysisId, "limitations", "Limitaciones", post.limitationsEs)}
       ${renderAnalysisBlock(analysisId, "local", "Aplicabilidad local", post.localApplicabilityEs)}
       ${renderAnalysisBlock(analysisId, "occupational", "Relevancia para salud ocupacional / gestión sanitaria", post.occupationalHealthRelevanceEs)}
-      ${renderAnalysisBlock(analysisId, "context", "Lugar / contexto", post.studyLocation)}
+      ${renderAnalysisBlock(analysisId, "limitations", "Limitaciones", post.limitationsEs)}
       ${renderAnalysisBlock(analysisId, "bibliography", "Datos bibliográficos", [post.journal, post.doi, (post.authors || []).join(", ")].filter(Boolean).join(" · "))}
-      ${renderAnalysisBlock(analysisId, "comment", "Comentario del usuario", post.userComment)}
     </div>
     ${renderWarnings(post.extractionWarnings)}
     ${renderTrace(post)}
@@ -885,6 +894,20 @@ const setAssistedModeVisible = (visible, expanded = false) => {
   els.assistedFields.hidden = !(visible && expanded);
 };
 
+const setPreviewVisible = (visible) => {
+  if (!els.previewZone) return;
+  els.previewZone.hidden = !visible;
+};
+
+const setAdvancedVisible = (visible) => {
+  if (!els.advancedZone) return;
+  els.advancedZone.hidden = !visible;
+  if (els.advancedToggle) {
+    els.advancedToggle.setAttribute("aria-expanded", visible ? "true" : "false");
+    els.advancedToggle.textContent = visible ? "Ocultar detalles avanzados" : "Editar detalles avanzados";
+  }
+};
+
 const setArticleTab = (tab = "pdf") => {
   const target = ["pdf", "text", "manual"].includes(tab) ? tab : "pdf";
   els.articleTabs.forEach((button) => {
@@ -898,6 +921,10 @@ const setArticleTab = (tab = "pdf") => {
     panel.hidden = !active;
     panel.classList.toggle("is-active", active);
   });
+  if (target === "manual") {
+    setPreviewVisible(true);
+    setAdvancedVisible(true);
+  }
 };
 
 const setFieldValue = (id, value = "", { overwrite = true } = {}) => {
@@ -919,6 +946,8 @@ const resetArticleForm = () => {
   setAiStatus("");
   setAiWarnings([]);
   setAssistedModeVisible(false);
+  setPreviewVisible(false);
+  setAdvancedVisible(false);
   setArticleTab("pdf");
   if (els.pdfInput) els.pdfInput.value = "";
   if (els.pdfFile) els.pdfFile.hidden = true;
@@ -1036,6 +1065,8 @@ const validateArticleBeforeSave = (requestedStatus = "pending_review") => {
 
 const fillArticleFromExtraction = (article = {}, rawEvidence = null) => {
   const sourceName = article.sourceName || article.journal || "";
+  const objective = article.objectiveEs || article.clinicalQuestionEs || article.clinicalQuestion || "";
+  const mainMessage = article.mainMessageEs || article.mainResultEs || article.mainResult || "";
   const fieldMap = {
     "article-title": article.title,
     "article-source-name": sourceName,
@@ -1052,8 +1083,8 @@ const fillArticleFromExtraction = (article = {}, rawEvidence = null) => {
     "article-card-summary": article.cardSummaryEs,
     "article-executive-summary": article.executiveSummaryEs || article.executiveSummary,
     "article-abstract-summary": article.abstractSummaryEs,
-    "article-clinical-question": article.clinicalQuestionEs || article.clinicalQuestion,
-    "article-main-result": article.mainResultEs || article.mainResult,
+    "article-clinical-question": objective,
+    "article-main-result": mainMessage,
     "article-methodology": article.methodologyEs,
     "article-key-points": (article.keyPointsEs || []).join("\n"),
     "article-limitations": article.limitationsEs,
@@ -1066,6 +1097,11 @@ const fillArticleFromExtraction = (article = {}, rawEvidence = null) => {
   Object.entries(fieldMap).forEach(([id, value]) => {
     if (value) setFieldValue(id, value);
   });
+
+  if (Object.values(fieldMap).some((value) => (Array.isArray(value) ? value.length : String(value || "").trim()))) {
+    setPreviewVisible(true);
+    setAdvancedVisible(false);
+  }
 
   state.articleDraftMeta.sourceDomain = article.sourceDomain || state.articleDraftMeta.sourceDomain;
   state.articleDraftMeta.doi = article.doi || state.articleDraftMeta.doi;
@@ -1338,6 +1374,8 @@ const buildArticlePayload = (status) => {
   const sourceName =
     ($("#article-source-name")?.value || $("#article-journal")?.value || "").trim() ||
     (sourceDomain ? inferSourceNameFromDomain(sourceDomain) : "");
+  const objective = $("#article-clinical-question")?.value || "";
+  const mainMessage = $("#article-main-result")?.value || "";
 
   return {
     title: $("#article-title")?.value || (status === "draft" ? "Borrador científico sin título" : ""),
@@ -1361,10 +1399,12 @@ const buildArticlePayload = (status) => {
     executiveSummary: $("#article-executive-summary")?.value || "",
     executiveSummaryEs: $("#article-executive-summary")?.value || "",
     abstractSummaryEs: $("#article-abstract-summary")?.value || "",
-    clinicalQuestion: $("#article-clinical-question")?.value || "",
-    clinicalQuestionEs: $("#article-clinical-question")?.value || "",
-    mainResult: $("#article-main-result")?.value || "",
-    mainResultEs: $("#article-main-result")?.value || "",
+    objectiveEs: objective,
+    clinicalQuestion: objective,
+    clinicalQuestionEs: objective,
+    mainMessageEs: mainMessage,
+    mainResult: mainMessage,
+    mainResultEs: mainMessage,
     methodologyEs: $("#article-methodology")?.value || "",
     keyPointsEs: splitLines($("#article-key-points")?.value || ""),
     limitationsEs: $("#article-limitations")?.value || "",
@@ -1649,6 +1689,10 @@ const bindEvents = () => {
   });
   els.analyzeButtons.forEach((button) => {
     button.addEventListener("click", () => handleAnalyzeArticle());
+  });
+  els.advancedToggle?.addEventListener("click", () => {
+    const expanded = els.advancedToggle.getAttribute("aria-expanded") === "true";
+    setAdvancedVisible(!expanded);
   });
   els.assistedToggle?.addEventListener("click", () => {
     const expanded = els.assistedToggle.getAttribute("aria-expanded") === "true";

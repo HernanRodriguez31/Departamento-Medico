@@ -56,6 +56,8 @@ const buildCreatedBy = (user) => {
 const buildPayload = (input = {}, user) => {
   const status = normalizeStatus(input.status);
   const extractionStatus = normalizeExtractionStatus(input.extractionStatus);
+  const objective = cleanString(input.objectiveEs || input.clinicalQuestionEs || input.clinicalQuestion);
+  const mainMessage = cleanString(input.mainMessageEs || input.mainResultEs || input.mainResult);
   const payload = {
     title: cleanString(input.title),
     sourceName: cleanString(input.sourceName),
@@ -78,10 +80,12 @@ const buildPayload = (input = {}, user) => {
     executiveSummary: cleanString(input.executiveSummary),
     executiveSummaryEs: cleanString(input.executiveSummaryEs),
     abstractSummaryEs: cleanString(input.abstractSummaryEs),
-    clinicalQuestion: cleanString(input.clinicalQuestion),
-    clinicalQuestionEs: cleanString(input.clinicalQuestionEs),
-    mainResult: cleanString(input.mainResult),
-    mainResultEs: cleanString(input.mainResultEs),
+    objectiveEs: objective,
+    clinicalQuestion: objective,
+    clinicalQuestionEs: objective,
+    mainMessageEs: mainMessage,
+    mainResult: mainMessage,
+    mainResultEs: mainMessage,
     methodologyEs: cleanString(input.methodologyEs),
     keyPointsEs: cleanStringList(input.keyPointsEs),
     limitationsEs: cleanString(input.limitationsEs),
@@ -112,7 +116,10 @@ const buildPayload = (input = {}, user) => {
   return payload;
 };
 
-export const normalizeBitacoraArticle = (id, data = {}, meta = {}) => ({
+export const normalizeBitacoraArticle = (id, data = {}, meta = {}) => {
+  const objective = cleanString(data.objectiveEs || data.clinicalQuestionEs || data.clinicalQuestion);
+  const mainMessage = cleanString(data.mainMessageEs || data.mainResultEs || data.mainResult);
+  return {
   id,
   title: cleanString(data.title),
   sourceName: cleanString(data.sourceName),
@@ -135,10 +142,12 @@ export const normalizeBitacoraArticle = (id, data = {}, meta = {}) => ({
   executiveSummary: cleanString(data.executiveSummary),
   executiveSummaryEs: cleanString(data.executiveSummaryEs),
   abstractSummaryEs: cleanString(data.abstractSummaryEs),
-  clinicalQuestion: cleanString(data.clinicalQuestion),
-  clinicalQuestionEs: cleanString(data.clinicalQuestionEs),
-  mainResult: cleanString(data.mainResult),
-  mainResultEs: cleanString(data.mainResultEs),
+  objectiveEs: objective,
+  clinicalQuestion: objective,
+  clinicalQuestionEs: objective,
+  mainMessageEs: mainMessage,
+  mainResult: mainMessage,
+  mainResultEs: mainMessage,
   methodologyEs: cleanString(data.methodologyEs),
   keyPointsEs: cleanStringList(data.keyPointsEs),
   limitationsEs: cleanString(data.limitationsEs),
@@ -169,7 +178,8 @@ export const normalizeBitacoraArticle = (id, data = {}, meta = {}) => ({
   updatedAt: toDate(data.updatedAt),
   repositoryMode: meta.mode || "firestore",
   optimistic: Boolean(meta.optimistic)
-});
+  };
+};
 
 export function createBitacoraArticleRepository({ db, auth, storage } = {}) {
   let memoryArticles = [];

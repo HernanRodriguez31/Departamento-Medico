@@ -1196,6 +1196,7 @@ const extractScientificArticleDocumentHandler = async (req, res) => {
       },
       bucket: admin.storage().bucket(),
       apiKey: process.env.OPENAI_API_KEY,
+      documentModel: process.env.OPENAI_DOCUMENT_MODEL || process.env.OPENAI_MODEL || "",
     });
     const article = result.article || {};
     const rawEvidence = result.rawEvidence || {};
@@ -1213,6 +1214,7 @@ const extractScientificArticleDocumentHandler = async (req, res) => {
       sectionsDetected: rawEvidence.extractedSections || [],
       extractionStatus: result.extractionStatus,
       extractionConfidence: article.extractionConfidence || 0,
+      modelUsed: rawEvidence.modelUsed || "",
       completedFields: quality.completedFields || [],
       warnings: article.warnings || [],
       agentDurations: rawEvidence.agentDurations || {},
@@ -1244,7 +1246,9 @@ const extractScientificArticleDocumentHandler = async (req, res) => {
         cardSummaryEs: "",
         executiveSummaryEs: "",
         abstractSummaryEs: "",
+        objectiveEs: "",
         clinicalQuestionEs: "",
+        mainMessageEs: "",
         mainResultEs: "",
         methodologyEs: "",
         keyPointsEs: [],
