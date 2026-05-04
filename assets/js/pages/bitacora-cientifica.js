@@ -822,7 +822,7 @@ const handleAnalyzeArticle = async () => {
   setArticleError(els.articleUrlError, "");
   setArticleError(els.articleFormError, "");
   setAnalyzeBusy(true);
-  setAiStatus("Analizando metadatos disponibles...");
+  setAiStatus("Analizando enlace...");
   try {
     const result = await requestArticleExtraction(validation.href, { auth });
     if (result.error) {
@@ -834,10 +834,13 @@ const handleAnalyzeArticle = async () => {
     fillArticleFromExtraction(result.article || {});
     state.articleDraftMeta.extractionStatus = result.extractionStatus || "manual";
     if (result.ok && result.extractionStatus === "ai_draft") {
-      setAiStatus("Datos cargados por IA. Revisar antes de guardar.");
+      setAiStatus(result.message || "Borrador cargado por IA. Revisá la información antes de guardar.");
       return;
     }
-    setAiStatus(result.message || "No se pudo completar con IA. Revisá o completá los campos manualmente.");
+    setAiStatus(
+      result.message ||
+        "No se pudo extraer información suficiente desde la página. Podés completar el artículo manualmente."
+    );
   } finally {
     setAnalyzeBusy(false);
   }

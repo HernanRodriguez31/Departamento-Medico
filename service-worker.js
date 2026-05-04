@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "brisa-root-";
-const CACHE_VERSION = "v111";
+const CACHE_VERSION = "v112";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const OFFLINE_URL = "/offline.html";
 const PRECACHE_URLS = [
@@ -13,12 +13,12 @@ const PRECACHE_URLS = [
   "/css/style.css?v=20260428-desktop-orgtree-eyebrow-plus-1",
   "/assets/css/pages/index.css?v=20260502-portal-hover-state-1",
   "/assets/css/pages/galeriadearte.css?v=20260503-art-gallery-like-tooltip-1",
-  "/assets/css/pages/bitacora-cientifica.css?v=20260504-bitacora-ai-extraction-1",
+  "/assets/css/pages/bitacora-cientifica.css?v=20260504-bitacora-agent-2",
   "/css/structure.css?v=20260502-specialists-lorena-popup-card-1",
   "/assets/css/core-contrast.css?v=20260502-committee-border-align-1",
   "/assets/js/pages/index.js?v=20260502-art-gallery-page-1",
   "/assets/js/pages/galeriadearte.js?v=20260503-art-gallery-like-tooltip-1",
-  "/assets/js/pages/bitacora-cientifica.js?v=20260504-bitacora-ai-extraction-1",
+  "/assets/js/pages/bitacora-cientifica.js?v=20260504-bitacora-agent-2",
   "/assets/js/data/bitacora-posts.js",
   "/assets/js/data/scientific-sources.js",
   "/assets/js/services/bitacora-article-repository.js",

@@ -23,6 +23,13 @@ const KNOWN_SOURCE_NAMES = new Map([
 ]);
 
 const cleanString = (value = "") => String(value || "").trim();
+const AUTH_MESSAGE = "Necesitás iniciar sesión para analizar enlaces.";
+const RATE_LIMIT_MESSAGE = "Se alcanzó el límite de análisis. Reintentá más tarde.";
+const NOT_CONFIGURED_MESSAGE = "El servicio de IA no está configurado en backend.";
+const METADATA_ONLY_MESSAGE = "Solo se detectaron metadatos básicos. Completá el resto manualmente.";
+const FAILED_MESSAGE =
+  "No se pudo extraer información suficiente desde la página. Podés completar el artículo manualmente.";
+const AI_DRAFT_MESSAGE = "Borrador cargado por IA. Revisá la información antes de guardar.";
 
 const normalizeTags = (value = []) =>
   (Array.isArray(value) ? value : String(value || "").split(","))
@@ -65,11 +72,25 @@ export const validateArticleUrl = (value = "") => {
         message: "Ingresá una URL web válida que comience con http o https."
       };
     }
+    const hostname = url.hostname.toLowerCase();
+    const isLocalHost =
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "0.0.0.0" ||
+      hostname.endsWith(".localhost") ||
+      hostname.endsWith(".local") ||
+      hostname.endsWith(".internal");
+    if (isLocalHost) {
+      return {
+        ok: false,
+        message: "Ingresá una URL pública del artículo científico."
+      };
+    }
     return {
       ok: true,
       href: url.href,
-      domain: url.hostname.toLowerCase(),
-      sourceName: inferSourceNameFromDomain(url.hostname)
+      domain: hostname,
+      sourceName: inferSourceNameFromDomain(hostname)
     };
   } catch (error) {
     return {
@@ -120,31 +141,37 @@ const resolveExtractionEndpoint = (endpoint) => {
 };
 
 const getEndpointErrorMessage = (status, payload) => {
-  const code = payload?.error || "";
+  const code =
+    typeof payload?.error === "string" ? payload.error : payload?.error?.code || "";
+  const backendMessage =
+    typeof payload?.error === "object" && typeof payload.error.message === "string"
+      ? payload.error.message
+      : "";
   if (status === 401 || code === "auth_required" || code === "auth_invalid") {
-    return "Iniciá sesión nuevamente para usar el análisis con IA.";
+    return AUTH_MESSAGE;
   }
   if (status === 404 || status === 405) {
-    return "El servicio de IA no está publicado en este entorno.";
+    return NOT_CONFIGURED_MESSAGE;
   }
   if (status === 429 || code === "rate_limited") {
-    return "Límite de análisis alcanzado. Probá nuevamente en un minuto.";
+    return RATE_LIMIT_MESSAGE;
   }
-  if (code === "missing_openai_api_key") {
-    return "Falta configurar OPENAI_API_KEY para completar el análisis.";
+  if (code === "missing_openai_api_key" || code === "not_configured") {
+    return NOT_CONFIGURED_MESSAGE;
   }
-  return "No se pudo completar con IA. Revisá o completá los campos manualmente.";
+  return backendMessage || FAILED_MESSAGE;
 };
 
-const getExtractionStatusMessage = (status, article) => {
+const getExtractionStatusMessage = (status) => {
+  if (status === "ai_draft") return AI_DRAFT_MESSAGE;
   if (status === "metadata_only") {
-    return article?.warnings?.[0] || "Se cargaron metadatos básicos. Completá los datos clínicos antes de guardar.";
+    return METADATA_ONLY_MESSAGE;
   }
   if (status === "not_configured") {
-    return article?.warnings?.[0] || "Falta configurar OPENAI_API_KEY para completar el análisis.";
+    return NOT_CONFIGURED_MESSAGE;
   }
   if (status === "failed") {
-    return article?.warnings?.[0] || "La IA no pudo completar el análisis. Revisá los campos.";
+    return FAILED_MESSAGE;
   }
   return "";
 };
@@ -171,19 +198,29 @@ const normalizeExtractionArticle = (input = {}, urlInfo) => ({
   warnings: normalizeTags(input.warnings || input.extractionWarnings || input.advertencias)
 });
 
-const hasUsefulAiDraft = (article = {}) =>
-  Boolean(
-    cleanString(article.executiveSummary).length >= 24 ||
-      cleanString(article.clinicalQuestion).length >= 24 ||
-      cleanString(article.mainResult).length >= 24 ||
-      article.studyType ||
-      article.evidenceType ||
-      article.studyLocation ||
-      (Array.isArray(article.tags) && article.tags.length >= 2)
-  );
+const hasCanonicalSource = (article = {}) => {
+  const sourceName = cleanString(article.sourceName).toLowerCase();
+  const sourceDomain = cleanString(article.sourceDomain).toLowerCase();
+  if (!sourceName) return false;
+  if (!sourceDomain) return true;
+  return sourceName !== sourceDomain && sourceName !== sourceDomain.replace(/^www\./, "");
+};
+
+const hasUsefulAiDraft = (article = {}) => {
+  const hasTitleOrSource = Boolean(cleanString(article.title) || hasCanonicalSource(article));
+  const usefulFieldCount = [
+    cleanString(article.executiveSummary).length >= 24,
+    cleanString(article.clinicalQuestion).length >= 24,
+    cleanString(article.mainResult).length >= 24,
+    Boolean(cleanString(article.studyType)),
+    Boolean(cleanString(article.evidenceType)),
+    Boolean(cleanString(article.publicationDate))
+  ].filter(Boolean).length;
+  return hasTitleOrSource && usefulFieldCount >= 2;
+};
 
 const hasMetadataDraft = (article = {}) =>
-  Boolean(article.title || article.executiveSummary || article.publicationDate);
+  Boolean(article.title || hasCanonicalSource(article) || article.publicationDate);
 
 export async function requestArticleExtraction(url, { auth, endpoint } = {}) {
   const validation = validateArticleUrl(url);
@@ -213,7 +250,7 @@ export async function requestArticleExtraction(url, { auth, endpoint } = {}) {
     return buildManualFallback(
       validation,
       "failed",
-      "No se pudo autenticar la solicitud de análisis. Completá los campos manualmente."
+      AUTH_MESSAGE
     );
   }
 
@@ -254,7 +291,8 @@ export async function requestArticleExtraction(url, { auth, endpoint } = {}) {
     return {
       ok: true,
       extractionStatus,
-      message: getExtractionStatusMessage(extractionStatus, article),
+      message: getExtractionStatusMessage(extractionStatus),
+      rawEvidence: payload.rawEvidence || null,
       article: {
         ...article,
         warnings: article.warnings.length
@@ -266,7 +304,7 @@ export async function requestArticleExtraction(url, { auth, endpoint } = {}) {
     return buildManualFallback(
       validation,
       "not_configured",
-      "No se pudo conectar con el servicio de IA desde este entorno."
+      NOT_CONFIGURED_MESSAGE
     );
   }
 }

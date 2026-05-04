@@ -44,7 +44,56 @@ test("scientific logbook renders as operational hub with modals and article crea
             sourceName: "Revista parcial",
             officialUrl: "https://example.org/partial",
             sourceDomain: "example.org",
-            warnings: ["Se cargaron metadatos básicos. Completá los datos clínicos antes de guardar."]
+            warnings: ["Solo se detectaron metadatos básicos. Completá el resto manualmente."]
+          }
+        })
+      });
+      return;
+    }
+    if (payload?.url === "https://example.org/auth") {
+      await route.fulfill({
+        status: 401,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: false,
+          error: {
+            code: "auth_required",
+            message: "Necesitás iniciar sesión para analizar enlaces."
+          }
+        })
+      });
+      return;
+    }
+    if (payload?.url === "https://example.org/failed") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          extractionStatus: "failed",
+          article: {
+            title: "",
+            sourceName: "",
+            officialUrl: "https://example.org/failed",
+            sourceDomain: "example.org",
+            studyType: "",
+            evidenceType: "",
+            publicationDate: "",
+            studyLocation: "",
+            executiveSummary: "",
+            clinicalQuestion: "",
+            mainResult: "",
+            tags: [],
+            accessType: "Pendiente",
+            extractionConfidence: 0,
+            warnings: [
+              "No se pudo extraer información suficiente desde la página. Podés completar el artículo manualmente."
+            ]
+          },
+          rawEvidence: {
+            metadataFieldsDetected: [],
+            contentLength: 0,
+            usedSources: ["url"]
           }
         })
       });
@@ -323,7 +372,7 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(articleModal.locator("#article-ai-status")).not.toContainText("Datos cargados por IA", {
     timeout: 10_000
   });
-  await expect(articleModal.locator("#article-ai-status")).toContainText("metadatos básicos");
+  await expect(articleModal.locator("#article-ai-status")).toContainText("Solo se detectaron metadatos básicos");
   await expect(articleModal.getByLabel("Fuente / revista / sitio científico")).toHaveValue("Revista parcial");
   await expect(articleModal.getByLabel("Título")).toHaveValue("");
   await saveArticleButton.click();
@@ -331,10 +380,24 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(page.locator(".bitacora-post")).toHaveCount(0);
   await expect(page.locator("#bitacora-results-count")).toHaveText("0 artículos agregados");
 
+  await articleModal.getByLabel("URL del artículo o paper").fill("https://example.org/auth");
+  await articleModal.getByRole("button", { name: "Analizar enlace con IA" }).click();
+  await expect(articleModal.locator("#article-ai-status")).toContainText("Necesitás iniciar sesión para analizar enlaces.", {
+    timeout: 10_000
+  });
+
+  await articleModal.getByLabel("Título").fill("Título manual preservado");
+  await articleModal.getByLabel("URL del artículo o paper").fill("https://example.org/failed");
+  await articleModal.getByRole("button", { name: "Analizar enlace con IA" }).click();
+  await expect(articleModal.locator("#article-ai-status")).toContainText("No se pudo extraer información suficiente", {
+    timeout: 10_000
+  });
+  await expect(articleModal.getByLabel("Título")).toHaveValue("Título manual preservado");
+
   await articleModal.getByLabel("URL del artículo o paper").fill("https://pubmed.ncbi.nlm.nih.gov/123456/");
   await expect(articleModal.locator("#article-domain-detected")).toContainText("pubmed.ncbi.nlm.nih.gov");
   await articleModal.getByRole("button", { name: "Analizar enlace con IA" }).click();
-  await expect(articleModal.locator("#article-ai-status")).toContainText("Datos cargados por IA", {
+  await expect(articleModal.locator("#article-ai-status")).toContainText("Borrador cargado por IA", {
     timeout: 30_000
   });
   await expect(articleModal.getByLabel("Título")).toHaveValue(articleTitle);
@@ -347,9 +410,11 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(articleModal.getByLabel("Etiquetas")).toHaveValue("QA, Lectura crítica, PubMed, IA");
   await expect(articleModal.getByLabel("Acceso")).toHaveValue("Resumen disponible");
   await expect(articleModal.getByLabel("Resumen ejecutivo")).toHaveValue("Resumen generado por IA desde Playwright.");
-  expect(extractionRequests).toHaveLength(2);
+  expect(extractionRequests).toHaveLength(4);
   expect(extractionRequests[0].url).toBe("https://example.org/partial");
-  expect(extractionRequests[1].url).toBe("https://pubmed.ncbi.nlm.nih.gov/123456/");
+  expect(extractionRequests[1].url).toBe("https://example.org/auth");
+  expect(extractionRequests[2].url).toBe("https://example.org/failed");
+  expect(extractionRequests[3].url).toBe("https://pubmed.ncbi.nlm.nih.gov/123456/");
   expect(extractionRequests.every((entry) => /^Bearer\s+/.test(entry.authorization))).toBe(true);
   await articleModal.getByLabel("Comentario breve del usuario").fill("Comentario interno de prueba.");
   await saveArticleButton.click();

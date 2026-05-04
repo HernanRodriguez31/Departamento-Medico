@@ -592,6 +592,7 @@ body.bitacora-modal-open {
 
 .bitacora-modal--article .bitacora-modal__dialog {
   grid-template-rows: auto minmax(0, 1fr);
+  max-height: min(88vh, 920px);
 }
 
 .bitacora-modal--sources .bitacora-modal__dialog {
@@ -675,6 +676,14 @@ body.bitacora-modal-open {
   padding: 0.9rem 1.1rem 1rem;
   border-top: 1px solid rgba(226, 232, 240, 0.92);
   background: #fff;
+}
+
+.bitacora-modal--article .bitacora-modal__actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(10px);
 }
 
 .scientific-sources-segmented {
