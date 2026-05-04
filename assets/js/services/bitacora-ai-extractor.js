@@ -46,6 +46,69 @@ const normalizeTags = (value = []) =>
     .filter(Boolean)
     .slice(0, 12);
 
+const METHODOLOGY_PROFILE_LIST_FIELDS = new Set([
+  "countriesIncluded",
+  "institutions",
+  "secondaryOutcomes",
+  "effectMeasures",
+  "methodologicalStrengths",
+  "methodologicalLimitations",
+  "applicabilityNotes",
+  "methodologyWarnings"
+]);
+
+const METHODOLOGY_PROFILE_KEYS = [
+  "studyFamily",
+  "studyFamilyEs",
+  "specificDesign",
+  "designCategoryEs",
+  "temporalDirection",
+  "centerScope",
+  "isMulticenter",
+  "multicenterRationale",
+  "setting",
+  "countryOrRegion",
+  "countriesIncluded",
+  "institutions",
+  "studyPopulation",
+  "sampleSize",
+  "sampleDescription",
+  "studyPeriod",
+  "studyDuration",
+  "recruitmentPeriod",
+  "followUpDuration",
+  "dataSource",
+  "interventionOrExposure",
+  "comparator",
+  "primaryOutcome",
+  "secondaryOutcomes",
+  "statisticalApproach",
+  "effectMeasures",
+  "reportingGuideline",
+  "methodologicalStrengths",
+  "methodologicalLimitations",
+  "applicabilityNotes",
+  "classificationRationale",
+  "classificationConfidence",
+  "evidenceSupport",
+  "methodologyWarnings"
+];
+
+const normalizeMethodologyProfile = (input = {}) =>
+  METHODOLOGY_PROFILE_KEYS.reduce((profile, key) => {
+    const value = input && typeof input === "object" ? input[key] : "";
+    if (METHODOLOGY_PROFILE_LIST_FIELDS.has(key)) {
+      profile[key] = normalizeTags(value);
+    } else if (key === "isMulticenter") {
+      profile[key] = value === true || value === "true" || value === "sí" || value === "si";
+    } else if (key === "evidenceSupport") {
+      profile[key] = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    } else {
+      profile[key] = cleanString(value);
+    }
+    return profile;
+  }, {});
+
 const firstText = (input = {}, keys = []) => {
   for (const key of keys) {
     const value = input?.[key];
@@ -266,9 +329,12 @@ const normalizeExtractionArticle = (input = {}, urlInfo) => ({
   evidenceType: firstText(input, ["evidenceType", "typeOfEvidence", "evidence_level", "evidenceLevel", "tipoEvidencia", "tipo_de_evidencia"]),
   publicationDate: firstText(input, ["publicationDate", "publishedAt", "publication_date", "datePublished", "fechaPublicacion", "fecha_de_publicacion"]),
   studyLocation: firstText(input, ["studyLocation", "location", "studyCountry", "setting", "lugar", "contexto"]),
+  briefDescriptionEs: firstText(input, ["briefDescriptionEs", "cardSummaryEs", "briefDescription", "summaryCard", "resumenBreve"]),
+  expandedDescriptionEs: firstText(input, ["expandedDescriptionEs", "executiveSummaryEs", "expandedDescription", "executiveSummary", "summary", "abstract", "resumenAmpliado"]),
   executiveSummary: firstText(input, ["executiveSummary", "summary", "abstract", "resumen", "resumenEjecutivo", "resumen_ejecutivo"]),
   clinicalQuestion: firstText(input, ["clinicalQuestion", "question", "researchQuestion", "preguntaClinica", "pregunta_clinica", "pregunta"]),
   mainResult: firstText(input, ["mainResult", "result", "results", "findings", "conclusion", "resultadoPrincipal", "resultado_principal", "mainFinding"]),
+  methodologyProfile: normalizeMethodologyProfile(input.methodologyProfile),
   tags: normalizeTags(input.tags || input.keywords || input.etiquetas || input.palabrasClave || input.palabras_clave),
   accessType: firstText(input, ["accessType", "access", "acceso", "availability"]) || "Pendiente",
   extractionConfidence: Number.isFinite(Number(input.extractionConfidence ?? input.confidence ?? input.confianza))
@@ -336,8 +402,10 @@ const normalizeDocumentArticle = (input = {}) => {
     studyType: firstText(input, ["studyType", "typeOfStudy", "studyDesign", "tipoEstudio"]),
     evidenceType: firstText(input, ["evidenceType", "typeOfEvidence", "tipoEvidencia"]),
     accessType: firstText(input, ["accessType", "access", "acceso"]) || "Pendiente",
-    cardSummaryEs: firstText(input, ["cardSummaryEs", "cardSummary", "resumenBreve", "summaryCard"]),
-    executiveSummaryEs: firstText(input, ["executiveSummaryEs", "executiveSummary", "resumenEjecutivo"]),
+    briefDescriptionEs: firstText(input, ["briefDescriptionEs", "cardSummaryEs", "cardSummary", "resumenBreve", "summaryCard"]),
+    expandedDescriptionEs: firstText(input, ["expandedDescriptionEs", "executiveSummaryEs", "executiveSummary", "resumenEjecutivo"]),
+    cardSummaryEs: firstText(input, ["cardSummaryEs", "briefDescriptionEs", "cardSummary", "resumenBreve", "summaryCard"]),
+    executiveSummaryEs: firstText(input, ["executiveSummaryEs", "expandedDescriptionEs", "executiveSummary", "resumenEjecutivo"]),
     abstractSummaryEs: firstText(input, ["abstractSummaryEs", "abstractSummary", "abstract", "resumenAbstract"]),
     objectiveEs,
     clinicalQuestionEs: objectiveEs,
@@ -353,6 +421,7 @@ const normalizeDocumentArticle = (input = {}) => {
     limitationsEs: firstText(input, ["limitationsEs", "limitations", "limitaciones"]),
     localApplicabilityEs: firstText(input, ["localApplicabilityEs", "localApplicability", "aplicabilidadLocal"]),
     occupationalHealthRelevanceEs: firstText(input, ["occupationalHealthRelevanceEs", "occupationalHealthRelevance", "relevanciaOcupacional"]),
+    methodologyProfile: normalizeMethodologyProfile(input.methodologyProfile),
     tags: normalizeTags(input.tags || input.keywords || input.etiquetas),
     sourcePages: Array.isArray(input.sourcePages) ? input.sourcePages : [],
     extractionConfidence: Number.isFinite(Number(input.extractionConfidence ?? input.confidence))
@@ -372,10 +441,10 @@ const hasUsefulDocumentDraft = (article = {}) => {
     Array.isArray(article.keyPointsEs) && article.keyPointsEs.length >= 3
   ].filter(Boolean).length;
   return Boolean(
-    cleanString(article.title) &&
+      cleanString(article.title) &&
       cleanString(article.sourceName || article.journal) &&
-      cleanString(article.cardSummaryEs).length >= 20 &&
-      cleanString(article.executiveSummaryEs).length >= 24 &&
+      cleanString(article.briefDescriptionEs || article.cardSummaryEs).length >= 20 &&
+      cleanString(article.expandedDescriptionEs || article.executiveSummaryEs).length >= 24 &&
       usefulFieldCount >= 2 &&
       Number(article.extractionConfidence || 0) >= 0.55
   );

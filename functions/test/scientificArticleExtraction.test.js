@@ -39,7 +39,87 @@ const {
   validateStoragePathForUid
 } = require("../scientificArticleDocumentExtraction");
 
+const {
+  SCIENTIFIC_METHODOLOGY_TAXONOMY,
+  buildMethodologyEvidence,
+  preclassifyMethodology
+} = require("../scientificMethodologyTaxonomy");
+
 const articleUrl = new URL("https://www.thelancet.com/journals/lanam/article/PIIS2667-193X(25)00322-9/fulltext");
+
+const methodologyProfileFixture = (overrides = {}) => ({
+  studyFamily: "implementation_health_policy",
+  studyFamilyEs: "Implementación / política sanitaria",
+  specificDesign: "Marco de implementación",
+  designCategoryEs: "Marco de implementación",
+  temporalDirection: "no aplica",
+  centerScope: "regional",
+  isMulticenter: false,
+  multicenterRationale: "Alcance regional programático, no estudio clínico multicéntrico.",
+  setting: "atención primaria",
+  countryOrRegion: "Américas",
+  countriesIncluded: [],
+  institutions: ["PAHO"],
+  studyPopulation: "Redes y equipos de atención primaria",
+  sampleSize: "",
+  sampleDescription: "Alcance programático regional, no muestra clínica.",
+  studyPeriod: "2017-2025",
+  studyDuration: "No especificado en el documento",
+  recruitmentPeriod: "",
+  followUpDuration: "",
+  dataSource: "Evidencia documental y experiencia regional.",
+  interventionOrExposure: "HEARTS Quality Framework",
+  comparator: "",
+  primaryOutcome: "Fortalecer la calidad de implementación.",
+  secondaryOutcomes: [],
+  statisticalApproach: "",
+  effectMeasures: [],
+  reportingGuideline: "",
+  methodologicalStrengths: ["Integra evidencia y experiencia regional."],
+  methodologicalLimitations: ["No es un estudio clínico primario."],
+  applicabilityNotes: ["Aplicable a gestión sanitaria."],
+  classificationRationale: "El documento describe un marco de política sanitaria e implementación.",
+  classificationConfidence: "alta",
+  evidenceSupport: {
+    specificDesign: {
+      supportLevel: "inferido_con_soporte",
+      evidenceText: "Health Policy y framework de implementación regional.",
+      sourceSection: "Summary"
+    },
+    temporalDirection: {
+      supportLevel: "no_aplica",
+      evidenceText: "No es estudio clínico primario.",
+      sourceSection: "Methods"
+    },
+    centerScope: {
+      supportLevel: "inferido_con_soporte",
+      evidenceText: "Participan países de las Américas.",
+      sourceSection: "Summary"
+    },
+    studyPopulation: {
+      supportLevel: "inferido_con_soporte",
+      evidenceText: "Atención primaria e hipertensión en la región.",
+      sourceSection: "Summary"
+    },
+    sampleSize: {
+      supportLevel: "no_aplica",
+      evidenceText: "No corresponde muestra clínica.",
+      sourceSection: "Methods"
+    },
+    studyPeriod: {
+      supportLevel: "explicito",
+      evidenceText: "2017-2025.",
+      sourceSection: "Methods"
+    },
+    institutions: {
+      supportLevel: "explicito",
+      evidenceText: "PAHO.",
+      sourceSection: "Summary"
+    }
+  },
+  methodologyWarnings: [],
+  ...overrides
+});
 
 const completeAiArticle = {
   title: "Official clinical title",
@@ -48,9 +128,12 @@ const completeAiArticle = {
   evidenceType: "Investigación clínica",
   publicationDate: "2026-05-03",
   studyLocation: "América Latina",
+  briefDescriptionEs: "Síntesis breve en español para orientar lectura científica.",
+  expandedDescriptionEs: "Descripción ampliada en español basada en el abstract público disponible.",
   executiveSummary: "Resumen ejecutivo en español basado en el abstract público disponible.",
   clinicalQuestion: "Pregunta clínica en español derivada del objetivo del artículo.",
   mainResult: "Resultado principal en español derivado de los hallazgos del artículo.",
+  methodologyProfile: methodologyProfileFixture(),
   tags: ["salud pública", "epidemiología"],
   accessType: "Open access",
   warnings: [],
@@ -165,6 +248,46 @@ test("builds evidence packet from scientific sections without scripts, nav or fo
   assert.doesNotMatch(visibleText, /Navigation should not be extracted/);
   assert.doesNotMatch(visibleText, /Footer should not be extracted/);
   assert.doesNotMatch(visibleText, /window.bad/);
+});
+
+test("preclassifies core methodology families deterministically", () => {
+  const trialPacket = {
+    sections: [
+      {
+        heading: "Methods",
+        text: "This randomized controlled trial used random allocation, placebo control, blinding, intervention, comparator and follow-up outcomes."
+      }
+    ],
+    methodologyEvidence: buildMethodologyEvidence({
+      sections: [{ heading: "Methods", text: "randomized controlled trial placebo blinding intervention comparator follow-up" }]
+    })
+  };
+  const cohortPacket = {
+    sections: [
+      {
+        heading: "Methods",
+        text: "A retrospective cohort study used electronic health records and medical records from 2016 to 2020 to assess exposure and outcome."
+      }
+    ],
+    methodologyEvidence: buildMethodologyEvidence({
+      sections: [{ heading: "Methods", text: "retrospective cohort electronic health records exposure outcome" }]
+    })
+  };
+  const reviewPacket = {
+    sections: [
+      {
+        heading: "Search strategy",
+        text: "This systematic review followed PRISMA, databases searched, inclusion criteria, risk of bias and meta-analysis."
+      }
+    ],
+    methodologyEvidence: buildMethodologyEvidence({
+      sections: [{ heading: "Search strategy", text: "systematic review PRISMA databases searched inclusion criteria risk of bias meta-analysis" }]
+    })
+  };
+
+  assert.equal(preclassifyMethodology(trialPacket, SCIENTIFIC_METHODOLOGY_TAXONOMY).possibleFamilies[0], "experimental_interventional");
+  assert.equal(preclassifyMethodology(cohortPacket, SCIENTIFIC_METHODOLOGY_TAXONOMY).possibleFamilies[0], "observational_analytical");
+  assert.equal(preclassifyMethodology(reviewPacket, SCIENTIFIC_METHODOLOGY_TAXONOMY).possibleFamilies[0], "evidence_synthesis");
 });
 
 test("detects CAPTCHA and avoids using blocked page title as a useful draft", () => {
@@ -417,12 +540,15 @@ test("resolveScientificArticle continues after publisher 403 and resolves Lancet
       return textResponse(200, JSON.stringify({
         choices: [{ message: { content: JSON.stringify({
           studyType: "Revisión / marco de política sanitaria",
-          evidenceType: "Marco de política sanitaria",
-          studyLocation: "Américas",
-          executiveSummary: "Resumen en español basado en la evidencia pública de PubMed y PMC.",
-          clinicalQuestion: "Qué marco puede fortalecer la calidad del manejo de hipertensión en atención primaria.",
-          mainResult: "El marco HEARTS Quality organiza objetivos e indicadores para fortalecer la implementación regional.",
-          tags: ["hipertensión", "atención primaria", "calidad"],
+	          evidenceType: "Marco de política sanitaria",
+	          studyLocation: "Américas",
+	          briefDescriptionEs: "Presenta HEARTS Quality como marco regional para fortalecer hipertensión en atención primaria.",
+	          expandedDescriptionEs: "El marco en español organiza objetivos e indicadores para fortalecer la calidad del manejo de hipertensión en atención primaria regional.",
+	          executiveSummary: "Resumen en español basado en la evidencia pública de PubMed y PMC.",
+	          clinicalQuestion: "Qué marco puede fortalecer la calidad del manejo de hipertensión en atención primaria.",
+	          mainResult: "El marco HEARTS Quality organiza objetivos e indicadores para fortalecer la implementación regional.",
+	          methodologyProfile: methodologyProfileFixture(),
+	          tags: ["hipertensión", "atención primaria", "calidad"],
           warnings: [],
           extractionConfidence: 0.86
         }) } }]
@@ -453,12 +579,15 @@ test("resolveScientificArticle uses pasted abstract as manual evidence with warn
         ? JSON.stringify({
             choices: [{ message: { content: JSON.stringify({
               studyType: "Estudio observacional",
-              evidenceType: "Investigación clínica",
-              studyLocation: "",
-              executiveSummary: "Resumen en español desde abstract pegado.",
-              clinicalQuestion: "Pregunta sintetizada desde el abstract pegado.",
-              mainResult: "Resultado principal derivado del texto pegado.",
-              tags: ["abstract pegado"],
+	              evidenceType: "Investigación clínica",
+	              studyLocation: "",
+	              briefDescriptionEs: "Resumen breve en español desde abstract pegado.",
+	              expandedDescriptionEs: "Descripción ampliada en español desde abstract pegado para revisión editorial.",
+	              executiveSummary: "Resumen en español desde abstract pegado.",
+	              clinicalQuestion: "Pregunta sintetizada desde el abstract pegado.",
+	              mainResult: "Resultado principal derivado del texto pegado.",
+	              methodologyProfile: methodologyProfileFixture({ studyFamily: "observational_analytical", studyFamilyEs: "Observacional analítico", specificDesign: "Estudio observacional", designCategoryEs: "Estudio observacional", countryOrRegion: "" }),
+	              tags: ["abstract pegado"],
               warnings: ["Parte de la evidencia fue aportada manualmente por el usuario."],
               extractionConfidence: 0.74
             }) } }]
@@ -569,6 +698,8 @@ References
     articleType: "Health Policy",
     evidenceType: "Marco de política sanitaria / implementación en salud pública",
     accessType: "Open access",
+    briefDescriptionEs: "Presenta el HEARTS Quality Framework para fortalecer el control de hipertensión en atención primaria de las Américas.",
+    expandedDescriptionEs: "El documento describe un marco regional para institucionalizar y escalar HEARTS en las Américas. Integra evidencia, experiencia de países y consenso experto para mejorar protocolos, equipos, dispositivos, medicamentos, monitoreo y gobernanza en atención primaria.",
     cardSummaryEs: "Presenta el HEARTS Quality Framework para fortalecer la calidad de atención en hipertensión y riesgo cardiovascular en atención primaria.",
     executiveSummaryEs: "El documento describe un marco regional para institucionalizar y escalar HEARTS en las Américas. Integra evidencia, experiencia de países y consenso experto para mejorar protocolos, equipos, dispositivos, medicamentos, monitoreo y gobernanza en atención primaria.",
     objectiveEs: "Describir y fundamentar un marco de calidad para institucionalizar y escalar HEARTS en las Américas.",
@@ -586,6 +717,15 @@ References
     localApplicabilityEs: "Puede orientar revisión institucional de procesos de atención primaria y gestión de riesgo cardiovascular.",
     occupationalHealthRelevanceEs: "Aporta criterios de gestión sanitaria poblacional aplicables a programas preventivos y seguimiento de riesgo cardiovascular.",
     limitationsEs: "Es un marco de política sanitaria; no reemplaza evaluación local ni protocolos institucionales.",
+    methodologyProfile: methodologyProfileFixture({
+      institutions: ["PAHO", "OPS", "WHO"],
+      countriesIncluded: ["33 países de las Américas"],
+      sampleSize: "",
+      sampleDescription: "33 países participantes, alrededor de 10.000 centros de atención primaria y más de 6 millones de personas en tratamiento, según el documento.",
+      studyPeriod: "2016/2017-2025",
+      studyDuration: "No especificado en el documento",
+      temporalDirection: "no aplica"
+    }),
     tags: ["Hipertensión", "Riesgo cardiovascular", "Atención primaria", "HEARTS", "Mejora de calidad"],
     warnings: [],
     extractionConfidence: 0.9
@@ -616,6 +756,20 @@ References
   assert.equal(result.article.studyContextEs.length > 0, true);
   assert.equal(result.article.studyLocationEs.length > 0, true);
   assert.equal(result.article.methodologyEs, result.article.studyDesignEs);
+  assert.equal(result.article.briefDescriptionEs.length <= 280, true);
+  assert.match(result.article.expandedDescriptionEs, /marco regional/i);
+  assert.equal(result.article.methodologyProfile.studyFamily, "implementation_health_policy");
+  assert.match(result.article.methodologyProfile.designCategoryEs, /Marco de implementación/i);
+  assert.equal(result.article.methodologyProfile.isMulticenter, false);
+  assert.match(result.article.methodologyProfile.multicenterRationale, /no estudio clínico multicéntrico|programático/i);
+  assert.match(result.article.methodologyProfile.countryOrRegion, /Américas/i);
+  assert.ok(result.article.methodologyProfile.institutions.some((institution) => /PAHO|OPS/.test(institution)));
+  assert.match(result.article.methodologyProfile.sampleDescription, /10\.000|10000|programático|países/i);
+  assert.equal(result.article.methodologyProfile.sampleSize, "");
+  assert.match(result.article.methodologyProfile.studyDuration, /No especificado/i);
+  assert.doesNotMatch(result.article.methodologyProfile.temporalDirection, /prospectivo|retrospectivo/i);
+  assert.equal(result.article.methodologyProfile.evidenceSupport.temporalDirection.supportLevel, "no_aplica");
+  assert.ok(result.rawEvidence.preclassification.possibleFamilies.includes("implementation_health_policy"));
   assert.equal(result.article.mainMessageEs.length > 0, true);
   assert.equal(result.article.keyPointsEs.length >= 3 && result.article.keyPointsEs.length <= 5, true);
   assert.deepEqual(result.article.tags.slice(0, 3), ["Hipertensión", "Riesgo cardiovascular", "Atención primaria"]);
@@ -641,6 +795,8 @@ test("document AI output is normalized and empty output is not ai_draft", async 
     articleType: "Artículo científico",
     evidenceType: "Política sanitaria",
     accessType: "Pendiente",
+    briefDescriptionEs: "Ficha breve en español para revisión del equipo médico.",
+    expandedDescriptionEs: "Resumen ejecutivo en español basado exclusivamente en el texto aportado.",
     cardSummaryEs: "Ficha breve en español para revisión del equipo médico.",
     executiveSummaryEs: "Resumen ejecutivo en español basado exclusivamente en el texto aportado.",
     objectiveEs: "Presentar un marco que fortalece la gestión de hipertensión en atención primaria.",
@@ -654,6 +810,7 @@ test("document AI output is normalized and empty output is not ai_draft", async 
     limitationsEs: "No especifica resultados clínicos individuales.",
     localApplicabilityEs: "Requiere adaptación institucional.",
     occupationalHealthRelevanceEs: "Puede orientar gestión sanitaria poblacional.",
+    methodologyProfile: methodologyProfileFixture(),
     tags: ["hipertensión", "calidad"],
     warnings: [],
     extractionConfidence: 0.86
@@ -679,6 +836,69 @@ test("document AI output is normalized and empty output is not ai_draft", async 
   assert.equal(emptyStatus, "failed");
 });
 
+test("document resolver keeps core ficha when advanced methodology extraction fails", async () => {
+  const coreArticle = {
+    title: "Core PDF title",
+    sourceName: "Core Journal",
+    journal: "Core Journal",
+    authors: ["Autora Core"],
+    officialUrl: "https://doi.org/10.5555/core",
+    doi: "10.5555/core",
+    publicationDate: "2026-05-04",
+    originalLanguage: "en",
+    articleType: "Artículo científico",
+    evidenceType: "Revisión científica",
+    accessType: "Open access",
+    briefDescriptionEs: "Ficha breve en español con valor editorial para la tarjeta.",
+    expandedDescriptionEs: "Descripción ampliada en español generada desde el resumen del documento con suficiente contexto metodológico.",
+    cardSummaryEs: "Ficha breve en español con valor editorial para la tarjeta.",
+    executiveSummaryEs: "Descripción ampliada en español generada desde el resumen del documento con suficiente contexto metodológico.",
+    objectiveEs: "Sintetizar el propósito principal del documento científico aportado.",
+    studyDesignEs: "Revisión científica.",
+    studyContextEs: "Documento científico con resumen, métodos y conclusiones.",
+    studyPopulationEs: "",
+    studyLocationEs: "",
+    studyPeriodEs: "2026",
+    mainMessageEs: "La ficha core debe sobrevivir aunque falle la metodología avanzada.",
+    keyPointsEs: ["Core", "Metodología opcional", "Resiliencia"],
+    tags: ["Core", "PDF"],
+    warnings: [],
+    extractionConfidence: 0.78
+  };
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls += 1;
+    if (calls === 1) {
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ choices: [{ message: { content: JSON.stringify(coreArticle) } }] })
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ choices: [{ message: { content: JSON.stringify({ title: "incompleto" }) } }] })
+    };
+  };
+
+  const result = await resolveScientificArticleDocument(
+    {
+      mode: "pasted_text",
+      pastedText: "Core PDF title\nCore Journal\nAbstract\nThis document has enough scientific content, methods, results and conclusions for extraction. ".repeat(30),
+      pastedSource: "Core Journal",
+      officialUrl: "https://doi.org/10.5555/core"
+    },
+    { uid: "user-a", user: { uid: "user-a" }, apiKey: "test-key", fetchImpl }
+  );
+
+  assert.equal(result.extractionStatus, "ai_draft");
+  assert.equal(result.article.title, "Core PDF title");
+  assert.equal(result.article.doi, "10.5555/core");
+  assert.match(result.article.warnings.join(" "), /metodología avanzada/i);
+  assert.ok(calls >= 2);
+});
+
 test("document AI falls back to secondary model when configured model fails", async () => {
   const packet = buildDocumentEvidencePacket({
     mode: "pasted_text",
@@ -697,6 +917,8 @@ test("document AI falls back to secondary model when configured model fails", as
     articleType: "Artículo científico",
     evidenceType: "Revisión",
     accessType: "Pendiente",
+    briefDescriptionEs: "Resumen breve en español para validar el fallback.",
+    expandedDescriptionEs: "Resumen ejecutivo en español basado en evidencia real del documento.",
     cardSummaryEs: "Resumen breve en español para validar el fallback.",
     executiveSummaryEs: "Resumen ejecutivo en español basado en evidencia real del documento.",
     objectiveEs: "Validar el funcionamiento del modelo documental secundario.",
@@ -710,6 +932,7 @@ test("document AI falls back to secondary model when configured model fails", as
     localApplicabilityEs: "",
     occupationalHealthRelevanceEs: "",
     limitationsEs: "",
+    methodologyProfile: methodologyProfileFixture({ studyFamily: "evidence_synthesis", studyFamilyEs: "Síntesis de evidencia", specificDesign: "Revisión", designCategoryEs: "Revisión" }),
     tags: ["Validación", "IA"],
     warnings: [],
     extractionConfidence: 0.82
@@ -746,6 +969,8 @@ test("document resolver processes pasted text, rejects short text and handles PD
     articleType: "Artículo científico",
     evidenceType: "Revisión",
     accessType: "Pendiente",
+    briefDescriptionEs: "Resumen breve en español para la tarjeta científica.",
+    expandedDescriptionEs: "Resumen ejecutivo en español basado en el documento aportado.",
     cardSummaryEs: "Resumen breve en español para la tarjeta científica.",
     executiveSummaryEs: "Resumen ejecutivo en español basado en el documento aportado.",
     objectiveEs: "Describir qué propósito científico aborda el documento.",
@@ -759,6 +984,7 @@ test("document resolver processes pasted text, rejects short text and handles PD
     limitationsEs: "",
     localApplicabilityEs: "",
     occupationalHealthRelevanceEs: "",
+    methodologyProfile: methodologyProfileFixture({ studyFamily: "evidence_synthesis", studyFamilyEs: "Síntesis de evidencia", specificDesign: "Revisión", designCategoryEs: "Revisión" }),
     tags: ["revisión"],
     warnings: [],
     extractionConfidence: 0.78

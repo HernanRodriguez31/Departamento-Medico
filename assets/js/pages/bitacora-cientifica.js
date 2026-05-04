@@ -7,19 +7,25 @@ import {
   getDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import {
+  EmailAuthProvider,
+  GoogleAuthProvider,
+  reauthenticateWithCredential,
+  reauthenticateWithPopup
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import {
   getBlob,
   ref as storageRef,
   uploadBytes
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { BITACORA_POSTS } from "../data/bitacora-posts.js";
 import { NATIONAL_SELECTED_SOURCE_IDS, SCIENTIFIC_SOURCES } from "../data/scientific-sources.js";
-import { createBitacoraArticleRepository } from "../services/bitacora-article-repository.js?v=20260504-bitacora-final-polish-1";
+import { createBitacoraArticleRepository } from "../services/bitacora-article-repository.js?v=20260504-bitacora-pdf-ai-fix-1";
 import {
   inferSourceNameFromDomain,
   requestArticleExtraction,
   requestArticleDocumentExtraction,
   validateArticleUrl
-} from "../services/bitacora-ai-extractor.js?v=20260504-bitacora-final-polish-1";
+} from "../services/bitacora-ai-extractor.js?v=20260504-bitacora-pdf-ai-fix-1";
 
 const { auth, db, storage } = getFirebase();
 
@@ -53,6 +59,7 @@ const EXTRACTION_SOURCE_LABELS = {
 };
 const MAX_PDF_BYTES = 20 * 1024 * 1024;
 const MIN_PASTED_TEXT_CHARS = 500;
+const SOCIAL_TOOLTIP_LIMIT = 8;
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
@@ -74,7 +81,12 @@ const els = {
   sourceScopeButtons: $$("[data-source-scope]"),
   sourcesModal: $("#scientific-sources-modal"),
   addArticleModal: $("#add-article-modal"),
+  addArticleTitle: $("#add-article-title"),
+  addArticleSubtitle: $("#add-article-description"),
   addArticleForm: $("#bitacora-add-article-form"),
+  articleDraftSaveButton: $("#bitacora-add-article-form [data-save-status='draft']"),
+  articlePrimarySaveButton: $("#bitacora-add-article-form [data-save-status='pending_review']"),
+  articleDocumentTabs: $(".bitacora-document-tabs"),
   articleTabs: $$("[data-article-tab]"),
   articlePanels: $$("[data-article-panel]"),
   pdfDropzone: $("#article-pdf-dropzone"),
@@ -95,6 +107,7 @@ const els = {
   articleDomain: $("#article-domain-detected"),
   articleAiStatus: $("#article-ai-status"),
   articleAiWarnings: $("#article-ai-warnings"),
+  articleAiProcessingOverlay: $("#article-ai-processing-overlay"),
   previewZone: $("#article-preview-zone"),
   advancedZone: $("#article-advanced-zone"),
   advancedToggle: $("#article-advanced-toggle"),
@@ -106,6 +119,20 @@ const els = {
   articleCreatedBy: $("#article-created-by"),
   articleCreatedAt: $("#article-created-at"),
   analyzeButtons: $$("[data-analyze-article]"),
+  reauthModal: $("#bitacora-reauth-modal"),
+  reauthForm: $("#bitacora-reauth-form"),
+  reauthTitle: $("#bitacora-reauth-title"),
+  reauthDescription: $("#bitacora-reauth-description"),
+  reauthPasswordSection: $("#bitacora-reauth-password-section"),
+  reauthProviderSection: $("#bitacora-reauth-provider-section"),
+  reauthProviderName: $("#bitacora-reauth-provider-name"),
+  reauthPassword: $("#bitacora-reauth-password"),
+  reauthError: $("#bitacora-reauth-error"),
+  reauthSubmit: $("#bitacora-reauth-submit"),
+  deleteConfirmModal: $("#bitacora-delete-confirm-modal"),
+  deleteConfirmForm: $("#bitacora-delete-confirm-form"),
+  deleteConfirmText: $("#bitacora-delete-confirm-text"),
+  deleteConfirmSubmit: $("#bitacora-delete-confirm-submit"),
   scrollUp: $("#scroll-up"),
   returnHome: $("#art-gallery-return-home")
 };
@@ -143,10 +170,25 @@ const state = {
     documentContentType: "",
     contentHash: "",
     pageCount: 0,
+    methodologyProfile: null,
     sourcePages: [],
     rawEvidence: null
   },
-  selectedPdfFile: null
+  selectedPdfFile: null,
+  articleModalMode: "create",
+  editingArticleId: "",
+  editingArticleSnapshot: null,
+  pendingSensitiveAction: null,
+  pendingDeleteArticleId: "",
+  socialSummaries: new Map(),
+  likeUnsubscribers: new Map(),
+  commentsByPost: new Map(),
+  activeCommentsArticleId: "",
+  activeCommentsUnsubscribe: null,
+  expandedCommentsAll: new Set(),
+  commentLikeSummaries: new Map(),
+  commentLikeUnsubscribers: new Map(),
+  editingCommentId: ""
 };
 
 let repository = null;
@@ -159,6 +201,8 @@ const escapeHtml = (value = "") =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+
+const cleanUserText = (value = "") => String(value || "").replace(/[<>]/g, "").trim();
 
 const normalizeText = (value = "") =>
   String(value)
@@ -235,6 +279,22 @@ const splitLines = (value = "") =>
     .filter(Boolean)
     .slice(0, 12);
 
+const truncateText = (value = "", maxLength = 120) => {
+  const clean = String(value || "").replace(/\s+/g, " ").trim();
+  if (clean.length <= maxLength) return clean;
+  return `${clean.slice(0, Math.max(0, maxLength - 1)).trim()}…`;
+};
+
+const isNoSpecifiedValue = (value = "") => {
+  const clean = normalizeText(value);
+  return clean === "no especificado" || clean === "no especificado en el documento";
+};
+
+const isNoAplicaValue = (value = "") => {
+  const clean = normalizeText(value);
+  return clean === "no aplica" || clean.startsWith("no aplica ");
+};
+
 const formatFileSize = (bytes = 0) => {
   const size = Number(bytes) || 0;
   if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
@@ -277,6 +337,8 @@ const renderStaticPost = (post) => ({
   extractionStatus: post.extractionStatus || "manual",
   accessType: post.accessType || "Pendiente",
   summary: post.summary || "",
+  briefDescriptionEs: post.summary || "",
+  expandedDescriptionEs: post.summary || "",
   executiveSummary: post.summary || "",
   clinicalQuestion: post.clinicalQuestion || "",
   mainResult: post.mainResult || post.keyFinding || "",
@@ -286,6 +348,7 @@ const renderStaticPost = (post) => ({
   studyLocation: post.localApplicability || "",
   tags: [...(post.specialty || []), ...(post.tags || [])],
   extractionWarnings: [],
+  methodologyProfile: {},
   isTemplate: Boolean(post.isDemo)
 });
 
@@ -312,6 +375,8 @@ const renderUserArticle = (article) => ({
   studyPeriodEs: article.studyPeriodEs,
   createdAt: article.createdAt,
   createdAtLabel: formatDateTime(article.createdAt),
+  updatedAt: article.updatedAt,
+  createdBy: article.createdBy,
   createdByUid: article.createdBy?.uid || "",
   createdByName: article.createdBy?.displayName || article.createdBy?.email || "Usuario",
   evidenceType: article.evidenceType || article.studyType || "Pendiente",
@@ -321,9 +386,17 @@ const renderUserArticle = (article) => ({
   extractionSource: article.extractionSource,
   extractionConfidence: article.extractionConfidence,
   accessType: article.accessType,
-  summary: article.cardSummaryEs || article.executiveSummaryEs || article.executiveSummary || "Artículo cargado para revisión interna.",
+  summary:
+    article.briefDescriptionEs ||
+    article.cardSummaryEs ||
+    article.expandedDescriptionEs ||
+    article.executiveSummaryEs ||
+    article.executiveSummary ||
+    "Artículo cargado para revisión interna.",
+  briefDescriptionEs: article.briefDescriptionEs || article.cardSummaryEs,
+  expandedDescriptionEs: article.expandedDescriptionEs || article.executiveSummaryEs || article.executiveSummary,
   cardSummaryEs: article.cardSummaryEs,
-  executiveSummary: article.executiveSummaryEs || article.executiveSummary,
+  executiveSummary: article.expandedDescriptionEs || article.executiveSummaryEs || article.executiveSummary,
   abstractSummaryEs: article.abstractSummaryEs,
   objectiveEs: article.objectiveEs || article.clinicalQuestionEs || article.clinicalQuestion,
   clinicalQuestion: article.objectiveEs || article.clinicalQuestionEs || article.clinicalQuestion,
@@ -334,6 +407,7 @@ const renderUserArticle = (article) => ({
   limitationsEs: article.limitationsEs,
   localApplicabilityEs: article.localApplicabilityEs,
   occupationalHealthRelevanceEs: article.occupationalHealthRelevanceEs,
+  methodologyProfile: article.methodologyProfile || {},
   userComment: article.userComment,
   studyLocation: article.studyLocation,
   originalFileName: article.originalFileName,
@@ -445,13 +519,131 @@ const renderAnalysisListBlock = (analysisId, suffix, title, items = []) => {
   `;
 };
 
+const joinDisplayList = (items = []) =>
+  (Array.isArray(items) ? items : [])
+    .map((item) => String(item || "").trim())
+    .filter(Boolean)
+    .join(", ");
+
+const getEvidenceSupport = (profile = {}, key = "") => {
+  const support = profile?.evidenceSupport?.[key];
+  return support && typeof support === "object" ? support : null;
+};
+
+const renderSupportChip = (support = null, value = "") => {
+  const level = support?.supportLevel || "";
+  if (level === "inferido_con_soporte") {
+    return `<span class="bitacora-methodology-chip bitacora-methodology-chip--inferred">inferido</span>`;
+  }
+  if (level === "no_aplica" || isNoAplicaValue(value)) {
+    return `<span class="bitacora-methodology-chip bitacora-methodology-chip--na">no aplica</span>`;
+  }
+  return "";
+};
+
+const renderMethodologyRow = ({ label, value, support, essential = false }) => {
+  const cleanValue = String(value || "").trim();
+  if (!cleanValue) return "";
+  if (!essential && isNoSpecifiedValue(cleanValue)) return "";
+  const chip = renderSupportChip(support, cleanValue);
+  const softClass = isNoSpecifiedValue(cleanValue) || isNoAplicaValue(cleanValue) ? " bitacora-methodology-row--soft" : "";
+  return `
+    <div class="bitacora-methodology-row${softClass}">
+      <dt>${escapeHtml(label)}${chip}</dt>
+      <dd>${escapeHtml(cleanValue)}</dd>
+    </div>
+  `;
+};
+
+const renderMethodologyGrid = (analysisId, post) => {
+  const profile = post.methodologyProfile || {};
+  const multicenterValue =
+    typeof profile.isMulticenter === "boolean"
+      ? profile.isMulticenter
+        ? "Sí"
+        : profile.multicenterRationale || "No"
+      : "";
+  const rows = [
+    { label: "Tipo de trabajo", value: profile.studyFamilyEs },
+    {
+      label: "Diseño específico",
+      value: profile.specificDesign || profile.designCategoryEs || post.studyDesignEs || post.methodologyEs,
+      support: getEvidenceSupport(profile, "specificDesign"),
+      essential: true
+    },
+    { label: "Categoría visible", value: profile.designCategoryEs },
+    { label: "Temporalidad", value: profile.temporalDirection, support: getEvidenceSupport(profile, "temporalDirection"), essential: true },
+    { label: "Alcance / centros", value: profile.centerScope, support: getEvidenceSupport(profile, "centerScope"), essential: true },
+    { label: "¿Multicéntrico?", value: multicenterValue, support: getEvidenceSupport(profile, "centerScope"), essential: true },
+    { label: "Ámbito", value: profile.setting },
+    { label: "Lugar / región", value: profile.countryOrRegion || post.studyLocationEs || post.studyLocation },
+    { label: "Instituciones", value: joinDisplayList(profile.institutions), support: getEvidenceSupport(profile, "institutions") },
+    { label: "Población o contexto", value: profile.studyPopulation || post.studyPopulationEs, support: getEvidenceSupport(profile, "studyPopulation") },
+    { label: "Tamaño / alcance", value: profile.sampleDescription || profile.sampleSize, support: getEvidenceSupport(profile, "sampleSize"), essential: true },
+    { label: "Período", value: profile.studyPeriod || post.studyPeriodEs, support: getEvidenceSupport(profile, "studyPeriod") },
+    { label: "Duración", value: profile.studyDuration, essential: true },
+    { label: "Fuente de datos", value: profile.dataSource },
+    { label: "Intervención / exposición", value: profile.interventionOrExposure },
+    { label: "Comparador", value: profile.comparator, essential: true },
+    { label: "Desenlace o propósito principal", value: profile.primaryOutcome },
+    { label: "Método estadístico / proceso analítico", value: profile.statisticalApproach },
+    { label: "Guía de reporte sugerida", value: profile.reportingGuideline },
+    { label: "Justificación de clasificación", value: profile.classificationRationale, essential: true }
+  ].filter((row) => hasMeaningfulAnalysisValue(row.value) && (row.essential || !isNoSpecifiedValue(row.value)));
+
+  if (!rows.length) return "";
+  return `
+    <section class="bitacora-analysis__section bitacora-analysis__section--wide" aria-labelledby="${analysisId}-methodology-profile">
+      <h3 id="${analysisId}-methodology-profile">Ficha metodológica</h3>
+      <dl class="bitacora-methodology-grid">
+        ${rows.map(renderMethodologyRow).join("")}
+      </dl>
+    </section>
+  `;
+};
+
+const renderMethodologyInterpretation = (analysisId, post) => {
+  const profile = post.methodologyProfile || {};
+  const blocks = [
+    ["Fortalezas metodológicas", joinDisplayList(profile.methodologicalStrengths)],
+    ["Limitaciones metodológicas", joinDisplayList(profile.methodologicalLimitations) || post.limitationsEs],
+    ["Cautelas de interpretación", joinDisplayList(profile.methodologyWarnings)]
+  ].filter(([, value]) => hasMeaningfulAnalysisValue(value));
+  if (!blocks.length) return "";
+  return `
+    <section class="bitacora-analysis__section" aria-labelledby="${analysisId}-methodology-interpretation">
+      <h3 id="${analysisId}-methodology-interpretation">Interpretación metodológica</h3>
+      <div class="bitacora-analysis__stack">
+        ${blocks.map(([label, value]) => `<p><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</p>`).join("")}
+      </div>
+    </section>
+  `;
+};
+
+const renderApplicability = (analysisId, post) => {
+  const profile = post.methodologyProfile || {};
+  const blocks = [
+    ["Aplicabilidad local", post.localApplicabilityEs || joinDisplayList(profile.applicabilityNotes)],
+    ["Salud ocupacional / gestión sanitaria", post.occupationalHealthRelevanceEs]
+  ].filter(([, value]) => hasMeaningfulAnalysisValue(value));
+  if (!blocks.length) return "";
+  return `
+    <section class="bitacora-analysis__section" aria-labelledby="${analysisId}-applicability">
+      <h3 id="${analysisId}-applicability">Aplicabilidad</h3>
+      <div class="bitacora-analysis__stack">
+        ${blocks.map(([label, value]) => `<p><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</p>`).join("")}
+      </div>
+    </section>
+  `;
+};
+
 const renderBibliography = (analysisId, post) => {
   const authors = Array.isArray(post.authors) ? post.authors.filter(Boolean) : [];
   const authorLabel = authors.length > 3 ? `${authors.slice(0, 3).join(", ")} et al.` : authors.join(", ");
   const rows = [
     ["Revista / fuente", post.journal || post.sourceName],
     ["Fecha de publicación", formatDateOnly(post.publicationDate)],
-    ["DOI", post.doi],
+    ["DOI (Identificador Digital de Objeto)", post.doi],
     ["Autores principales", authorLabel],
     ["URL oficial", ensureWebUrl(post.officialUrl)]
   ].filter(([, value]) => hasMeaningfulAnalysisValue(value));
@@ -475,7 +667,216 @@ const renderBibliography = (analysisId, post) => {
   `;
 };
 
-const canDeleteArticle = (post) =>
+const getSocialSummary = (postId = "") =>
+  state.socialSummaries.get(postId) || {
+    likeCount: 0,
+    commentCount: 0,
+    likedByCurrentUser: false,
+    likes: [],
+    comments: [],
+    latestComments: []
+  };
+
+const getPostComments = (postId = "") => state.commentsByPost.get(postId) || [];
+
+const commentLikeKey = (postId = "", commentId = "") => `${postId}::${commentId}`;
+
+const getCommentLikeSummary = (postId = "", commentId = "") =>
+  state.commentLikeSummaries.get(commentLikeKey(postId, commentId)) || {
+    count: 0,
+    likedByCurrentUser: false,
+    likes: []
+  };
+
+const canManageComment = (comment = {}) =>
+  Boolean(state.currentUser && (state.isAdmin || comment.createdBy?.uid === state.currentUser.uid));
+
+const getSocialNames = (likes = []) =>
+  (Array.isArray(likes) ? likes : [])
+    .map((like) => like.displayName || like.email || "Usuario")
+    .filter(Boolean);
+
+const getSocialTooltipText = (likes = []) => {
+  const names = getSocialNames(likes);
+  const visible = names.slice(0, SOCIAL_TOOLTIP_LIMIT);
+  const extra = Math.max(0, names.length - visible.length);
+  return visible.length ? `${visible.join(", ")}${extra ? `, +${extra} más` : ""}` : "Sin me gusta todavía";
+};
+
+const renderSocialTooltip = (id = "", likes = []) => {
+  const text = getSocialTooltipText(likes);
+  return `<span id="${escapeHtml(id)}" class="bitacora-social-tooltip" role="tooltip">${escapeHtml(text)}</span>`;
+};
+
+const buildLikeAriaLabel = ({ liked = false, count = 0, target = "esta publicación" } = {}) => {
+  const countLabel = count === 1 ? "1 like" : `${count} likes`;
+  return liked ? `Te gusta ${target}. ${countLabel}.` : `${countLabel} en ${target}.`;
+};
+
+const renderCommentActions = (postId, comment) => {
+  const summary = getCommentLikeSummary(postId, comment.id);
+  const liked = Boolean(summary.likedByCurrentUser);
+  const tooltipId = `comment-like-tooltip-${postId}-${comment.id}`;
+  return `
+    <div class="bitacora-comment__actions">
+      <button
+        class="bitacora-comment-action bitacora-comment-like-button${liked ? " is-active" : ""}"
+        type="button"
+        data-bitacora-action="toggle-comment-like"
+        aria-pressed="${liked ? "true" : "false"}"
+        aria-describedby="${tooltipId}"
+        aria-label="${escapeHtml(buildLikeAriaLabel({ liked, count: summary.count || 0, target: "este comentario" }))}"
+      >
+        <i data-lucide="heart" aria-hidden="true"></i>
+        <strong data-bitacora-comment-like-count>${summary.count || 0}</strong>
+        ${renderSocialTooltip(tooltipId, summary.likes || [])}
+      </button>
+      ${
+        canManageComment(comment)
+          ? `
+            <button class="bitacora-comment-action" type="button" data-bitacora-action="edit-comment" aria-label="Editar comentario" title="Editar comentario">
+              <i data-lucide="pencil" aria-hidden="true"></i>
+            </button>
+            <button class="bitacora-comment-action bitacora-comment-action--delete" type="button" data-bitacora-action="delete-comment" aria-label="Eliminar comentario" title="Eliminar comentario">
+              <i data-lucide="trash-2" aria-hidden="true"></i>
+            </button>
+          `
+          : ""
+      }
+    </div>
+  `;
+};
+
+const renderComment = (analysisId, postId, comment) => {
+  const editing = state.editingCommentId === comment.id;
+  return `
+    <article class="bitacora-comment" data-comment-id="${escapeHtml(comment.id)}">
+      <div class="bitacora-comment__meta">
+        <strong>${escapeHtml(comment.createdBy?.displayName || "Usuario")}</strong>
+        <span>${escapeHtml(formatDateTime(comment.updatedAt || comment.createdAt) || "Ahora")}</span>
+      </div>
+      ${
+        editing
+          ? `
+            <form class="bitacora-comment-edit-form" data-bitacora-comment-edit-form>
+              <label class="sr-only" for="${analysisId}-comment-edit-${escapeHtml(comment.id)}">Editar comentario</label>
+              <textarea id="${analysisId}-comment-edit-${escapeHtml(comment.id)}" maxlength="1000" rows="2" data-bitacora-comment-edit-text>${escapeHtml(comment.text)}</textarea>
+              <span class="bitacora-comment-edit-form__actions">
+                <button class="bitacora-btn bitacora-btn--secondary" type="submit">Guardar</button>
+                <button class="bitacora-btn bitacora-btn--secondary" type="button" data-bitacora-action="cancel-edit-comment">Cancelar</button>
+              </span>
+            </form>
+          `
+          : `<p>${escapeHtml(comment.text)}</p>`
+      }
+      ${renderCommentActions(postId, comment)}
+    </article>
+  `;
+};
+
+const renderComments = (analysisId, post) => {
+  if (post.isTemplate) return "";
+  const comments = getPostComments(post.id);
+  const showAll = state.expandedCommentsAll.has(post.id);
+  const visibleComments = showAll ? [...comments].reverse() : comments.slice(-5).reverse();
+  const hiddenCount = Math.max(0, comments.length - visibleComments.length);
+  return `
+    <section class="bitacora-comments" aria-labelledby="${analysisId}-comments">
+      <div class="bitacora-comments__header">
+        <h3 id="${analysisId}-comments">Comentarios</h3>
+        <span>${comments.length === 1 ? "1 comentario" : `${comments.length} comentarios`}</span>
+      </div>
+      <form class="bitacora-comment-form" data-bitacora-comment-form>
+        <label class="sr-only" for="${analysisId}-comment-text">Agregar comentario</label>
+        <textarea id="${analysisId}-comment-text" maxlength="1000" rows="2" placeholder="Sumá un comentario breve" data-bitacora-comment-text></textarea>
+        <button class="bitacora-btn bitacora-btn--secondary" type="submit">Comentar</button>
+      </form>
+      <div class="bitacora-comments__list">
+        ${
+          visibleComments.length
+            ? visibleComments
+                .map((comment) => renderComment(analysisId, post.id, comment))
+                .join("")
+            : `<p class="bitacora-comments__empty">Sé el primero en comentar esta publicación.</p>`
+        }
+      </div>
+      ${
+        hiddenCount
+          ? `<button class="bitacora-comments__more" type="button" data-bitacora-action="show-all-comments">Ver todos</button>`
+          : ""
+      }
+    </section>
+  `;
+};
+
+const renderSocialActions = (post) => {
+  if (post.isTemplate) return "";
+  const summary = getSocialSummary(post.id);
+  const liked = Boolean(summary.likedByCurrentUser);
+  const tooltipId = `article-like-tooltip-${post.id}`;
+  return `
+    <span class="bitacora-post-card__social" aria-label="Interacciones">
+      <button
+        class="bitacora-social-action bitacora-like-button${liked ? " is-active" : ""}"
+        type="button"
+        data-bitacora-action="toggle-like"
+        aria-pressed="${liked ? "true" : "false"}"
+        aria-describedby="${tooltipId}"
+        aria-label="${escapeHtml(buildLikeAriaLabel({ liked, count: summary.likeCount || 0, target: "esta publicación" }))}"
+      >
+        <i data-lucide="heart" aria-hidden="true"></i>
+        <strong data-bitacora-like-count>${summary.likeCount || 0}</strong>
+        ${renderSocialTooltip(tooltipId, summary.likes || [])}
+      </button>
+      <button
+        class="bitacora-social-action"
+        type="button"
+        data-bitacora-action="focus-comments"
+        aria-label="${summary.commentCount === 1 ? "1 comentario en esta publicación" : `${summary.commentCount || 0} comentarios en esta publicación`}"
+      >
+        <i data-lucide="message-circle" aria-hidden="true"></i>
+        <strong data-bitacora-comment-count>${summary.commentCount || 0}</strong>
+      </button>
+    </span>
+  `;
+};
+
+const renderCommentPreview = (post) => {
+  if (post.isTemplate) return "";
+  const summary = getSocialSummary(post.id);
+  const latest = summary.latestComments || [];
+  const count = Number(summary.commentCount || 0);
+  if (!count) {
+    return `
+      <button class="bitacora-comment-preview bitacora-comment-preview--empty" type="button" data-bitacora-action="focus-comments" aria-label="0 comentarios">
+        <i data-lucide="message-circle" aria-hidden="true"></i>
+        <strong data-bitacora-comment-preview-count>0</strong>
+      </button>
+    `;
+  }
+  const last = latest[0] || {};
+  const otherNames = latest
+    .slice(1, 3)
+    .map((comment) => comment.createdBy?.displayName || comment.createdBy?.email || "Usuario")
+    .filter(Boolean);
+  const extra = Math.max(0, count - 1 - otherNames.length);
+  const tail = otherNames.length
+    ? ` · ${otherNames.join(", ")}${extra ? ` y +${extra} comentaron también` : " comentó también"}`
+    : extra
+      ? ` · +${extra} comentarios`
+      : "";
+  return `
+    <button class="bitacora-comment-preview" type="button" data-bitacora-action="focus-comments" aria-label="${escapeHtml(`${count} comentarios. Abrir comentarios.`)}">
+      <i data-lucide="message-circle" aria-hidden="true"></i>
+      <strong data-bitacora-comment-preview-count>${count}</strong>
+      <span data-bitacora-comment-preview-text>
+        ${escapeHtml(last.createdBy?.displayName || last.createdBy?.email || "Usuario")}: “${escapeHtml(truncateText(last.text, 92))}”${escapeHtml(tail)}
+      </span>
+    </button>
+  `;
+};
+
+const canManageArticle = (post) =>
   Boolean(
     post &&
       !post.isTemplate &&
@@ -483,26 +884,36 @@ const canDeleteArticle = (post) =>
       (state.isAdmin || (post.createdByUid && post.createdByUid === state.currentUser.uid))
   );
 
+const getUploaderLabel = (post) =>
+  post?.createdByName ||
+  post?.createdBy?.displayName ||
+  post?.createdBy?.email ||
+  "Usuario del departamento";
+
 const renderAnalysis = (post, analysisId, expanded) => `
   <div id="${analysisId}" class="bitacora-analysis bitacora-analysis-panel" ${expanded ? "" : "hidden"}>
     <section class="bitacora-analysis__lead" aria-labelledby="${analysisId}-quick">
       <h3 id="${analysisId}-quick">Lectura rápida</h3>
-      ${hasMeaningfulAnalysisValue(post.executiveSummary || post.summary) ? `<p>${escapeHtml(post.executiveSummary || post.summary)}</p>` : ""}
+      ${hasMeaningfulAnalysisValue(post.briefDescriptionEs || post.summary) ? `<p>${escapeHtml(post.briefDescriptionEs || post.summary)}</p>` : ""}
       ${hasMeaningfulAnalysisValue(post.mainMessageEs || post.mainResult) ? `<p class="bitacora-analysis__main-message">${escapeHtml(post.mainMessageEs || post.mainResult)}</p>` : ""}
     </section>
+    ${
+      hasMeaningfulAnalysisValue(post.expandedDescriptionEs || post.executiveSummary)
+        ? `<section class="bitacora-analysis__section bitacora-analysis__section--wide" aria-labelledby="${analysisId}-expanded">
+            <h3 id="${analysisId}-expanded">Descripción ampliada</h3>
+            <p>${escapeHtml(post.expandedDescriptionEs || post.executiveSummary)}</p>
+          </section>`
+        : ""
+    }
     <div class="bitacora-analysis__grid">
       ${renderAnalysisBlock(analysisId, "question", "Objetivo", post.objectiveEs || post.clinicalQuestion)}
-      ${renderAnalysisBlock(analysisId, "design", "Diseño / metodología", post.studyDesignEs || post.methodologyEs || post.studyType || post.articleType)}
-      ${renderAnalysisBlock(analysisId, "context", "Dónde y población", post.studyContextEs)}
-      ${renderAnalysisBlock(analysisId, "population", "Población", post.studyPopulationEs)}
-      ${renderAnalysisBlock(analysisId, "location", "Lugar / región", post.studyLocationEs || post.studyLocation)}
-      ${renderAnalysisBlock(analysisId, "period", "Período / año", post.studyPeriodEs)}
       ${renderAnalysisListBlock(analysisId, "keypoints", "Puntos clave", post.keyPointsEs)}
-      ${renderAnalysisBlock(analysisId, "local", "Aplicabilidad local", post.localApplicabilityEs)}
-      ${renderAnalysisBlock(analysisId, "occupational", "Relevancia para salud ocupacional / gestión sanitaria", post.occupationalHealthRelevanceEs)}
-      ${renderAnalysisBlock(analysisId, "limitations", "Limitaciones", post.limitationsEs)}
+      ${renderMethodologyGrid(analysisId, post)}
+      ${renderMethodologyInterpretation(analysisId, post)}
+      ${renderApplicability(analysisId, post)}
       ${renderBibliography(analysisId, post)}
     </div>
+    ${renderComments(analysisId, post)}
   </div>
 `;
 
@@ -510,6 +921,8 @@ const renderPostMeta = (post) => {
   const rows = [
     ["Publicación", formatDateOnly(post.publicationDate)],
     ["Tipo", post.evidenceType || post.articleType || post.studyDesignEs],
+    ["Subido por", getUploaderLabel(post)],
+    ["Carga", post.createdAtLabel || formatDateTime(post.createdAt) || "Carga no registrada"],
     ["Acceso", post.accessType]
   ].filter(([, value]) => hasMeaningfulAnalysisValue(value));
   if (!rows.length) return "";
@@ -533,16 +946,21 @@ const renderPost = (post) => {
   const expanded = state.expandedPostId === post.id;
   const analysisId = `bitacora-analysis-${post.id}`;
   const originalUrl = ensureWebUrl(post.officialUrl);
+  const methodLabel =
+    post.methodologyProfile?.designCategoryEs ||
+    post.methodologyProfile?.specificDesign ||
+    post.evidenceType ||
+    post.articleType;
 
   return `
     <article class="bitacora-post bitacora-post-card" data-post-id="${escapeHtml(post.id)}">
       <div class="bitacora-post-card__inner">
         <div class="bitacora-post-card__header">
-          <div class="bitacora-post-card__eyebrow">
+          <div class="bitacora-post-card__source-line">
             <span class="bitacora-post-card__source">${escapeHtml(post.sourceName || post.journal || "Fuente pendiente")}</span>
             ${
-              hasMeaningfulAnalysisValue(post.evidenceType || post.articleType)
-                ? `<span class="bitacora-post-card__type">${escapeHtml(post.evidenceType || post.articleType)}</span>`
+              hasMeaningfulAnalysisValue(methodLabel)
+                ? `<span class="bitacora-post-card__method-label">${escapeHtml(methodLabel)}</span>`
                 : ""
             }
           </div>
@@ -579,12 +997,35 @@ const renderPost = (post) => {
             ? `<button class="bitacora-btn bitacora-btn--secondary" type="button" data-bitacora-action="dismiss-demo">Quitar ejemplo</button>`
             : ""
         }
+        ${renderSocialActions(post)}
         ${
-          canDeleteArticle(post)
-            ? `<button class="bitacora-btn bitacora-btn--danger" type="button" data-bitacora-action="delete-article">Eliminar</button>`
+          canManageArticle(post)
+            ? `
+              <span class="bitacora-post-card__management" aria-label="Acciones de gestión">
+                <button
+                  class="bitacora-post-action bitacora-post-action--edit"
+                  type="button"
+                  data-bitacora-action="edit-article"
+                  aria-label="Editar publicación"
+                  title="Editar publicación"
+                >
+                  <i data-lucide="pencil" aria-hidden="true"></i>
+                </button>
+                <button
+                  class="bitacora-post-action bitacora-post-action--delete"
+                  type="button"
+                  data-bitacora-action="delete-article"
+                  aria-label="Eliminar publicación"
+                  title="Eliminar publicación"
+                >
+                  <i data-lucide="trash-2" aria-hidden="true"></i>
+                </button>
+              </span>
+            `
             : ""
         }
       </div>
+      ${renderCommentPreview(post)}
       ${renderAnalysis(post, analysisId, expanded)}
     </article>
   `;
@@ -627,6 +1068,135 @@ const renderFilterOptions = () => {
   }
 };
 
+const updatePostSocialDom = (postId = "") => {
+  const card = $(`.bitacora-post[data-post-id="${escapeSelector(postId)}"]`);
+  const summary = getSocialSummary(postId);
+  if (!card) return;
+  const likeButton = card.querySelector("[data-bitacora-action='toggle-like']");
+  const likeCount = card.querySelector("[data-bitacora-like-count]");
+  const likeTooltip = likeButton?.querySelector(".bitacora-social-tooltip");
+  const commentCount = card.querySelector("[data-bitacora-comment-count]");
+  const commentPreviewCount = card.querySelector("[data-bitacora-comment-preview-count]");
+  const commentPreviewText = card.querySelector("[data-bitacora-comment-preview-text]");
+  const liked = Boolean(summary.likedByCurrentUser);
+  if (likeButton) {
+    likeButton.classList.toggle("is-active", liked);
+    likeButton.setAttribute("aria-pressed", liked ? "true" : "false");
+    likeButton.setAttribute(
+      "aria-label",
+      buildLikeAriaLabel({ liked, count: summary.likeCount || 0, target: "esta publicación" })
+    );
+  }
+  if (likeCount) likeCount.textContent = String(summary.likeCount || 0);
+  if (likeTooltip) likeTooltip.textContent = getSocialTooltipText(summary.likes || []);
+  if (commentCount) commentCount.textContent = String(summary.commentCount || 0);
+  if (commentPreviewCount) commentPreviewCount.textContent = String(summary.commentCount || 0);
+  if (commentPreviewText) {
+    const latest = summary.latestComments || [];
+    const last = latest[0] || null;
+    commentPreviewText.textContent = last
+      ? `${last.createdBy?.displayName || last.createdBy?.email || "Usuario"}: “${truncateText(last.text, 92)}”`
+      : "";
+  }
+};
+
+const mergeSocialSummary = (postId = "", patch = {}) => {
+  state.socialSummaries.set(postId, {
+    ...getSocialSummary(postId),
+    ...patch
+  });
+  updatePostSocialDom(postId);
+};
+
+const syncSocialWatchers = (posts = []) => {
+  if (!repository) return;
+  const activeIds = new Set(posts.filter((post) => !post.isTemplate).map((post) => post.id));
+  state.likeUnsubscribers.forEach((unsubscribe, postId) => {
+    if (!activeIds.has(postId)) {
+      unsubscribe?.();
+      state.likeUnsubscribers.delete(postId);
+    }
+  });
+  posts.forEach((post) => {
+    if (post.isTemplate || state.likeUnsubscribers.has(post.id)) return;
+    repository.getArticleSocialSummary?.(post.id)
+      .then((summary) => {
+        mergeSocialSummary(post.id, summary);
+        if (Array.isArray(summary.comments)) state.commentsByPost.set(post.id, summary.comments);
+      })
+      .catch(() => {});
+    const unsubscribe = repository.watchArticleSocialSummary?.(post.id, (summary) => {
+      mergeSocialSummary(post.id, summary);
+      if (Array.isArray(summary.comments)) state.commentsByPost.set(post.id, summary.comments);
+      if (state.expandedPostId === post.id) {
+        renderPosts();
+      }
+    });
+    if (typeof unsubscribe === "function") {
+      state.likeUnsubscribers.set(post.id, unsubscribe);
+    }
+  });
+};
+
+const syncExpandedCommentsWatcher = () => {
+  const postId = state.expandedPostId || "";
+  if (postId && state.likeUnsubscribers.has(postId)) return;
+  if (!repository || state.activeCommentsArticleId === postId) return;
+  if (typeof state.activeCommentsUnsubscribe === "function") {
+    state.activeCommentsUnsubscribe();
+  }
+  state.activeCommentsArticleId = "";
+  state.activeCommentsUnsubscribe = null;
+  if (!postId) return;
+  const post = getAllPosts().find((item) => item.id === postId);
+  if (!post || post.isTemplate) return;
+  state.activeCommentsArticleId = postId;
+  state.activeCommentsUnsubscribe = repository.watchArticleComments?.(postId, (comments = []) => {
+    state.commentsByPost.set(postId, comments);
+    mergeSocialSummary(postId, { commentCount: comments.length });
+    renderPosts();
+  });
+};
+
+const syncCommentLikeWatchers = () => {
+  if (!repository || !state.expandedPostId) {
+    state.commentLikeUnsubscribers.forEach((unsubscribe) => unsubscribe?.());
+    state.commentLikeUnsubscribers.clear();
+    state.commentLikeSummaries.clear();
+    return;
+  }
+  const postId = state.expandedPostId;
+  const comments = getPostComments(postId);
+  const activeKeys = new Set(comments.map((comment) => commentLikeKey(postId, comment.id)));
+  state.commentLikeUnsubscribers.forEach((unsubscribe, key) => {
+    if (!activeKeys.has(key)) {
+      unsubscribe?.();
+      state.commentLikeUnsubscribers.delete(key);
+      state.commentLikeSummaries.delete(key);
+    }
+  });
+  comments.forEach((comment) => {
+    const key = commentLikeKey(postId, comment.id);
+    if (state.commentLikeUnsubscribers.has(key)) return;
+    const unsubscribe = repository.watchCommentLikes?.(postId, comment.id, (summary) => {
+      state.commentLikeSummaries.set(key, summary);
+      const commentNode = $(`.bitacora-post[data-post-id="${escapeSelector(postId)}"] .bitacora-comment[data-comment-id="${escapeSelector(comment.id)}"]`);
+      const button = commentNode?.querySelector("[data-bitacora-action='toggle-comment-like']");
+      const count = commentNode?.querySelector("[data-bitacora-comment-like-count]");
+      const tooltip = button?.querySelector(".bitacora-social-tooltip");
+      const liked = Boolean(summary.likedByCurrentUser);
+      button?.classList.toggle("is-active", liked);
+      button?.setAttribute("aria-pressed", liked ? "true" : "false");
+      button?.setAttribute("aria-label", buildLikeAriaLabel({ liked, count: summary.count || 0, target: "este comentario" }));
+      if (count) count.textContent = String(summary.count || 0);
+      if (tooltip) tooltip.textContent = getSocialTooltipText(summary.likes || []);
+    });
+    if (typeof unsubscribe === "function") {
+      state.commentLikeUnsubscribers.set(key, unsubscribe);
+    }
+  });
+};
+
 const renderPosts = () => {
   if (!els.posts) return;
   const filtered = sortPosts(getAllPosts().filter(matchesFilters));
@@ -634,6 +1204,10 @@ const renderPosts = () => {
   if (els.empty) els.empty.hidden = filtered.length > 0;
   updateResultCount(state.userArticles.length);
   updatePersistenceNote();
+  syncSocialWatchers(filtered);
+  filtered.forEach((post) => updatePostSocialDom(post.id));
+  syncExpandedCommentsWatcher();
+  syncCommentLikeWatchers();
   if (window.lucide) window.lucide.createIcons();
 };
 
@@ -838,6 +1412,7 @@ const resetArticleDraftMeta = () => {
     documentContentType: "",
     contentHash: "",
     pageCount: 0,
+    methodologyProfile: null,
     sourcePages: [],
     rawEvidence: null
   };
@@ -852,6 +1427,18 @@ const setArticleError = (element, message = "") => {
 
 const setAiStatus = (message = "") => {
   if (els.articleAiStatus) els.articleAiStatus.textContent = message;
+};
+
+const setAiProcessingOverlay = (visible) => {
+  if (!els.articleAiProcessingOverlay) return;
+  els.articleAiProcessingOverlay.hidden = !visible;
+  els.articleAiProcessingOverlay.setAttribute("aria-busy", visible ? "true" : "false");
+  els.addArticleForm?.classList.toggle("is-ai-processing", visible);
+  [els.analyzePdfButton, els.analyzeTextButton].filter(Boolean).forEach((button) => {
+    button.disabled = visible;
+    button.setAttribute("aria-busy", visible ? "true" : "false");
+  });
+  if (visible && window.lucide) window.lucide.createIcons();
 };
 
 const setAiWarnings = (warnings = []) => {
@@ -912,13 +1499,44 @@ const syncArticleAudit = () => {
   if (els.articleCreatedAt) els.articleCreatedAt.textContent = formatDateTime(new Date());
 };
 
+const setArticleModalMode = (mode = "create") => {
+  const editing = mode === "edit";
+  state.articleModalMode = editing ? "edit" : "create";
+  els.addArticleModal?.classList.toggle("is-editing", editing);
+  if (els.addArticleTitle) {
+    els.addArticleTitle.textContent = editing ? "Editar artículo científico" : "Agregar artículo científico";
+  }
+  if (els.addArticleSubtitle) {
+    els.addArticleSubtitle.textContent = editing
+      ? "Actualizá la ficha editorial. Los datos de carga y el PDF asociado se conservan sin cambios."
+      : "Cargá un PDF o pegá el texto del documento. La IA generará una ficha en español para revisión antes de guardar.";
+  }
+  if (els.articleDocumentTabs) els.articleDocumentTabs.hidden = editing;
+  els.articlePanels.forEach((panel) => {
+    if (editing) panel.hidden = true;
+  });
+  if (els.articleAiStatus) els.articleAiStatus.hidden = editing;
+  if (els.articleAiWarnings) els.articleAiWarnings.hidden = true;
+  if (els.assistedZone) els.assistedZone.hidden = true;
+  if (els.articleDraftSaveButton) els.articleDraftSaveButton.hidden = editing;
+  if (els.articlePrimarySaveButton) {
+    els.articlePrimarySaveButton.textContent = editing ? "Guardar cambios" : "Guardar artículo";
+    els.articlePrimarySaveButton.dataset.saveStatus = editing ? "edit" : "pending_review";
+  }
+};
+
 const resetArticleForm = () => {
   els.addArticleForm?.reset();
   resetArticleDraftMeta();
+  state.editingArticleId = "";
+  state.editingArticleSnapshot = null;
+  setArticleModalMode("create");
   setArticleError(els.articleUrlError, "");
   setArticleError(els.articleFormError, "");
+  if (els.articleAiStatus) els.articleAiStatus.hidden = false;
   setAiStatus("");
   setAiWarnings([]);
+  setAiProcessingOverlay(false);
   setAssistedModeVisible(false);
   setPreviewVisible(false);
   setAdvancedVisible(false);
@@ -935,6 +1553,47 @@ const resetArticleForm = () => {
 
 const openAddArticleModal = (trigger) => {
   resetArticleForm();
+  openModal(els.addArticleModal, trigger);
+};
+
+const populateArticleFormForEdit = (post) => {
+  if (!post) return;
+  resetArticleForm();
+  state.editingArticleId = post.id;
+  state.editingArticleSnapshot = post;
+  state.articleDraftMeta = {
+    extractionStatus: post.extractionStatus || "manual",
+    extractionSource: post.extractionSource || "manual",
+    extractionConfidence: post.extractionConfidence ?? null,
+    extractionWarnings: post.extractionWarnings || [],
+    sourceDomain: post.sourceDomain || "",
+    doi: post.doi || "",
+    pmid: post.pmid || "",
+    pmcid: post.pmcid || "",
+    nctId: post.nctId || "",
+    pii: post.pii || "",
+    originalFileName: post.originalFileName || "",
+    storagePath: post.storagePath || "",
+    fileSize: post.fileSize || 0,
+    documentContentType: post.documentContentType || "",
+    contentHash: post.contentHash || "",
+    pageCount: post.pageCount || 0,
+    methodologyProfile: post.methodologyProfile || null,
+    sourcePages: post.sourcePages || [],
+    rawEvidence: null
+  };
+  fillArticleFromExtraction(post, null);
+  setFieldValue("article-user-comment", post.userComment || "");
+  setFieldValue("article-access-type", post.accessType || "Pendiente");
+  setPreviewVisible(true);
+  setAdvancedVisible(false);
+  setArticleModalMode("edit");
+};
+
+const openEditArticleModal = (postId, trigger) => {
+  const post = getAllPosts().find((item) => item.id === postId);
+  if (!post || !canManageArticle(post)) return;
+  populateArticleFormForEdit(post);
   openModal(els.addArticleModal, trigger);
 };
 
@@ -967,6 +1626,8 @@ const validateOptionalArticleUrl = (value = "") => {
 const hasArticleEvidenceField = () =>
   [
     $("#article-executive-summary")?.value,
+    $("#article-brief-description")?.value,
+    $("#article-expanded-description")?.value,
     $("#article-card-summary")?.value,
     $("#article-clinical-question")?.value,
     $("#article-main-result")?.value,
@@ -1015,7 +1676,7 @@ const validateArticleBeforeSave = (requestedStatus = "pending_review") => {
     $("#article-source-name")?.focus();
     return null;
   }
-  if (!($("#article-card-summary")?.value || $("#article-executive-summary")?.value || "").trim()) {
+  if (!($("#article-brief-description")?.value || $("#article-card-summary")?.value || $("#article-expanded-description")?.value || $("#article-executive-summary")?.value || "").trim()) {
     setArticleError(
       els.articleFormError,
       "Para guardar como artículo, agregá un resumen breve o resumen ejecutivo. Podés guardarlo como borrador si está incompleto."
@@ -1044,6 +1705,7 @@ const fillArticleFromExtraction = (article = {}, rawEvidence = null) => {
   const objective = article.objectiveEs || article.clinicalQuestionEs || article.clinicalQuestion || "";
   const mainMessage = article.mainMessageEs || article.mainResultEs || article.mainResult || "";
   const studyDesign = article.studyDesignEs || article.methodologyEs || article.studyType || "";
+  const profile = article.methodologyProfile || {};
   const doiUrl = article.doi ? `https://doi.org/${String(article.doi).replace(/^https?:\/\/doi\.org\//i, "")}` : "";
   const fieldMap = {
     "article-title": article.title,
@@ -1058,8 +1720,10 @@ const fillArticleFromExtraction = (article = {}, rawEvidence = null) => {
     "article-publication-date": article.publicationDate,
     "article-original-language": article.originalLanguage,
     "article-study-location": article.studyLocation || article.studyLocationEs,
-    "article-card-summary": article.cardSummaryEs,
-    "article-executive-summary": article.executiveSummaryEs || article.executiveSummary,
+    "article-brief-description": article.briefDescriptionEs || article.cardSummaryEs,
+    "article-expanded-description": article.expandedDescriptionEs || article.executiveSummaryEs || article.executiveSummary,
+    "article-card-summary": article.cardSummaryEs || article.briefDescriptionEs,
+    "article-executive-summary": article.executiveSummaryEs || article.expandedDescriptionEs || article.executiveSummary,
     "article-abstract-summary": article.abstractSummaryEs,
     "article-clinical-question": objective,
     "article-study-design": studyDesign,
@@ -1073,6 +1737,39 @@ const fillArticleFromExtraction = (article = {}, rawEvidence = null) => {
     "article-limitations": article.limitationsEs,
     "article-local-applicability": article.localApplicabilityEs,
     "article-occupational-relevance": article.occupationalHealthRelevanceEs,
+    "article-methodology-family": profile.studyFamily,
+    "article-methodology-family-es": profile.studyFamilyEs,
+    "article-methodology-specific-design": profile.specificDesign || studyDesign,
+    "article-methodology-design-category": profile.designCategoryEs || studyDesign,
+    "article-methodology-temporal-direction": profile.temporalDirection,
+    "article-methodology-center-scope": profile.centerScope,
+    "article-methodology-is-multicenter": profile.isMulticenter ? "true" : "false",
+    "article-methodology-multicenter-rationale": profile.multicenterRationale,
+    "article-methodology-setting": profile.setting,
+    "article-methodology-country-region": profile.countryOrRegion || article.studyLocationEs || article.studyLocation,
+    "article-methodology-countries": (profile.countriesIncluded || []).join(", "),
+    "article-methodology-institutions": (profile.institutions || []).join(", "),
+    "article-methodology-population": profile.studyPopulation || article.studyPopulationEs,
+    "article-methodology-sample-size": profile.sampleSize,
+    "article-methodology-sample-description": profile.sampleDescription,
+    "article-methodology-study-period": profile.studyPeriod || article.studyPeriodEs,
+    "article-methodology-study-duration": profile.studyDuration,
+    "article-methodology-recruitment-period": profile.recruitmentPeriod,
+    "article-methodology-follow-up-duration": profile.followUpDuration,
+    "article-methodology-data-source": profile.dataSource,
+    "article-methodology-intervention": profile.interventionOrExposure,
+    "article-methodology-comparator": profile.comparator,
+    "article-methodology-primary-outcome": profile.primaryOutcome,
+    "article-methodology-secondary-outcomes": (profile.secondaryOutcomes || []).join("\n"),
+    "article-methodology-statistical-approach": profile.statisticalApproach,
+    "article-methodology-effect-measures": (profile.effectMeasures || []).join(", "),
+    "article-methodology-reporting-guideline": profile.reportingGuideline,
+    "article-methodology-strengths": (profile.methodologicalStrengths || []).join("\n"),
+    "article-methodology-limitations": (profile.methodologicalLimitations || []).join("\n"),
+    "article-methodology-applicability": (profile.applicabilityNotes || []).join("\n"),
+    "article-methodology-rationale": profile.classificationRationale,
+    "article-methodology-classification-confidence": profile.classificationConfidence,
+    "article-methodology-warnings": (profile.methodologyWarnings || []).join("\n"),
     "article-tags": (article.tags || []).join(", "),
     "article-access-type": article.accessType
   };
@@ -1094,6 +1791,7 @@ const fillArticleFromExtraction = (article = {}, rawEvidence = null) => {
   state.articleDraftMeta.pii = article.pii || state.articleDraftMeta.pii;
   state.articleDraftMeta.extractionConfidence = article.extractionConfidence ?? null;
   state.articleDraftMeta.extractionWarnings = article.warnings || [];
+  state.articleDraftMeta.methodologyProfile = article.methodologyProfile || state.articleDraftMeta.methodologyProfile;
   state.articleDraftMeta.contentHash = rawEvidence?.contentHash || state.articleDraftMeta.contentHash;
   state.articleDraftMeta.pageCount = rawEvidence?.pageCount || state.articleDraftMeta.pageCount;
   state.articleDraftMeta.fileSize = rawEvidence?.fileSize || state.articleDraftMeta.fileSize;
@@ -1238,9 +1936,38 @@ const uploadSelectedPdf = async () => {
   return path;
 };
 
+const hasUsefulExtractedArticle = (article = {}) => {
+  const hasTitle = Boolean(String(article.title || "").trim());
+  const hasSource = Boolean(String(article.sourceName || article.journal || "").trim());
+  const hasDescription = Boolean(
+    String(
+      article.briefDescriptionEs ||
+        article.cardSummaryEs ||
+        article.expandedDescriptionEs ||
+        article.executiveSummaryEs ||
+        article.objectiveEs ||
+        article.mainMessageEs ||
+        ""
+    ).trim()
+  );
+  const hasMetadata = Boolean(article.doi || article.publicationDate || hasSource);
+  return {
+    aiDraft: hasTitle && hasSource && hasDescription,
+    metadataOnly: hasTitle || hasMetadata
+  };
+};
+
 const applyDocumentExtractionResult = (result, source) => {
-  fillArticleFromExtraction(result.article || {}, result.rawEvidence || null);
-  state.articleDraftMeta.extractionStatus = result.extractionStatus || "manual";
+  const article = result.article || {};
+  const usefulness = hasUsefulExtractedArticle(article);
+  let extractionStatus = result.extractionStatus || "manual";
+  if (extractionStatus === "failed" && usefulness.aiDraft) {
+    extractionStatus = "ai_draft";
+  } else if (extractionStatus === "failed" && usefulness.metadataOnly) {
+    extractionStatus = "metadata_only";
+  }
+  fillArticleFromExtraction(article, result.rawEvidence || null);
+  state.articleDraftMeta.extractionStatus = extractionStatus;
   state.articleDraftMeta.extractionSource = source;
   if (result.rawEvidence?.originalFileName) {
     state.articleDraftMeta.originalFileName = result.rawEvidence.originalFileName;
@@ -1260,11 +1987,11 @@ const applyDocumentExtractionResult = (result, source) => {
   if (result.rawEvidence?.documentContentType) {
     state.articleDraftMeta.documentContentType = result.rawEvidence.documentContentType;
   }
-  if (result.extractionStatus === "ai_draft") {
+  if (extractionStatus === "ai_draft") {
     setAiStatus(result.message || "Ficha generada por IA. Revisá la información antes de guardar.");
-  } else if (result.extractionStatus === "metadata_only") {
+  } else if (extractionStatus === "metadata_only") {
     setAiStatus(result.message || "Se detectaron datos básicos, pero falta contenido suficiente. Completá los campos necesarios antes de guardar.");
-  } else if (result.extractionStatus === "not_configured") {
+  } else if (extractionStatus === "not_configured") {
     setAiStatus(result.error || "El servicio de IA no está configurado en backend.");
   } else {
     setAiStatus(result.error || "No se pudo analizar el documento. Podés completar la publicación manualmente.");
@@ -1280,6 +2007,7 @@ const handleAnalyzePdf = async () => {
   setArticleError(els.articleFormError, "");
   setAiWarnings([]);
   setDocumentAnalyzeBusy(els.analyzePdfButton, true, "Analizar PDF con IA");
+  setAiProcessingOverlay(true);
   try {
     setAiStatus("Subiendo PDF…");
     const storagePath = await uploadSelectedPdf();
@@ -1304,6 +2032,7 @@ const handleAnalyzePdf = async () => {
     setAiStatus(error?.message || "No se pudo analizar el documento. Podés completar la publicación manualmente.");
   } finally {
     setDocumentAnalyzeBusy(els.analyzePdfButton, false, "Analizar PDF con IA");
+    setAiProcessingOverlay(false);
   }
 };
 
@@ -1317,6 +2046,7 @@ const handleAnalyzePastedText = async () => {
   setArticleError(els.articleFormError, "");
   setAiWarnings([]);
   setDocumentAnalyzeBusy(els.analyzeTextButton, true, "Analizar texto con IA");
+  setAiProcessingOverlay(true);
   try {
     setAiStatus("Analizando texto…");
     const result = await requestArticleDocumentExtraction(
@@ -1333,6 +2063,7 @@ const handleAnalyzePastedText = async () => {
     applyDocumentExtractionResult(result, "pasted_text");
   } finally {
     setDocumentAnalyzeBusy(els.analyzeTextButton, false, "Analizar texto con IA");
+    setAiProcessingOverlay(false);
   }
 };
 
@@ -1362,6 +2093,142 @@ const handleViewPdf = async (postId, button) => {
   }
 };
 
+const handleToggleLike = async (postId, button) => {
+  if (!repository || !state.currentUser) return;
+  if (button) button.disabled = true;
+  try {
+    await repository.toggleArticleLike(postId, state.currentUser);
+  } catch (error) {
+    showArticleActionError("No se pudo actualizar el me gusta. Verificá la sesión o la conexión.");
+  } finally {
+    if (button) button.disabled = false;
+  }
+};
+
+const handleToggleCommentLike = async (postId, commentId, button) => {
+  if (!repository || !state.currentUser || !postId || !commentId) return;
+  if (button) button.disabled = true;
+  try {
+    await repository.toggleCommentLike(postId, commentId, state.currentUser);
+  } catch (error) {
+    showArticleActionError("No se pudo actualizar el me gusta del comentario. Verificá la sesión o la conexión.");
+  } finally {
+    if (button) button.disabled = false;
+  }
+};
+
+const focusCommentsForPost = (postId) => {
+  if (state.expandedPostId !== postId) {
+    state.expandedPostId = postId;
+    renderPosts();
+  }
+  window.requestAnimationFrame(() => {
+    const card = $(`.bitacora-post[data-post-id="${escapeSelector(postId)}"]`);
+    card?.querySelector("[data-bitacora-comment-text]")?.focus({ preventScroll: false });
+  });
+};
+
+const handleCommentSubmit = async (event) => {
+  const form = event.target.closest("[data-bitacora-comment-form]");
+  if (!form) return;
+  event.preventDefault();
+  const card = form.closest(".bitacora-post");
+  const postId = card?.dataset?.postId || "";
+  const textarea = form.querySelector("[data-bitacora-comment-text]");
+  const text = cleanUserText(textarea?.value || "");
+  if (!postId || !text || !repository) return;
+  const button = form.querySelector("button[type='submit']");
+  setActionBusy(button, true, "Comentando...");
+  try {
+    await repository.addArticleComment(postId, text, state.currentUser);
+    if (textarea) textarea.value = "";
+  } catch (error) {
+    showArticleActionError("No se pudo guardar el comentario. Usá texto simple de hasta 1000 caracteres.");
+  } finally {
+    setActionBusy(button, false);
+  }
+};
+
+const handleCommentEditSubmit = async (event) => {
+  const form = event.target.closest("[data-bitacora-comment-edit-form]");
+  if (!form) return;
+  event.preventDefault();
+  const card = form.closest(".bitacora-post");
+  const commentNode = form.closest(".bitacora-comment");
+  const postId = card?.dataset?.postId || "";
+  const commentId = commentNode?.dataset?.commentId || "";
+  const textarea = form.querySelector("[data-bitacora-comment-edit-text]");
+  const text = cleanUserText(textarea?.value || "");
+  if (!postId || !commentId || !text || !repository) return;
+  const button = form.querySelector("button[type='submit']");
+  setActionBusy(button, true, "Guardando...");
+  try {
+    await repository.updateArticleComment(postId, commentId, text, state.currentUser);
+    state.editingCommentId = "";
+  } catch (error) {
+    showArticleActionError("No se pudo editar el comentario. Usá texto simple de hasta 1000 caracteres.");
+  } finally {
+    setActionBusy(button, false);
+  }
+};
+
+const handleDeleteComment = async (postId, commentId, button) => {
+  if (!postId || !commentId || !repository) return;
+  const confirmed = window.confirm("Eliminar comentario\n\nEsta acción eliminará el comentario.");
+  if (!confirmed) return;
+  if (button) button.disabled = true;
+  try {
+    await repository.deleteArticleComment(postId, commentId, state.currentUser);
+  } catch (error) {
+    showArticleActionError("No se pudo eliminar el comentario. Verificá permisos o conexión.");
+  } finally {
+    if (button) button.disabled = false;
+  }
+};
+
+const buildMethodologyProfileFromForm = ({ studyDesign = "", studyLocationEs = "" } = {}) => {
+  const existingProfile =
+    state.articleDraftMeta.methodologyProfile ||
+    state.editingArticleSnapshot?.methodologyProfile ||
+    {};
+  return {
+    studyFamily: $("#article-methodology-family")?.value || "",
+    studyFamilyEs: $("#article-methodology-family-es")?.value || "",
+    specificDesign: $("#article-methodology-specific-design")?.value || studyDesign,
+    designCategoryEs: $("#article-methodology-design-category")?.value || studyDesign,
+    temporalDirection: $("#article-methodology-temporal-direction")?.value || "",
+    centerScope: $("#article-methodology-center-scope")?.value || "",
+    isMulticenter: $("#article-methodology-is-multicenter")?.value === "true",
+    multicenterRationale: $("#article-methodology-multicenter-rationale")?.value || "",
+    setting: $("#article-methodology-setting")?.value || "",
+    countryOrRegion: $("#article-methodology-country-region")?.value || studyLocationEs,
+    countriesIncluded: splitTags($("#article-methodology-countries")?.value || ""),
+    institutions: splitTags($("#article-methodology-institutions")?.value || ""),
+    studyPopulation: $("#article-methodology-population")?.value || $("#article-study-population")?.value || "",
+    sampleSize: $("#article-methodology-sample-size")?.value || "",
+    sampleDescription: $("#article-methodology-sample-description")?.value || "",
+    studyPeriod: $("#article-methodology-study-period")?.value || $("#article-study-period")?.value || "",
+    studyDuration: $("#article-methodology-study-duration")?.value || "",
+    recruitmentPeriod: $("#article-methodology-recruitment-period")?.value || "",
+    followUpDuration: $("#article-methodology-follow-up-duration")?.value || "",
+    dataSource: $("#article-methodology-data-source")?.value || "",
+    interventionOrExposure: $("#article-methodology-intervention")?.value || "",
+    comparator: $("#article-methodology-comparator")?.value || "",
+    primaryOutcome: $("#article-methodology-primary-outcome")?.value || "",
+    secondaryOutcomes: splitLines($("#article-methodology-secondary-outcomes")?.value || ""),
+    statisticalApproach: $("#article-methodology-statistical-approach")?.value || "",
+    effectMeasures: splitTags($("#article-methodology-effect-measures")?.value || ""),
+    reportingGuideline: $("#article-methodology-reporting-guideline")?.value || "",
+    methodologicalStrengths: splitLines($("#article-methodology-strengths")?.value || ""),
+    methodologicalLimitations: splitLines($("#article-methodology-limitations")?.value || ""),
+    applicabilityNotes: splitLines($("#article-methodology-applicability")?.value || ""),
+    classificationRationale: $("#article-methodology-rationale")?.value || "",
+    classificationConfidence: $("#article-methodology-classification-confidence")?.value || "",
+    evidenceSupport: existingProfile.evidenceSupport || {},
+    methodologyWarnings: splitLines($("#article-methodology-warnings")?.value || "")
+  };
+};
+
 const buildArticlePayload = (status) => {
   const officialUrl = (
     $("#article-official-url")?.value ||
@@ -1381,6 +2248,8 @@ const buildArticlePayload = (status) => {
   const mainMessage = $("#article-main-result")?.value || "";
   const studyDesign = $("#article-study-design")?.value || $("#article-methodology")?.value || "";
   const studyLocationEs = $("#article-study-location-es")?.value || $("#article-study-location")?.value || "";
+  const briefDescriptionEs = $("#article-brief-description")?.value || $("#article-card-summary")?.value || "";
+  const expandedDescriptionEs = $("#article-expanded-description")?.value || $("#article-executive-summary")?.value || "";
 
   return {
     title: $("#article-title")?.value || (status === "draft" ? "Borrador científico sin título" : ""),
@@ -1405,9 +2274,11 @@ const buildArticlePayload = (status) => {
     studyPopulationEs: $("#article-study-population")?.value || "",
     studyLocationEs,
     studyPeriodEs: $("#article-study-period")?.value || "",
-    cardSummaryEs: $("#article-card-summary")?.value || "",
-    executiveSummary: $("#article-executive-summary")?.value || "",
-    executiveSummaryEs: $("#article-executive-summary")?.value || "",
+    briefDescriptionEs,
+    expandedDescriptionEs,
+    cardSummaryEs: $("#article-card-summary")?.value || briefDescriptionEs,
+    executiveSummary: $("#article-executive-summary")?.value || expandedDescriptionEs,
+    executiveSummaryEs: $("#article-executive-summary")?.value || expandedDescriptionEs,
     abstractSummaryEs: $("#article-abstract-summary")?.value || "",
     objectiveEs: objective,
     clinicalQuestion: objective,
@@ -1420,6 +2291,7 @@ const buildArticlePayload = (status) => {
     limitationsEs: $("#article-limitations")?.value || "",
     localApplicabilityEs: $("#article-local-applicability")?.value || "",
     occupationalHealthRelevanceEs: $("#article-occupational-relevance")?.value || "",
+    methodologyProfile: buildMethodologyProfileFromForm({ studyDesign, studyLocationEs }),
     tags: splitTags($("#article-tags")?.value || ""),
     accessType: $("#article-access-type")?.value || "Pendiente",
     userComment: $("#article-user-comment")?.value || "",
@@ -1458,23 +2330,6 @@ const setActionBusy = (button, busy, busyText = "Procesando...") => {
   button.textContent = busy ? busyText : button.dataset.originalText;
 };
 
-const confirmArticleDeletion = async (post) => {
-  const title = post?.title || "este artículo";
-  if (window.Swal?.fire) {
-    const result = await window.Swal.fire({
-      title: "Eliminar artículo",
-      text: `Se quitará "${title}" de la Bitácora.`,
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Eliminar",
-      cancelButtonText: "Cancelar",
-      confirmButtonColor: "#b91c1c"
-    });
-    return Boolean(result.isConfirmed);
-  }
-  return window.confirm(`Eliminar "${title}" de la Bitácora?`);
-};
-
 const showArticleActionError = (message) => {
   if (window.Swal?.fire) {
     window.Swal.fire("No se pudo completar", message, "error");
@@ -1483,43 +2338,190 @@ const showArticleActionError = (message) => {
   window.alert(message);
 };
 
+const setReauthError = (message = "") => {
+  if (!els.reauthError) return;
+  els.reauthError.hidden = !message;
+  els.reauthError.textContent = message;
+};
+
+const getReauthProviderMode = () => {
+  const providers = state.currentUser?.providerData?.map((provider) => provider.providerId) || [];
+  if (providers.includes("password")) return "password";
+  if (providers.includes("google.com")) return "google";
+  return providers[0] || "unsupported";
+};
+
+const openReauthModal = ({ action, postId, trigger }) => {
+  const post = getAllPosts().find((item) => item.id === postId);
+  if (!post || !canManageArticle(post)) return;
+  state.pendingSensitiveAction = { action, postId, trigger };
+  const mode = getReauthProviderMode();
+  const actionLabel = action === "edit" ? "edición" : "eliminación";
+  if (els.reauthTitle) {
+    els.reauthTitle.textContent = action === "edit" ? "Confirmar edición" : "Confirmar eliminación";
+  }
+  if (els.reauthDescription) {
+    els.reauthDescription.textContent =
+      mode === "password"
+        ? `Por seguridad, ingresá tu contraseña para continuar con la ${actionLabel}.`
+        : `Por seguridad, reautenticate con tu proveedor para continuar con la ${actionLabel}.`;
+  }
+  if (els.reauthPasswordSection) els.reauthPasswordSection.hidden = mode !== "password";
+  if (els.reauthProviderSection) els.reauthProviderSection.hidden = mode === "password";
+  if (els.reauthProviderName) {
+    els.reauthProviderName.textContent =
+      mode === "google" ? "Google" : "Este proveedor no tiene reautenticación disponible en esta vista.";
+  }
+  if (els.reauthPassword) els.reauthPassword.value = "";
+  if (els.reauthSubmit) {
+    els.reauthSubmit.disabled = mode !== "password" && mode !== "google";
+    els.reauthSubmit.textContent = mode === "password" ? "Confirmar" : "Reautenticar";
+    delete els.reauthSubmit.dataset.originalText;
+  }
+  setReauthError("");
+  openModal(els.reauthModal, trigger);
+};
+
+const reauthenticateCurrentUser = async () => {
+  const user = state.currentUser || auth.currentUser;
+  if (!user) throw new Error("AUTH_REQUIRED");
+  const mode = getReauthProviderMode();
+  if (mode === "password") {
+    const email = user.email || "";
+    const password = els.reauthPassword?.value || "";
+    if (!email || !password) {
+      throw new Error("PASSWORD_REQUIRED");
+    }
+    await reauthenticateWithCredential(user, EmailAuthProvider.credential(email, password));
+    return;
+  }
+  if (mode === "google") {
+    await reauthenticateWithPopup(user, new GoogleAuthProvider());
+    return;
+  }
+  throw new Error("UNSUPPORTED_PROVIDER");
+};
+
+const openDeleteConfirmation = (postId, trigger) => {
+  const post = getAllPosts().find((item) => item.id === postId);
+  if (!post || !canManageArticle(post)) return;
+  state.pendingDeleteArticleId = postId;
+  if (els.deleteConfirmText) {
+    els.deleteConfirmText.textContent = `Esta acción eliminará "${post.title || "esta publicación"}" de la Bitácora. Si tiene PDF asociado, también se intentará eliminar el archivo privado.`;
+  }
+  openModal(els.deleteConfirmModal, trigger);
+};
+
+const handleReauthSubmit = async (event) => {
+  event.preventDefault();
+  const submitter = event.submitter || els.reauthSubmit;
+  setActionBusy(submitter, true, "Validando...");
+  setReauthError("");
+  try {
+    await reauthenticateCurrentUser();
+    const pending = state.pendingSensitiveAction;
+    state.pendingSensitiveAction = null;
+    closeModal(els.reauthModal);
+    if (pending?.action === "edit") {
+      openEditArticleModal(pending.postId, pending.trigger);
+    } else if (pending?.action === "delete") {
+      openDeleteConfirmation(pending.postId, pending.trigger);
+    }
+  } catch (error) {
+    const code = String(error?.code || error?.message || "");
+    const message =
+      code === "PASSWORD_REQUIRED"
+        ? "Ingresá tu contraseña para continuar."
+        : code === "UNSUPPORTED_PROVIDER"
+          ? "Este proveedor de inicio de sesión no permite reautenticación desde esta vista."
+          : "Contraseña incorrecta o sesión no validada.";
+    setReauthError(message);
+  } finally {
+    setActionBusy(submitter, false);
+  }
+};
+
 const handleDeleteArticle = async (postId, button) => {
   const post = getAllPosts().find((item) => item.id === postId);
-  if (!post || !repository || !canDeleteArticle(post)) return;
-  const confirmed = await confirmArticleDeletion(post);
-  if (!confirmed) return;
+  if (!post || !repository || !canManageArticle(post)) return false;
   setActionBusy(button, true, "Eliminando...");
   try {
     await repository.deleteArticle(post.id, { storagePath: post.storagePath || "" });
     state.userArticles = state.userArticles.filter((article) => article.id !== post.id);
     if (state.expandedPostId === post.id) state.expandedPostId = "";
+    state.socialSummaries.delete(post.id);
+    state.commentsByPost.delete(post.id);
+    state.likeUnsubscribers.get(post.id)?.();
+    state.likeUnsubscribers.delete(post.id);
+    state.commentLikeUnsubscribers.forEach((unsubscribe, key) => {
+      if (key.startsWith(`${post.id}::`)) {
+        unsubscribe?.();
+        state.commentLikeUnsubscribers.delete(key);
+        state.commentLikeSummaries.delete(key);
+      }
+    });
     renderFilterOptions();
     renderPosts();
+    return true;
   } catch (error) {
     const message =
       error?.message === "AUTH_REQUIRED"
         ? "La sesión no está activa. Iniciá sesión nuevamente."
         : "No se pudo eliminar el artículo. Verificá permisos o conexión.";
     showArticleActionError(message);
+    return false;
   } finally {
     setActionBusy(button, false);
+  }
+};
+
+const handleDeleteConfirmSubmit = async (event) => {
+  event.preventDefault();
+  const postId = state.pendingDeleteArticleId;
+  const submitter = event.submitter || els.deleteConfirmSubmit;
+  if (!postId) return;
+  const deleted = await handleDeleteArticle(postId, submitter);
+  if (deleted) {
+    state.pendingDeleteArticleId = "";
+    closeModal(els.deleteConfirmModal);
+    if (els.deleteConfirmText) {
+      els.deleteConfirmText.textContent =
+        "Esta acción eliminará la publicación de la Bitácora. Si tiene PDF asociado, también se intentará eliminar el archivo privado.";
+    }
+    resetArticleForm();
   }
 };
 
 const handleArticleSubmit = async (event) => {
   event.preventDefault();
   const submitter = event.submitter;
-  const requestedStatus = submitter?.dataset?.saveStatus === "draft" ? "draft" : "pending_review";
+  const isEditing = state.articleModalMode === "edit" && state.editingArticleId;
+  const requestedStatus = isEditing
+    ? state.editingArticleSnapshot?.status || "pending_review"
+    : submitter?.dataset?.saveStatus === "draft"
+      ? "draft"
+      : "pending_review";
   const validation = validateArticleBeforeSave(requestedStatus);
   if (!validation || !repository) return;
   setSaveBusy(submitter, true);
   try {
-    const article = await repository.createArticle(buildArticlePayload(requestedStatus));
-    upsertUserArticle(article);
-    state.repositoryMode = article.repositoryMode || repository.getMode();
+    const payload = buildArticlePayload(requestedStatus);
+    const article = isEditing
+      ? await repository.updateArticle(state.editingArticleId, {
+          ...payload,
+          id: state.editingArticleSnapshot?.id,
+          createdBy: state.editingArticleSnapshot?.createdBy,
+          createdAt: state.editingArticleSnapshot?.createdAt
+        })
+      : await repository.createArticle(payload);
+    if (article) {
+      upsertUserArticle(article);
+      state.repositoryMode = article.repositoryMode || repository.getMode();
+    }
     renderFilterOptions();
     renderPosts();
     closeModal(els.addArticleModal);
+    resetArticleForm();
   } catch (error) {
     const message =
       error?.message === "AUTH_REQUIRED"
@@ -1602,6 +2604,7 @@ const bindEvents = () => {
   els.posts?.addEventListener("click", (event) => {
     const actionButton = event.target.closest("[data-bitacora-action]");
     if (!actionButton) return;
+    event.stopPropagation();
     const post = event.target.closest(".bitacora-post");
     const postId = post?.dataset?.postId || "";
     if (!postId) return;
@@ -1612,12 +2615,56 @@ const bindEvents = () => {
       renderPosts();
       return;
     }
+    if (action === "edit-article") {
+      openReauthModal({ action: "edit", postId, trigger: actionButton });
+      return;
+    }
     if (action === "delete-article") {
-      handleDeleteArticle(postId, actionButton);
+      openReauthModal({ action: "delete", postId, trigger: actionButton });
       return;
     }
     if (action === "view-pdf") {
       handleViewPdf(postId, actionButton);
+      return;
+    }
+    if (action === "toggle-like") {
+      handleToggleLike(postId, actionButton);
+      return;
+    }
+    if (action === "focus-comments") {
+      focusCommentsForPost(postId);
+      return;
+    }
+    if (action === "show-all-comments") {
+      state.expandedCommentsAll.add(postId);
+      renderPosts();
+      return;
+    }
+    if (action === "delete-comment") {
+      const commentId = actionButton.closest(".bitacora-comment")?.dataset?.commentId || "";
+      handleDeleteComment(postId, commentId, actionButton);
+      return;
+    }
+    if (action === "edit-comment") {
+      const commentId = actionButton.closest(".bitacora-comment")?.dataset?.commentId || "";
+      state.editingCommentId = commentId;
+      renderPosts();
+      window.requestAnimationFrame(() => {
+        const card = $(`.bitacora-post[data-post-id="${escapeSelector(postId)}"]`);
+        card?.querySelector(`.bitacora-comment[data-comment-id="${escapeSelector(commentId)}"] [data-bitacora-comment-edit-text]`)?.focus({
+          preventScroll: true
+        });
+      });
+      return;
+    }
+    if (action === "cancel-edit-comment") {
+      state.editingCommentId = "";
+      renderPosts();
+      return;
+    }
+    if (action === "toggle-comment-like") {
+      const commentId = actionButton.closest(".bitacora-comment")?.dataset?.commentId || "";
+      handleToggleCommentLike(postId, commentId, actionButton);
       return;
     }
     if (action !== "toggle-analysis") return;
@@ -1625,6 +2672,14 @@ const bindEvents = () => {
     renderPosts();
     const restored = $(`.bitacora-post[data-post-id="${escapeSelector(postId)}"]`);
     restored?.querySelector('[data-bitacora-action="toggle-analysis"]')?.focus({ preventScroll: true });
+  });
+
+  els.posts?.addEventListener("submit", (event) => {
+    if (event.target.closest("[data-bitacora-comment-edit-form]")) {
+      handleCommentEditSubmit(event);
+      return;
+    }
+    handleCommentSubmit(event);
   });
 
   document.addEventListener("click", (event) => {
@@ -1636,6 +2691,10 @@ const bindEvents = () => {
   });
 
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && event.target.closest?.(".bitacora-social-action, .bitacora-comment-action")) {
+      event.target.blur?.();
+      return;
+    }
     if (event.key === "Escape" && !state.activeModal && state.expandedPostId) {
       collapseOpenAnalysis();
     }
@@ -1745,6 +2804,8 @@ const bindEvents = () => {
   });
   els.assistedAnalyzeButton?.addEventListener("click", () => handleAnalyzeArticle(getAssistedEvidence()));
   els.addArticleForm?.addEventListener("submit", handleArticleSubmit);
+  els.reauthForm?.addEventListener("submit", handleReauthSubmit);
+  els.deleteConfirmForm?.addEventListener("submit", handleDeleteConfirmSubmit);
 };
 
 const initArticleRepository = () => {
@@ -1801,6 +2862,9 @@ const boot = async () => {
 
 window.addEventListener("beforeunload", () => {
   if (typeof unsubscribeArticles === "function") unsubscribeArticles();
+  state.likeUnsubscribers.forEach((unsubscribe) => unsubscribe?.());
+  state.commentLikeUnsubscribers.forEach((unsubscribe) => unsubscribe?.());
+  if (typeof state.activeCommentsUnsubscribe === "function") state.activeCommentsUnsubscribe();
 });
 
 if (document.readyState === "loading") {

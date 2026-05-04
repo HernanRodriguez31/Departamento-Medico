@@ -4,9 +4,9 @@ const QA_EMAIL = process.env.MOBILE_QA_EMAIL || "mobile.qa@departamento-medico.t
 const QA_PASSWORD = process.env.MOBILE_QA_PASSWORD || "MobileQa!12345";
 const LOGIN_URL = `/login.html?dmEmulators=1&next=${encodeURIComponent("/bitacora-cientifica")}`;
 
-const submitLogin = async (page) => {
-  await page.locator("#email").fill(QA_EMAIL);
-  await page.locator("#password").fill(QA_PASSWORD);
+const submitLogin = async (page, email = QA_EMAIL, password = QA_PASSWORD) => {
+  await page.locator("#email").fill(email);
+  await page.locator("#password").fill(password);
   await page.locator("#login-form").evaluate((form) => form.requestSubmit());
 };
 
@@ -18,11 +18,100 @@ const expectNoHorizontalOverflow = async (page) => {
   expect(overflow).toBeLessThanOrEqual(2);
 };
 
+const confirmSensitiveAction = async (page) => {
+  const reauthModal = page.locator("#bitacora-reauth-modal");
+  await expect(reauthModal).toBeVisible({ timeout: 10_000 });
+  await reauthModal.getByLabel("Contraseña actual").fill(QA_PASSWORD);
+  await reauthModal.getByRole("button", { name: "Confirmar" }).click();
+  await expect(reauthModal).toBeHidden({ timeout: 15_000 });
+};
+
+const confirmDeleteAction = async (page) => {
+  await confirmSensitiveAction(page);
+  const deleteModal = page.locator("#bitacora-delete-confirm-modal");
+  await expect(deleteModal).toBeVisible({ timeout: 10_000 });
+  await deleteModal.getByRole("button", { name: "Eliminar definitivamente" }).click();
+  await expect(deleteModal).toBeHidden({ timeout: 15_000 });
+};
+
 test("scientific logbook renders as operational hub with modals and article creation", async ({ page }, testInfo) => {
   const articleTitle = `Artículo QA Bitácora ${testInfo.project.name}`;
   const extractionRequests = [];
   const documentExtractionRequests = [];
   const consoleErrors = [];
+  const methodologyProfile = (overrides = {}) => ({
+    studyFamily: "implementation_health_policy",
+    studyFamilyEs: "Implementación y política sanitaria",
+    specificDesign: "Marco de implementación",
+    designCategoryEs: "Marco de implementación",
+    temporalDirection: "no aplica",
+    centerScope: "regional",
+    isMulticenter: false,
+    multicenterRationale: "Alcance regional programático, no estudio clínico multicéntrico.",
+    setting: "atención primaria",
+    countryOrRegion: "Américas",
+    countriesIncluded: ["Argentina", "Brasil", "Chile"],
+    institutions: ["OPS/PAHO", "Organización Mundial de la Salud"],
+    studyPopulation: "Personas adultas con hipertensión en programas de atención primaria.",
+    sampleSize: "",
+    sampleDescription: "Alcance programático regional con 33 países participantes.",
+    studyPeriod: "2016/2017-2025",
+    studyDuration: "No especificado en el documento",
+    recruitmentPeriod: "",
+    followUpDuration: "",
+    dataSource: "Documentos técnicos e indicadores programáticos regionales.",
+    interventionOrExposure: "Marco de calidad HEARTS para atención primaria.",
+    comparator: "",
+    primaryOutcome: "Mejorar el control de la hipertensión y la calidad asistencial.",
+    secondaryOutcomes: ["Equidad de acceso", "Calidad de medición de presión arterial"],
+    statisticalApproach: "Síntesis descriptiva del marco y sus indicadores.",
+    effectMeasures: [],
+    reportingGuideline: "",
+    methodologicalStrengths: ["Describe componentes operativos y trazabilidad institucional."],
+    methodologicalLimitations: ["No presenta evaluación causal de impacto clínico."],
+    applicabilityNotes: ["Aplicable a gestión sanitaria y programas de salud ocupacional."],
+    classificationRationale: "El documento propone un marco regional de implementación sanitaria.",
+    classificationConfidence: "alta",
+    evidenceSupport: {
+      specificDesign: {
+        supportLevel: "inferido_con_soporte",
+        evidenceText: "Marco regional de implementación sanitaria.",
+        sourceSection: "Summary"
+      },
+      temporalDirection: {
+        supportLevel: "no_aplica",
+        evidenceText: "No es estudio clínico primario.",
+        sourceSection: "Methods"
+      },
+      centerScope: {
+        supportLevel: "inferido_con_soporte",
+        evidenceText: "33 países participantes.",
+        sourceSection: "Summary"
+      },
+      studyPopulation: {
+        supportLevel: "inferido_con_soporte",
+        evidenceText: "Personas con hipertensión en atención primaria.",
+        sourceSection: "Summary"
+      },
+      sampleSize: {
+        supportLevel: "no_aplica",
+        evidenceText: "Alcance programático regional.",
+        sourceSection: "Summary"
+      },
+      studyPeriod: {
+        supportLevel: "explicito",
+        evidenceText: "2016/2017-2025.",
+        sourceSection: "Methods"
+      },
+      institutions: {
+        supportLevel: "explicito",
+        evidenceText: "OPS/PAHO.",
+        sourceSection: "Summary"
+      }
+    },
+    methodologyWarnings: ["No interpretar como ensayo clínico ni cohorte."],
+    ...overrides
+  });
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
   });
@@ -37,6 +126,7 @@ test("scientific logbook renders as operational hub with modals and article crea
       authorization: request.headers().authorization || ""
     });
     const isTextMode = payload?.mode === "pasted_text";
+    await new Promise((resolve) => setTimeout(resolve, 150));
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -63,18 +153,28 @@ test("scientific logbook renders as operational hub with modals and article crea
           studyPeriodEs: "2026",
           evidenceType: "Revisión científica",
           accessType: "Pendiente",
+          briefDescriptionEs: isTextMode
+            ? "Descripción breve en español desde documento aportado."
+            : "Descripción breve en español desde PDF.",
+          expandedDescriptionEs: isTextMode
+            ? "Descripción ampliada en español generada desde documento aportado."
+            : "Descripción ampliada en español generada desde PDF.",
           cardSummaryEs: isTextMode
-            ? "Resumen breve en español desde documento aportado."
-            : "Resumen breve en español desde PDF.",
+            ? "Descripción breve en español desde documento aportado."
+            : "Descripción breve en español desde PDF.",
           executiveSummaryEs: isTextMode
-            ? "Resumen ejecutivo en español generado desde documento aportado."
-            : "Resumen ejecutivo en español generado desde PDF.",
+            ? "Descripción ampliada en español generada desde documento aportado."
+            : "Descripción ampliada en español generada desde PDF.",
           abstractSummaryEs: "Abstract sintetizado y traducido al español.",
           objectiveEs: "Objetivo o pregunta sintetizada en español.",
           clinicalQuestionEs: "Objetivo o pregunta sintetizada en español.",
           mainMessageEs: "Mensaje principal en español.",
           mainResultEs: "Mensaje principal en español.",
           methodologyEs: "Revisión narrativa documentada en español.",
+          methodologyProfile: methodologyProfile({
+            specificDesign: isTextMode ? "Revisión narrativa" : "Marco de implementación",
+            designCategoryEs: isTextMode ? "Revisión narrativa" : "Marco de implementación"
+          }),
           keyPointsEs: ["Punto clave uno", "Punto clave dos", "Punto clave tres"],
           limitationsEs: "Limitaciones sintetizadas en español.",
           localApplicabilityEs: "Aplicabilidad local para revisión del equipo.",
@@ -128,9 +228,19 @@ test("scientific logbook renders as operational hub with modals and article crea
             evidenceType: "Artículo científico",
             publicationDate: "2026-05-04",
             studyLocation: "Contexto asistido",
-            executiveSummary: "Resumen asistido en español desde datos pegados.",
+            briefDescriptionEs: "Descripción breve asistida en español desde datos pegados.",
+            expandedDescriptionEs: "Descripción ampliada asistida en español desde datos pegados.",
+            cardSummaryEs: "Descripción breve asistida en español desde datos pegados.",
+            executiveSummary: "Descripción ampliada asistida en español desde datos pegados.",
+            executiveSummaryEs: "Descripción ampliada asistida en español desde datos pegados.",
             clinicalQuestion: "Pregunta asistida en español.",
             mainResult: "Resultado asistido en español.",
+            methodologyProfile: methodologyProfile({
+              studyFamily: "evidence_synthesis",
+              studyFamilyEs: "Síntesis de evidencia",
+              specificDesign: "Revisión narrativa",
+              designCategoryEs: "Revisión narrativa"
+            }),
             tags: ["Asistido", "IA"],
             accessType: "Resumen disponible",
             extractionConfidence: 0.74,
@@ -206,6 +316,8 @@ test("scientific logbook renders as operational hub with modals and article crea
             evidenceType: "",
             publicationDate: "",
             studyLocation: "",
+            briefDescriptionEs: "",
+            expandedDescriptionEs: "",
             executiveSummary: "",
             clinicalQuestion: "",
             mainResult: "",
@@ -250,9 +362,34 @@ test("scientific logbook renders as operational hub with modals and article crea
           evidenceType: "Investigación clínica",
           publicationDate: "2026-05-03",
           studyLocation: "Contexto hospitalario",
-          executiveSummary: "Resumen generado por IA desde Playwright.",
+          briefDescriptionEs: "Descripción breve generada por IA desde Playwright.",
+          expandedDescriptionEs: "Descripción ampliada generada por IA desde Playwright.",
+          cardSummaryEs: "Descripción breve generada por IA desde Playwright.",
+          executiveSummary: "Descripción ampliada generada por IA desde Playwright.",
+          executiveSummaryEs: "Descripción ampliada generada por IA desde Playwright.",
           clinicalQuestion: "Pregunta clínica generada por IA.",
           mainResult: "Resultado principal generado por IA.",
+          methodologyProfile: methodologyProfile({
+            studyFamily: "experimental_interventional",
+            studyFamilyEs: "Experimental/intervencional",
+            specificDesign: "Ensayo clínico aleatorizado",
+            designCategoryEs: "Ensayo clínico",
+            temporalDirection: "prospectivo",
+            centerScope: "multicéntrico",
+            setting: "hospital",
+            countryOrRegion: "Argentina",
+            countriesIncluded: ["Argentina"],
+            institutions: ["Hospital QA"],
+            sampleSize: "240 participantes",
+            sampleDescription: "Participantes adultos incluidos en centros hospitalarios.",
+            studyDuration: "12 meses",
+            dataSource: "Registro clínico del ensayo.",
+            interventionOrExposure: "Intervención clínica QA.",
+            comparator: "Atención habitual",
+            primaryOutcome: "Cambio en el desenlace clínico principal.",
+            statisticalApproach: "Comparación entre grupos por intención de tratar.",
+            reportingGuideline: "CONSORT"
+          }),
           tags: ["QA", "Lectura crítica", "PubMed", "IA"],
           accessType: "Resumen disponible",
           extractionConfidence: 0.82,
@@ -506,8 +643,8 @@ test("scientific logbook renders as operational hub with modals and article crea
   const incompleteDraft = page.locator(".bitacora-post").filter({ hasText: "Borrador científico sin título" }).first();
   await expect(incompleteDraft).toBeVisible({ timeout: 30_000 });
   await expect(incompleteDraft).not.toContainText("Borrador incompleto");
-  page.once("dialog", (dialog) => dialog.accept());
-  await incompleteDraft.getByRole("button", { name: "Eliminar" }).click();
+  await incompleteDraft.getByRole("button", { name: "Eliminar publicación" }).click();
+  await confirmDeleteAction(page);
   await expect(page.locator(".bitacora-post")).toHaveCount(0);
 
   await page.getByRole("button", { name: "Agregar artículo" }).click();
@@ -524,16 +661,24 @@ test("scientific logbook renders as operational hub with modals and article crea
   await articleModal.locator("#article-pdf-official-url").fill("https://doi.org/10.1000/documento");
   await expect(articleModal.locator("#article-pdf-file")).toBeVisible();
   await expect(articleModal.locator("#article-pdf-name")).toHaveText("paper-qa.pdf");
+  await expect(articleModal.getByText("PDF único, máximo 20 MB.")).toBeVisible();
+  await expect(articleModal).not.toContainText("El procesamiento se realiza en backend");
   await articleModal.getByRole("button", { name: "Analizar PDF con IA" }).click();
+  await expect(articleModal.locator("#article-ai-processing-overlay")).toBeVisible();
+  await expect(articleModal.locator("#article-ai-processing-overlay")).toContainText(
+    "La inteligencia artificial está procesando los datos. Aguarde un momento."
+  );
+  await expect(articleModal.locator("#article-ai-processing-overlay")).toBeHidden({ timeout: 30_000 });
   await expect(articleModal.locator("#article-ai-status")).toContainText("Ficha generada por IA", {
     timeout: 30_000
   });
   await expect(articleModal.locator("#article-preview-zone")).toBeVisible();
   await expect(articleModal.locator("#article-preview-zone")).toContainText("Vista previa generada");
+  await expect(articleModal.getByLabel("DOI (Identificador Digital de Objeto)")).toBeVisible();
   await expect(articleModal.locator("#article-advanced-zone")).toBeHidden();
   await expect(articleModal.getByLabel("Título")).toHaveValue("PDF QA Bitácora");
-  await expect(articleModal.getByLabel("Resumen breve para tarjeta")).toHaveValue("Resumen breve en español desde PDF.");
-  await expect(articleModal.getByLabel("Resumen ejecutivo")).toHaveValue("Resumen ejecutivo en español generado desde PDF.");
+  await expect(articleModal.getByLabel("Descripción breve para tarjeta")).toHaveValue("Descripción breve en español desde PDF.");
+  await expect(articleModal.getByLabel("Descripción ampliada")).toHaveValue("Descripción ampliada en español generada desde PDF.");
   await saveArticleButton.click();
   await expect(articleModal).toBeHidden({ timeout: 30_000 });
 
@@ -543,18 +688,79 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(pdfPost).not.toContainText("Borrador automático");
   await expect(pdfPost).not.toContainText("Metadatos básicos");
   await expect(pdfPost).not.toContainText("Extracción fallida");
-  await expect(pdfPost).toContainText("Resumen breve en español desde PDF.");
+  await expect(pdfPost).toContainText("Descripción breve en español desde PDF.");
+  const sourceTitleGap = await pdfPost.locator(".bitacora-post-card__source-line").evaluate((sourceLine) => {
+    const title = sourceLine.closest(".bitacora-post-card__header")?.querySelector(".bitacora-post-card__title");
+    if (!title) return 0;
+    return Math.round(title.getBoundingClientRect().top - sourceLine.getBoundingClientRect().bottom);
+  });
+  expect(sourceTitleGap).toBeGreaterThanOrEqual(5);
   await expect(pdfPost.getByRole("button", { name: "Ver PDF" })).toBeVisible();
   await expect(pdfPost.getByRole("link", { name: "Ver fuente original" })).toHaveAttribute("href", "https://doi.org/10.1000/documento");
+  const articleLikeButton = pdfPost.locator("[data-bitacora-action='toggle-like']").first();
+  await expect(articleLikeButton).toHaveAttribute("aria-pressed", "false");
+  await expect(pdfPost.locator("[data-bitacora-like-count]")).toHaveText("0");
+  await expect(articleLikeButton).not.toContainText("Me gusta");
+  await articleLikeButton.click();
+  await expect(articleLikeButton).toHaveAttribute("aria-pressed", "true");
+  await expect(pdfPost.locator("[data-bitacora-like-count]")).toHaveText("1");
+  await articleLikeButton.hover();
+  await expect(pdfPost.locator(".bitacora-like-button .bitacora-social-tooltip")).toContainText("Dra. Mobile QA");
+  await articleLikeButton.click();
+  await expect(articleLikeButton).toHaveAttribute("aria-pressed", "false");
+  await expect(pdfPost.locator("[data-bitacora-like-count]")).toHaveText("0");
+  const articleCommentButton = pdfPost.locator("[data-bitacora-action='focus-comments']").first();
+  await expect(articleCommentButton).toHaveAccessibleName("0 comentarios en esta publicación");
+  await expect(articleCommentButton).not.toContainText("Comentarios");
   await pdfPost.getByRole("button", { name: "Leer análisis" }).click();
+  await expect(pdfPost.locator(".bitacora-analysis")).toContainText("Descripción ampliada en español generada desde PDF.");
+  await expect(pdfPost.locator(".bitacora-analysis")).toContainText("Ficha metodológica");
+  await expect(pdfPost.locator(".bitacora-analysis")).toContainText("Marco de implementación");
+  await expect(pdfPost.locator(".bitacora-analysis")).toContainText("¿Multicéntrico?");
+  await expect(pdfPost.locator(".bitacora-analysis")).toContainText("no estudio clínico multicéntrico");
+  await expect(pdfPost.locator(".bitacora-analysis")).toContainText("Américas");
+  await expect(pdfPost.locator(".bitacora-analysis")).toContainText("OPS/PAHO");
+  await expect(pdfPost.locator(".bitacora-analysis")).toContainText("33 países");
   await expect(pdfPost.locator(".bitacora-analysis")).toContainText("Objetivo o pregunta sintetizada en español.");
   await expect(pdfPost.locator(".bitacora-analysis")).toContainText("Mensaje principal en español.");
+  await expect(pdfPost.locator(".bitacora-comments")).toContainText("Sé el primero en comentar esta publicación.");
+  const pdfComment = "Comentario E2E de lectura crítica.";
+  await pdfPost.locator("[data-bitacora-comment-text]").fill(pdfComment);
+  await pdfPost.getByRole("button", { name: "Comentar", exact: true }).click();
+  const postedComment = pdfPost.locator(".bitacora-comment").filter({ hasText: pdfComment }).first();
+  await expect(postedComment).toBeVisible({ timeout: 15_000 });
+  await expect(postedComment.locator(".bitacora-comment__meta strong")).toContainText("Dra. Mobile QA");
+  await expect(postedComment.locator(".bitacora-comment__meta span")).not.toHaveText("");
+  await expect(pdfPost.locator("[data-bitacora-comment-count]")).toHaveText("1");
+  await expect(pdfPost.locator(".bitacora-comment-preview")).toContainText(pdfComment);
+  const commentLikeButton = postedComment.locator("[data-bitacora-action='toggle-comment-like']");
+  await commentLikeButton.click();
+  await expect(commentLikeButton).toHaveAttribute("aria-pressed", "true");
+  await expect(postedComment.locator("[data-bitacora-comment-like-count]")).toHaveText("1");
+  await commentLikeButton.hover();
+  await expect(postedComment.locator(".bitacora-social-tooltip")).toContainText("Dra. Mobile QA");
+  await postedComment.getByRole("button", { name: "Editar comentario" }).click();
+  await postedComment.locator("[data-bitacora-comment-edit-text]").fill("Comentario E2E editado.");
+  await postedComment.getByRole("button", { name: "Guardar" }).click();
+  await expect(pdfPost.locator(".bitacora-comment").filter({ hasText: "Comentario E2E editado." })).toBeVisible({
+    timeout: 15_000
+  });
+
+  page.once("dialog", async (dialog) => {
+    expect(dialog.message()).toContain("Eliminar comentario");
+    await dialog.accept();
+  });
+  await pdfPost.locator(".bitacora-comment").filter({ hasText: "Comentario E2E editado." }).getByRole("button", { name: "Eliminar comentario" }).click();
+  await expect(pdfPost.locator(".bitacora-comments__empty")).toContainText("Sé el primero en comentar esta publicación.", {
+    timeout: 15_000
+  });
+  await expect(pdfPost.locator("[data-bitacora-comment-count]")).toHaveText("0");
   await page.locator("#bitacora-publicaciones-title").scrollIntoViewIfNeeded();
   await page.locator("#bitacora-publicaciones-title").click();
   await expect(pdfPost.locator(".bitacora-analysis")).toBeHidden();
   await pdfPost.scrollIntoViewIfNeeded();
-  page.once("dialog", (dialog) => dialog.accept());
-  await pdfPost.getByRole("button", { name: "Eliminar" }).click();
+  await pdfPost.getByRole("button", { name: "Eliminar publicación" }).click();
+  await confirmDeleteAction(page);
   await expect(page.locator(".bitacora-post")).toHaveCount(0);
 
   await page.getByRole("button", { name: "Agregar artículo" }).click();
@@ -565,19 +771,23 @@ test("scientific logbook renders as operational hub with modals and article crea
   await articleModal.getByLabel("Texto del artículo o documento").fill(pastedText);
   await articleModal.locator("#article-pasted-source").fill("Revista Texto QA");
   await articleModal.getByRole("button", { name: "Analizar texto con IA" }).click();
+  await expect(articleModal.locator("#article-ai-processing-overlay")).toBeVisible();
+  await expect(articleModal.locator("#article-ai-processing-overlay")).toBeHidden({ timeout: 30_000 });
   await expect(articleModal.locator("#article-ai-status")).toContainText("Ficha generada por IA", {
     timeout: 30_000
   });
   await expect(articleModal.getByLabel("Título")).toHaveValue("Texto QA traducido");
-  await expect(articleModal.getByLabel("Resumen ejecutivo")).toHaveValue("Resumen ejecutivo en español generado desde documento aportado.");
+  await expect(articleModal.getByLabel("Descripción ampliada")).toHaveValue(
+    "Descripción ampliada en español generada desde documento aportado."
+  );
   await expect(articleModal.locator("#article-advanced-zone")).toBeHidden();
   await articleModal.getByRole("button", { name: "Guardar como borrador" }).click();
   await expect(articleModal).toBeHidden({ timeout: 30_000 });
   const textDraft = page.locator(".bitacora-post").filter({ hasText: "Texto QA traducido" }).first();
   await expect(textDraft).toBeVisible({ timeout: 30_000 });
   await expect(textDraft).not.toContainText("Texto pegado");
-  page.once("dialog", (dialog) => dialog.accept());
-  await textDraft.getByRole("button", { name: "Eliminar" }).click();
+  await textDraft.getByRole("button", { name: "Eliminar publicación" }).click();
+  await confirmDeleteAction(page);
   await expect(page.locator(".bitacora-post")).toHaveCount(0);
 
   await page.getByRole("button", { name: "Agregar artículo" }).click();
@@ -632,7 +842,9 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(articleModal.getByLabel("Tipo de evidencia")).toHaveValue("Investigación clínica");
   await expect(articleModal.getByLabel("Etiquetas")).toHaveValue("QA, Lectura crítica, PubMed, IA");
   await expect(articleModal.getByLabel("Acceso")).toHaveValue("Resumen disponible");
-  await expect(articleModal.getByLabel("Resumen ejecutivo")).toHaveValue("Resumen generado por IA desde Playwright.");
+  await expect(articleModal.getByLabel("Descripción ampliada")).toHaveValue(
+    "Descripción ampliada generada por IA desde Playwright."
+  );
   expect(documentExtractionRequests).toHaveLength(2);
   expect(documentExtractionRequests[0].mode).toBe("pdf");
   expect(documentExtractionRequests[0].storagePath).toMatch(/^bitacora\/article-documents\/.+\/.+paper-qa\.pdf$/);
@@ -655,8 +867,10 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(page.locator("#bitacora-results-count")).toHaveText("1 artículo agregado");
   await expect(newPost).not.toContainText("Pendiente de revisión");
   await expect(newPost).not.toContainText("Borrador automático");
-  await expect(newPost).not.toContainText("Dra. Mobile QA");
-  await expect(newPost).toContainText("Resumen generado por IA desde Playwright.");
+  await expect(newPost).toContainText("Subido por");
+  await expect(newPost).toContainText("Dra. Mobile QA");
+  await expect(newPost).toContainText("Carga");
+  await expect(newPost).toContainText("Descripción breve generada por IA desde Playwright.");
   await expect(newPost.locator(".bitacora-tag")).toHaveCount(4);
   await expect(newPost.getByRole("link", { name: "Ver fuente original" })).toHaveAttribute(
     "href",
@@ -667,6 +881,12 @@ test("scientific logbook renders as operational hub with modals and article crea
   await newPost.getByRole("button", { name: "Leer análisis" }).click();
   await expect(newPost.getByRole("button", { name: "Ocultar análisis" })).toHaveAttribute("aria-expanded", "true");
   await expect(newPost.locator(".bitacora-analysis")).toBeVisible();
+  await expect(newPost.locator(".bitacora-analysis")).toContainText(
+    "Descripción ampliada generada por IA desde Playwright."
+  );
+  await expect(newPost.locator(".bitacora-analysis")).toContainText("Ficha metodológica");
+  await expect(newPost.locator(".bitacora-analysis")).toContainText("Ensayo clínico");
+  await expect(newPost.locator(".bitacora-analysis")).toContainText("Hospital QA");
   await expect(newPost.locator(".bitacora-analysis")).toContainText("Pregunta clínica generada por IA.");
   await expect(newPost.locator(".bitacora-analysis")).not.toContainText("Confianza");
   await expect(newPost.locator(".bitacora-analysis")).not.toContainText("Usuario");
@@ -677,10 +897,31 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(newPost.getByRole("button", { name: "Leer análisis" })).toHaveAttribute("aria-expanded", "false");
   await expect(newPost.locator(".bitacora-analysis")).toBeHidden();
 
-  page.once("dialog", (dialog) => dialog.accept());
-  await newPost.getByRole("button", { name: "Eliminar" }).click();
+  await expect(newPost.getByRole("button", { name: "Editar publicación" })).toBeVisible();
+  await newPost.getByRole("button", { name: "Editar publicación" }).click();
+  const reauthModal = page.locator("#bitacora-reauth-modal");
+  await expect(reauthModal).toBeVisible({ timeout: 10_000 });
+  await reauthModal.getByLabel("Contraseña actual").fill("PasswordIncorrecta!123");
+  await reauthModal.getByRole("button", { name: "Confirmar" }).click();
+  await expect(reauthModal).toContainText("Contraseña incorrecta");
+  await reauthModal.getByRole("button", { name: "Cancelar" }).click();
+  await expect(reauthModal).toBeHidden();
+  await newPost.getByRole("button", { name: "Editar publicación" }).click();
+  await confirmSensitiveAction(page);
+  await expect(articleModal).toBeVisible({ timeout: 10_000 });
+  await expect(articleModal.locator("#add-article-title")).toHaveText("Editar artículo científico");
+  await articleModal.getByLabel("Título").fill(`${articleTitle} editado`);
+  await articleModal.getByLabel("Descripción breve para tarjeta").fill("Resumen breve actualizado por edición segura.");
+  await articleModal.getByRole("button", { name: "Guardar cambios" }).click();
+  await expect(articleModal).toBeHidden({ timeout: 30_000 });
+  const editedPost = page.locator(".bitacora-post").filter({ hasText: `${articleTitle} editado` }).first();
+  await expect(editedPost).toBeVisible({ timeout: 30_000 });
+  await expect(editedPost).toContainText("Resumen breve actualizado por edición segura.");
+
+  await editedPost.getByRole("button", { name: "Eliminar publicación" }).click();
+  await confirmDeleteAction(page);
   await expect(page.locator(".bitacora-post")).toHaveCount(0);
-  await expect(page.locator("body")).not.toContainText(articleTitle);
+  await expect(page.locator("body")).not.toContainText(`${articleTitle} editado`);
   await expect(page.locator("#bitacora-empty")).toBeVisible();
   await expect(page.locator("#bitacora-results-count")).toHaveText("0 artículos agregados");
 
@@ -695,7 +936,7 @@ test("scientific logbook renders as operational hub with modals and article crea
 
   if ((page.viewportSize()?.width || 0) >= 1024) {
     await page.goto("/index.html?dmEmulators=1");
-    await expect(page.locator("#portal-logbook")).toHaveAttribute("href", "/bitacora-cientifica");
+    await expect(page.locator("#portal-logbook")).toHaveAttribute("href", "/bitacora-cientifica.html");
   }
 
   const criticalErrors = consoleErrors.filter(

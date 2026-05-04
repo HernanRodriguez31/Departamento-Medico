@@ -34,7 +34,7 @@
     <link rel="stylesheet" href="/assets/css/pages/index.css?v=20260502-portal-hover-state-1" />
     <link rel="stylesheet" href="/assets/css/core-contrast.css?v=20260502-committee-border-align-1" />
     <link rel="stylesheet" href="/assets/css/pages/galeriadearte.css?v=20260503-art-gallery-like-tooltip-1" />
-    <link rel="stylesheet" href="/assets/css/pages/bitacora-cientifica.css?v=20260504-bitacora-final-polish-1" />
+    <link rel="stylesheet" href="/assets/css/pages/bitacora-cientifica.css?v=20260504-bitacora-pdf-ai-fix-1" />
   </head>
   <body class="art-gallery-page bitacora-page ui-clarity">
     <div id="app">
@@ -314,10 +314,10 @@
                   <p>Subí el PDF del paper, guía, revisión o publicación científica. La IA extraerá la información principal y generará una ficha en español.</p>
                 </div>
                 <div id="article-pdf-dropzone" class="bitacora-pdf-dropzone" tabindex="0" role="button" aria-describedby="article-pdf-help">
-                  <i data-lucide="file-text" aria-hidden="true"></i>
-                  <div>
-                    <strong>Arrastrá un PDF o seleccionalo desde tu equipo</strong>
-                    <span id="article-pdf-help">PDF único, máximo 20 MB. El procesamiento se realiza en backend.</span>
+                  <div class="bitacora-pdf-dropzone__content">
+                    <i data-lucide="file-text" aria-hidden="true"></i>
+                    <strong>Arrastrá un PDF o seleccionalo desde tu equipo.</strong>
+                    <span id="article-pdf-help">PDF único, máximo 20 MB.</span>
                   </div>
                   <button type="button" class="bitacora-btn bitacora-btn--secondary" data-select-pdf>Seleccionar PDF</button>
                 </div>
@@ -384,6 +384,13 @@
 
               <p id="article-ai-status" class="bitacora-ai-status" aria-live="polite"></p>
               <div id="article-ai-warnings" class="bitacora-ai-warning" hidden></div>
+              <div id="article-ai-processing-overlay" class="bitacora-ai-processing-overlay" hidden aria-live="polite" aria-busy="false">
+                <div class="bitacora-ai-processing-dialog" role="status">
+                  <i data-lucide="scan-text" aria-hidden="true"></i>
+                  <span class="bitacora-ai-processing-spinner" aria-hidden="true"></span>
+                  <p>La inteligencia artificial está procesando los datos. Aguarde un momento.</p>
+                </div>
+              </div>
 
               <section id="article-preview-zone" class="bitacora-form-zone bitacora-preview-zone" aria-labelledby="article-preview-zone-title" hidden>
                 <div class="bitacora-form-zone__header">
@@ -404,7 +411,7 @@
                     <input id="article-publication-date" name="publicationDate" type="text" placeholder="AAAA-MM-DD o texto de la fuente" />
                   </label>
                   <label class="bitacora-field" for="article-doi">
-                    <span>DOI</span>
+                    <span>DOI (Identificador Digital de Objeto)</span>
                     <input id="article-doi" name="doi" type="text" />
                   </label>
                   <label class="bitacora-field" for="article-official-url">
@@ -420,11 +427,11 @@
                     <input id="article-evidence-type" name="evidenceType" type="text" />
                   </label>
                   <label class="bitacora-field bitacora-field--wide" for="article-card-summary">
-                    <span>Resumen breve para tarjeta</span>
+                    <span>Descripción breve para tarjeta</span>
                     <textarea id="article-card-summary" name="cardSummaryEs" rows="2"></textarea>
                   </label>
                   <label class="bitacora-field bitacora-field--wide" for="article-executive-summary">
-                    <span>Resumen ejecutivo</span>
+                    <span>Descripción ampliada</span>
                     <textarea id="article-executive-summary" name="executiveSummary" rows="3"></textarea>
                   </label>
                   <label class="bitacora-field bitacora-field--wide" for="article-clinical-question">
@@ -497,6 +504,141 @@
                     <span>Período / año</span>
                     <input id="article-study-period" name="studyPeriodEs" type="text" />
                   </label>
+                  <label class="bitacora-field" for="article-methodology-family">
+                    <span>Familia metodológica</span>
+                    <input id="article-methodology-family" name="methodologyProfile.studyFamily" type="text" />
+                  </label>
+                  <label class="bitacora-field" for="article-methodology-family-es">
+                    <span>Familia metodológica en español</span>
+                    <input id="article-methodology-family-es" name="methodologyProfile.studyFamilyEs" type="text" />
+                  </label>
+                  <label class="bitacora-field" for="article-methodology-specific-design">
+                    <span>Diseño específico</span>
+                    <input id="article-methodology-specific-design" name="methodologyProfile.specificDesign" type="text" />
+                  </label>
+                  <label class="bitacora-field" for="article-methodology-design-category">
+                    <span>Categoría visible</span>
+                    <input id="article-methodology-design-category" name="methodologyProfile.designCategoryEs" type="text" />
+                  </label>
+                  <label class="bitacora-field" for="article-methodology-temporal-direction">
+                    <span>Temporalidad</span>
+                    <input id="article-methodology-temporal-direction" name="methodologyProfile.temporalDirection" type="text" />
+                  </label>
+                  <label class="bitacora-field" for="article-methodology-center-scope">
+                    <span>Alcance de centros</span>
+                    <input id="article-methodology-center-scope" name="methodologyProfile.centerScope" type="text" />
+                  </label>
+                  <label class="bitacora-field" for="article-methodology-is-multicenter">
+                    <span>¿Multicéntrico?</span>
+                    <select id="article-methodology-is-multicenter" name="methodologyProfile.isMulticenter">
+                      <option value="false">No</option>
+                      <option value="true">Sí</option>
+                    </select>
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-methodology-multicenter-rationale">
+                    <span>Racional multicéntrico / alcance programático</span>
+                    <textarea id="article-methodology-multicenter-rationale" name="methodologyProfile.multicenterRationale" rows="2"></textarea>
+                  </label>
+                  <label class="bitacora-field" for="article-methodology-setting">
+                    <span>Ámbito</span>
+                    <input id="article-methodology-setting" name="methodologyProfile.setting" type="text" />
+                  </label>
+                  <label class="bitacora-field" for="article-methodology-country-region">
+                    <span>País / región</span>
+                    <input id="article-methodology-country-region" name="methodologyProfile.countryOrRegion" type="text" />
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-methodology-countries">
+                    <span>Países incluidos</span>
+                    <input id="article-methodology-countries" name="methodologyProfile.countriesIncluded" type="text" placeholder="Separados por coma" />
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-methodology-institutions">
+                    <span>Instituciones</span>
+                    <input id="article-methodology-institutions" name="methodologyProfile.institutions" type="text" placeholder="Separadas por coma" />
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-methodology-population">
+                    <span>Población / contexto</span>
+                    <input id="article-methodology-population" name="methodologyProfile.studyPopulation" type="text" />
+                  </label>
+                  <label class="bitacora-field" for="article-methodology-sample-size">
+                    <span>Tamaño muestral</span>
+                    <input id="article-methodology-sample-size" name="methodologyProfile.sampleSize" type="text" />
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-methodology-sample-description">
+                    <span>Muestra / alcance</span>
+                    <textarea id="article-methodology-sample-description" name="methodologyProfile.sampleDescription" rows="2"></textarea>
+                  </label>
+                  <label class="bitacora-field" for="article-methodology-study-period">
+                    <span>Período del estudio</span>
+                    <input id="article-methodology-study-period" name="methodologyProfile.studyPeriod" type="text" />
+                  </label>
+                  <label class="bitacora-field" for="article-methodology-study-duration">
+                    <span>Duración</span>
+                    <input id="article-methodology-study-duration" name="methodologyProfile.studyDuration" type="text" />
+                  </label>
+                  <label class="bitacora-field" for="article-methodology-recruitment-period">
+                    <span>Reclutamiento</span>
+                    <input id="article-methodology-recruitment-period" name="methodologyProfile.recruitmentPeriod" type="text" />
+                  </label>
+                  <label class="bitacora-field" for="article-methodology-follow-up-duration">
+                    <span>Seguimiento</span>
+                    <input id="article-methodology-follow-up-duration" name="methodologyProfile.followUpDuration" type="text" />
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-methodology-data-source">
+                    <span>Fuente de datos</span>
+                    <textarea id="article-methodology-data-source" name="methodologyProfile.dataSource" rows="2"></textarea>
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-methodology-intervention">
+                    <span>Intervención / exposición</span>
+                    <textarea id="article-methodology-intervention" name="methodologyProfile.interventionOrExposure" rows="2"></textarea>
+                  </label>
+                  <label class="bitacora-field" for="article-methodology-comparator">
+                    <span>Comparador</span>
+                    <input id="article-methodology-comparator" name="methodologyProfile.comparator" type="text" />
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-methodology-primary-outcome">
+                    <span>Desenlace principal</span>
+                    <textarea id="article-methodology-primary-outcome" name="methodologyProfile.primaryOutcome" rows="2"></textarea>
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-methodology-secondary-outcomes">
+                    <span>Desenlaces secundarios</span>
+                    <textarea id="article-methodology-secondary-outcomes" name="methodologyProfile.secondaryOutcomes" rows="2" placeholder="Uno por línea"></textarea>
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-methodology-statistical-approach">
+                    <span>Método estadístico / analítico</span>
+                    <textarea id="article-methodology-statistical-approach" name="methodologyProfile.statisticalApproach" rows="2"></textarea>
+                  </label>
+                  <label class="bitacora-field" for="article-methodology-effect-measures">
+                    <span>Medidas de efecto</span>
+                    <input id="article-methodology-effect-measures" name="methodologyProfile.effectMeasures" type="text" />
+                  </label>
+                  <label class="bitacora-field" for="article-methodology-reporting-guideline">
+                    <span>Guía de reporte</span>
+                    <input id="article-methodology-reporting-guideline" name="methodologyProfile.reportingGuideline" type="text" />
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-methodology-strengths">
+                    <span>Fortalezas metodológicas</span>
+                    <textarea id="article-methodology-strengths" name="methodologyProfile.methodologicalStrengths" rows="2" placeholder="Una por línea"></textarea>
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-methodology-limitations">
+                    <span>Limitaciones metodológicas</span>
+                    <textarea id="article-methodology-limitations" name="methodologyProfile.methodologicalLimitations" rows="2" placeholder="Una por línea"></textarea>
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-methodology-applicability">
+                    <span>Notas de aplicabilidad</span>
+                    <textarea id="article-methodology-applicability" name="methodologyProfile.applicabilityNotes" rows="2" placeholder="Una por línea"></textarea>
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-methodology-rationale">
+                    <span>Racional de clasificación</span>
+                    <textarea id="article-methodology-rationale" name="methodologyProfile.classificationRationale" rows="2"></textarea>
+                  </label>
+                  <label class="bitacora-field" for="article-methodology-classification-confidence">
+                    <span>Confianza de clasificación</span>
+                    <input id="article-methodology-classification-confidence" name="methodologyProfile.classificationConfidence" type="text" />
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-methodology-warnings">
+                    <span>Cautelas metodológicas</span>
+                    <textarea id="article-methodology-warnings" name="methodologyProfile.methodologyWarnings" rows="2" placeholder="Una por línea"></textarea>
+                  </label>
                   <label class="bitacora-field bitacora-field--wide" for="article-abstract-summary">
                     <span>Abstract / resumen traducido o sintetizado</span>
                     <textarea id="article-abstract-summary" name="abstractSummaryEs" rows="3"></textarea>
@@ -552,6 +694,80 @@
         </div>
       </div>
 
+      <div id="bitacora-reauth-modal" class="bitacora-modal bitacora-modal--confirm" aria-hidden="true" hidden>
+        <div
+          class="bitacora-modal__dialog bitacora-confirm-modal__dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="bitacora-reauth-title"
+          tabindex="-1"
+        >
+          <div class="bitacora-modal__header">
+            <div>
+              <h2 id="bitacora-reauth-title">Confirmar acción</h2>
+              <p id="bitacora-reauth-description">Por seguridad, reautenticate para continuar.</p>
+            </div>
+            <button type="button" class="bitacora-modal__close" data-close-modal aria-label="Cerrar">
+              <i data-lucide="x" aria-hidden="true"></i>
+            </button>
+          </div>
+          <form id="bitacora-reauth-form" class="bitacora-confirm-modal" novalidate>
+            <div class="bitacora-modal__body">
+              <label id="bitacora-reauth-password-section" class="bitacora-field bitacora-password-field" for="bitacora-reauth-password">
+                <span>Contraseña actual</span>
+                <input id="bitacora-reauth-password" type="password" autocomplete="current-password" />
+              </label>
+              <div id="bitacora-reauth-provider-section" class="bitacora-provider-reauth" hidden>
+                <p>
+                  Tu cuenta usa <strong id="bitacora-reauth-provider-name">proveedor externo</strong>.
+                  Reautenticate para continuar.
+                </p>
+              </div>
+              <p id="bitacora-reauth-error" class="bitacora-form-error" hidden></p>
+            </div>
+            <div class="bitacora-modal__actions">
+              <button type="button" class="bitacora-btn bitacora-btn--secondary" data-close-modal>Cancelar</button>
+              <button id="bitacora-reauth-submit" type="submit" class="bitacora-btn bitacora-btn--primary">
+                Confirmar
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div id="bitacora-delete-confirm-modal" class="bitacora-modal bitacora-modal--confirm" aria-hidden="true" hidden>
+        <div
+          class="bitacora-modal__dialog bitacora-confirm-modal__dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="bitacora-delete-confirm-title"
+          tabindex="-1"
+        >
+          <div class="bitacora-modal__header">
+            <div>
+              <h2 id="bitacora-delete-confirm-title">Eliminar definitivamente</h2>
+              <p id="bitacora-delete-confirm-text">Esta acción eliminará la publicación de la Bitácora.</p>
+            </div>
+            <button type="button" class="bitacora-modal__close" data-close-modal aria-label="Cerrar">
+              <i data-lucide="x" aria-hidden="true"></i>
+            </button>
+          </div>
+          <form id="bitacora-delete-confirm-form" class="bitacora-confirm-modal" novalidate>
+            <div class="bitacora-modal__body">
+              <p class="bitacora-confirm-modal__warning">
+                Si tiene PDF asociado, también se intentará eliminar el archivo privado.
+              </p>
+            </div>
+            <div class="bitacora-modal__actions">
+              <button type="button" class="bitacora-btn bitacora-btn--secondary" data-close-modal>Cancelar</button>
+              <button id="bitacora-delete-confirm-submit" type="submit" class="bitacora-btn bitacora-btn--danger">
+                Eliminar definitivamente
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
       <footer class="footer">
         <div class="container footer__container">
           <div class="footer__logos">
@@ -600,7 +816,7 @@
       installFirebaseGlobals();
     </script>
     <script type="module" src="/assets/js/common/notifications.js"></script>
-    <script type="module" src="/assets/js/pages/bitacora-cientifica.js?v=20260504-bitacora-final-polish-1"></script>
+    <script type="module" src="/assets/js/pages/bitacora-cientifica.js?v=20260504-bitacora-pdf-ai-fix-1"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {

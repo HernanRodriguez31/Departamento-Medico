@@ -1,5 +1,19 @@
 const crypto = require("crypto");
 const pdfParse = require("pdf-parse");
+const {
+  EVIDENCE_SUPPORT_FIELDS,
+  METHODOLOGY_BOOLEAN_FIELDS,
+  METHODOLOGY_LIST_FIELDS,
+  METHODOLOGY_OBJECT_FIELDS,
+  METHODOLOGY_PROFILE_KEYS,
+  SCIENTIFIC_METHODOLOGY_TAXONOMY,
+  STUDY_FAMILIES,
+  buildEmptyMethodologyProfile,
+  buildMethodologyEvidence,
+  inferDesignCategoryFromProfile,
+  normalizeMethodologyProfile,
+  preclassifyMethodology
+} = require("./scientificMethodologyTaxonomy");
 
 const DOCUMENT_MODES = new Set(["pdf", "pasted_text"]);
 const ACCESS_TYPES = ["Open access", "Suscripción", "Resumen disponible", "Pendiente"];
@@ -55,6 +69,8 @@ const DOCUMENT_AI_ARTICLE_KEYS = [
   "articleType",
   "evidenceType",
   "accessType",
+  "briefDescriptionEs",
+  "expandedDescriptionEs",
   "cardSummaryEs",
   "executiveSummaryEs",
   "objectiveEs",
@@ -68,6 +84,36 @@ const DOCUMENT_AI_ARTICLE_KEYS = [
   "localApplicabilityEs",
   "occupationalHealthRelevanceEs",
   "limitationsEs",
+  "methodologyProfile",
+  "tags",
+  "warnings",
+  "extractionConfidence"
+];
+
+const DOCUMENT_CORE_AI_ARTICLE_KEYS = [
+  "title",
+  "sourceName",
+  "journal",
+  "authors",
+  "officialUrl",
+  "doi",
+  "publicationDate",
+  "originalLanguage",
+  "articleType",
+  "evidenceType",
+  "accessType",
+  "briefDescriptionEs",
+  "expandedDescriptionEs",
+  "cardSummaryEs",
+  "executiveSummaryEs",
+  "objectiveEs",
+  "studyDesignEs",
+  "studyContextEs",
+  "studyPopulationEs",
+  "studyLocationEs",
+  "studyPeriodEs",
+  "mainMessageEs",
+  "keyPointsEs",
   "tags",
   "warnings",
   "extractionConfidence"
@@ -329,6 +375,81 @@ const buildDetectedMetadata = ({ text = "", officialUrl = "", pastedSource = "" 
   };
 };
 
+const splitSentences = (text = "") =>
+  cleanLongText(text)
+    .split(/(?<=[.!?])\s+/)
+    .map(cleanString)
+    .filter((sentence) => sentence.length >= 20);
+
+const getSummaryEvidenceText = (packet = {}) => {
+  const summarySection = (packet.sections || []).find((section) =>
+    /summary|abstract|resumen/i.test(section.heading)
+  );
+  if (summarySection?.text) return cleanLongText(summarySection.text).slice(0, 1800);
+  const summaryBucket = packet.methodologyEvidence?.abstractOrSummary?.text;
+  if (summaryBucket) return cleanLongText(summaryBucket).slice(0, 1800);
+  const snippet = packet.snippets?.[0]?.text || "";
+  return cleanLongText(snippet).slice(0, 1800);
+};
+
+const buildDeterministicDocumentFallback = (packet = {}, {
+  warnings = [],
+  extractionConfidence = 0.24
+} = {}) => {
+  const metadata = packet.detectedMetadata || {};
+  const summaryText = getSummaryEvidenceText(packet);
+  const summarySentences = splitSentences(summaryText);
+  const preclassification = packet.preclassification || {};
+  const likelyDesign = cleanString(preclassification.likelyDesigns?.[0]);
+  const family = cleanString(preclassification.possibleFamilies?.[0]);
+  const taxonomyFamily = family ? SCIENTIFIC_METHODOLOGY_TAXONOMY[family] : null;
+  const spanishSummaryAvailable = packet.detectedLanguage === "es";
+  const briefDescriptionEs = spanishSummaryAvailable ? cleanString(summarySentences.slice(0, 1).join(" ")).slice(0, 280) : "";
+  const expandedDescriptionEs = spanishSummaryAvailable ? cleanString(summarySentences.slice(0, 4).join(" ")).slice(0, 1200) : "";
+  const objectiveEs = spanishSummaryAvailable ? cleanString(summarySentences.slice(0, 2).join(" ")).slice(0, 500) : "";
+
+  const article = {
+    ...buildEmptyArticle(),
+    title: metadata.title || "",
+    sourceName: metadata.sourceName || metadata.journal || "",
+    journal: metadata.journal || metadata.sourceName || "",
+    authors: normalizeList(metadata.authors, 30),
+    officialUrl: packet.officialUrl || "",
+    doi: metadata.doi || "",
+    publicationDate: metadata.publicationDate || "",
+    originalLanguage: packet.detectedLanguage || "und",
+    articleType: metadata.articleType || likelyDesign || "",
+    evidenceType: taxonomyFamily?.labelEs || likelyDesign || "",
+    accessType: "Pendiente",
+    briefDescriptionEs,
+    expandedDescriptionEs,
+    cardSummaryEs: briefDescriptionEs,
+    executiveSummaryEs: expandedDescriptionEs,
+    abstractSummaryEs: summaryText,
+    objectiveEs,
+    clinicalQuestionEs: objectiveEs,
+    mainMessageEs: "",
+    mainResultEs: "",
+    studyDesignEs: likelyDesign || taxonomyFamily?.labelEs || "",
+    studyContextEs: "",
+    methodologyEs: likelyDesign || taxonomyFamily?.labelEs || "",
+    tags: normalizeList(metadata.keywords, 8),
+    extractionConfidence,
+    warnings: normalizeList(warnings, 10)
+  };
+
+  article.methodologyProfile = normalizeMethodologyProfile({
+    ...buildEmptyMethodologyProfile(),
+    studyFamily: STUDY_FAMILIES.includes(family) ? family : "",
+    studyFamilyEs: taxonomyFamily?.labelEs || "",
+    specificDesign: likelyDesign,
+    designCategoryEs: likelyDesign || taxonomyFamily?.labelEs || "",
+    classificationRationale: preclassification.classificationRationale || "",
+    methodologyWarnings: preclassification.warnings || []
+  });
+  return article;
+};
+
 const buildQualitySignals = (sections = [], metadata = {}, text = "") => {
   const headings = sections.map((section) => section.heading.toLowerCase());
   const hasHeading = (patterns) => headings.some((heading) => patterns.some((pattern) => heading.includes(pattern)));
@@ -375,7 +496,7 @@ const buildEvidencePacket = ({
   const detectedLanguage = detectLanguage(cleanText);
   const qualitySignals = buildQualitySignals(sections, detectedMetadata, cleanText);
   const contentHash = hashText(cleanText);
-  return {
+  const basePacket = {
     mode,
     originalFileName: cleanString(originalFileName),
     officialUrl: validatePublicUrl(officialUrl),
@@ -396,6 +517,9 @@ const buildEvidencePacket = ({
     ],
     qualitySignals
   };
+  basePacket.methodologyEvidence = buildMethodologyEvidence({ ...basePacket, fullText: cleanText });
+  basePacket.preclassification = preclassifyMethodology(basePacket, SCIENTIFIC_METHODOLOGY_TAXONOMY);
+  return basePacket;
 };
 
 const buildEmptyArticle = () => ({
@@ -411,6 +535,8 @@ const buildEmptyArticle = () => ({
   studyType: "",
   evidenceType: "",
   accessType: "Pendiente",
+  briefDescriptionEs: "",
+  expandedDescriptionEs: "",
   cardSummaryEs: "",
   executiveSummaryEs: "",
   abstractSummaryEs: "",
@@ -428,6 +554,7 @@ const buildEmptyArticle = () => ({
   limitationsEs: "",
   localApplicabilityEs: "",
   occupationalHealthRelevanceEs: "",
+  methodologyProfile: buildEmptyMethodologyProfile(),
   tags: [],
   sourcePages: [],
   extractionConfidence: 0,
@@ -448,6 +575,11 @@ const buildRawEvidence = (packet = {}) => ({
     .filter(([, value]) => (Array.isArray(value) ? value.length : Boolean(value)))
     .map(([key]) => key),
   extractedSections: (packet.sections || []).map((section) => section.heading).slice(0, 16),
+  methodologyEvidenceSections: Object.entries(packet.methodologyEvidence || {})
+    .filter(([, section]) => cleanString(section?.text))
+    .map(([key]) => key)
+    .slice(0, 20),
+  preclassification: packet.preclassification || {},
   qualitySignals: packet.qualitySignals || {},
   modelUsed: cleanString(packet.modelUsed || "")
 });
@@ -472,15 +604,17 @@ const normalizeAiDocumentOutput = (input = {}, packet = {}) => {
   article.journal = cleanString(input.journal) || metadata.journal || article.sourceName;
   article.authors = normalizeList(input.authors?.length ? input.authors : metadata.authors, 30);
   article.officialUrl = packet.officialUrl || validatePublicUrl(input.officialUrl);
-  article.doi = metadata.doi || "";
-  article.publicationDate = metadata.publicationDate ? metadata.publicationDate : "";
+  article.doi = cleanString(input.doi) || metadata.doi || "";
+  article.publicationDate = cleanString(input.publicationDate) || metadata.publicationDate || "";
   article.originalLanguage = cleanString(input.originalLanguage) || packet.detectedLanguage || "";
-  article.articleType = cleanString(input.articleType || metadata.articleType);
+  article.articleType = cleanString(input.articleType || input.documentType || metadata.articleType);
   article.studyType = cleanString(input.studyType);
   article.evidenceType = cleanString(input.evidenceType);
   article.accessType = ACCESS_TYPES.includes(input.accessType) ? input.accessType : "Pendiente";
-  article.cardSummaryEs = cleanString(input.cardSummaryEs);
-  article.executiveSummaryEs = cleanString(input.executiveSummaryEs);
+  article.briefDescriptionEs = cleanString(input.briefDescriptionEs || input.cardSummaryEs);
+  article.expandedDescriptionEs = cleanString(input.expandedDescriptionEs || input.executiveSummaryEs);
+  article.cardSummaryEs = cleanString(input.cardSummaryEs) || article.briefDescriptionEs;
+  article.executiveSummaryEs = cleanString(input.executiveSummaryEs) || article.expandedDescriptionEs;
   article.abstractSummaryEs = cleanString(input.abstractSummaryEs);
   article.objectiveEs = cleanString(
     input.objectiveEs || input.objective || input.purposeEs || input.clinicalQuestionEs || input.clinicalQuestion
@@ -500,6 +634,17 @@ const normalizeAiDocumentOutput = (input = {}, packet = {}) => {
   article.limitationsEs = cleanString(input.limitationsEs);
   article.localApplicabilityEs = cleanString(input.localApplicabilityEs);
   article.occupationalHealthRelevanceEs = cleanString(input.occupationalHealthRelevanceEs);
+  article.methodologyProfile = normalizeMethodologyProfile(input.methodologyProfile);
+  article.methodologyProfile.specificDesign = article.methodologyProfile.specificDesign || article.studyDesignEs;
+  article.methodologyProfile.designCategoryEs =
+    article.methodologyProfile.designCategoryEs ||
+    inferDesignCategoryFromProfile(article.methodologyProfile) ||
+    article.evidenceType ||
+    article.studyDesignEs;
+  article.methodologyProfile.studyPopulation = article.methodologyProfile.studyPopulation || article.studyPopulationEs;
+  article.methodologyProfile.countryOrRegion = article.methodologyProfile.countryOrRegion || article.studyLocationEs;
+  article.methodologyProfile.studyPeriod = article.methodologyProfile.studyPeriod || article.studyPeriodEs;
+  article.methodologyProfile.dataSource = article.methodologyProfile.dataSource || article.studyContextEs;
   article.tags = normalizeList(input.tags?.length ? input.tags : metadata.keywords, 8);
   article.sourcePages = normalizeSourcePages(input.sourcePages);
   article.extractionConfidence = Number.isFinite(Number(input.extractionConfidence))
@@ -512,6 +657,49 @@ const normalizeAiDocumentOutput = (input = {}, packet = {}) => {
 const validateStructuredAIOutput = (article = {}) => {
   const invalid = [];
   DOCUMENT_AI_ARTICLE_KEYS.forEach((key) => {
+    if (!(key in article)) invalid.push(key);
+  });
+  if (!Array.isArray(article.authors)) invalid.push("authors_type");
+  if (!Array.isArray(article.keyPointsEs)) invalid.push("keyPointsEs_type");
+  if (!Array.isArray(article.tags)) invalid.push("tags_type");
+  if (!Array.isArray(article.warnings)) invalid.push("warnings_type");
+  if (!article.methodologyProfile || typeof article.methodologyProfile !== "object" || Array.isArray(article.methodologyProfile)) {
+    invalid.push("methodologyProfile_type");
+  } else {
+    METHODOLOGY_PROFILE_KEYS.forEach((key) => {
+      if (!(key in article.methodologyProfile)) invalid.push(`methodologyProfile.${key}`);
+      if (METHODOLOGY_LIST_FIELDS.has(key) && !Array.isArray(article.methodologyProfile[key])) {
+        invalid.push(`methodologyProfile.${key}_type`);
+      }
+      if (METHODOLOGY_BOOLEAN_FIELDS.has(key) && typeof article.methodologyProfile[key] !== "boolean") {
+        invalid.push(`methodologyProfile.${key}_type`);
+      }
+      if (
+        METHODOLOGY_OBJECT_FIELDS.has(key) &&
+        (!article.methodologyProfile[key] ||
+          typeof article.methodologyProfile[key] !== "object" ||
+          Array.isArray(article.methodologyProfile[key]))
+      ) {
+        invalid.push(`methodologyProfile.${key}_type`);
+      }
+      if (
+        !METHODOLOGY_LIST_FIELDS.has(key) &&
+        !METHODOLOGY_BOOLEAN_FIELDS.has(key) &&
+        !METHODOLOGY_OBJECT_FIELDS.has(key) &&
+        typeof article.methodologyProfile[key] !== "string"
+      ) {
+        invalid.push(`methodologyProfile.${key}_type`);
+      }
+    });
+  }
+  if (!ACCESS_TYPES.includes(article.accessType)) invalid.push("accessType");
+  if (!Number.isFinite(Number(article.extractionConfidence))) invalid.push("extractionConfidence");
+  return { ok: invalid.length === 0, invalid };
+};
+
+const validateStructuredCoreAIOutput = (article = {}) => {
+  const invalid = [];
+  DOCUMENT_CORE_AI_ARTICLE_KEYS.forEach((key) => {
     if (!(key in article)) invalid.push(key);
   });
   if (!Array.isArray(article.authors)) invalid.push("authors_type");
@@ -534,8 +722,8 @@ const scoreDocumentArticle = (article = {}) => {
   ].filter(Boolean).length;
   const hasTitle = Boolean(cleanString(article.title));
   const hasSource = Boolean(cleanString(article.sourceName || article.journal));
-  const hasCard = cleanString(article.cardSummaryEs).length >= 24;
-  const hasExecutiveSummary = cleanString(article.executiveSummaryEs).length >= 32;
+  const hasCard = cleanString(article.briefDescriptionEs || article.cardSummaryEs).length >= 24;
+  const hasExecutiveSummary = cleanString(article.expandedDescriptionEs || article.executiveSummaryEs).length >= 32;
   return {
     usefulFieldCount: useful,
     hasTitle,
@@ -551,14 +739,13 @@ const scoreDocumentArticle = (article = {}) => {
 
 const computeExtractionStatus = (article = {}) => {
   const score = scoreDocumentArticle(article);
-  if (
-    score.hasTitle &&
-    score.hasSource &&
-    score.hasCard &&
-    score.hasExecutiveSummary &&
-    score.usefulFieldCount >= 2 &&
-    Number(article.extractionConfidence || 0) >= 0.55
-  ) {
+  const hasUsefulNarrative =
+    score.hasCard ||
+    score.hasExecutiveSummary ||
+    cleanString(article.objectiveEs || article.clinicalQuestionEs).length >= 24 ||
+    cleanString(article.mainMessageEs || article.mainResultEs).length >= 24 ||
+    (Array.isArray(article.keyPointsEs) && article.keyPointsEs.length >= 2);
+  if (score.hasTitle && score.hasSource && hasUsefulNarrative) {
     return "ai_draft";
   }
   if (score.hasTitle || score.hasSource || article.doi || article.publicationDate) {
@@ -590,6 +777,50 @@ const buildDocumentExtractionResponse = ({ extractionStatus, article, rawEvidenc
   ...(error ? { error } : {})
 });
 
+const buildEvidenceSupportSchema = () => ({
+  type: "object",
+  additionalProperties: false,
+  required: EVIDENCE_SUPPORT_FIELDS,
+  properties: EVIDENCE_SUPPORT_FIELDS.reduce((properties, key) => {
+    properties[key] = {
+      type: "object",
+      additionalProperties: false,
+      required: ["supportLevel", "evidenceText", "sourceSection"],
+      properties: {
+        supportLevel: {
+          type: "string",
+          enum: key === "sampleSize" || key === "centerScope" || key === "temporalDirection"
+            ? ["explicito", "inferido_con_soporte", "no_especificado", "no_aplica"]
+            : ["explicito", "inferido_con_soporte", "no_especificado"]
+        },
+        evidenceText: { type: "string" },
+        sourceSection: { type: "string" }
+      }
+    };
+    return properties;
+  }, {})
+});
+
+const buildMethodologyProfileSchema = () => ({
+  type: "object",
+  additionalProperties: false,
+  required: METHODOLOGY_PROFILE_KEYS,
+  properties: METHODOLOGY_PROFILE_KEYS.reduce((properties, key) => {
+    if (METHODOLOGY_LIST_FIELDS.has(key)) {
+      properties[key] = { type: "array", items: { type: "string" } };
+    } else if (METHODOLOGY_BOOLEAN_FIELDS.has(key)) {
+      properties[key] = { type: "boolean" };
+    } else if (METHODOLOGY_OBJECT_FIELDS.has(key) && key === "evidenceSupport") {
+      properties[key] = buildEvidenceSupportSchema();
+    } else if (key === "studyFamily") {
+      properties[key] = { type: "string", enum: STUDY_FAMILIES };
+    } else {
+      properties[key] = { type: "string" };
+    }
+    return properties;
+  }, {})
+});
+
 const buildOpenAiDocumentPayload = (packet = {}, { model = "" } = {}) => ({
   model: cleanString(model) || DEFAULT_DOCUMENT_EXTRACTION_MODEL,
   temperature: 0.1,
@@ -614,13 +845,21 @@ const buildOpenAiDocumentPayload = (packet = {}, { model = "" } = {}) => ({
           articleType: { type: "string" },
           evidenceType: { type: "string" },
           accessType: { type: "string", enum: ACCESS_TYPES },
+          briefDescriptionEs: {
+            type: "string",
+            description: "Descripción breve en español, máximo 280 caracteres, para tarjeta. Responde de qué trata y por qué importa."
+          },
+          expandedDescriptionEs: {
+            type: "string",
+            description: "Descripción ampliada en español, 1 o 2 párrafos breves, máximo 180 palabras. No reemplaza la lectura del paper."
+          },
           cardSummaryEs: {
             type: "string",
-            description: "Resumen breve en español, máximo 280 caracteres, para mostrar en la tarjeta cerrada."
+            description: "Alias de briefDescriptionEs. Usar el mismo contenido si no hay diferencia editorial."
           },
           executiveSummaryEs: {
             type: "string",
-            description: "Resumen ejecutivo en español, claro y profesional, máximo 120 palabras."
+            description: "Alias de expandedDescriptionEs. Usar el mismo contenido si no hay diferencia editorial."
           },
           objectiveEs: {
             type: "string",
@@ -667,6 +906,7 @@ const buildOpenAiDocumentPayload = (packet = {}, { model = "" } = {}) => ({
             type: "string",
             description: "Limitaciones del documento o cautelas interpretativas."
           },
+          methodologyProfile: buildMethodologyProfileSchema(),
           tags: { type: "array", items: { type: "string" } },
           warnings: { type: "array", items: { type: "string" } },
           extractionConfidence: { type: "number", minimum: 0, maximum: 1 }
@@ -678,11 +918,27 @@ const buildOpenAiDocumentPayload = (packet = {}, { model = "" } = {}) => ({
     {
       role: "system",
       content:
-        "Sos un agente experto en comunicación científica médica, lectura crítica inicial y síntesis editorial para una Bitácora Científica institucional. Tu tarea es transformar evidencia real extraída de un PDF o texto pegado en una ficha breve, clara y útil en español para médicos y equipos de salud. Respondé exclusivamente JSON válido conforme al schema. Todo texto editorial debe estar en español. Conservá título oficial, DOI, autores, revista e instituciones tal como aparecen. No inventes datos. No inventes DOI, autores, fecha, resultados, población, país ni período. No uses conocimiento externo. Sí podés sintetizar, traducir y ordenar ideas presentes en el documento. No traduzcas literalmente todo el paper. La ficha debe orientar al lector para decidir si quiere leer el artículo completo. El resumen breve debe ser corto y no superar 280 caracteres. El resumen ejecutivo debe ser claro, máximo 100 a 120 palabras. El mensaje principal debe ser una frase o párrafo corto. Los puntos clave deben ser 3 a 5, breves y accionables. Identificá el tipo real de estudio o documento con precisión. Si es un estudio clínico, indicá si es prospectivo, retrospectivo, transversal, cohorte, caso-control, ensayo clínico, multicéntrico u otro solo cuando esté sustentado. Si no es estudio clínico, no lo fuerces: clasificalo como guía, consenso, health policy, marco de implementación, revisión, informe técnico u otro tipo real. Siempre intentá extraer dónde y población: país/región, ámbito, población o contexto. Si no está especificado, dejá el campo vacío o indicá 'No especificado en el documento'. No hagas recomendaciones clínicas directas, no cambies protocolos institucionales y no presentes conclusiones como conducta obligatoria. Tags en español, salvo nombres propios como HEARTS, OPS u OMS."
+        [
+          "Sos un agente experto en metodología de investigación clínica, epidemiología, salud pública, implementación sanitaria y comunicación científica médica.",
+          "Tu tarea es analizar evidencia real extraída de un PDF o texto científico y generar una ficha en español para una Bitácora de Ciencia Médica.",
+          "Tu prioridad es identificar correctamente la metodología y estructura del trabajo.",
+          "Respondé solo JSON válido conforme al schema. Todo texto editorial debe estar en español.",
+          "Conservá título oficial, autores, DOI, revista e instituciones tal como aparecen. No inventes datos y no uses conocimiento externo.",
+          "No fuerces todos los documentos a ensayo clínico, prospectivo, retrospectivo o multicéntrico.",
+          "Si un documento es guía, consenso, health policy, informe técnico o marco de implementación, clasificalo como tal.",
+          "Si un documento no es estudio clínico primario, usá 'no aplica' para temporalidad prospectivo/retrospectivo cuando corresponda.",
+          "Si hay múltiples países o instituciones en implementación o política sanitaria, describilo como regional/internacional o alcance programático, no como multicéntrico clínico salvo que sea un estudio clínico multicéntrico.",
+          "Si se puede inferir un diseño con soporte fuerte, usá supportLevel='inferido_con_soporte' y explicá la base. Si no hay soporte, usá 'No especificado en el documento'.",
+          "Diferenciá: ensayo clínico, cohorte prospectiva, cohorte retrospectiva, caso-control, transversal, revisión sistemática/metaanálisis, guía/consenso, health policy/marco de implementación, quality improvement, evaluación económica, diagnóstico/pronóstico y modelo predictivo.",
+          "Si no hay muestra clínica, no inventarla. Si hay alcance programático, usá sampleDescription. Si no hay duración, no la inventes.",
+          "La descripción breve debe ser concreta, máximo 280 caracteres, y responder de qué trata y por qué importa.",
+          "La descripción ampliada debe tener 1 o 2 párrafos breves, máximo 180 palabras, explicar contexto, población o ámbito y metodología si corresponde, sin reemplazar la lectura del paper.",
+          "Evitá frases genéricas como 'El documento trata sobre' o 'Este artículo habla de'. La clasificación metodológica debe ayudar a un médico a entender qué tipo de evidencia está leyendo."
+        ].join(" ")
     },
     {
       role: "user",
-      content: `Analizá el siguiente evidencePacket extraído del documento y generá una ficha editorial científica en español para la Bitácora Científica:\n${JSON.stringify({
+      content: `Analizá este evidencePacket, la preclasificación determinística y la taxonomía metodológica. Generá la ficha editorial en español y methodologyProfile completo:\n${JSON.stringify({
         mode: packet.mode,
         originalFileName: packet.originalFileName,
         officialUrl: packet.officialUrl,
@@ -700,19 +956,128 @@ const buildOpenAiDocumentPayload = (packet = {}, { model = "" } = {}) => ({
           text: cleanLongText(snippet.text).slice(0, MAX_AI_TEXT_CHARS),
           pages: snippet.pages || []
         })),
+        methodologyEvidence: packet.methodologyEvidence,
+        preclassification: packet.preclassification,
+        scientificMethodologyTaxonomy: SCIENTIFIC_METHODOLOGY_TAXONOMY,
         qualitySignals: packet.qualitySignals
       })}`
     }
   ]
 });
 
-const callDocumentExtractionAI = async (packet = {}, { apiKey = "", fetchImpl = fetch, model = "" } = {}) => {
+const buildOpenAiDocumentCorePayload = (packet = {}, { model = "" } = {}) => ({
+  model: cleanString(model) || DEFAULT_DOCUMENT_EXTRACTION_MODEL,
+  temperature: 0.1,
+  response_format: {
+    type: "json_schema",
+    json_schema: {
+      name: "scientific_article_core_card",
+      strict: true,
+      schema: {
+        type: "object",
+        additionalProperties: false,
+        required: DOCUMENT_CORE_AI_ARTICLE_KEYS,
+        properties: {
+          title: { type: "string" },
+          sourceName: { type: "string" },
+          journal: { type: "string" },
+          authors: { type: "array", items: { type: "string" } },
+          officialUrl: { type: "string" },
+          doi: { type: "string" },
+          publicationDate: { type: "string" },
+          originalLanguage: { type: "string" },
+          articleType: { type: "string" },
+          evidenceType: { type: "string" },
+          accessType: { type: "string", enum: ACCESS_TYPES },
+          briefDescriptionEs: {
+            type: "string",
+            description: "Descripción breve en español, máximo 280 caracteres, para tarjeta."
+          },
+          expandedDescriptionEs: {
+            type: "string",
+            description: "Descripción ampliada en español, máximo 180 palabras."
+          },
+          cardSummaryEs: { type: "string" },
+          executiveSummaryEs: { type: "string" },
+          objectiveEs: { type: "string" },
+          studyDesignEs: { type: "string" },
+          studyContextEs: { type: "string" },
+          studyPopulationEs: { type: "string" },
+          studyLocationEs: { type: "string" },
+          studyPeriodEs: { type: "string" },
+          mainMessageEs: { type: "string" },
+          keyPointsEs: { type: "array", items: { type: "string" } },
+          tags: { type: "array", items: { type: "string" } },
+          warnings: { type: "array", items: { type: "string" } },
+          extractionConfidence: { type: "number", minimum: 0, maximum: 1 }
+        }
+      }
+    }
+  },
+  messages: [
+    {
+      role: "system",
+      content:
+        [
+          "Sos un editor científico médico y comunicador clínico.",
+          "Generá primero una ficha editorial mínima útil en español para revisar antes de guardar.",
+          "Respondé solo JSON válido conforme al schema.",
+          "No inventes datos y no uses conocimiento externo.",
+          "Conservá título, autores, DOI, revista, fecha y URL tal como aparecen.",
+          "La descripción breve debe orientar de qué trata el documento y por qué importa, máximo 280 caracteres.",
+          "La descripción ampliada debe resumir contexto, población o ámbito, metodología general y mensaje principal, máximo 180 palabras.",
+          "Clasificá el tipo de documento en términos médicos útiles: ensayo, cohorte, revisión, guía, consenso, health policy, marco de implementación u otro.",
+          "Si un dato no aparece, dejalo vacío o indicá 'No especificado en el documento' solo cuando sea necesario para entender la ficha.",
+          "No completes metodología avanzada ni evidenceSupport en esta etapa."
+        ].join(" ")
+    },
+    {
+      role: "user",
+      content: `Generá la ficha core en español desde este evidencePacket:\n${JSON.stringify({
+        mode: packet.mode,
+        originalFileName: packet.originalFileName,
+        officialUrl: packet.officialUrl,
+        detectedLanguage: packet.detectedLanguage,
+        pageCount: packet.pageCount,
+        textLength: packet.textLength,
+        detectedMetadata: packet.detectedMetadata,
+        sections: (packet.sections || []).map((section) => ({
+          heading: normalizeSectionHeading(section.heading),
+          text: cleanLongText(section.text).slice(0, getSectionPriority(section.heading) === 0 ? 5200 : 2400),
+          pages: section.pages || []
+        })),
+        snippets: (packet.snippets || []).map((snippet) => ({
+          label: snippet.label,
+          text: cleanLongText(snippet.text).slice(0, 12000),
+          pages: snippet.pages || []
+        })),
+        methodologyHints: {
+          possibleFamilies: packet.preclassification?.possibleFamilies || [],
+          likelyDesigns: packet.preclassification?.likelyDesigns || [],
+          explicitClaims: packet.preclassification?.explicitClaims || [],
+          inferredClaims: packet.preclassification?.inferredClaims || []
+        },
+        qualitySignals: packet.qualitySignals
+      })}`
+    }
+  ]
+});
+
+const callOpenAiStructuredDocument = async ({
+  packet = {},
+  apiKey = "",
+  fetchImpl = fetch,
+  model = "",
+  buildPayload,
+  validateOutput,
+  invalidSchemaMessage = "La IA devolvió un schema incompleto."
+} = {}) => {
   if (!apiKey) {
     return { ok: false, error: { code: "missing_openai_api_key", message: "El servicio de IA no está configurado en backend." } };
   }
   let lastError = { code: "ai_request_failed", message: "No se pudo conectar con el servicio de IA." };
   for (const candidateModel of getConfiguredDocumentModels({ model })) {
-    const payload = buildOpenAiDocumentPayload(packet, { model: candidateModel });
+    const payload = buildPayload(packet, { model: candidateModel });
     try {
       const response = await fetchImpl("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -734,9 +1099,9 @@ const callDocumentExtractionAI = async (packet = {}, { apiKey = "", fetchImpl = 
         lastError = { code: "invalid_ai_json", message: "La IA no devolvió JSON válido.", modelUsed: candidateModel };
         continue;
       }
-      const validation = validateStructuredAIOutput(parsed);
+      const validation = validateOutput(parsed);
       if (!validation.ok) {
-        lastError = { code: "invalid_ai_schema", message: "La IA devolvió un schema incompleto.", modelUsed: candidateModel };
+        lastError = { code: "invalid_ai_schema", message: invalidSchemaMessage, modelUsed: candidateModel, invalid: validation.invalid };
         continue;
       }
       return { ok: true, article: parsed, modelUsed: candidateModel };
@@ -745,6 +1110,104 @@ const callDocumentExtractionAI = async (packet = {}, { apiKey = "", fetchImpl = 
     }
   }
   return { ok: false, error: lastError };
+};
+
+const callDocumentExtractionAI = async (packet = {}, { apiKey = "", fetchImpl = fetch, model = "" } = {}) => {
+  return callOpenAiStructuredDocument({
+    packet,
+    apiKey,
+    fetchImpl,
+    model,
+    buildPayload: buildOpenAiDocumentPayload,
+    validateOutput: validateStructuredAIOutput,
+    invalidSchemaMessage: "La IA devolvió un schema metodológico incompleto."
+  });
+};
+
+const callDocumentCoreExtractionAI = async (packet = {}, { apiKey = "", fetchImpl = fetch, model = "" } = {}) =>
+  callOpenAiStructuredDocument({
+    packet,
+    apiKey,
+    fetchImpl,
+    model,
+    buildPayload: buildOpenAiDocumentCorePayload,
+    validateOutput: validateStructuredCoreAIOutput,
+    invalidSchemaMessage: "La IA devolvió una ficha core incompleta."
+  });
+
+const mergeDocumentExtractionResults = (coreArticle = {}, methodologyArticle = {}) => {
+  const core = coreArticle || {};
+  const methodology = methodologyArticle || {};
+  const merged = buildEmptyArticle();
+  DOCUMENT_ARTICLE_KEYS.forEach((key) => {
+    const advancedValue = methodology[key];
+    const coreValue = core[key];
+    if (Array.isArray(advancedValue) && advancedValue.length) {
+      merged[key] = advancedValue;
+    } else if (!Array.isArray(advancedValue) && cleanString(advancedValue)) {
+      merged[key] = advancedValue;
+    } else if (Array.isArray(coreValue) && coreValue.length) {
+      merged[key] = coreValue;
+    } else if (!Array.isArray(coreValue) && cleanString(coreValue)) {
+      merged[key] = coreValue;
+    }
+  });
+  merged.methodologyProfile = normalizeMethodologyProfile(
+    Object.values(methodology.methodologyProfile || {}).some((value) =>
+      Array.isArray(value) ? value.length : cleanString(value)
+    )
+      ? methodology.methodologyProfile
+      : core.methodologyProfile
+  );
+  merged.cardSummaryEs = merged.cardSummaryEs || merged.briefDescriptionEs;
+  merged.executiveSummaryEs = merged.executiveSummaryEs || merged.expandedDescriptionEs;
+  merged.clinicalQuestionEs = merged.clinicalQuestionEs || merged.objectiveEs;
+  merged.mainResultEs = merged.mainResultEs || merged.mainMessageEs;
+  merged.methodologyEs = merged.methodologyEs || merged.studyDesignEs;
+  merged.sourceName = merged.sourceName || merged.journal;
+  merged.journal = merged.journal || merged.sourceName;
+  merged.extractionConfidence = Math.max(
+    Number(core.extractionConfidence || 0),
+    Number(methodology.extractionConfidence || 0)
+  );
+  merged.warnings = normalizeList([...(core.warnings || []), ...(methodology.warnings || [])], 10);
+  return merged;
+};
+
+const extractCoreArticleFicha = async (packet = {}, { apiKey = "", fetchImpl = fetch, model = "" } = {}) => {
+  const ai = await callDocumentCoreExtractionAI(packet, { apiKey, fetchImpl, model });
+  if (!ai.ok) {
+    return {
+      ok: false,
+      article: buildDeterministicDocumentFallback(packet, {
+        warnings: ["La IA no pudo generar la ficha editorial core."]
+      }),
+      error: ai.error,
+      modelUsed: ai.error?.modelUsed || ""
+    };
+  }
+  return {
+    ok: true,
+    article: normalizeAiDocumentOutput(ai.article, packet),
+    modelUsed: ai.modelUsed || ""
+  };
+};
+
+const extractMethodologyProfile = async (packet = {}, { apiKey = "", fetchImpl = fetch, model = "" } = {}) => {
+  const ai = await callDocumentExtractionAI(packet, { apiKey, fetchImpl, model });
+  if (!ai.ok) {
+    return {
+      ok: false,
+      article: buildEmptyArticle(),
+      error: ai.error,
+      modelUsed: ai.error?.modelUsed || ""
+    };
+  }
+  return {
+    ok: true,
+    article: normalizeAiDocumentOutput(ai.article, packet),
+    modelUsed: ai.modelUsed || ""
+  };
 };
 
 const extractPdfTextFromStorage = async ({ bucket, storagePath, pdfParseImpl = pdfParse } = {}) => {
@@ -901,53 +1364,37 @@ const resolveScientificArticleDocument = async (input = {}, {
   }
 
   if (!apiKey) {
+    const article = buildDeterministicDocumentFallback(packet, {
+      warnings: ["El servicio de IA no está configurado en backend."],
+      extractionConfidence: 0.18
+    });
     return buildDocumentExtractionResponse({
       extractionStatus: "not_configured",
-      article: {
-        ...buildEmptyArticle(),
-        title: packet.detectedMetadata.title,
-        sourceName: packet.detectedMetadata.sourceName,
-        journal: packet.detectedMetadata.journal,
-        authors: packet.detectedMetadata.authors,
-        officialUrl: packet.officialUrl,
-        doi: packet.detectedMetadata.doi,
-        publicationDate: packet.detectedMetadata.publicationDate,
-        originalLanguage: packet.detectedLanguage,
-        warnings: ["El servicio de IA no está configurado en backend."]
-      },
+      article,
       rawEvidence: { ...buildRawEvidence(packet), agentDurations },
       error: { code: "missing_openai_api_key", message: "El servicio de IA no está configurado en backend." }
     });
   }
 
-  const aiStart = now();
-  const ai = await callDocumentExtractionAI(packet, { apiKey, fetchImpl, model: documentModel });
-  agentDurations.aiMs = now() - aiStart;
-  packet.modelUsed = ai.modelUsed || ai.error?.modelUsed || "";
+  const coreStart = now();
+  const core = await extractCoreArticleFicha(packet, { apiKey, fetchImpl, model: documentModel });
+  agentDurations.coreAiMs = now() - coreStart;
 
-  if (!ai.ok) {
-    const article = {
-      ...buildEmptyArticle(),
-      title: packet.detectedMetadata.title,
-      sourceName: packet.detectedMetadata.sourceName,
-      journal: packet.detectedMetadata.journal,
-      authors: packet.detectedMetadata.authors,
-      officialUrl: packet.officialUrl,
-      doi: packet.detectedMetadata.doi,
-      publicationDate: packet.detectedMetadata.publicationDate,
-      originalLanguage: packet.detectedLanguage,
-      warnings: ["La IA no pudo generar una ficha confiable.", ...(packet.warnings || [])],
-      extractionConfidence: 0.22
-    };
-    return buildDocumentExtractionResponse({
-      extractionStatus: computeExtractionStatus(article),
-      article,
-      rawEvidence: { ...buildRawEvidence(packet), agentDurations },
-      error: ai.error
-    });
+  const methodologyStart = now();
+  const methodology = core.ok
+    ? await extractMethodologyProfile(packet, { apiKey, fetchImpl, model: documentModel })
+    : { ok: false, article: buildEmptyArticle(), error: core.error, modelUsed: core.modelUsed };
+  agentDurations.methodologyAiMs = now() - methodologyStart;
+  agentDurations.aiMs = agentDurations.coreAiMs + agentDurations.methodologyAiMs;
+  packet.modelUsed = [core.modelUsed, methodology.modelUsed].filter(Boolean).join(" + ");
+
+  let article = mergeDocumentExtractionResults(core.article, methodology.article);
+  if (!core.ok) {
+    article.warnings.push("La IA no pudo generar una ficha editorial confiable.");
   }
-
-  const article = normalizeAiDocumentOutput(ai.article, packet);
+  if (core.ok && !methodology.ok) {
+    article.warnings.push("No se pudo completar la metodología avanzada; se conservó la ficha editorial.");
+  }
   article.warnings = Array.from(new Set([...(packet.warnings || []), ...(article.warnings || [])])).slice(0, 10);
   const status = computeExtractionStatus(article);
   if (status !== "ai_draft") {
@@ -958,7 +1405,12 @@ const resolveScientificArticleDocument = async (input = {}, {
     extractionStatus: status,
     article,
     rawEvidence: { ...buildRawEvidence(packet), agentDurations },
-    error: status === "failed" ? { code: "insufficient_document_fields", message: "No se detectó contenido científico suficiente." } : undefined
+    error:
+      status === "failed"
+        ? core.error || methodology.error || { code: "insufficient_document_fields", message: "No se detectó contenido científico suficiente." }
+        : methodology.ok
+          ? undefined
+          : methodology.error
   });
 };
 
@@ -966,6 +1418,7 @@ module.exports = {
   ACCESS_TYPES,
   DOCUMENT_AI_ARTICLE_KEYS,
   DOCUMENT_ARTICLE_KEYS,
+  DOCUMENT_CORE_AI_ARTICLE_KEYS,
   DEFAULT_DOCUMENT_EXTRACTION_MODEL,
   DOCUMENT_EXTRACTION_FALLBACK_MODEL,
   MAX_PDF_BYTES,
@@ -973,15 +1426,20 @@ module.exports = {
   MIN_DOCUMENT_TEXT_LENGTH,
   buildDocumentExtractionResponse,
   buildEvidencePacket,
+  buildOpenAiDocumentCorePayload,
   buildOpenAiDocumentPayload,
   buildRawEvidence,
   callDocumentExtractionAI,
+  callDocumentCoreExtractionAI,
   cleanLongText,
   computeExtractionStatus,
   detectDoi,
   detectLanguage,
   extractSectionsFromText,
+  extractCoreArticleFicha,
+  extractMethodologyProfile,
   getConfiguredDocumentModels,
+  mergeDocumentExtractionResults,
   normalizeAiDocumentOutput,
   parseJsonObjectFromText,
   resolveScientificArticleDocument,

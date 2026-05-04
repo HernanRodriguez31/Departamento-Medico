@@ -539,15 +539,6 @@ service cloud.firestore {
         && validCalendarMinutes(request.resource.data);
     }
 
-    function validBitacoraStatus(data) {
-      return data.status is string
-        && (
-          data.status == "pending_review"
-          || data.status == "published"
-          || data.status == "draft"
-        );
-    }
-
     function validBitacoraCreateStatus(data) {
       return data.status is string
         && (
@@ -593,112 +584,31 @@ service cloud.firestore {
         );
     }
 
-    function validBitacoraBibliographicFields(data) {
-      return data.title is string
-        && data.title.size() <= 500
-        && data.sourceName is string
-        && data.sourceName.size() <= 180
-        && data.journal is string
-        && data.journal.size() <= 180
-        && data.authors is list
-        && data.authors.size() <= 30
-        && data.sourceDomain is string
-        && data.sourceDomain.size() <= 180
-        && data.officialUrl is string
-        && data.officialUrl.size() <= 1200
-        && data.doi is string
-        && data.doi.size() <= 240
-        && data.pmid is string
-        && data.pmid.size() <= 32
-        && data.pmcid is string
-        && data.pmcid.size() <= 32
-        && data.nctId is string
-        && data.nctId.size() <= 32
-        && data.pii is string
-        && data.pii.size() <= 80
-        && data.studyType is string
-        && data.studyType.size() <= 180
-        && data.evidenceType is string
-        && data.evidenceType.size() <= 180
-        && data.publicationDate is string
-        && data.publicationDate.size() <= 80
-        && data.originalLanguage is string
-        && data.originalLanguage.size() <= 80
-        && data.articleType is string
-        && data.articleType.size() <= 160
-        && data.studyLocation is string
-        && data.studyLocation.size() <= 260;
+    function validBitacoraUpdatedByShape(data) {
+      return !data.keys().hasAny(["updatedBy"])
+        || (
+          data.updatedBy is map
+          && data.updatedBy.keys().hasOnly(["uid", "displayName", "email", "photoURL"])
+          && data.updatedBy.keys().hasAll(["uid", "displayName", "email"])
+          && data.updatedBy.uid is string
+          && data.updatedBy.displayName is string
+          && data.updatedBy.email is string
+          && data.updatedBy.displayName.size() > 0
+          && data.updatedBy.displayName.size() <= 160
+          && data.updatedBy.email.size() <= 240
+          && (
+            !data.updatedBy.keys().hasAny(["photoURL"])
+            || data.updatedBy.photoURL is string
+          )
+        );
     }
 
-    function validBitacoraContextFields(data) {
-      return data.studyDesignEs is string
-        && data.studyDesignEs.size() <= 3000
-        && data.studyContextEs is string
-        && data.studyContextEs.size() <= 3000
-        && data.studyPopulationEs is string
-        && data.studyPopulationEs.size() <= 2600
-        && data.studyLocationEs is string
-        && data.studyLocationEs.size() <= 1200
-        && data.studyPeriodEs is string
-        && data.studyPeriodEs.size() <= 600;
-    }
-
-    function validBitacoraEditorialFields(data) {
-      return data.cardSummaryEs is string
-        && data.cardSummaryEs.size() <= 700
-        && data.executiveSummary is string
-        && data.executiveSummary.size() <= 8000
-        && data.executiveSummaryEs is string
-        && data.executiveSummaryEs.size() <= 8000
-        && data.abstractSummaryEs is string
-        && data.abstractSummaryEs.size() <= 8000
-        && data.objectiveEs is string
-        && data.objectiveEs.size() <= 3000
-        && data.clinicalQuestion is string
-        && data.clinicalQuestion.size() <= 3000
-        && data.clinicalQuestionEs is string
-        && data.clinicalQuestionEs.size() <= 3000
-        && data.mainMessageEs is string
-        && data.mainMessageEs.size() <= 4000
-        && data.mainResult is string
-        && data.mainResult.size() <= 4000
-        && data.mainResultEs is string
-        && data.mainResultEs.size() <= 4000
-        && data.methodologyEs is string
-        && data.methodologyEs.size() <= 5000
-        && data.keyPointsEs is list
-        && data.keyPointsEs.size() <= 12
-        && data.limitationsEs is string
-        && data.limitationsEs.size() <= 5000
-        && data.localApplicabilityEs is string
-        && data.localApplicabilityEs.size() <= 5000
-        && data.occupationalHealthRelevanceEs is string
-        && data.occupationalHealthRelevanceEs.size() <= 5000
-        && data.tags is list
-        && data.tags.size() <= 12
-        && data.accessType is string
-        && data.accessType.size() <= 80
-        && data.userComment is string
-        && data.userComment.size() <= 4000
-        && data.sourcePages is list
-        && data.sourcePages.size() <= 20;
-    }
-
-    function validBitacoraDocumentFields(data) {
-      return validBitacoraExtractionSource(data)
-        && data.originalFileName is string
-        && data.originalFileName.size() <= 180
-        && data.storagePath is string
-        && data.storagePath.size() <= 500
-        && data.fileSize is number
-        && data.fileSize >= 0
-        && data.fileSize <= 20971520
-        && data.documentContentType is string
-        && data.documentContentType.size() <= 120
-        && data.contentHash is string
-        && data.contentHash.size() <= 128
-        && data.pageCount is number
-        && data.pageCount >= 0;
+    function validBitacoraMethodologyProfile(data) {
+      return !data.keys().hasAny(["methodologyProfile"])
+        || (
+          data.methodologyProfile is map
+          && data.methodologyProfile.keys().size() <= 48
+        );
     }
 
     function validBitacoraFinalCompleteness(data) {
@@ -706,7 +616,13 @@ service cloud.firestore {
         || (
           data.title.size() > 0
           && (data.sourceName.size() > 0 || data.journal.size() > 0)
-          && (data.cardSummaryEs.size() > 0 || data.executiveSummaryEs.size() > 0 || data.executiveSummary.size() > 0)
+          && (
+            (data.keys().hasAny(["briefDescriptionEs"]) && data.briefDescriptionEs.size() > 0)
+            || data.cardSummaryEs.size() > 0
+            || (data.keys().hasAny(["expandedDescriptionEs"]) && data.expandedDescriptionEs.size() > 0)
+            || data.executiveSummaryEs.size() > 0
+            || data.executiveSummary.size() > 0
+          )
           && (
             data.executiveSummaryEs.size() > 0
             || data.objectiveEs.size() > 0
@@ -722,48 +638,270 @@ service cloud.firestore {
         );
     }
 
-    function validBitacoraWorkflowFields(data) {
-      return validBitacoraStatus(data)
-        && validBitacoraExtractionStatus(data)
-        && validBitacoraFinalCompleteness(data)
-        && !data.keys().hasAny(["unsafeHtml", "html", "rawHtml", "script"])
-        && data.extractionWarnings is list
-        && data.extractionWarnings.size() <= 8
-        && (
-          !data.keys().hasAny(["extractionConfidence"])
-          || data.extractionConfidence is number
-        )
-        && validBitacoraCreatedByShape(data)
-        && data.createdAt is timestamp
-        && data.updatedAt is timestamp;
+    function bitacoraArticleCreateKeys() {
+      return [
+        "title",
+        "sourceName",
+        "journal",
+        "authors",
+        "sourceDomain",
+        "officialUrl",
+        "doi",
+        "pmid",
+        "pmcid",
+        "nctId",
+        "pii",
+        "studyType",
+        "evidenceType",
+        "publicationDate",
+        "originalLanguage",
+        "articleType",
+        "studyLocation",
+        "studyDesignEs",
+        "studyContextEs",
+        "studyPopulationEs",
+        "studyLocationEs",
+        "studyPeriodEs",
+        "briefDescriptionEs",
+        "expandedDescriptionEs",
+        "cardSummaryEs",
+        "executiveSummary",
+        "executiveSummaryEs",
+        "abstractSummaryEs",
+        "objectiveEs",
+        "clinicalQuestion",
+        "clinicalQuestionEs",
+        "mainMessageEs",
+        "mainResult",
+        "mainResultEs",
+        "methodologyEs",
+        "keyPointsEs",
+        "limitationsEs",
+        "localApplicabilityEs",
+        "occupationalHealthRelevanceEs",
+        "methodologyProfile",
+        "tags",
+        "accessType",
+        "userComment",
+        "sourcePages",
+        "extractionSource",
+        "originalFileName",
+        "storagePath",
+        "fileSize",
+        "documentContentType",
+        "contentHash",
+        "pageCount",
+        "status",
+        "extractionStatus",
+        "extractionWarnings",
+        "extractionConfidence",
+        "createdBy",
+        "createdAt",
+        "updatedBy",
+        "updatedAt"
+      ];
     }
 
-    function validBitacoraArticleData(data) {
-      return validBitacoraBibliographicFields(data)
-        && validBitacoraContextFields(data)
-        && validBitacoraEditorialFields(data)
-        && validBitacoraDocumentFields(data)
-        && validBitacoraWorkflowFields(data);
+    function validBitacoraArticleCreateData(data) {
+      return data.keys().hasOnly(bitacoraArticleCreateKeys())
+        && validBitacoraCreateStatus(data)
+        && validBitacoraExtractionStatus(data)
+        && validBitacoraExtractionSource(data)
+        && data.title is string
+        && data.title.size() <= 500
+        && data.sourceName is string
+        && data.sourceName.size() <= 180
+        && data.officialUrl is string
+        && data.officialUrl.size() <= 1200
+        && (!data.keys().hasAny(["authors"]) || (data.authors is list && data.authors.size() <= 30))
+        && (!data.keys().hasAny(["tags"]) || (data.tags is list && data.tags.size() <= 12))
+        && (!data.keys().hasAny(["keyPointsEs"]) || (data.keyPointsEs is list && data.keyPointsEs.size() <= 12))
+        && (!data.keys().hasAny(["sourcePages"]) || data.sourcePages is list)
+        && validBitacoraMethodologyProfile(data)
+        && validBitacoraCreatedByShape(data)
+        && validBitacoraUpdatedByShape(data)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp
+        && validBitacoraFinalCompleteness(data);
     }
 
     function validBitacoraArticleCreate() {
       return signedIn()
-        && validBitacoraArticleData(request.resource.data)
-        && validBitacoraCreateStatus(request.resource.data)
+        && validBitacoraArticleCreateData(request.resource.data)
         && request.resource.data.createdBy.uid == request.auth.uid;
     }
 
-    function validBitacoraArticleAdminUpdate() {
-      return isAdmin()
-        && validBitacoraArticleData(request.resource.data)
-        && request.resource.data.createdBy == resource.data.createdBy
-        && request.resource.data.createdAt == resource.data.createdAt;
+    function bitacoraArticleEditableKeys() {
+      return [
+        "title",
+        "sourceName",
+        "journal",
+        "authors",
+        "sourceDomain",
+        "officialUrl",
+        "doi",
+        "pmid",
+        "pmcid",
+        "nctId",
+        "pii",
+        "studyType",
+        "evidenceType",
+        "publicationDate",
+        "originalLanguage",
+        "articleType",
+        "studyLocation",
+        "studyDesignEs",
+        "studyContextEs",
+        "studyPopulationEs",
+        "studyLocationEs",
+        "studyPeriodEs",
+        "briefDescriptionEs",
+        "expandedDescriptionEs",
+        "cardSummaryEs",
+        "executiveSummary",
+        "executiveSummaryEs",
+        "abstractSummaryEs",
+        "objectiveEs",
+        "clinicalQuestion",
+        "clinicalQuestionEs",
+        "mainMessageEs",
+        "mainResult",
+        "mainResultEs",
+        "methodologyEs",
+        "keyPointsEs",
+        "limitationsEs",
+        "localApplicabilityEs",
+        "occupationalHealthRelevanceEs",
+        "methodologyProfile",
+        "tags",
+        "accessType",
+        "userComment",
+        "sourcePages",
+        "extractionWarnings",
+        "extractionConfidence",
+        "updatedBy",
+        "updatedAt"
+      ];
+    }
+
+    function bitacoraArticleChangedOnlyEditable() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(bitacoraArticleEditableKeys());
+    }
+
+    function validBitacoraArticleEditedFields() {
+      return bitacoraArticleChangedOnlyEditable()
+        && request.resource.data.title is string
+        && request.resource.data.title.size() <= 500
+        && request.resource.data.sourceName is string
+        && request.resource.data.sourceName.size() <= 180
+        && request.resource.data.officialUrl is string
+        && request.resource.data.officialUrl.size() <= 1200
+        && (!request.resource.data.keys().hasAny(["authors"]) || (request.resource.data.authors is list && request.resource.data.authors.size() <= 30))
+        && (!request.resource.data.keys().hasAny(["tags"]) || (request.resource.data.tags is list && request.resource.data.tags.size() <= 12))
+        && (!request.resource.data.keys().hasAny(["keyPointsEs"]) || (request.resource.data.keyPointsEs is list && request.resource.data.keyPointsEs.size() <= 12))
+        && (!request.resource.data.keys().hasAny(["sourcePages"]) || request.resource.data.sourcePages is list)
+        && validBitacoraMethodologyProfile(request.resource.data)
+        && request.resource.data.updatedAt is timestamp
+        && request.resource.data.updatedBy is map
+        && request.resource.data.updatedBy.keys().hasOnly(["uid", "displayName", "email", "photoURL"])
+        && request.resource.data.updatedBy.keys().hasAll(["uid", "displayName", "email"])
+        && request.resource.data.updatedBy.uid == request.auth.uid
+        && request.resource.data.updatedBy.displayName is string
+        && request.resource.data.updatedBy.email is string
+        && request.resource.data.updatedBy.displayName.size() > 0
+        && request.resource.data.updatedBy.displayName.size() <= 160
+        && request.resource.data.updatedBy.email.size() <= 240
+        && (
+          !request.resource.data.updatedBy.keys().hasAny(["photoURL"])
+          || request.resource.data.updatedBy.photoURL is string
+        )
+        && validBitacoraFinalCompleteness(request.resource.data);
+    }
+
+    function validBitacoraArticleManagerUpdate() {
+      return signedIn()
+        && (isBitacoraArticleOwner(resource.data) || isAdmin())
+        && validBitacoraArticleEditedFields();
     }
 
     function isBitacoraArticleOwner(data) {
       return signedIn()
         && data.createdBy is map
         && data.createdBy.uid == request.auth.uid;
+    }
+
+    function validBitacoraSocialActor(data) {
+      return data.keys().hasOnly(["uid", "displayName", "email", "photoURL"])
+        && data.keys().hasAll(["uid", "displayName", "email"])
+        && data.uid is string
+        && data.displayName is string
+        && data.email is string
+        && data.uid == request.auth.uid
+        && data.displayName.size() > 0
+        && data.displayName.size() <= 160
+        && data.email.size() <= 240
+        && (!data.keys().hasAny(["photoURL"]) || data.photoURL is string);
+    }
+
+    function validBitacoraLikeCreate(userId) {
+      return signedIn()
+        && userId == request.auth.uid
+        && request.resource.data.keys().hasOnly(["uid", "displayName", "email", "photoURL", "createdAt"])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() > 0
+        && request.resource.data.displayName.size() <= 160
+        && request.resource.data.email is string
+        && request.resource.data.email.size() <= 240
+        && (!request.resource.data.keys().hasAny(["photoURL"]) || request.resource.data.photoURL is string)
+        && request.resource.data.createdAt is timestamp;
+    }
+
+    function bitacoraCommentKeys() {
+      return ["text", "createdBy", "createdAt", "updatedAt", "status", "deletedAt", "deletedBy"];
+    }
+
+    function validBitacoraCommentText(text) {
+      return text is string
+        && text.size() > 0
+        && text.size() <= 1000
+        && text.matches("[^<>]*");
+    }
+
+    function validBitacoraCommentCreate() {
+      return signedIn()
+        && request.resource.data.keys().hasOnly(bitacoraCommentKeys())
+        && validBitacoraCommentText(request.resource.data.text)
+        && request.resource.data.createdBy is map
+        && validBitacoraSocialActor(request.resource.data.createdBy)
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp
+        && request.resource.data.status == "visible"
+        && request.resource.data.deletedAt == null
+        && request.resource.data.deletedBy == "";
+    }
+
+    function validBitacoraCommentUpdate() {
+      return signedIn()
+        && (resource.data.createdBy.uid == request.auth.uid || isAdmin())
+        && request.resource.data.keys().hasOnly(bitacoraCommentKeys())
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedAt is timestamp
+        && (
+          (
+            request.resource.data.status == "visible"
+            && validBitacoraCommentText(request.resource.data.text)
+            && request.resource.data.deletedAt == resource.data.deletedAt
+            && request.resource.data.deletedBy == resource.data.deletedBy
+          )
+          || (
+            request.resource.data.status == "deleted"
+            && request.resource.data.text == "Comentario eliminado"
+            && request.resource.data.deletedAt is timestamp
+            && request.resource.data.deletedBy == request.auth.uid
+          )
+        );
     }
 
     // CAMBIO AQUI: Solo permitimos LEER la configuración (el candado cerrado)
@@ -877,8 +1015,29 @@ service cloud.firestore {
     match /bitacoraArticles/{articleId} {
       allow read: if signedIn();
       allow create: if validBitacoraArticleCreate();
-      allow update: if validBitacoraArticleAdminUpdate();
+      allow update: if validBitacoraArticleManagerUpdate();
       allow delete: if isBitacoraArticleOwner(resource.data) || isAdmin();
+
+      match /likes/{userId} {
+        allow read: if signedIn();
+        allow create: if validBitacoraLikeCreate(userId);
+        allow update: if false;
+        allow delete: if signedIn() && userId == request.auth.uid;
+      }
+
+      match /comments/{commentId} {
+        allow read: if signedIn();
+        allow create: if validBitacoraCommentCreate();
+        allow update: if validBitacoraCommentUpdate();
+        allow delete: if signedIn() && (resource.data.createdBy.uid == request.auth.uid || isAdmin());
+
+        match /likes/{userId} {
+          allow read: if signedIn();
+          allow create: if validBitacoraLikeCreate(userId);
+          allow update: if false;
+          allow delete: if signedIn() && userId == request.auth.uid;
+        }
+      }
     }
 
     match /dm_posts/{postId} {

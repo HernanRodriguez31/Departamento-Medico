@@ -55,7 +55,8 @@ test("desktop portal cube opens three accessible actions", async ({ page }) => {
     "href",
     "https://brisasaludybienestar.com/"
   );
-  await expect(page.locator("#portal-logbook")).toHaveAttribute("href", "/bitacora-cientifica");
+  await expect(page.locator("#portal-gallery")).toHaveAttribute("href", "/galeriadearte.html");
+  await expect(page.locator("#portal-logbook")).toHaveAttribute("href", "/bitacora-cientifica.html");
 
   await expect(page.locator("#portal-gallery")).not.toBeFocused();
   await expectTooltipHidden(page.locator("#portal-gallery"));
@@ -92,14 +93,14 @@ test("desktop portal cube opens three accessible actions", async ({ page }) => {
 
   await openPortalMenu(page);
   await page.locator("#portal-gallery").click();
-  await page.waitForURL(/\/galeriadearte(\?dmEmulators=1)?$/, { timeout: 30_000 });
+  await page.waitForURL(/\/galeriadearte\.html\?dmEmulators=1$/, { timeout: 30_000 });
   await expect(page.locator("#art-gallery-heading")).toHaveText("Galería de Arte");
 
   await page.goto(PORTAL_URL);
   await openPortalMenu(page);
   await page.locator("#portal-logbook").click();
-  await page.waitForURL(/\/bitacora-cientifica\?dmEmulators=1$/, { timeout: 30_000 });
-  await expect(page.locator("#bitacora-heading")).toHaveText("Bitácora Científica");
+  await page.waitForURL(/\/bitacora-cientifica\.html\?dmEmulators=1$/, { timeout: 30_000 });
+  await expect(page.locator("#bitacora-heading")).toHaveText("Bitácora de Ciencia Médica");
 
   const criticalErrors = consoleErrors.filter(
     (text) => !/favicon|net::ERR_ABORTED|ResizeObserver loop|Could not reach Cloud Firestore backend/i.test(text)

@@ -47,6 +47,9 @@ const {
   resolveScientificArticleDocument,
   scoreDocumentArticle,
 } = require("./scientificArticleDocumentExtraction");
+const {
+  buildEmptyMethodologyProfile,
+} = require("./scientificMethodologyTaxonomy");
 
 // Inicializacion
 admin.initializeApp();
@@ -75,6 +78,15 @@ const ARTICLE_EXTRACTION_RATE_LIMIT_MAX = 8;
 const ARTICLE_DOCUMENT_EXTRACTION_RATE_LIMIT_MAX = 6;
 const PUSH_MESSAGE_BODY = "Tienes un nuevo mensaje";
 const PUSH_ACTIVITY_BODY = "Hay nueva actividad en la aplicación";
+
+const redactStoragePath = (value = "") => {
+  const clean = cleanString(value);
+  if (!clean) return "";
+  const parts = clean.split("/");
+  const fileName = parts.pop() || "";
+  const owner = parts.pop() || "";
+  return `${parts.join("/")}/${owner ? `${owner.slice(0, 4)}…` : ""}/${fileName.slice(0, 18)}…`;
+};
 const PUSH_NOTIFICATION_BODY = "Tienes una nueva notificación";
 const aiRateLimitByUid = new Map();
 const articleExtractionRateLimitByUid = new Map();
@@ -1201,9 +1213,15 @@ const extractScientificArticleDocumentHandler = async (req, res) => {
     const article = result.article || {};
     const rawEvidence = result.rawEvidence || {};
     const quality = scoreDocumentArticle(article);
+    const missingCriticalFields = ["title", "source", "description"].filter((field) => {
+      if (field === "title") return !article.title;
+      if (field === "source") return !(article.sourceName || article.journal);
+      return !(article.briefDescriptionEs || article.cardSummaryEs || article.expandedDescriptionEs || article.executiveSummaryEs);
+    });
     logDocumentExtraction(200, {
       mode: rawEvidence.mode || body.mode || "",
       originalFileName: rawEvidence.originalFileName || body.originalFileName || "",
+      storagePath: redactStoragePath(rawEvidence.storagePath || body.storagePath || ""),
       fileSize: rawEvidence.fileSize || 0,
       pageCount: rawEvidence.pageCount || 0,
       textLength: rawEvidence.textLength || 0,
@@ -1211,11 +1229,14 @@ const extractScientificArticleDocumentHandler = async (req, res) => {
       detectedTitle: Boolean(article.title),
       detectedDOI: Boolean(article.doi),
       detectedSource: Boolean(article.sourceName || article.journal),
+      summaryDetected: Boolean(rawEvidence.qualitySignals?.hasAbstractOrSummary),
+      openAiCalled: Boolean(rawEvidence.modelUsed),
       sectionsDetected: rawEvidence.extractedSections || [],
       extractionStatus: result.extractionStatus,
       extractionConfidence: article.extractionConfidence || 0,
       modelUsed: rawEvidence.modelUsed || "",
       completedFields: quality.completedFields || [],
+      missingCriticalFields,
       warnings: article.warnings || [],
       agentDurations: rawEvidence.agentDurations || {},
       error: result.error?.code,
@@ -1243,6 +1264,8 @@ const extractScientificArticleDocumentHandler = async (req, res) => {
         studyType: "",
         evidenceType: "",
         accessType: "Pendiente",
+        briefDescriptionEs: "",
+        expandedDescriptionEs: "",
         cardSummaryEs: "",
         executiveSummaryEs: "",
         abstractSummaryEs: "",
@@ -1260,6 +1283,7 @@ const extractScientificArticleDocumentHandler = async (req, res) => {
         limitationsEs: "",
         localApplicabilityEs: "",
         occupationalHealthRelevanceEs: "",
+        methodologyProfile: buildEmptyMethodologyProfile(),
         tags: [],
         sourcePages: [],
         extractionConfidence: 0,
@@ -1599,7 +1623,11 @@ exports.extractScientificArticle = onRequest(
 );
 
 exports.extractScientificArticleDocument = onRequest(
-  { secrets: ["OPENAI_API_KEY"] },
+  {
+    secrets: ["OPENAI_API_KEY"],
+    timeoutSeconds: 180,
+    memory: "512MiB",
+  },
   extractScientificArticleDocumentHandler
 );
 

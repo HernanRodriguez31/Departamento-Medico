@@ -3,10 +3,14 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
+  getDocs,
   onSnapshot,
   orderBy,
   query,
-  serverTimestamp
+  serverTimestamp,
+  setDoc,
+  updateDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import {
   deleteObject,
@@ -19,6 +23,7 @@ const STATUS_VALUES = new Set(["pending_review", "published", "draft"]);
 const EXTRACTION_STATUS_VALUES = new Set(["manual", "ai_draft", "metadata_only", "failed", "not_configured"]);
 
 const cleanString = (value = "") => String(value || "").trim();
+const sanitizeCommentText = (value = "") => cleanString(value).replace(/[<>]/g, "").slice(0, 1000).trim();
 
 const cleanStringList = (items = []) =>
   Array.from(
@@ -28,6 +33,69 @@ const cleanStringList = (items = []) =>
         .filter(Boolean)
     )
   ).slice(0, 12);
+
+const METHODOLOGY_LIST_FIELDS = new Set([
+  "countriesIncluded",
+  "institutions",
+  "secondaryOutcomes",
+  "effectMeasures",
+  "methodologicalStrengths",
+  "methodologicalLimitations",
+  "applicabilityNotes",
+  "methodologyWarnings"
+]);
+
+const METHODOLOGY_PROFILE_KEYS = [
+  "studyFamily",
+  "studyFamilyEs",
+  "specificDesign",
+  "designCategoryEs",
+  "temporalDirection",
+  "centerScope",
+  "isMulticenter",
+  "multicenterRationale",
+  "setting",
+  "countryOrRegion",
+  "countriesIncluded",
+  "institutions",
+  "studyPopulation",
+  "sampleSize",
+  "sampleDescription",
+  "studyPeriod",
+  "studyDuration",
+  "recruitmentPeriod",
+  "followUpDuration",
+  "dataSource",
+  "interventionOrExposure",
+  "comparator",
+  "primaryOutcome",
+  "secondaryOutcomes",
+  "statisticalApproach",
+  "effectMeasures",
+  "reportingGuideline",
+  "methodologicalStrengths",
+  "methodologicalLimitations",
+  "applicabilityNotes",
+  "classificationRationale",
+  "classificationConfidence",
+  "evidenceSupport",
+  "methodologyWarnings"
+];
+
+const cleanMethodologyProfile = (input = {}) =>
+  METHODOLOGY_PROFILE_KEYS.reduce((profile, key) => {
+    const value = input && typeof input === "object" ? input[key] : "";
+    if (METHODOLOGY_LIST_FIELDS.has(key)) {
+      profile[key] = cleanStringList(value);
+    } else if (key === "isMulticenter") {
+      profile[key] = value === true || value === "true" || value === "sí" || value === "si";
+    } else if (key === "evidenceSupport") {
+      profile[key] = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    } else {
+      profile[key] = cleanString(value);
+    }
+    return profile;
+  }, {});
 
 const toDate = (value) => {
   if (!value) return null;
@@ -53,11 +121,15 @@ const buildCreatedBy = (user) => {
   return createdBy;
 };
 
+const buildUpdatedBy = (user) => buildCreatedBy(user);
+
 const buildPayload = (input = {}, user) => {
   const status = normalizeStatus(input.status);
   const extractionStatus = normalizeExtractionStatus(input.extractionStatus);
   const objective = cleanString(input.objectiveEs || input.clinicalQuestionEs || input.clinicalQuestion);
   const mainMessage = cleanString(input.mainMessageEs || input.mainResultEs || input.mainResult);
+  const briefDescription = cleanString(input.briefDescriptionEs || input.cardSummaryEs);
+  const expandedDescription = cleanString(input.expandedDescriptionEs || input.executiveSummaryEs || input.executiveSummary);
   const payload = {
     title: cleanString(input.title),
     sourceName: cleanString(input.sourceName),
@@ -81,9 +153,11 @@ const buildPayload = (input = {}, user) => {
     studyPopulationEs: cleanString(input.studyPopulationEs),
     studyLocationEs: cleanString(input.studyLocationEs),
     studyPeriodEs: cleanString(input.studyPeriodEs),
-    cardSummaryEs: cleanString(input.cardSummaryEs),
-    executiveSummary: cleanString(input.executiveSummary),
-    executiveSummaryEs: cleanString(input.executiveSummaryEs),
+    briefDescriptionEs: briefDescription,
+    expandedDescriptionEs: expandedDescription,
+    cardSummaryEs: cleanString(input.cardSummaryEs) || briefDescription,
+    executiveSummary: cleanString(input.executiveSummary) || expandedDescription,
+    executiveSummaryEs: cleanString(input.executiveSummaryEs) || expandedDescription,
     abstractSummaryEs: cleanString(input.abstractSummaryEs),
     objectiveEs: objective,
     clinicalQuestion: objective,
@@ -96,6 +170,7 @@ const buildPayload = (input = {}, user) => {
     limitationsEs: cleanString(input.limitationsEs),
     localApplicabilityEs: cleanString(input.localApplicabilityEs),
     occupationalHealthRelevanceEs: cleanString(input.occupationalHealthRelevanceEs),
+    methodologyProfile: cleanMethodologyProfile(input.methodologyProfile),
     tags: cleanStringList(input.tags),
     accessType: cleanString(input.accessType) || "Pendiente",
     userComment: cleanString(input.userComment),
@@ -111,6 +186,7 @@ const buildPayload = (input = {}, user) => {
     extractionStatus,
     extractionWarnings: cleanStringList(input.extractionWarnings),
     createdBy: buildCreatedBy(user),
+    updatedBy: buildUpdatedBy(user),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   };
@@ -123,9 +199,20 @@ const buildPayload = (input = {}, user) => {
   return payload;
 };
 
+const buildUpdatePayload = (input = {}, user) => {
+  const payload = buildPayload(input, user);
+  delete payload.createdBy;
+  delete payload.createdAt;
+  payload.updatedBy = buildUpdatedBy(user);
+  payload.updatedAt = serverTimestamp();
+  return payload;
+};
+
 export const normalizeBitacoraArticle = (id, data = {}, meta = {}) => {
   const objective = cleanString(data.objectiveEs || data.clinicalQuestionEs || data.clinicalQuestion);
   const mainMessage = cleanString(data.mainMessageEs || data.mainResultEs || data.mainResult);
+  const briefDescription = cleanString(data.briefDescriptionEs || data.cardSummaryEs);
+  const expandedDescription = cleanString(data.expandedDescriptionEs || data.executiveSummaryEs || data.executiveSummary);
   return {
   id,
   title: cleanString(data.title),
@@ -150,9 +237,11 @@ export const normalizeBitacoraArticle = (id, data = {}, meta = {}) => {
   studyPopulationEs: cleanString(data.studyPopulationEs),
   studyLocationEs: cleanString(data.studyLocationEs || data.studyLocation),
   studyPeriodEs: cleanString(data.studyPeriodEs),
-  cardSummaryEs: cleanString(data.cardSummaryEs),
-  executiveSummary: cleanString(data.executiveSummary),
-  executiveSummaryEs: cleanString(data.executiveSummaryEs),
+  briefDescriptionEs: briefDescription,
+  expandedDescriptionEs: expandedDescription,
+  cardSummaryEs: cleanString(data.cardSummaryEs) || briefDescription,
+  executiveSummary: cleanString(data.executiveSummary) || expandedDescription,
+  executiveSummaryEs: cleanString(data.executiveSummaryEs) || expandedDescription,
   abstractSummaryEs: cleanString(data.abstractSummaryEs),
   objectiveEs: objective,
   clinicalQuestion: objective,
@@ -165,6 +254,7 @@ export const normalizeBitacoraArticle = (id, data = {}, meta = {}) => {
   limitationsEs: cleanString(data.limitationsEs),
   localApplicabilityEs: cleanString(data.localApplicabilityEs),
   occupationalHealthRelevanceEs: cleanString(data.occupationalHealthRelevanceEs),
+  methodologyProfile: cleanMethodologyProfile(data.methodologyProfile),
   tags: cleanStringList(data.tags),
   accessType: cleanString(data.accessType) || "Pendiente",
   userComment: cleanString(data.userComment),
@@ -187,6 +277,12 @@ export const normalizeBitacoraArticle = (id, data = {}, meta = {}) => {
     displayName: cleanString(data.createdBy?.displayName) || cleanString(data.createdBy?.email) || "Usuario",
     email: cleanString(data.createdBy?.email),
     photoURL: cleanString(data.createdBy?.photoURL)
+  },
+  updatedBy: {
+    uid: cleanString(data.updatedBy?.uid),
+    displayName: cleanString(data.updatedBy?.displayName) || cleanString(data.updatedBy?.email),
+    email: cleanString(data.updatedBy?.email),
+    photoURL: cleanString(data.updatedBy?.photoURL)
   },
   createdAt: toDate(data.createdAt),
   updatedAt: toDate(data.updatedAt),
@@ -278,6 +374,54 @@ export function createBitacoraArticleRepository({ db, auth, storage } = {}) {
     return localArticle;
   };
 
+  const updateArticle = async (articleId = "", input = {}) => {
+    const id = cleanString(articleId);
+    if (!id) return null;
+    const user = auth?.currentUser;
+    if (!user) {
+      throw new Error("AUTH_REQUIRED");
+    }
+
+    const optimisticDate = new Date();
+    const updatedBy = buildUpdatedBy(user);
+    const payload = buildUpdatePayload(input, user);
+
+    if (db && mode === "firestore") {
+      await updateDoc(doc(db, COLLECTION_NAME, id), payload);
+      return normalizeBitacoraArticle(
+        id,
+        {
+          ...input,
+          ...payload,
+          createdBy: input.createdBy,
+          createdAt: input.createdAt,
+          updatedAt: optimisticDate,
+          updatedBy
+        },
+        { mode: "firestore", optimistic: true }
+      );
+    }
+
+    const index = memoryArticles.findIndex((article) => article.id === id);
+    if (index === -1) return null;
+    const nextArticle = normalizeBitacoraArticle(
+      id,
+      {
+        ...memoryArticles[index],
+        ...input,
+        ...payload,
+        createdBy: memoryArticles[index].createdBy,
+        createdAt: memoryArticles[index].createdAt,
+        updatedAt: optimisticDate,
+        updatedBy
+      },
+      { mode: "memory" }
+    );
+    memoryArticles = memoryArticles.map((article) => (article.id === id ? nextArticle : article));
+    emitMemory();
+    return nextArticle;
+  };
+
   const deleteArticle = async (articleId = "", { storagePath = "" } = {}) => {
     const id = cleanString(articleId);
     if (!id) return;
@@ -304,10 +448,265 @@ export function createBitacoraArticleRepository({ db, auth, storage } = {}) {
     emitMemory();
   };
 
+  const articleSubcollection = (articleId = "", subcollection = "") => {
+    const id = cleanString(articleId);
+    if (!db || !id || !subcollection) return null;
+    return collection(db, COLLECTION_NAME, id, subcollection);
+  };
+
+  const commentLikesCollection = (articleId = "", commentId = "") => {
+    const article = cleanString(articleId);
+    const comment = cleanString(commentId);
+    if (!db || !article || !comment) return null;
+    return collection(db, COLLECTION_NAME, article, "comments", comment, "likes");
+  };
+
+  const normalizeLike = (id = "", data = {}) => ({
+    id,
+    uid: cleanString(data.uid || id),
+    displayName: cleanString(data.displayName) || cleanString(data.email) || "Usuario",
+    email: cleanString(data.email),
+    photoURL: cleanString(data.photoURL),
+    createdAt: toDate(data.createdAt)
+  });
+
+  const normalizeComment = (id = "", data = {}) => ({
+    id,
+    text: cleanString(data.text),
+    status: cleanString(data.status) || "visible",
+    createdBy: {
+      uid: cleanString(data.createdBy?.uid),
+      displayName: cleanString(data.createdBy?.displayName) || cleanString(data.createdBy?.email) || "Usuario",
+      email: cleanString(data.createdBy?.email),
+      photoURL: cleanString(data.createdBy?.photoURL)
+    },
+    createdAt: toDate(data.createdAt),
+    updatedAt: toDate(data.updatedAt),
+    deletedAt: toDate(data.deletedAt),
+    deletedBy: cleanString(data.deletedBy)
+  });
+
+  const watchArticleLikes = (articleId = "", callback = () => {}) => {
+    const likesRef = articleSubcollection(articleId, "likes");
+    if (!likesRef) {
+      callback({ count: 0, likedByCurrentUser: false, likes: [] });
+      return () => {};
+    }
+    return onSnapshot(likesRef, (snapshot) => {
+      const likes = snapshot.docs.map((docSnap) => normalizeLike(docSnap.id, docSnap.data()));
+      const uid = auth?.currentUser?.uid || "";
+      callback({
+        count: likes.length,
+        likedByCurrentUser: Boolean(uid && likes.some((like) => like.uid === uid)),
+        likes
+      });
+    });
+  };
+
+  const hasCurrentUserLiked = async (articleId = "", uid = "") => {
+    const userId = cleanString(uid || auth?.currentUser?.uid);
+    const id = cleanString(articleId);
+    if (!db || !id || !userId) return false;
+    const snap = await getDoc(doc(db, COLLECTION_NAME, id, "likes", userId));
+    return snap.exists();
+  };
+
+  const toggleArticleLike = async (articleId = "", currentUser = auth?.currentUser) => {
+    const id = cleanString(articleId);
+    const user = currentUser || auth?.currentUser;
+    if (!db || !id || !user) throw new Error("AUTH_REQUIRED");
+    const likeRef = doc(db, COLLECTION_NAME, id, "likes", user.uid);
+    const snap = await getDoc(likeRef);
+    if (snap.exists()) {
+      await deleteDoc(likeRef);
+      return { liked: false };
+    }
+    await setDoc(likeRef, {
+      ...buildCreatedBy(user),
+      uid: user.uid,
+      createdAt: serverTimestamp()
+    });
+    return { liked: true };
+  };
+
+  const getArticleLikeUsers = async (articleId = "") => {
+    const likesRef = articleSubcollection(articleId, "likes");
+    if (!likesRef) return [];
+    const snap = await getDocs(likesRef);
+    return snap.docs.map((docSnap) => normalizeLike(docSnap.id, docSnap.data()));
+  };
+
+  const watchArticleComments = (articleId = "", callback = () => {}) => {
+    const commentsRef = articleSubcollection(articleId, "comments");
+    if (!commentsRef) {
+      callback([]);
+      return () => {};
+    }
+    return onSnapshot(query(commentsRef, orderBy("createdAt", "asc")), (snapshot) => {
+      callback(
+        snapshot.docs
+          .map((docSnap) => normalizeComment(docSnap.id, docSnap.data()))
+          .filter((comment) => comment.status !== "deleted")
+      );
+    });
+  };
+
+  const addArticleComment = async (articleId = "", text = "", currentUser = auth?.currentUser) => {
+    const id = cleanString(articleId);
+    const user = currentUser || auth?.currentUser;
+    const safeText = sanitizeCommentText(text);
+    if (!db || !id || !user) throw new Error("AUTH_REQUIRED");
+    if (!safeText) throw new Error("COMMENT_REQUIRED");
+    const docRef = await addDoc(collection(db, COLLECTION_NAME, id, "comments"), {
+      text: safeText,
+      createdBy: buildCreatedBy(user),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      status: "visible",
+      deletedAt: null,
+      deletedBy: ""
+    });
+    return docRef.id;
+  };
+
+  const updateArticleComment = async (articleId = "", commentId = "", text = "", currentUser = auth?.currentUser) => {
+    const id = cleanString(articleId);
+    const comment = cleanString(commentId);
+    const user = currentUser || auth?.currentUser;
+    const safeText = sanitizeCommentText(text);
+    if (!db || !id || !comment || !user) throw new Error("AUTH_REQUIRED");
+    if (!safeText) throw new Error("COMMENT_REQUIRED");
+    await updateDoc(doc(db, COLLECTION_NAME, id, "comments", comment), {
+      text: safeText,
+      updatedAt: serverTimestamp(),
+      status: "visible"
+    });
+  };
+
+  const deleteArticleComment = async (articleId = "", commentId = "", currentUser = auth?.currentUser) => {
+    const id = cleanString(articleId);
+    const comment = cleanString(commentId);
+    const user = currentUser || auth?.currentUser;
+    if (!db || !id || !comment || !user) throw new Error("AUTH_REQUIRED");
+    await updateDoc(doc(db, COLLECTION_NAME, id, "comments", comment), {
+      text: "Comentario eliminado",
+      updatedAt: serverTimestamp(),
+      status: "deleted",
+      deletedAt: serverTimestamp(),
+      deletedBy: user.uid
+    });
+  };
+
+  const watchCommentLikes = (articleId = "", commentId = "", callback = () => {}) => {
+    const likesRef = commentLikesCollection(articleId, commentId);
+    if (!likesRef) {
+      callback({ count: 0, likedByCurrentUser: false, likes: [] });
+      return () => {};
+    }
+    return onSnapshot(likesRef, (snapshot) => {
+      const likes = snapshot.docs.map((docSnap) => normalizeLike(docSnap.id, docSnap.data()));
+      const uid = auth?.currentUser?.uid || "";
+      callback({
+        count: likes.length,
+        likedByCurrentUser: Boolean(uid && likes.some((like) => like.uid === uid)),
+        likes
+      });
+    });
+  };
+
+  const toggleCommentLike = async (articleId = "", commentId = "", currentUser = auth?.currentUser) => {
+    const article = cleanString(articleId);
+    const comment = cleanString(commentId);
+    const user = currentUser || auth?.currentUser;
+    if (!db || !article || !comment || !user) throw new Error("AUTH_REQUIRED");
+    const likeRef = doc(db, COLLECTION_NAME, article, "comments", comment, "likes", user.uid);
+    const snap = await getDoc(likeRef);
+    if (snap.exists()) {
+      await deleteDoc(likeRef);
+      return { liked: false };
+    }
+    await setDoc(likeRef, {
+      ...buildCreatedBy(user),
+      uid: user.uid,
+      createdAt: serverTimestamp()
+    });
+    return { liked: true };
+  };
+
+  const getCommentLikeUsers = async (articleId = "", commentId = "") => {
+    const likesRef = commentLikesCollection(articleId, commentId);
+    if (!likesRef) return [];
+    const snap = await getDocs(likesRef);
+    return snap.docs.map((docSnap) => normalizeLike(docSnap.id, docSnap.data()));
+  };
+
+  const watchArticleSocialSummary = (articleId = "", callback = () => {}) => {
+    const summary = {
+      likeCount: 0,
+      commentCount: 0,
+      likedByCurrentUser: false,
+      likes: [],
+      comments: [],
+      latestComments: []
+    };
+    const emit = () => callback({ ...summary, latestComments: [...summary.latestComments], likes: [...summary.likes] });
+    const unsubscribers = [
+      watchArticleLikes(articleId, (likesSummary) => {
+        summary.likeCount = likesSummary.count || 0;
+        summary.likedByCurrentUser = Boolean(likesSummary.likedByCurrentUser);
+        summary.likes = likesSummary.likes || [];
+        emit();
+      }),
+      watchArticleComments(articleId, (comments = []) => {
+        summary.commentCount = comments.length;
+        summary.comments = comments;
+        summary.latestComments = comments.slice(-4).reverse();
+        emit();
+      })
+    ];
+    return () => unsubscribers.forEach((unsubscribe) => unsubscribe?.());
+  };
+
+  const getArticleSocialSummary = async (articleId = "") => {
+    const id = cleanString(articleId);
+    if (!db || !id) return { likeCount: 0, commentCount: 0, likedByCurrentUser: false, likes: [], comments: [], latestComments: [] };
+    const [likesSnap, commentsSnap] = await Promise.all([
+      getDocs(collection(db, COLLECTION_NAME, id, "likes")),
+      getDocs(collection(db, COLLECTION_NAME, id, "comments"))
+    ]);
+    const uid = auth?.currentUser?.uid || "";
+    const comments = commentsSnap.docs
+      .map((docSnap) => normalizeComment(docSnap.id, docSnap.data()))
+      .filter((comment) => comment.status !== "deleted");
+    const likes = likesSnap.docs.map((docSnap) => normalizeLike(docSnap.id, docSnap.data()));
+    return {
+      likeCount: likesSnap.size,
+      commentCount: comments.length,
+      likedByCurrentUser: Boolean(uid && likes.some((like) => like.uid === uid)),
+      likes,
+      comments,
+      latestComments: comments.slice(-4).reverse()
+    };
+  };
+
   return {
     subscribe,
     createArticle,
+    updateArticle,
     deleteArticle,
+    watchArticleLikes,
+    toggleArticleLike,
+    hasCurrentUserLiked,
+    getArticleLikeUsers,
+    watchArticleSocialSummary,
+    watchArticleComments,
+    addArticleComment,
+    updateArticleComment,
+    deleteArticleComment,
+    watchCommentLikes,
+    toggleCommentLike,
+    getCommentLikeUsers,
+    getArticleSocialSummary,
     getMode: () => mode
   };
 }

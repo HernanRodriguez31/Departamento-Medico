@@ -174,6 +174,79 @@ const authedAdminDb = (uid) =>
   testEnv.authenticatedContext(uid, { admin: true }).firestore();
 const unauthedDb = () => testEnv.unauthenticatedContext().firestore();
 
+const bitacoraMethodologyProfile = () => ({
+  studyFamily: "observational_analytical",
+  studyFamilyEs: "Observacional analítico",
+  specificDesign: "Cohorte",
+  designCategoryEs: "Cohorte",
+  temporalDirection: "retrospectivo",
+  centerScope: "unicéntrico",
+  isMulticenter: false,
+  multicenterRationale: "Estudio institucional único.",
+  setting: "hospital",
+  countryOrRegion: "Argentina",
+  countriesIncluded: ["Argentina"],
+  institutions: ["Departamento Médico QA"],
+  studyPopulation: "Trabajadores evaluados por el equipo clínico.",
+  sampleSize: "120 participantes",
+  sampleDescription: "Trabajadores con seguimiento clínico institucional.",
+  studyPeriod: "2026",
+  studyDuration: "12 meses",
+  recruitmentPeriod: "Enero a marzo de 2026",
+  followUpDuration: "12 meses",
+  dataSource: "Historia clínica ocupacional.",
+  interventionOrExposure: "Exposición laboral documentada.",
+  comparator: "Trabajadores sin exposición registrada.",
+  primaryOutcome: "Resultado clínico principal.",
+  secondaryOutcomes: ["Ausentismo", "Derivación médica"],
+  statisticalApproach: "Análisis descriptivo y comparación de grupos.",
+  effectMeasures: ["Riesgo relativo"],
+  reportingGuideline: "STROBE",
+  methodologicalStrengths: ["Fuente institucional trazable"],
+  methodologicalLimitations: ["Posible sesgo de selección"],
+  applicabilityNotes: ["Aplicable a vigilancia ocupacional local"],
+  classificationRationale: "El documento describe seguimiento de una cohorte institucional.",
+  classificationConfidence: "moderada",
+  evidenceSupport: {
+    specificDesign: {
+      supportLevel: "explicito",
+      evidenceText: "Cohorte institucional.",
+      sourceSection: "Métodos"
+    },
+    temporalDirection: {
+      supportLevel: "explicito",
+      evidenceText: "Retrospectivo.",
+      sourceSection: "Métodos"
+    },
+    centerScope: {
+      supportLevel: "explicito",
+      evidenceText: "Unicéntrico.",
+      sourceSection: "Métodos"
+    },
+    studyPopulation: {
+      supportLevel: "explicito",
+      evidenceText: "Trabajadores evaluados.",
+      sourceSection: "Población"
+    },
+    sampleSize: {
+      supportLevel: "explicito",
+      evidenceText: "120 participantes.",
+      sourceSection: "Resultados"
+    },
+    studyPeriod: {
+      supportLevel: "explicito",
+      evidenceText: "2026.",
+      sourceSection: "Métodos"
+    },
+    institutions: {
+      supportLevel: "explicito",
+      evidenceText: "Departamento Médico QA.",
+      sourceSection: "Afiliación"
+    }
+  },
+  methodologyWarnings: []
+});
+
 const validBitacoraPayload = (uid = "user-b") => ({
   title: "Artículo nuevo",
   sourceName: "PubMed / MEDLINE",
@@ -197,6 +270,8 @@ const validBitacoraPayload = (uid = "user-b") => ({
   studyPopulationEs: "Trabajadores evaluados por el equipo clínico.",
   studyLocationEs: "Argentina.",
   studyPeriodEs: "2026",
+  briefDescriptionEs: "Descripción breve de tarjeta para revisión institucional.",
+  expandedDescriptionEs: "Descripción ampliada en español para revisión clínica y metodológica.",
   cardSummaryEs: "Resumen breve de tarjeta para revisión institucional.",
   executiveSummary: "Resumen para revisión.",
   executiveSummaryEs: "Resumen ejecutivo en español para revisión.",
@@ -212,6 +287,7 @@ const validBitacoraPayload = (uid = "user-b") => ({
   limitationsEs: "Limitaciones indicadas por el documento.",
   localApplicabilityEs: "Aplicabilidad local a evaluar por el equipo.",
   occupationalHealthRelevanceEs: "Relevancia para salud ocupacional.",
+  methodologyProfile: bitacoraMethodologyProfile(),
   tags: ["QA", "Evidencia"],
   accessType: "Open access",
   userComment: "Comentario del usuario.",
@@ -468,22 +544,18 @@ test("bitacoraArticles allow authenticated reads and valid own creates only", as
   );
 });
 
-test("bitacoraArticles updates are admin-only and deletes allow owner or admin", async () => {
+test("bitacoraArticles updates and deletes allow owner or admin only", async () => {
   const ownerDb = authedDb("user-a");
   const otherDb = authedDb("user-b");
   const adminDb = authedAdminDb("admin-a");
 
-  await assertFails(
-    updateDoc(doc(ownerDb, "bitacoraArticles", "article-a"), {
-      status: "published",
-      updatedAt: Timestamp.now()
-    })
-  );
-  await assertFails(deleteDoc(doc(otherDb, "bitacoraArticles", "article-a")));
-  await assertSucceeds(deleteDoc(doc(ownerDb, "bitacoraArticles", "article-a")));
-
   await testEnv.withSecurityRulesDisabled(async (context) => {
-    await setDoc(doc(context.firestore(), "bitacoraArticles", "article-admin-delete"), {
+    await setDoc(doc(context.firestore(), "bitacoraArticles", "article-owner-update"), {
+      ...validBitacoraPayload("user-a"),
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    });
+    await setDoc(doc(context.firestore(), "bitacoraArticles", "article-admin-update"), {
       ...validBitacoraPayload("user-b"),
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now()
@@ -491,13 +563,328 @@ test("bitacoraArticles updates are admin-only and deletes allow owner or admin",
   });
 
   await assertSucceeds(
-    updateDoc(doc(adminDb, "bitacoraArticles", "article-admin-delete"), {
+    updateDoc(doc(ownerDb, "bitacoraArticles", "article-owner-update"), {
+      title: "Artículo editado por autor",
+      updatedAt: Timestamp.now(),
+      updatedBy: {
+        uid: "user-a",
+        displayName: "Dr. Usuario A",
+        email: "user-a@test.local"
+      }
+    })
+  );
+
+  await assertFails(
+    updateDoc(doc(otherDb, "bitacoraArticles", "article-owner-update"), {
+      title: "Edición ajena",
+      updatedAt: Timestamp.now(),
+      updatedBy: {
+        uid: "user-b",
+        displayName: "Dr. Usuario B",
+        email: "user-b@test.local"
+      }
+    })
+  );
+
+  await assertFails(
+    updateDoc(doc(ownerDb, "bitacoraArticles", "article-owner-update"), {
+      "createdBy.uid": "user-b",
+      updatedAt: Timestamp.now(),
+      updatedBy: {
+        uid: "user-a",
+        displayName: "Dr. Usuario A",
+        email: "user-a@test.local"
+      }
+    })
+  );
+
+  await assertFails(
+    updateDoc(doc(ownerDb, "bitacoraArticles", "article-owner-update"), {
+      storagePath: "bitacora/article-documents/user-a/reemplazo.pdf",
+      updatedAt: Timestamp.now(),
+      updatedBy: {
+        uid: "user-a",
+        displayName: "Dr. Usuario A",
+        email: "user-a@test.local"
+      }
+    })
+  );
+
+  await assertSucceeds(
+    updateDoc(doc(adminDb, "bitacoraArticles", "article-admin-update"), {
       title: "Artículo aprobado",
-      status: "published",
+      updatedAt: Timestamp.now(),
+      updatedBy: {
+        uid: "admin-a",
+        displayName: "Admin",
+        email: "admin@test.local"
+      }
+    })
+  );
+
+  await assertFails(deleteDoc(doc(otherDb, "bitacoraArticles", "article-owner-update")));
+  await assertSucceeds(deleteDoc(doc(ownerDb, "bitacoraArticles", "article-owner-update")));
+  await assertSucceeds(deleteDoc(doc(adminDb, "bitacoraArticles", "article-admin-update")));
+  await assertFails(
+    updateDoc(doc(unauthedDb(), "bitacoraArticles", "article-a"), {
+      title: "Sin sesión"
+    })
+  );
+});
+
+test("bitacoraArticles likes allow only authenticated own like lifecycle", async () => {
+  const ownerDb = authedDb("user-a");
+  const otherDb = authedDb("user-b");
+  const likeRef = doc(ownerDb, "bitacoraArticles", "article-a", "likes", "user-a");
+
+  await assertSucceeds(getDocs(query(collection(ownerDb, "bitacoraArticles", "article-a", "likes"), limit(10))));
+  await assertFails(getDocs(query(collection(unauthedDb(), "bitacoraArticles", "article-a", "likes"), limit(10))));
+
+  await assertSucceeds(
+    setDoc(likeRef, {
+      uid: "user-a",
+      displayName: "Dr. Usuario A",
+      email: "user-a@test.local",
+      photoURL: "",
+      createdAt: Timestamp.now()
+    })
+  );
+  await assertFails(
+    setDoc(likeRef, {
+      uid: "user-a",
+      displayName: "Dr. Usuario A duplicado",
+      email: "user-a@test.local",
+      photoURL: "",
+      createdAt: Timestamp.now()
+    })
+  );
+  await assertFails(
+    setDoc(doc(otherDb, "bitacoraArticles", "article-a", "likes", "user-a"), {
+      uid: "user-a",
+      displayName: "Dr. Usuario A",
+      email: "user-a@test.local",
+      photoURL: "",
+      createdAt: Timestamp.now()
+    })
+  );
+  await assertFails(
+    setDoc(doc(unauthedDb(), "bitacoraArticles", "article-a", "likes", "guest"), {
+      uid: "guest",
+      displayName: "Invitado",
+      email: "guest@test.local",
+      photoURL: "",
+      createdAt: Timestamp.now()
+    })
+  );
+
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "bitacoraArticles", "article-a", "likes", "user-b"), {
+      uid: "user-b",
+      displayName: "Dr. Usuario B",
+      email: "user-b@test.local",
+      photoURL: "",
+      createdAt: Timestamp.now()
+    });
+  });
+
+  await assertFails(deleteDoc(doc(ownerDb, "bitacoraArticles", "article-a", "likes", "user-b")));
+  await assertSucceeds(deleteDoc(likeRef));
+});
+
+test("bitacoraArticles comments validate text and author/admin permissions", async () => {
+  const ownerDb = authedDb("user-a");
+  const otherDb = authedDb("user-b");
+  const adminDb = authedAdminDb("admin-a");
+  const commentPayload = (uid, text = "Comentario clínico útil.") => ({
+    text,
+    createdBy: {
+      uid,
+      displayName: uid === "user-a" ? "Dr. Usuario A" : "Dr. Usuario B",
+      email: `${uid}@test.local`,
+      photoURL: ""
+    },
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+    status: "visible",
+    deletedAt: null,
+    deletedBy: ""
+  });
+
+  const ownComment = doc(ownerDb, "bitacoraArticles", "article-a", "comments", "comment-owner");
+  await assertSucceeds(getDocs(query(collection(ownerDb, "bitacoraArticles", "article-a", "comments"), limit(10))));
+  await assertFails(getDocs(query(collection(unauthedDb(), "bitacoraArticles", "article-a", "comments"), limit(10))));
+
+  await assertSucceeds(setDoc(ownComment, commentPayload("user-a")));
+  await assertFails(setDoc(doc(ownerDb, "bitacoraArticles", "article-a", "comments", "empty"), commentPayload("user-a", "")));
+  await assertFails(
+    setDoc(
+      doc(ownerDb, "bitacoraArticles", "article-a", "comments", "long"),
+      commentPayload("user-a", "x".repeat(1001))
+    )
+  );
+  await assertFails(
+    setDoc(
+      doc(ownerDb, "bitacoraArticles", "article-a", "comments", "html"),
+      commentPayload("user-a", "Comentario <b>con HTML</b>")
+    )
+  );
+  await assertFails(
+    setDoc(
+      doc(ownerDb, "bitacoraArticles", "article-a", "comments", "forged"),
+      commentPayload("user-b", "Autor falsificado.")
+    )
+  );
+  await assertFails(
+    setDoc(doc(unauthedDb(), "bitacoraArticles", "article-a", "comments", "guest"), commentPayload("guest"))
+  );
+
+  await assertSucceeds(
+    updateDoc(ownComment, {
+      text: "Comentario editado por su autor.",
       updatedAt: Timestamp.now()
     })
   );
-  await assertSucceeds(deleteDoc(doc(adminDb, "bitacoraArticles", "article-admin-delete")));
+  await assertFails(
+    updateDoc(doc(otherDb, "bitacoraArticles", "article-a", "comments", "comment-owner"), {
+      text: "Edición ajena.",
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertFails(
+    updateDoc(ownComment, {
+      "createdBy.uid": "user-b",
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertSucceeds(
+    updateDoc(ownComment, {
+      text: "Comentario eliminado",
+      status: "deleted",
+      deletedAt: Timestamp.now(),
+      deletedBy: "user-a",
+      updatedAt: Timestamp.now()
+    })
+  );
+
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(
+      doc(context.firestore(), "bitacoraArticles", "article-a", "comments", "comment-admin-delete"),
+      commentPayload("user-b", "Comentario para borrar por admin.")
+    );
+    await setDoc(
+      doc(context.firestore(), "bitacoraArticles", "article-a", "comments", "comment-other-delete"),
+      commentPayload("user-b", "Comentario ajeno.")
+    );
+  });
+
+  await assertSucceeds(deleteDoc(doc(adminDb, "bitacoraArticles", "article-a", "comments", "comment-admin-delete")));
+  await assertFails(deleteDoc(doc(ownerDb, "bitacoraArticles", "article-a", "comments", "comment-other-delete")));
+  await assertSucceeds(deleteDoc(doc(otherDb, "bitacoraArticles", "article-a", "comments", "comment-other-delete")));
+});
+
+test("bitacoraArticles comment likes allow only authenticated own like lifecycle", async () => {
+  const ownerDb = authedDb("user-a");
+  const otherDb = authedDb("user-b");
+  const commentRef = doc(ownerDb, "bitacoraArticles", "article-a", "comments", "comment-like-target");
+  await assertSucceeds(
+    setDoc(commentRef, {
+      text: "Comentario para like.",
+      createdBy: {
+        uid: "user-a",
+        displayName: "Dr. Usuario A",
+        email: "user-a@test.local",
+        photoURL: ""
+      },
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+      status: "visible",
+      deletedAt: null,
+      deletedBy: ""
+    })
+  );
+
+  const ownLike = doc(ownerDb, "bitacoraArticles", "article-a", "comments", "comment-like-target", "likes", "user-a");
+  await assertSucceeds(
+    setDoc(ownLike, {
+      uid: "user-a",
+      displayName: "Dr. Usuario A",
+      email: "user-a@test.local",
+      photoURL: "",
+      createdAt: Timestamp.now()
+    })
+  );
+  await assertFails(
+    updateDoc(ownLike, {
+      displayName: "Otro nombre"
+    })
+  );
+  await assertFails(
+    setDoc(doc(otherDb, "bitacoraArticles", "article-a", "comments", "comment-like-target", "likes", "user-a"), {
+      uid: "user-a",
+      displayName: "Dr. Usuario A",
+      email: "user-a@test.local",
+      photoURL: "",
+      createdAt: Timestamp.now()
+    })
+  );
+  await assertFails(
+    setDoc(doc(unauthedDb(), "bitacoraArticles", "article-a", "comments", "comment-like-target", "likes", "guest"), {
+      uid: "guest",
+      displayName: "Invitado",
+      email: "guest@test.local",
+      photoURL: "",
+      createdAt: Timestamp.now()
+    })
+  );
+
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "bitacoraArticles", "article-a", "comments", "comment-like-target", "likes", "user-b"), {
+      uid: "user-b",
+      displayName: "Dr. Usuario B",
+      email: "user-b@test.local",
+      photoURL: "",
+      createdAt: Timestamp.now()
+    });
+  });
+
+  await assertFails(deleteDoc(doc(ownerDb, "bitacoraArticles", "article-a", "comments", "comment-like-target", "likes", "user-b")));
+  await assertSucceeds(deleteDoc(ownLike));
+});
+
+test("bitacoraArticles block client-controlled social counters on article documents", async () => {
+  const ownerDb = authedDb("user-a");
+
+  await assertFails(
+    setDoc(doc(authedDb("user-b"), "bitacoraArticles", "article-social-counters"), {
+      ...validBitacoraPayload("user-b"),
+      social: {
+        likeCount: 99,
+        commentCount: 99
+      }
+    })
+  );
+  await assertFails(
+    updateDoc(doc(ownerDb, "bitacoraArticles", "article-a"), {
+      likeCount: 99,
+      updatedAt: Timestamp.now(),
+      updatedBy: {
+        uid: "user-a",
+        displayName: "Dr. Usuario A",
+        email: "user-a@test.local"
+      }
+    })
+  );
+  await assertFails(
+    updateDoc(doc(ownerDb, "bitacoraArticles", "article-a"), {
+      commentCount: 99,
+      updatedAt: Timestamp.now(),
+      updatedBy: {
+        uid: "user-a",
+        displayName: "Dr. Usuario A",
+        email: "user-a@test.local"
+      }
+    })
+  );
 });
 
 test("authenticated user can create valid own multi-day calendar event", async () => {

@@ -12,9 +12,12 @@ const FINAL_ARTICLE_FIELD_KEYS = [
   "evidenceType",
   "publicationDate",
   "studyLocation",
+  "briefDescriptionEs",
+  "expandedDescriptionEs",
   "executiveSummary",
   "clinicalQuestion",
   "mainResult",
+  "methodologyProfile",
   "tags",
   "accessType",
   "extractionConfidence",
@@ -25,15 +28,32 @@ const AI_ARTICLE_FIELD_KEYS = [
   "studyType",
   "evidenceType",
   "studyLocation",
+  "briefDescriptionEs",
+  "expandedDescriptionEs",
   "executiveSummary",
   "clinicalQuestion",
   "mainResult",
+  "methodologyProfile",
   "tags",
   "warnings",
   "extractionConfidence"
 ];
 
 const ACCESS_TYPES = ["Open access", "Suscripción", "Resumen disponible", "Pendiente"];
+const {
+  EVIDENCE_SUPPORT_FIELDS,
+  METHODOLOGY_BOOLEAN_FIELDS,
+  METHODOLOGY_LIST_FIELDS,
+  METHODOLOGY_OBJECT_FIELDS,
+  METHODOLOGY_PROFILE_KEYS,
+  SCIENTIFIC_METHODOLOGY_TAXONOMY,
+  STUDY_FAMILIES,
+  buildEmptyMethodologyProfile,
+  buildMethodologyEvidence,
+  inferDesignCategoryFromProfile,
+  normalizeMethodologyProfile,
+  preclassifyMethodology
+} = require("./scientificMethodologyTaxonomy");
 const MAX_URL_LENGTH = 2048;
 const MAX_HTML_BYTES = 450000;
 const MAX_VISIBLE_TEXT_CHARS = 14000;
@@ -664,7 +684,7 @@ const buildEvidencePacket = (htmlSignals, url, fetchInfo = {}) => {
   if (htmlSignals.visibleTextSections.length) usedSources.push("visible_text");
   if (!usedSources.length) usedSources.push("url");
 
-  return {
+  const packet = {
     officialUrl: url.href,
     sourceDomain: url.hostname,
     detectedMetadata: htmlSignals.detectedMetadata,
@@ -684,6 +704,14 @@ const buildEvidencePacket = (htmlSignals, url, fetchInfo = {}) => {
       usedSources
     }
   };
+  packet.methodologyEvidence = buildMethodologyEvidence(packet);
+  packet.preclassification = preclassifyMethodology(packet, SCIENTIFIC_METHODOLOGY_TAXONOMY);
+  packet.rawEvidence.methodologyEvidenceSections = Object.entries(packet.methodologyEvidence || {})
+    .filter(([, section]) => cleanString(section?.text))
+    .map(([key]) => key)
+    .slice(0, 20);
+  packet.rawEvidence.preclassification = packet.preclassification;
+  return packet;
 };
 
 const buildRawEvidence = (evidencePacket = {}) =>
@@ -707,9 +735,12 @@ const buildMetadataOnlyArticle = (url, metadata = {}, evidencePacket = {}) => ({
   evidenceType: "",
   publicationDate: cleanString(metadata.publicationDate),
   studyLocation: "",
+  briefDescriptionEs: cleanString(metadata.description || metadata.summary || metadata.abstract).slice(0, 280),
+  expandedDescriptionEs: cleanString(metadata.description || metadata.summary || metadata.abstract),
   executiveSummary: cleanString(metadata.description || metadata.summary || metadata.abstract),
   clinicalQuestion: "",
   mainResult: "",
+  methodologyProfile: buildEmptyMethodologyProfile(),
   tags: normalizeList(metadata.keywords || [], 12),
   accessType: normalizeAccessType(metadata.accessType) !== "Pendiente"
     ? normalizeAccessType(metadata.accessType)
@@ -762,9 +793,12 @@ const normalizeAiInputAliases = (input = {}) => ({
   evidenceType: readStringAlias(input, ["evidenceType", "typeOfEvidence", "evidence_level", "evidenceLevel", "tipoEvidencia", "tipo_de_evidencia"]),
   publicationDate: readStringAlias(input, ["publicationDate", "publishedAt", "publication_date", "datePublished", "fechaPublicacion", "fecha_de_publicacion"]),
   studyLocation: readStringAlias(input, ["studyLocation", "location", "studyCountry", "setting", "lugar", "contexto"]),
+  briefDescriptionEs: readStringAlias(input, ["briefDescriptionEs", "cardSummaryEs", "briefDescription", "summaryCard", "resumenBreve"]),
+  expandedDescriptionEs: readStringAlias(input, ["expandedDescriptionEs", "executiveSummaryEs", "expandedDescription", "summary", "abstract", "resumenAmpliado"]),
   executiveSummary: readStringAlias(input, ["executiveSummary", "summary", "abstract", "resumen", "resumenEjecutivo", "resumen_ejecutivo"]),
   clinicalQuestion: readStringAlias(input, ["clinicalQuestion", "question", "researchQuestion", "preguntaClinica", "pregunta_clinica", "pregunta"]),
   mainResult: readStringAlias(input, ["mainResult", "result", "results", "findings", "conclusion", "resultadoPrincipal", "resultado_principal", "mainFinding"]),
+  methodologyProfile: normalizeMethodologyProfile(input.methodologyProfile),
   tags: normalizeList(input.tags || input.keywords || input.etiquetas || input.palabrasClave || input.palabras_clave),
   accessType: readStringAlias(input, ["accessType", "access", "acceso", "availability"]),
   extractionConfidence: Number.isFinite(Number(input.extractionConfidence ?? input.confidence ?? input.confianza))
@@ -802,9 +836,12 @@ const normalizeAiArticleOutput = (url, evidenceOrMetadata = {}, input = {}) => {
     evidenceType: normalized.evidenceType,
     publicationDate: fallback.publicationDate || normalized.publicationDate,
     studyLocation: normalized.studyLocation,
-    executiveSummary: normalized.executiveSummary || fallback.executiveSummary,
+    briefDescriptionEs: normalized.briefDescriptionEs || fallback.briefDescriptionEs,
+    expandedDescriptionEs: normalized.expandedDescriptionEs || normalized.executiveSummary || fallback.expandedDescriptionEs,
+    executiveSummary: normalized.expandedDescriptionEs || normalized.executiveSummary || fallback.executiveSummary,
     clinicalQuestion: normalized.clinicalQuestion,
     mainResult: normalized.mainResult,
+    methodologyProfile: normalizeMethodologyProfile(normalized.methodologyProfile),
     tags: normalized.tags.length ? normalized.tags : fallback.tags,
     accessType: normalizeAccessType(fallback.accessType || normalized.accessType),
     extractionConfidence: normalized.extractionConfidence ?? 0.45,
@@ -813,6 +850,13 @@ const normalizeAiArticleOutput = (url, evidenceOrMetadata = {}, input = {}) => {
   if (!article.warnings.length) {
     article.warnings.push("El resumen automático debe ser revisado por el equipo médico.");
   }
+  article.methodologyProfile.specificDesign = article.methodologyProfile.specificDesign || article.studyType;
+  article.methodologyProfile.designCategoryEs =
+    article.methodologyProfile.designCategoryEs ||
+    inferDesignCategoryFromProfile(article.methodologyProfile) ||
+    article.studyType ||
+    article.evidenceType;
+  article.methodologyProfile.countryOrRegion = article.methodologyProfile.countryOrRegion || article.studyLocation;
   return article;
 };
 
@@ -839,9 +883,39 @@ const validateAIArticleSchema = (input = {}) => {
   if (missing.length) {
     return { ok: false, code: "missing_fields", message: `Faltan campos requeridos: ${missing.join(", ")}` };
   }
-  const stringFields = AI_ARTICLE_FIELD_KEYS.filter((key) => !["tags", "warnings", "extractionConfidence"].includes(key));
+  const stringFields = AI_ARTICLE_FIELD_KEYS.filter((key) => !["tags", "warnings", "extractionConfidence", "methodologyProfile"].includes(key));
   const badString = stringFields.find((key) => typeof input[key] !== "string");
   if (badString) return { ok: false, code: "invalid_field_type", message: `${badString} debe ser string.` };
+  if (!input.methodologyProfile || typeof input.methodologyProfile !== "object" || Array.isArray(input.methodologyProfile)) {
+    return { ok: false, code: "invalid_methodology_profile", message: "methodologyProfile debe ser objeto." };
+  }
+  for (const key of METHODOLOGY_PROFILE_KEYS) {
+    if (!(key in input.methodologyProfile)) {
+      return { ok: false, code: "invalid_methodology_profile", message: `Falta methodologyProfile.${key}.` };
+    }
+    if (METHODOLOGY_LIST_FIELDS.has(key) && !Array.isArray(input.methodologyProfile[key])) {
+      return { ok: false, code: "invalid_methodology_profile", message: `${key} debe ser array.` };
+    }
+    if (METHODOLOGY_BOOLEAN_FIELDS.has(key) && typeof input.methodologyProfile[key] !== "boolean") {
+      return { ok: false, code: "invalid_methodology_profile", message: `${key} debe ser boolean.` };
+    }
+    if (
+      METHODOLOGY_OBJECT_FIELDS.has(key) &&
+      (!input.methodologyProfile[key] ||
+        typeof input.methodologyProfile[key] !== "object" ||
+        Array.isArray(input.methodologyProfile[key]))
+    ) {
+      return { ok: false, code: "invalid_methodology_profile", message: `${key} debe ser objeto.` };
+    }
+    if (
+      !METHODOLOGY_LIST_FIELDS.has(key) &&
+      !METHODOLOGY_BOOLEAN_FIELDS.has(key) &&
+      !METHODOLOGY_OBJECT_FIELDS.has(key) &&
+      typeof input.methodologyProfile[key] !== "string"
+    ) {
+      return { ok: false, code: "invalid_methodology_profile", message: `${key} debe ser string.` };
+    }
+  }
   if (!Array.isArray(input.tags) || !input.tags.every((item) => typeof item === "string")) {
     return { ok: false, code: "invalid_tags", message: "tags debe ser array de strings." };
   }
@@ -856,7 +930,8 @@ const validateAIArticleSchema = (input = {}) => {
 
 const scoreExtractionCompleteness = (article = {}) => {
   const usefulFields = [
-    cleanString(article.executiveSummary).length >= 24,
+    cleanString(article.briefDescriptionEs).length >= 24,
+    cleanString(article.expandedDescriptionEs || article.executiveSummary).length >= 24,
     cleanString(article.clinicalQuestion).length >= 24,
     cleanString(article.mainResult).length >= 24,
     Boolean(cleanString(article.studyType)),
@@ -892,6 +967,50 @@ const hasMetadataContent = (article = {}) => {
       (sourceName && !sourceIsOnlyDomain)
   );
 };
+
+const buildEvidenceSupportSchema = () => ({
+  type: "object",
+  additionalProperties: false,
+  required: EVIDENCE_SUPPORT_FIELDS,
+  properties: EVIDENCE_SUPPORT_FIELDS.reduce((properties, key) => {
+    properties[key] = {
+      type: "object",
+      additionalProperties: false,
+      required: ["supportLevel", "evidenceText", "sourceSection"],
+      properties: {
+        supportLevel: {
+          type: "string",
+          enum: key === "sampleSize" || key === "centerScope" || key === "temporalDirection"
+            ? ["explicito", "inferido_con_soporte", "no_especificado", "no_aplica"]
+            : ["explicito", "inferido_con_soporte", "no_especificado"]
+        },
+        evidenceText: { type: "string" },
+        sourceSection: { type: "string" }
+      }
+    };
+    return properties;
+  }, {})
+});
+
+const buildMethodologyProfileSchema = () => ({
+  type: "object",
+  additionalProperties: false,
+  required: METHODOLOGY_PROFILE_KEYS,
+  properties: METHODOLOGY_PROFILE_KEYS.reduce((properties, key) => {
+    if (METHODOLOGY_LIST_FIELDS.has(key)) {
+      properties[key] = { type: "array", items: { type: "string" } };
+    } else if (METHODOLOGY_BOOLEAN_FIELDS.has(key)) {
+      properties[key] = { type: "boolean" };
+    } else if (METHODOLOGY_OBJECT_FIELDS.has(key) && key === "evidenceSupport") {
+      properties[key] = buildEvidenceSupportSchema();
+    } else if (key === "studyFamily") {
+      properties[key] = { type: "string", enum: STUDY_FAMILIES };
+    } else {
+      properties[key] = { type: "string" };
+    }
+    return properties;
+  }, {})
+});
 
 const buildOpenAiArticleExtractionPayload = (evidenceOrUrl, maybeMetadata = {}) => {
   const evidencePacket =
@@ -930,6 +1049,14 @@ const buildOpenAiArticleExtractionPayload = (evidenceOrUrl, maybeMetadata = {}) 
         type: "string",
         description: "Lugar, región o contexto del estudio si está explícito o claramente sostenido."
       },
+      briefDescriptionEs: {
+        type: "string",
+        description: "Descripción breve en español, máximo 280 caracteres, para tarjeta. Responde de qué trata y por qué importa."
+      },
+      expandedDescriptionEs: {
+        type: "string",
+        description: "Descripción ampliada en español, máximo 180 palabras, sin reemplazar la lectura del paper."
+      },
       executiveSummary: {
         type: "string",
         description: "Resumen ejecutivo en español basado solo en abstract, summary o texto científico disponible."
@@ -942,6 +1069,7 @@ const buildOpenAiArticleExtractionPayload = (evidenceOrUrl, maybeMetadata = {}) 
         type: "string",
         description: "Resultado principal o mensaje central, sin inventar datos."
       },
+      methodologyProfile: buildMethodologyProfileSchema(),
       tags: {
         type: "array",
         items: { type: "string" },
@@ -971,6 +1099,9 @@ const buildOpenAiArticleExtractionPayload = (evidenceOrUrl, maybeMetadata = {}) 
         text: cleanString(section.text).slice(0, MAX_SECTION_CHARS)
       }))
       .slice(0, 10),
+    methodologyEvidence: evidencePacket.methodologyEvidence,
+    preclassification: evidencePacket.preclassification,
+    scientificMethodologyTaxonomy: SCIENTIFIC_METHODOLOGY_TAXONOMY,
     pageSignals: evidencePacket.pageSignals,
     warnings: evidencePacket.warnings
   };
@@ -996,9 +1127,15 @@ const buildOpenAiArticleExtractionPayload = (evidenceOrUrl, maybeMetadata = {}) 
           "No agregues DOI, PMID, PMCID, autores, fechas ni resultados si no están en la evidencia.",
           "No conviertas una fuente bloqueada en éxito.",
           "Si no hay abstract, summary o texto científico, dejá executiveSummary, clinicalQuestion y mainResult vacíos y agregá warning.",
-          "Si el artículo es una guía, policy framework, health policy, trial record o revisión, clasificalo correctamente.",
+          "Clasificá primero si es estudio clínico primario, revisión, guía/consenso, health policy/implementación u otro/no claro.",
+          "Si el artículo es una guía, policy framework, health policy, trial record, revisión, estudio observacional, diagnóstico, modelo predictivo o evaluación económica, clasificalo correctamente.",
+          "Generá briefDescriptionEs en hasta 280 caracteres y expandedDescriptionEs en hasta 180 palabras.",
+          "Completá methodologyProfile solo con datos presentes o deducidos directamente: diseño, familia, temporalidad, ámbito, lugar, instituciones, población, muestra/alcance, período, duración, fuente, intervención, comparador y desenlaces.",
+          "Usá evidenceSupport para marcar explicito, inferido_con_soporte, no_especificado o no_aplica con texto de soporte breve.",
+          "No inventes muestra clínica, país, institución, duración, retrospectivo/prospectivo ni multicéntrico.",
+          "Si hay múltiples países o instituciones en implementación o política sanitaria, describilo como alcance regional/internacional programático, no como estudio clínico multicéntrico salvo evidencia directa.",
           "No emitas recomendaciones clínicas. No modifiques protocolos.",
-          "Basá cada campo en merged y en sources exitosas."
+          "Usá la preclasificación determinística como orientación, pero corregila si la evidencia lo justifica."
         ].join(" ")
       },
       {
@@ -1730,7 +1867,7 @@ const mergeEvidencePackets = ({ inputUrl, articleUrl, identifiers = {}, sources 
     scientificTextLength,
     confidence: Math.max(...sources.map((source) => source.confidence || 0), 0)
   };
-  return {
+  const packet = {
     inputUrl,
     officialUrl: articleUrl.href,
     sourceDomain: articleUrl.hostname,
@@ -1762,6 +1899,14 @@ const mergeEvidencePackets = ({ inputUrl, articleUrl, identifiers = {}, sources 
       usedSources: audit.successfulResolvers.length ? audit.successfulResolvers : audit.attemptedResolvers
     }
   };
+  packet.methodologyEvidence = buildMethodologyEvidence(packet);
+  packet.preclassification = preclassifyMethodology(packet, SCIENTIFIC_METHODOLOGY_TAXONOMY);
+  packet.rawEvidence.methodologyEvidenceSections = Object.entries(packet.methodologyEvidence || {})
+    .filter(([, section]) => cleanString(section?.text))
+    .map(([key]) => key)
+    .slice(0, 20);
+  packet.rawEvidence.preclassification = packet.preclassification;
+  return packet;
 };
 
 const hasScientificTextForAI = (packet = {}) =>
