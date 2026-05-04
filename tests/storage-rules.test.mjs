@@ -50,14 +50,15 @@ const unauthedStorage = () => testEnv.unauthenticatedContext().storage(BUCKET_UR
 
 const pdfBytes = () => new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34]);
 
-test("bitacora PDF storage allows only owner PDF uploads", async () => {
+test("bitacora PDF storage allows authenticated reads and only owner PDF uploads", async () => {
   const owner = storageFor("user-a");
   const other = storageFor("user-b");
   const ownerRef = owner.ref("bitacora/article-documents/user-a/paper.pdf");
 
   await assertSucceeds(ownerRef.put(pdfBytes(), { contentType: "application/pdf" }));
   await assertSucceeds(ownerRef.getMetadata());
-  await assertFails(other.ref("bitacora/article-documents/user-a/paper.pdf").getMetadata());
+  await assertSucceeds(other.ref("bitacora/article-documents/user-a/paper.pdf").getMetadata());
+  await assertFails(unauthedStorage().ref("bitacora/article-documents/user-a/paper.pdf").getMetadata());
   await assertFails(
     other.ref("bitacora/article-documents/user-a/other.pdf").put(pdfBytes(), { contentType: "application/pdf" })
   );
@@ -89,5 +90,6 @@ test("bitacora PDF storage allows owner delete and admin read/delete", async () 
 
   const secondRef = owner.ref("bitacora/article-documents/user-a/owner-delete.pdf");
   await assertSucceeds(secondRef.put(pdfBytes(), { contentType: "application/pdf" }));
+  await assertFails(storageFor("user-b").ref("bitacora/article-documents/user-a/owner-delete.pdf").delete());
   await assertSucceeds(secondRef.delete());
 });

@@ -34,7 +34,7 @@
     <link rel="stylesheet" href="/assets/css/pages/index.css?v=20260502-portal-hover-state-1" />
     <link rel="stylesheet" href="/assets/css/core-contrast.css?v=20260502-committee-border-align-1" />
     <link rel="stylesheet" href="/assets/css/pages/galeriadearte.css?v=20260503-art-gallery-like-tooltip-1" />
-    <link rel="stylesheet" href="/assets/css/pages/bitacora-cientifica.css?v=20260504-bitacora-pdf-ai-fix-1" />
+    <link rel="stylesheet" href="/assets/css/pages/bitacora-cientifica.css?v=20260504-methodology-guide-terms-1" />
   </head>
   <body class="art-gallery-page bitacora-page ui-clarity">
     <div id="app">
@@ -169,16 +169,30 @@
           <section class="bitacora-intro-segment" aria-labelledby="bitacora-heading">
             <p class="bitacora-breadcrumb">Portal</p>
             <h1 class="art-gallery-title bitacora-title" id="bitacora-heading">Bitácora de Ciencia Médica</h1>
-            <button
-              type="button"
-              class="bitacora-sources-trigger"
-              data-open-scientific-sources
-              aria-haspopup="dialog"
-              aria-controls="scientific-sources-modal"
-            >
-              <i data-lucide="book-open" aria-hidden="true"></i>
-              <span>Fuentes recomendadas</span>
-            </button>
+            <div class="bitacora-hero__actions" aria-label="Herramientas de la Bitácora">
+              <button
+                type="button"
+                class="bitacora-hero__action bitacora-hero__action--sources bitacora-sources-trigger"
+                data-open-scientific-sources
+                aria-haspopup="dialog"
+                aria-controls="scientific-sources-modal"
+                aria-expanded="false"
+              >
+                <i data-lucide="book-open" aria-hidden="true"></i>
+                <span>Fuentes recomendadas</span>
+              </button>
+              <button
+                type="button"
+                class="bitacora-hero__action bitacora-hero__action--methodology"
+                data-open-methodology-guide
+                aria-haspopup="dialog"
+                aria-controls="methodology-guide-modal"
+                aria-expanded="false"
+              >
+                <i data-lucide="clipboard-list" aria-hidden="true"></i>
+                <span>Guía Metodológica</span>
+              </button>
+            </div>
           </section>
 
           <section
@@ -216,6 +230,8 @@
           </div>
         </div>
       </main>
+
+      <div id="bitacora-notice-region" class="bitacora-notice-region" aria-live="polite" aria-atomic="true"></div>
 
       <div
         id="scientific-sources-modal"
@@ -276,6 +292,40 @@
             </div>
             <div id="bitacora-sources" class="scientific-sources-directory"></div>
           </div>
+        </div>
+      </div>
+
+      <div
+        id="methodology-guide-modal"
+        class="bitacora-modal bitacora-modal--methodology-guide methodology-guide-modal"
+        aria-hidden="true"
+        hidden
+      >
+        <div
+          class="bitacora-modal__dialog methodology-guide-modal__dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="methodology-guide-title"
+          aria-describedby="methodology-guide-description"
+          tabindex="-1"
+        >
+          <div class="bitacora-modal__header methodology-guide-modal__header">
+            <div class="methodology-guide-modal__header-copy">
+              <span class="methodology-guide-modal__header-icon" aria-hidden="true">
+                <i data-lucide="microscope"></i>
+              </span>
+              <div>
+              <h2 id="methodology-guide-title">Metodología de estudios científicos</h2>
+              <p id="methodology-guide-description">
+                Guía rápida para reconocer diseño, temporalidad, población, comparador y análisis.
+              </p>
+              </div>
+            </div>
+            <button type="button" class="bitacora-modal__close methodology-guide-close" data-close-modal aria-label="Cerrar guía metodológica">
+              <i data-lucide="x" aria-hidden="true"></i>
+            </button>
+          </div>
+          <div id="methodology-guide-content" class="bitacora-modal__body methodology-guide-modal__body"></div>
         </div>
       </div>
 
@@ -816,7 +866,7 @@
       installFirebaseGlobals();
     </script>
     <script type="module" src="/assets/js/common/notifications.js"></script>
-    <script type="module" src="/assets/js/pages/bitacora-cientifica.js?v=20260504-bitacora-pdf-ai-fix-1"></script>
+    <script type="module" src="/assets/js/pages/bitacora-cientifica.js?v=20260504-methodology-guide-terms-1"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {

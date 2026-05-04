@@ -95,6 +95,7 @@ body.bitacora-modal-open {
 }
 
 .bitacora-sources-trigger,
+.bitacora-hero__action,
 .bitacora-add-article-button,
 .bitacora-btn {
   display: inline-flex;
@@ -128,13 +129,15 @@ body.bitacora-modal-open {
   box-shadow: 0 12px 26px rgba(74, 159, 47, 0.22);
 }
 
-.bitacora-btn--secondary {
+.bitacora-btn--secondary,
+.bitacora-hero__action--methodology {
   border: 1px solid rgba(74, 159, 47, 0.38);
   background: rgba(255, 255, 255, 0.96);
   color: var(--bitacora-green);
 }
 
 .bitacora-sources-trigger svg,
+.bitacora-hero__action svg,
 .bitacora-add-article-button svg,
 .bitacora-btn svg {
   width: 1rem;
@@ -151,15 +154,39 @@ body.bitacora-modal-open {
   font-weight: 900;
 }
 
+.bitacora-hero__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  width: 100%;
+}
+
+.bitacora-hero__action {
+  min-height: 2.95rem;
+  gap: 0.56rem;
+  padding: 0 1.18rem;
+  border-radius: 0.7rem;
+  font-size: 0.96rem;
+  font-weight: 900;
+}
+
+.bitacora-hero__action--methodology {
+  justify-self: end;
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.055);
+}
+
 .bitacora-sources-trigger svg {
   width: 1.16rem;
   height: 1.16rem;
 }
 
 .bitacora-sources-trigger:hover,
+.bitacora-hero__action:hover,
 .bitacora-add-article-button:hover,
 .bitacora-btn:hover,
 .bitacora-sources-trigger:focus-visible,
+.bitacora-hero__action:focus-visible,
 .bitacora-add-article-button:focus-visible,
 .bitacora-btn:focus-visible {
   outline: none;
@@ -175,7 +202,9 @@ body.bitacora-modal-open {
 }
 
 .bitacora-btn--secondary:hover,
-.bitacora-btn--secondary:focus-visible {
+.bitacora-btn--secondary:focus-visible,
+.bitacora-hero__action--methodology:hover,
+.bitacora-hero__action--methodology:focus-visible {
   border-color: rgba(74, 159, 47, 0.7);
   box-shadow: 0 0 0 4px rgba(122, 184, 0, 0.1);
 }
@@ -1052,6 +1081,64 @@ body.bitacora-modal-open {
   display: none;
 }
 
+.bitacora-notice-region {
+  position: fixed;
+  right: clamp(0.75rem, 2vw, 1.25rem);
+  bottom: clamp(0.75rem, 2vw, 1.25rem);
+  z-index: 2750;
+  display: grid;
+  gap: 0.5rem;
+  width: min(28rem, calc(100vw - 1.5rem));
+  pointer-events: none;
+}
+
+.bitacora-notice {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.78rem 0.82rem;
+  border: 1px solid rgba(203, 213, 225, 0.92);
+  border-left: 4px solid var(--bitacora-green);
+  border-radius: 0.78rem;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16);
+  color: var(--bitacora-ink);
+  font-size: 0.88rem;
+  font-weight: 760;
+  line-height: 1.35;
+  pointer-events: auto;
+}
+
+.bitacora-notice--success {
+  border-left-color: var(--bitacora-green);
+}
+
+.bitacora-notice--warning {
+  border-left-color: #ca8a04;
+}
+
+.bitacora-notice--error {
+  border-left-color: var(--bitacora-danger);
+}
+
+.bitacora-notice__close {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.bitacora-notice__close:hover,
+.bitacora-notice__close:focus-visible {
+  color: var(--bitacora-ink);
+  outline: none;
+}
+
 .bitacora-modal {
   position: fixed;
   inset: 0;
@@ -1159,6 +1246,796 @@ body.bitacora-modal-open {
   min-height: 0;
   overflow: hidden;
   padding-bottom: 1rem;
+}
+
+.bitacora-modal--methodology-guide {
+  --guide-panel-bg: #f3f6f1;
+  --guide-panel-bg-strong: #edf2ea;
+  --guide-panel-border: rgba(98, 128, 82, 0.24);
+  --methodology-guide-header-height: 78px;
+  background: rgba(15, 23, 42, 0.48);
+  backdrop-filter: blur(3px);
+}
+
+.methodology-guide-modal__dialog {
+  width: min(65rem, 100%);
+  max-height: min(88vh, 60rem);
+  grid-template-rows: auto minmax(0, 1fr);
+  border-radius: 1.6rem;
+  box-shadow: 0 28px 90px rgba(15, 23, 42, 0.28);
+}
+
+.methodology-guide-modal__header {
+  z-index: 3;
+  padding: 1.22rem 1.5rem 1.08rem;
+  border-bottom: 1px solid rgba(124, 176, 77, 0.22);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(246, 252, 243, 0.98));
+  backdrop-filter: blur(10px);
+}
+
+.methodology-guide-modal__header-copy {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.82rem;
+  min-width: 0;
+}
+
+.methodology-guide-modal__header-icon {
+  display: grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(74, 159, 47, 0.2);
+  border-radius: 0.9rem;
+  background: rgba(237, 244, 236, 0.95);
+  color: #2f6f28;
+}
+
+.methodology-guide-modal__header-icon svg {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.methodology-guide-close {
+  width: 2.45rem;
+  height: 2.45rem;
+  min-width: 2.45rem;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
+}
+
+.methodology-guide-modal__body {
+  display: grid;
+  gap: 1rem;
+  min-height: 0;
+  padding: 1.1rem 1.35rem 1.35rem;
+  background:
+    radial-gradient(circle at top left, rgba(122, 184, 0, 0.12), transparent 22rem),
+    linear-gradient(180deg, rgba(248, 251, 247, 0.92), rgba(255, 255, 255, 0.98) 16rem),
+    #fff;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.56) transparent;
+  scroll-behavior: smooth;
+}
+
+.methodology-guide-modal__body::-webkit-scrollbar {
+  width: 0.55rem;
+}
+
+.methodology-guide-modal__body::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(100, 116, 139, 0.45);
+}
+
+.methodology-guide-section,
+.methodology-guide-intro {
+  display: grid;
+  gap: 0.82rem;
+  min-width: 0;
+  scroll-margin-top: 130px;
+}
+
+.methodology-guide-section__heading {
+  display: grid;
+  gap: 0.22rem;
+}
+
+.methodology-guide-section__heading h3,
+.methodology-guide-intro h3 {
+  margin: 0;
+  color: var(--bitacora-ink);
+  font-size: clamp(1.05rem, 1.6vw, 1.25rem);
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1.16;
+}
+
+.methodology-guide-section__heading p,
+.methodology-guide-intro p,
+.methodology-guide-note {
+  margin: 0;
+  color: var(--bitacora-muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.methodology-guide-eyebrow {
+  margin: 0;
+  color: #2f6f28;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.methodology-guide-intro {
+  padding: 1rem;
+  border: 1px solid rgba(74, 159, 47, 0.18);
+  border-radius: 1.1rem;
+  background:
+    linear-gradient(135deg, rgba(237, 244, 236, 0.96), rgba(255, 255, 255, 0.94));
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.055);
+}
+
+.methodology-guide-intro__copy {
+  display: grid;
+  gap: 0.36rem;
+  max-width: 58rem;
+}
+
+.methodology-guide-intro__cards,
+.methodology-guide-comparison-grid,
+.methodology-guide-family-grid,
+.methodology-guide-design-grid,
+.methodology-guide-checklist,
+.methodology-guide-reporting-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.methodology-guide-intro__cards {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.methodology-guide-microcard,
+.methodology-guide-family-card,
+.methodology-guide-design-card,
+.methodology-guide-comparison-card,
+.methodology-guide-classification-row,
+.methodology-guide-checklist__group {
+  min-width: 0;
+  border: 1px solid var(--guide-panel-border);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.045);
+}
+
+.methodology-guide-microcard {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.24rem 0.62rem;
+  align-items: start;
+  padding: 0.82rem;
+  background: var(--guide-panel-bg);
+}
+
+.methodology-guide-microcard__icon,
+.methodology-guide-family-card__icon,
+.methodology-guide-design-card__icon,
+.methodology-guide-closing span {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 0.78rem;
+  background: rgba(237, 244, 236, 0.95);
+  color: #2f6f28;
+}
+
+.methodology-guide-microcard__icon {
+  grid-row: span 2;
+}
+
+.methodology-guide-microcard svg,
+.methodology-guide-family-card__icon svg,
+.methodology-guide-design-card__icon svg,
+.methodology-guide-reporting-chip svg,
+.methodology-guide-closing svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.methodology-guide-microcard h4,
+.methodology-guide-family-card h4,
+.methodology-guide-design-card h4,
+.methodology-guide-comparison-card h4,
+.methodology-guide-classification-row h4,
+.methodology-guide-checklist__group h4 {
+  margin: 0;
+  color: var(--bitacora-ink);
+  font-size: 0.88rem;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.methodology-guide-microcard p,
+.methodology-guide-family-card p,
+.methodology-guide-design-card p,
+.methodology-guide-comparison-card p,
+.methodology-guide-family-card__item span {
+  margin: 0;
+  color: var(--bitacora-muted);
+  font-size: 0.82rem;
+  line-height: 1.36;
+}
+
+.methodology-guide-nav {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  overflow-x: visible;
+  overflow-y: visible;
+  min-height: calc(2.125rem + 1.7rem);
+  padding: 0.85rem 1.25rem;
+  margin: 0 -1.25rem 1.1rem;
+  border-bottom: 1px solid rgba(124, 176, 77, 0.22);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 252, 246, 0.94));
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+  scrollbar-width: thin;
+}
+
+.methodology-guide-nav__button {
+  min-height: 2.125rem;
+  flex: 0 0 auto;
+  padding: 0.42rem 0.78rem;
+  border: 1px solid rgba(91, 158, 58, 0.32);
+  border-radius: 999px;
+  background: #fff;
+  color: #2f6f28;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 900;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.methodology-guide-nav__button:hover,
+.methodology-guide-nav__button:focus-visible,
+.methodology-guide-nav__button[aria-current="true"] {
+  border-color: rgba(91, 158, 58, 0.55);
+  background: rgba(91, 158, 58, 0.1);
+  box-shadow: 0 0 0 3px rgba(122, 184, 0, 0.1);
+  outline: none;
+}
+
+.methodology-guide-section--workflow {
+  padding: 1rem;
+  border: 1px solid rgba(74, 159, 47, 0.16);
+  border-radius: 1.1rem;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.methodology-guide-workflow {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(82px, 1fr));
+  gap: 0.45rem;
+  align-items: stretch;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: methodology-step;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.methodology-guide-workflow__step {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 2.375rem;
+  padding: 0.42rem 0.48rem;
+  border: 1px solid rgba(91, 158, 58, 0.32);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffffff, #f6fbf3);
+  color: #2f6f28;
+  font-size: 0.78rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.methodology-guide-workflow__step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  right: -0.46rem;
+  width: 0.28rem;
+  height: 0.28rem;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.95);
+}
+
+.methodology-guide-workflow__number {
+  display: grid;
+  width: 1.36rem;
+  height: 1.36rem;
+  place-items: center;
+  border-radius: 999px;
+  background: #2f6f28;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.methodology-guide-example {
+  display: grid;
+  gap: 0.14rem;
+  padding: 0.78rem 0.88rem;
+  border-radius: 0.9rem;
+  border: 1px solid var(--guide-panel-border);
+  background: var(--guide-panel-bg);
+  color: var(--bitacora-muted);
+  font-size: 0.9rem;
+  line-height: 1.42;
+}
+
+.methodology-guide-example strong {
+  color: var(--bitacora-ink);
+}
+
+.methodology-guide-comparison-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.methodology-guide-comparison-card {
+  display: grid;
+  gap: 0.58rem;
+  padding: 0.86rem;
+}
+
+.methodology-guide-comparison-card__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 0.6rem;
+  align-items: stretch;
+}
+
+.methodology-guide-comparison-card__body > div {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.65rem;
+  border-radius: 0.78rem;
+  border: 1px solid var(--guide-panel-border);
+  background: var(--guide-panel-bg);
+}
+
+.methodology-guide-comparison-card__body strong {
+  color: #2f6f28;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.methodology-guide-comparison-card__vs {
+  align-self: center;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.methodology-guide-family-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.methodology-guide-family-card {
+  display: grid;
+  gap: 0.82rem;
+  padding: 0.95rem;
+}
+
+.methodology-guide-family-card__header {
+  display: flex;
+  gap: 0.72rem;
+  align-items: flex-start;
+}
+
+.methodology-guide-family-card__items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.48rem;
+}
+
+.methodology-guide-family-card__item {
+  display: grid;
+  gap: 0.16rem;
+  flex: 1 1 12rem;
+  min-width: 0;
+  padding: 0.58rem 0.66rem;
+  border-radius: 0.76rem;
+  border: 1px solid var(--guide-panel-border);
+  background: var(--guide-panel-bg-strong);
+}
+
+.methodology-guide-family-card__item strong,
+.methodology-guide-distinction span {
+  color: #2f6f28;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.methodology-guide-distinction {
+  display: flex;
+  gap: 0.8rem;
+  align-items: flex-start;
+  padding: 0.86rem 0.95rem;
+  border-left: 4px solid rgba(74, 159, 47, 0.7);
+  border-radius: 0.9rem;
+  background: rgba(239, 246, 255, 0.72);
+  color: var(--bitacora-muted);
+  font-size: 0.86rem;
+  line-height: 1.42;
+}
+
+.methodology-guide-distinction > strong {
+  min-width: 12rem;
+  color: var(--bitacora-ink);
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.methodology-guide-distinction p {
+  margin: 0;
+}
+
+.methodology-guide-classification-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.64rem;
+}
+
+.methodology-guide-classification-row {
+  display: grid;
+  gap: 0.72rem;
+  padding: 0.88rem;
+}
+
+.methodology-guide-classification-row__copy {
+  display: grid;
+  gap: 0.22rem;
+}
+
+.methodology-guide-classification-row__copy p {
+  margin: 0;
+  color: var(--bitacora-muted);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.methodology-guide-classification-row__terms,
+.methodology-guide-reporting-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.38rem;
+}
+
+.methodology-guide-chip,
+.methodology-guide-term {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  min-height: 1.78rem;
+  padding: 0.3rem 0.62rem;
+  border: 1px solid rgba(74, 159, 47, 0.22);
+  border-radius: 999px;
+  background: rgba(247, 251, 245, 0.96);
+  color: #2f6f28;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 850;
+  line-height: 1.15;
+}
+
+.methodology-guide-term {
+  cursor: pointer;
+}
+
+.methodology-guide-term svg {
+  width: 0.82rem;
+  height: 0.82rem;
+}
+
+.methodology-guide-term:hover,
+.methodology-guide-term:focus-visible,
+.methodology-guide-term[aria-expanded="true"] {
+  border-color: rgba(91, 158, 58, 0.58);
+  background: rgba(91, 158, 58, 0.12);
+  box-shadow: 0 0 0 3px rgba(122, 184, 0, 0.1);
+  outline: none;
+}
+
+.methodology-guide-design-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.methodology-guide-design-card {
+  display: grid;
+  gap: 0.42rem;
+  padding: 0.85rem;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.methodology-guide-design-card:hover,
+.methodology-guide-design-card:focus-within {
+  border-color: rgba(74, 159, 47, 0.28);
+  box-shadow: 0 18px 34px rgba(15, 23, 42, 0.075);
+  transform: translateY(-1px);
+}
+
+.methodology-guide-design-card > span {
+  justify-self: start;
+  padding: 0.24rem 0.52rem;
+  border-radius: 999px;
+  background: rgba(237, 244, 236, 0.95);
+  color: #2f6f28;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.methodology-guide-section--checklist {
+  padding: 0.95rem;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 1.1rem;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.methodology-guide-checklist {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.methodology-guide-checklist__group {
+  display: grid;
+  align-content: start;
+  gap: 0.55rem;
+  padding: 0.8rem;
+  background: var(--guide-panel-bg);
+  box-shadow: none;
+}
+
+.methodology-guide-checklist__group ul {
+  display: grid;
+  gap: 0.42rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.methodology-guide-checklist__group li {
+  position: relative;
+  min-width: 0;
+  padding-left: 1.34rem;
+  color: var(--bitacora-muted);
+  font-size: 0.82rem;
+  line-height: 1.34;
+}
+
+.methodology-guide-checklist__group li::before {
+  content: "";
+  position: absolute;
+  top: 0.12rem;
+  left: 0;
+  width: 0.92rem;
+  height: 0.92rem;
+  border-radius: 999px;
+  background:
+    linear-gradient(#fff, #fff) center / 0.34rem 0.12rem no-repeat,
+    var(--bitacora-green);
+}
+
+.methodology-guide-table-wrap {
+  overflow-x: auto;
+  border: 1px solid rgba(226, 232, 240, 0.96);
+  border-radius: 1rem;
+  background: var(--guide-panel-bg);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.04);
+}
+
+.methodology-guide-table {
+  width: 100%;
+  min-width: 0;
+  border-collapse: collapse;
+  color: var(--bitacora-muted);
+  font-size: 0.84rem;
+}
+
+.methodology-guide-table thead {
+  background: rgba(237, 244, 236, 0.88);
+  color: #2f6f28;
+}
+
+.methodology-guide-table th,
+.methodology-guide-table td {
+  padding: 0.66rem 0.76rem;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.82);
+  text-align: left;
+  vertical-align: top;
+}
+
+.methodology-guide-table tbody tr:nth-child(even) {
+  background: var(--guide-panel-bg);
+}
+
+.methodology-guide-table tr:last-child th,
+.methodology-guide-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.methodology-guide-table th {
+  color: var(--bitacora-ink);
+  font-weight: 900;
+}
+
+.methodology-guide-reporting-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.methodology-guide-reporting-chip {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.08rem 0.5rem;
+  align-items: center;
+  min-height: 3.1rem;
+  padding: 0.62rem 0.7rem;
+  border: 1px solid rgba(74, 159, 47, 0.18);
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--bitacora-muted);
+}
+
+.methodology-guide-reporting-chip svg {
+  grid-row: span 2;
+  color: #2f6f28;
+}
+
+.methodology-guide-reporting-chip strong {
+  color: #2f6f28;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.methodology-guide-reporting-chip small {
+  min-width: 0;
+  color: var(--bitacora-muted);
+  font-size: 0.74rem;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.methodology-guide-closing {
+  display: flex;
+  gap: 0.72rem;
+  align-items: center;
+  margin: 0 0 0.15rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(74, 159, 47, 0.18);
+  border-radius: 1rem;
+  background:
+    linear-gradient(135deg, rgba(237, 244, 236, 0.96), rgba(255, 255, 255, 0.92));
+  color: #2f5130;
+  font-size: 0.94rem;
+  line-height: 1.42;
+}
+
+.methodology-guide-closing strong {
+  color: #2f5130;
+  font-weight: 900;
+}
+
+.methodology-term-popover {
+  position: fixed;
+  z-index: 80;
+}
+
+.methodology-term-popover[hidden] {
+  display: none;
+}
+
+.methodology-term-popover__card {
+  position: relative;
+  display: grid;
+  gap: 0.66rem;
+  width: min(22.5rem, calc(100vw - 2rem));
+  padding: 1rem;
+  border: 1px solid rgba(91, 158, 58, 0.28);
+  border-radius: 1.12rem;
+  background: #fff;
+  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.22);
+}
+
+.methodology-term-popover__close {
+  position: absolute;
+  top: 0.62rem;
+  right: 0.62rem;
+  display: grid;
+  width: 1.9rem;
+  height: 1.9rem;
+  place-items: center;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+  background: #fff;
+  color: #475569;
+  cursor: pointer;
+}
+
+.methodology-term-popover__close:hover,
+.methodology-term-popover__close:focus-visible {
+  border-color: rgba(91, 158, 58, 0.55);
+  color: #2f6f28;
+  box-shadow: 0 0 0 3px rgba(122, 184, 0, 0.1);
+  outline: none;
+}
+
+.methodology-term-popover__close svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.methodology-term-popover__category {
+  justify-self: start;
+  max-width: calc(100% - 2.4rem);
+  padding: 0.24rem 0.54rem;
+  border: 1px solid rgba(91, 158, 58, 0.22);
+  border-radius: 999px;
+  background: var(--guide-panel-bg);
+  color: #2f6f28;
+  font-size: 0.7rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.methodology-term-popover__card h3 {
+  margin: 0;
+  color: var(--bitacora-ink);
+  font-size: 1.08rem;
+  font-weight: 900;
+  line-height: 1.18;
+}
+
+.methodology-term-popover__definition,
+.methodology-term-popover__note {
+  margin: 0;
+  color: var(--bitacora-muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.methodology-term-popover__example {
+  display: grid;
+  gap: 0.18rem;
+  padding: 0.72rem;
+  border: 1px solid var(--guide-panel-border);
+  border-radius: 0.82rem;
+  background: var(--guide-panel-bg);
+  color: var(--bitacora-muted);
+  font-size: 0.82rem;
+  line-height: 1.38;
+}
+
+.methodology-term-popover__example strong {
+  color: var(--bitacora-ink);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
 }
 
 .bitacora-modal__actions {
@@ -1875,6 +2752,7 @@ body.bitacora-modal-open {
 }
 
 @media (max-width: 900px) {
+  .bitacora-hero__actions,
   .bitacora-publications-header,
   .bitacora-publications-meta {
     display: grid;
@@ -1885,14 +2763,27 @@ body.bitacora-modal-open {
     text-align: left;
   }
 
-	  .bitacora-post-card__meta,
-	  .bitacora-trace,
-	  .bitacora-analysis__grid,
-	  .bitacora-methodology-grid,
-	  .bitacora-analysis__compact-list,
-	  .bitacora-form-audit {
-	    grid-template-columns: 1fr;
-	  }
+  .bitacora-post-card__meta,
+  .bitacora-trace,
+  .bitacora-analysis__grid,
+  .bitacora-methodology-grid,
+  .bitacora-analysis__compact-list,
+  .bitacora-form-audit {
+    grid-template-columns: 1fr;
+  }
+
+  .methodology-guide-intro__cards,
+  .methodology-guide-design-grid,
+  .methodology-guide-checklist,
+  .methodology-guide-reporting-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .methodology-guide-comparison-grid,
+  .methodology-guide-family-grid,
+  .methodology-guide-classification-grid {
+    grid-template-columns: 1fr;
+  }
 
   .bitacora-post-card__meta dd,
   .bitacora-trace dd,
@@ -1900,13 +2791,13 @@ body.bitacora-modal-open {
     white-space: normal;
   }
 
-	  .bitacora-url-row,
-	  .bitacora-form-grid,
-	  .bitacora-preview-grid,
-	  .bitacora-comment-form,
-	  .bitacora-document-tabs {
-	    grid-template-columns: 1fr;
-	  }
+  .bitacora-url-row,
+  .bitacora-form-grid,
+  .bitacora-preview-grid,
+  .bitacora-comment-form,
+  .bitacora-document-tabs {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
@@ -1924,6 +2815,7 @@ body.bitacora-modal-open {
   }
 
   .bitacora-sources-trigger,
+  .bitacora-hero__action,
   .bitacora-add-article-button,
   .bitacora-btn,
   .bitacora-filters-card .bitacora-btn,
@@ -1960,18 +2852,18 @@ body.bitacora-modal-open {
     gap: 0.72rem;
   }
 
-	  .bitacora-post-card__actions,
-	  .bitacora-modal__actions {
-	    flex-direction: column;
-	  }
+  .bitacora-post-card__actions,
+  .bitacora-modal__actions {
+    flex-direction: column;
+  }
 
-	  .bitacora-post-card__social {
-	    width: 100%;
-	  }
+  .bitacora-post-card__social {
+    width: 100%;
+  }
 
-	  .bitacora-social-action {
-	    flex: 1 1 9rem;
-	  }
+  .bitacora-social-action {
+    flex: 1 1 9rem;
+  }
 
   .bitacora-post-card__summary {
     max-width: 100%;
@@ -2004,5 +2896,145 @@ body.bitacora-modal-open {
 
   .scientific-source-card {
     grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .methodology-guide-modal__dialog {
+    border-radius: 1rem;
+  }
+
+  .methodology-guide-modal__header {
+    padding-top: 0.9rem;
+    padding-bottom: 0.82rem;
+  }
+
+  .methodology-guide-modal__header-copy {
+    gap: 0.62rem;
+  }
+
+  .methodology-guide-modal__header-icon {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.72rem;
+  }
+
+  .methodology-guide-intro__cards,
+  .methodology-guide-design-grid,
+  .methodology-guide-checklist,
+  .methodology-guide-reporting-grid,
+  .methodology-guide-classification-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .methodology-guide-modal__body {
+    padding: 0.85rem;
+  }
+
+  .methodology-guide-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    min-height: 3.85rem;
+    scroll-snap-type: x proximity;
+    margin-right: -0.85rem;
+    margin-left: -0.85rem;
+    padding: 0.75rem 0.85rem;
+  }
+
+  .methodology-guide-nav__button {
+    scroll-snap-align: start;
+  }
+
+  .methodology-guide-workflow {
+    display: flex;
+    flex-wrap: nowrap;
+  }
+
+  .methodology-guide-workflow__step {
+    flex: 0 0 auto;
+    min-width: 7.6rem;
+  }
+
+  .methodology-guide-comparison-card__body {
+    grid-template-columns: 1fr;
+  }
+
+  .methodology-guide-comparison-card__vs {
+    justify-self: start;
+  }
+
+  .methodology-guide-distinction {
+    display: grid;
+  }
+
+  .methodology-guide-distinction > strong {
+    min-width: 0;
+  }
+
+  .methodology-guide-table,
+  .methodology-guide-table thead,
+  .methodology-guide-table tbody,
+  .methodology-guide-table tr,
+  .methodology-guide-table th,
+  .methodology-guide-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .methodology-guide-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+  }
+
+  .methodology-guide-table tbody {
+    display: grid;
+    gap: 0.62rem;
+    padding: 0.62rem;
+  }
+
+  .methodology-guide-table tr {
+    padding: 0.72rem;
+    border: 1px solid rgba(226, 232, 240, 0.92);
+    border-radius: 0.86rem;
+    background: #fff;
+  }
+
+  .methodology-guide-table th,
+  .methodology-guide-table td {
+    padding: 0;
+    border: 0;
+  }
+
+  .methodology-guide-table td {
+    margin-top: 0.36rem;
+  }
+
+  .methodology-guide-table td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 0.08rem;
+    color: #64748b;
+    font-size: 0.68rem;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .methodology-term-popover {
+    top: 50% !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .methodology-guide-modal *,
+  .methodology-guide-modal *::before,
+  .methodology-guide-modal *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
   }
 }

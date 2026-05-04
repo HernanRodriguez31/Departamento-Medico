@@ -81,7 +81,7 @@ service firebase.storage {
     }
 
     match /bitacora/article-documents/{uid}/{fileName} {
-      allow read: if isOwner(uid) || isAdmin();
+      allow read: if signedIn();
       allow create, update: if isOwner(uid)
                             && isAllowedBitacoraPdfName(fileName)
                             && isPdfUpload()

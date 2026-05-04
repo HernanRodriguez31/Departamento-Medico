@@ -13,19 +13,20 @@ import {
   reauthenticateWithPopup
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
-  getBlob,
+  getDownloadURL,
   ref as storageRef,
   uploadBytes
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { BITACORA_POSTS } from "../data/bitacora-posts.js";
-import { NATIONAL_SELECTED_SOURCE_IDS, SCIENTIFIC_SOURCES } from "../data/scientific-sources.js";
-import { createBitacoraArticleRepository } from "../services/bitacora-article-repository.js?v=20260504-bitacora-pdf-ai-fix-1";
+import { METHODOLOGY_GUIDE, METHODOLOGY_TERMS } from "../data/methodology-guide.js?v=20260504-methodology-guide-terms-1";
+import { NATIONAL_SELECTED_SOURCE_IDS, SCIENTIFIC_SOURCES } from "../data/scientific-sources.js?v=20260504-scientific-source-logo-align-1";
+import { createBitacoraArticleRepository } from "../services/bitacora-article-repository.js?v=20260504-bitacora-methodology-guide-document-fix-1";
 import {
   inferSourceNameFromDomain,
   requestArticleExtraction,
   requestArticleDocumentExtraction,
   validateArticleUrl
-} from "../services/bitacora-ai-extractor.js?v=20260504-bitacora-pdf-ai-fix-1";
+} from "../services/bitacora-ai-extractor.js?v=20260504-bitacora-methodology-guide-document-fix-1";
 
 const { auth, db, storage } = getFirebase();
 
@@ -80,6 +81,9 @@ const els = {
   sourceSearch: $("#scientific-sources-search"),
   sourceScopeButtons: $$("[data-source-scope]"),
   sourcesModal: $("#scientific-sources-modal"),
+  methodologyGuideModal: $("#methodology-guide-modal"),
+  methodologyGuideContent: $("#methodology-guide-content"),
+  noticeRegion: $("#bitacora-notice-region"),
   addArticleModal: $("#add-article-modal"),
   addArticleTitle: $("#add-article-title"),
   addArticleSubtitle: $("#add-article-description"),
@@ -188,7 +192,10 @@ const state = {
   expandedCommentsAll: new Set(),
   commentLikeSummaries: new Map(),
   commentLikeUnsubscribers: new Map(),
-  editingCommentId: ""
+  editingCommentId: "",
+  noticeTimeout: null,
+  methodologyTermAnchor: null,
+  methodologyTermKey: ""
 };
 
 let repository = null;
@@ -227,6 +234,474 @@ const ensureWebUrl = (value = "") => {
     return url.protocol === "https:" || url.protocol === "http:" ? url.href : "";
   } catch (error) {
     return "";
+  }
+};
+
+const ensureSecureDocumentUrl = (value = "") => {
+  try {
+    const url = new URL(String(value || "").trim());
+    return url.protocol === "https:" ? url.href : "";
+  } catch (error) {
+    return "";
+  }
+};
+
+const getArticleDocumentPath = (article = {}) =>
+  [
+    article.storagePath,
+    article.documentStoragePath,
+    article.pdfStoragePath,
+    article.documentPath,
+    article.pdfPath,
+    article.storageRef
+  ]
+    .map((value) => String(value || "").trim())
+    .find(Boolean) || "";
+
+const getArticleDocumentUrl = (article = {}) =>
+  [article.documentUrl, article.pdfUrl, article.sourcePdfUrl]
+    .map(ensureSecureDocumentUrl)
+    .find(Boolean) || "";
+
+const hasArticleDocument = (article = {}) => Boolean(getArticleDocumentPath(article) || getArticleDocumentUrl(article));
+
+const renderMethodologyGuideIcon = (icon = "circle") =>
+  `<i data-lucide="${escapeHtml(icon)}" aria-hidden="true"></i>`;
+
+const getMethodologyTermPopover = () => $("#methodology-term-popover", els.methodologyGuideContent);
+
+const isMethodologyTermPopoverOpen = () => Boolean(getMethodologyTermPopover() && !getMethodologyTermPopover().hidden);
+
+const renderMethodologyGuideTerm = (term = {}) => {
+  const termKey = String(term.termKey || "").trim();
+  const termData = termKey ? METHODOLOGY_TERMS[termKey] : null;
+  const label = term.label || termData?.label || "";
+  if (!label) return "";
+  if (!termData) {
+    return `<span class="methodology-guide-chip">${escapeHtml(label)}</span>`;
+  }
+  return `
+    <button
+      type="button"
+      class="methodology-guide-term"
+      data-methodology-term="${escapeHtml(termKey)}"
+      aria-label="Ver definición de ${escapeHtml(label)}"
+      aria-expanded="false"
+      aria-controls="methodology-term-popover"
+    >
+      <span>${escapeHtml(label)}</span>
+      ${renderMethodologyGuideIcon("info")}
+    </button>
+  `;
+};
+
+const renderMethodologyGuideTerms = (terms = []) => terms.map(renderMethodologyGuideTerm).join("");
+
+const renderMethodologyTermPopover = (term = {}) => `
+  <div
+    class="methodology-term-popover__card"
+    role="dialog"
+    aria-modal="false"
+    aria-labelledby="methodology-term-popover-title"
+    tabindex="-1"
+  >
+    <button
+      type="button"
+      class="methodology-term-popover__close"
+      data-methodology-term-popover-close
+      aria-label="Cerrar definición"
+    >
+      ${renderMethodologyGuideIcon("x")}
+    </button>
+    <span class="methodology-term-popover__category">${escapeHtml(term.category || "Concepto metodológico")}</span>
+    <h3 id="methodology-term-popover-title">${escapeHtml(term.label || "")}</h3>
+    <p class="methodology-term-popover__definition">${escapeHtml(term.definition || "")}</p>
+    <div class="methodology-term-popover__example">
+      <strong>Ejemplo</strong>
+      <span>${escapeHtml(term.example || "Aplicación contextual dentro de un diseño científico.")}</span>
+    </div>
+    ${term.note ? `<p class="methodology-term-popover__note">${escapeHtml(term.note)}</p>` : ""}
+  </div>
+`;
+
+const positionMethodologyTermPopover = (anchorElement) => {
+  const popover = getMethodologyTermPopover();
+  const card = popover?.querySelector(".methodology-term-popover__card");
+  if (!popover || !card || !anchorElement) return;
+  popover.style.removeProperty("left");
+  popover.style.removeProperty("top");
+  popover.style.removeProperty("right");
+  popover.style.removeProperty("bottom");
+  popover.style.removeProperty("transform");
+  const anchorRect = anchorElement.getBoundingClientRect();
+  const cardRect = card.getBoundingClientRect();
+  const margin = 16;
+  let left = anchorRect.left;
+  let top = anchorRect.bottom + 10;
+  if (left + cardRect.width > window.innerWidth - margin) {
+    left = window.innerWidth - cardRect.width - margin;
+  }
+  if (left < margin) {
+    left = margin;
+  }
+  if (top + cardRect.height > window.innerHeight - margin) {
+    top = Math.max(margin, anchorRect.top - cardRect.height - 10);
+  }
+  popover.style.left = `${Math.round(left)}px`;
+  popover.style.top = `${Math.round(top)}px`;
+};
+
+const closeMethodologyTermPopover = ({ restoreFocus = true } = {}) => {
+  const popover = getMethodologyTermPopover();
+  const anchor = state.methodologyTermAnchor;
+  if (popover) {
+    popover.hidden = true;
+    popover.innerHTML = "";
+    popover.style.removeProperty("left");
+    popover.style.removeProperty("top");
+    popover.style.removeProperty("right");
+    popover.style.removeProperty("bottom");
+    popover.style.removeProperty("transform");
+  }
+  $$("[data-methodology-term]", els.methodologyGuideContent).forEach((button) => {
+    button.setAttribute("aria-expanded", "false");
+  });
+  state.methodologyTermAnchor = null;
+  state.methodologyTermKey = "";
+  if (restoreFocus && anchor && typeof anchor.focus === "function") {
+    anchor.focus({ preventScroll: true });
+  }
+};
+
+const openMethodologyTermPopover = (termKey = "", anchorElement) => {
+  const term = METHODOLOGY_TERMS[termKey];
+  const popover = getMethodologyTermPopover();
+  if (!term || !popover || !anchorElement) return;
+  state.methodologyTermAnchor = anchorElement;
+  state.methodologyTermKey = termKey;
+  $$("[data-methodology-term]", els.methodologyGuideContent).forEach((button) => {
+    button.setAttribute("aria-expanded", button === anchorElement ? "true" : "false");
+  });
+  popover.innerHTML = renderMethodologyTermPopover(term);
+  popover.hidden = false;
+  positionMethodologyTermPopover(anchorElement);
+  if (window.lucide) window.lucide.createIcons();
+  const focusTarget = popover.querySelector("[data-methodology-term-popover-close]") || popover.querySelector(".methodology-term-popover__card");
+  focusTarget?.focus({ preventScroll: true });
+};
+
+const renderMethodologyGuide = () => {
+  if (!els.methodologyGuideContent) return;
+  const guide = METHODOLOGY_GUIDE;
+  const nav = guide.navItems
+    .map(
+      ([target, label], index) => `
+        <button
+          type="button"
+          class="methodology-guide-nav__button"
+          data-methodology-guide-target="${escapeHtml(target)}"
+          ${index === 0 ? 'aria-current="true"' : ""}
+        >
+          ${escapeHtml(label)}
+        </button>
+      `
+    )
+    .join("");
+  els.methodologyGuideContent.innerHTML = `
+    <section class="methodology-guide-intro" aria-labelledby="methodology-guide-intro-title">
+      <div class="methodology-guide-intro__copy">
+        <p class="methodology-guide-eyebrow">Lectura rápida</p>
+        <h3 id="methodology-guide-intro-title">${escapeHtml(guide.intro.title)}</h3>
+        <p>${escapeHtml(guide.intro.text)}</p>
+      </div>
+      <div class="methodology-guide-intro__cards">
+        ${guide.intro.cards
+          .map(
+            (card) => `
+              <article class="methodology-guide-microcard">
+                <span class="methodology-guide-microcard__icon">${renderMethodologyGuideIcon(card.icon)}</span>
+                <h4>${escapeHtml(card.title)}</h4>
+                <p>${escapeHtml(card.text)}</p>
+              </article>
+            `
+          )
+          .join("")}
+      </div>
+    </section>
+
+    <nav class="methodology-guide-nav" aria-label="Navegación de guía metodológica">
+      ${nav}
+    </nav>
+
+    <section class="methodology-guide-section methodology-guide-section--workflow" id="methodology-guide-section-formula" aria-labelledby="methodology-guide-formula">
+      <div class="methodology-guide-section__heading">
+        <p class="methodology-guide-eyebrow">Cadena metodológica</p>
+        <h3 id="methodology-guide-formula">Fórmula visual</h3>
+      </div>
+      <ol class="methodology-guide-workflow">
+        ${guide.formula.steps
+          .map(
+            (item, index) => `
+              <li class="methodology-guide-workflow__step">
+                <span class="methodology-guide-workflow__number">${index + 1}</span>
+                <span>${escapeHtml(item)}</span>
+              </li>
+            `
+          )
+          .join("")}
+      </ol>
+      <div class="methodology-guide-example">
+        <strong>Ejemplo</strong>
+        <span>${escapeHtml(guide.formula.example)}</span>
+      </div>
+      <p class="methodology-guide-note">${escapeHtml(guide.formula.note)}</p>
+    </section>
+
+    <section class="methodology-guide-section" id="methodology-guide-section-differences" aria-labelledby="methodology-guide-differences">
+      <div class="methodology-guide-section__heading">
+        <p class="methodology-guide-eyebrow">Conceptos que suelen confundirse</p>
+        <h3 id="methodology-guide-differences">Diferencias clave</h3>
+      </div>
+      <div class="methodology-guide-comparison-grid">
+        ${guide.keyDifferences
+          .map(
+            (item) => `
+              <article class="methodology-guide-comparison-card">
+                <h4>${escapeHtml(item.title)}</h4>
+                <div class="methodology-guide-comparison-card__body">
+                  <div>
+                    <strong>${escapeHtml(item.left[0])}</strong>
+                    <p>${escapeHtml(item.left[1])}</p>
+                  </div>
+                  <span class="methodology-guide-comparison-card__vs" aria-hidden="true">vs</span>
+                  <div>
+                    <strong>${escapeHtml(item.right[0])}</strong>
+                    <p>${escapeHtml(item.right[1])}</p>
+                  </div>
+                </div>
+              </article>
+            `
+          )
+          .join("")}
+      </div>
+    </section>
+
+    <section class="methodology-guide-section" id="methodology-guide-section-families" aria-labelledby="methodology-guide-families">
+      <div class="methodology-guide-section__heading">
+        <p class="methodology-guide-eyebrow">Tipo de evidencia</p>
+        <h3 id="methodology-guide-families">Grandes familias de estudios</h3>
+      </div>
+      <div class="methodology-guide-family-grid">
+        ${guide.families
+          .map(
+            (family) => `
+              <article class="methodology-guide-family-card">
+                <div class="methodology-guide-family-card__header">
+                  <span class="methodology-guide-family-card__icon">${renderMethodologyGuideIcon(family.icon)}</span>
+                  <div>
+                    <h4>${escapeHtml(family.title)}</h4>
+                    <p>${escapeHtml(family.subtitle)}</p>
+                  </div>
+                </div>
+                <div class="methodology-guide-family-card__items">
+                  ${family.items
+                    .map(
+                      ([label, text]) => `
+                        <div class="methodology-guide-family-card__item">
+                          <strong>${escapeHtml(label)}</strong>
+                          <span>${escapeHtml(text)}</span>
+                        </div>
+                      `
+                    )
+                    .join("")}
+                </div>
+              </article>
+            `
+          )
+          .join("")}
+      </div>
+      <aside class="methodology-guide-distinction" aria-label="No confundir revisión sistemática y metaanálisis">
+        <strong>${escapeHtml(guide.distinction.title)}</strong>
+        <div>
+          ${guide.distinction.items
+            .map(([label, text]) => `<p><span>${escapeHtml(label)}:</span> ${escapeHtml(text)}</p>`)
+            .join("")}
+        </div>
+      </aside>
+    </section>
+
+    <section class="methodology-guide-section" id="methodology-guide-section-classifications" aria-labelledby="methodology-guide-classifications">
+      <div class="methodology-guide-section__heading">
+        <p class="methodology-guide-eyebrow">Ejes de descripción</p>
+        <h3 id="methodology-guide-classifications">Clasificaciones clave</h3>
+      </div>
+      <div class="methodology-guide-classification-grid">
+        ${guide.classifications
+          .map(
+            (classification) => `
+              <article class="methodology-guide-classification-row">
+                <div class="methodology-guide-classification-row__copy">
+                  <h4>${escapeHtml(classification.title)}</h4>
+                  <p>${escapeHtml(classification.description || "")}</p>
+                </div>
+                <div class="methodology-guide-classification-row__terms">${renderMethodologyGuideTerms(classification.terms || [])}</div>
+              </article>
+            `
+          )
+          .join("")}
+      </div>
+    </section>
+
+    <section class="methodology-guide-section" id="methodology-guide-section-designs" aria-labelledby="methodology-guide-designs">
+      <div class="methodology-guide-section__heading">
+        <p class="methodology-guide-eyebrow">Patrones frecuentes</p>
+        <h3 id="methodology-guide-designs">Diseños más frecuentes</h3>
+      </div>
+      <div class="methodology-guide-design-grid">
+        ${guide.frequentDesigns
+          .map(
+            (design) => `
+              <article class="methodology-guide-design-card">
+                <div class="methodology-guide-design-card__icon">${renderMethodologyGuideIcon(design.icon)}</div>
+                <h4>${escapeHtml(design.title)}</h4>
+                <p>${escapeHtml(design.text)}</p>
+                <span>${escapeHtml(design.badge)}</span>
+              </article>
+            `
+          )
+          .join("")}
+      </div>
+    </section>
+
+    <section class="methodology-guide-section methodology-guide-section--checklist" id="methodology-guide-section-checklist" aria-labelledby="methodology-guide-checklist">
+      <div class="methodology-guide-section__heading">
+        <p class="methodology-guide-eyebrow">Checklist básico</p>
+        <h3 id="methodology-guide-checklist">Parámetros mínimos que debe informar un estudio</h3>
+        <p>Checklist básico para evaluar si el reporte permite interpretar el estudio.</p>
+      </div>
+      <div class="methodology-guide-checklist">
+        ${guide.checklistGroups
+          .map(
+            (group) => `
+              <article class="methodology-guide-checklist__group">
+                <h4>${escapeHtml(group.title)}</h4>
+                <ul>
+                  ${group.items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+                </ul>
+              </article>
+            `
+          )
+          .join("")}
+      </div>
+    </section>
+
+    <section class="methodology-guide-section" id="methodology-guide-section-measures" aria-labelledby="methodology-guide-measures">
+      <div class="methodology-guide-section__heading">
+        <p class="methodology-guide-eyebrow">Lectura cuantitativa</p>
+        <h3 id="methodology-guide-measures">Medidas frecuentes</h3>
+      </div>
+      <div class="methodology-guide-table-wrap">
+        <table class="methodology-guide-table">
+          <thead>
+            <tr>
+              <th scope="col">Diseño</th>
+              <th scope="col">Medidas habituales</th>
+              <th scope="col">Uso orientativo</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${guide.commonMeasures
+              .map(
+                ([design, measures, use]) => `
+                  <tr>
+                    <th scope="row">${escapeHtml(design)}</th>
+                    <td data-label="Medidas habituales">${escapeHtml(measures)}</td>
+                    <td data-label="Uso orientativo">${escapeHtml(use)}</td>
+                  </tr>
+                `
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="methodology-guide-section" id="methodology-guide-section-reporting" aria-labelledby="methodology-guide-reporting">
+      <div class="methodology-guide-section__heading">
+        <p class="methodology-guide-eyebrow">Transparencia del reporte</p>
+        <h3 id="methodology-guide-reporting">Guías de reporte</h3>
+      </div>
+      <div class="methodology-guide-reporting-grid">
+        ${guide.reportingGuidelines
+          .map(
+            ([label, text]) => `
+              <span class="methodology-guide-reporting-chip">
+                ${renderMethodologyGuideIcon("book-open-check")}
+                <strong>${escapeHtml(label)}</strong>
+                <small>${escapeHtml(text)}</small>
+              </span>
+            `
+          )
+          .join("")}
+      </div>
+    </section>
+
+    <p class="methodology-guide-closing">
+      <span>${renderMethodologyGuideIcon(guide.closing.icon)}</span>
+      <strong>${escapeHtml(guide.closing.text)}</strong>
+    </p>
+
+    <div id="methodology-term-popover" class="methodology-term-popover" hidden></div>
+  `;
+  if (window.lucide) window.lucide.createIcons();
+};
+
+const handleMethodologyGuideNavigation = (event) => {
+  const trigger = event.target.closest("[data-methodology-guide-target]");
+  if (!trigger || !els.methodologyGuideContent?.contains(trigger)) return;
+  const targetId = `methodology-guide-section-${trigger.dataset.methodologyGuideTarget || ""}`;
+  const target = document.getElementById(targetId);
+  if (!target) return;
+  event.preventDefault();
+  $$("[data-methodology-guide-target]", els.methodologyGuideContent).forEach((button) => {
+    if (button === trigger) {
+      button.setAttribute("aria-current", "true");
+    } else {
+      button.removeAttribute("aria-current");
+    }
+  });
+  const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  const nav = $(".methodology-guide-nav", els.methodologyGuideContent);
+  const offset = (nav?.offsetHeight || 0) + 16;
+  els.methodologyGuideContent.scrollTo({
+    top: Math.max(0, target.offsetTop - offset),
+    behavior: prefersReducedMotion ? "auto" : "smooth"
+  });
+};
+
+const handleMethodologyGuideTermInteraction = (event) => {
+  const closeButton = event.target.closest("[data-methodology-term-popover-close]");
+  if (closeButton && els.methodologyGuideContent?.contains(closeButton)) {
+    event.preventDefault();
+    closeMethodologyTermPopover();
+    return;
+  }
+
+  const termButton = event.target.closest("[data-methodology-term]");
+  if (termButton && els.methodologyGuideContent?.contains(termButton)) {
+    event.preventDefault();
+    openMethodologyTermPopover(termButton.dataset.methodologyTerm || "", termButton);
+    return;
+  }
+
+  if (!isMethodologyTermPopoverOpen()) return;
+  if (event.target.closest(".methodology-term-popover__card")) return;
+  closeMethodologyTermPopover({ restoreFocus: false });
+};
+
+const handleMethodologyGuideScroll = () => {
+  if (isMethodologyTermPopoverOpen()) {
+    positionMethodologyTermPopover(state.methodologyTermAnchor);
   }
 };
 
@@ -980,16 +1455,23 @@ const renderPost = (post) => {
           aria-expanded="${expanded ? "true" : "false"}"
           aria-controls="${analysisId}"
         >
-          ${expanded ? "Ocultar análisis" : "Leer análisis"}
+          <i data-lucide="${expanded ? "chevron-up" : "file-text"}" aria-hidden="true"></i>
+          <span>${expanded ? "Ocultar Resumen Técnico" : "Resumen Técnico"}</span>
         </button>
         ${
           originalUrl
-            ? `<a class="bitacora-btn bitacora-btn--secondary" href="${escapeHtml(originalUrl)}" target="_blank" rel="noopener noreferrer">Ver fuente original</a>`
+            ? `<a class="bitacora-btn bitacora-btn--secondary" href="${escapeHtml(originalUrl)}" target="_blank" rel="noopener noreferrer">
+                <i data-lucide="external-link" aria-hidden="true"></i>
+                <span>Ver fuente original</span>
+              </a>`
             : ""
         }
         ${
-          post.storagePath
-            ? `<button class="bitacora-btn bitacora-btn--secondary" type="button" data-bitacora-action="view-pdf">Ver PDF</button>`
+          hasArticleDocument(post)
+            ? `<button class="bitacora-btn bitacora-btn--secondary" type="button" data-bitacora-action="view-document" aria-label="Ver documento asociado">
+                <i data-lucide="file-search" aria-hidden="true"></i>
+                <span>Ver Documento</span>
+              </button>`
             : ""
         }
         ${
@@ -1347,6 +1829,9 @@ const openModal = (modal, trigger) => {
   state.activeModalTrigger = trigger || document.activeElement;
   modal.hidden = false;
   modal.setAttribute("aria-hidden", "false");
+  if (trigger?.hasAttribute?.("aria-expanded")) {
+    trigger.setAttribute("aria-expanded", "true");
+  }
   document.body.classList.add("bitacora-modal-open");
   window.requestAnimationFrame(() => {
     const focusTarget = getFocusable(modal)[0] || $(".bitacora-modal__dialog", modal);
@@ -1356,12 +1841,18 @@ const openModal = (modal, trigger) => {
 
 const closeModal = (modal = state.activeModal) => {
   if (!modal) return;
+  if (modal === els.methodologyGuideModal) {
+    closeMethodologyTermPopover({ restoreFocus: false });
+  }
   modal.hidden = true;
   modal.setAttribute("aria-hidden", "true");
   document.body.classList.remove("bitacora-modal-open");
   const trigger = state.activeModalTrigger;
   state.activeModal = null;
   state.activeModalTrigger = null;
+  if (trigger?.hasAttribute?.("aria-expanded")) {
+    trigger.setAttribute("aria-expanded", "false");
+  }
   if (trigger && typeof trigger.focus === "function") {
     trigger.focus({ preventScroll: true });
   }
@@ -1372,6 +1863,10 @@ const handleModalKeydown = (event) => {
   if (!modal) return;
   if (event.key === "Escape") {
     event.preventDefault();
+    if (modal === els.methodologyGuideModal && isMethodologyTermPopoverOpen()) {
+      closeMethodologyTermPopover();
+      return;
+    }
     closeModal(modal);
     return;
   }
@@ -2074,20 +2569,43 @@ const handlePdfDrop = (event) => {
   if (file) handleDocumentFileSelected(file);
 };
 
-const handleViewPdf = async (postId, button) => {
+const getDocumentOpenErrorMessage = (error) => {
+  const code = String(error?.code || "").toLowerCase();
+  if (code.includes("unauthorized")) return "No tenés permisos para abrir este documento.";
+  if (code.includes("object-not-found")) return "El documento no está disponible en el almacenamiento.";
+  if (code.includes("canceled") || code.includes("retry-limit") || code.includes("unknown")) {
+    return "No se pudo abrir el documento por un problema de conexión.";
+  }
+  return "No se pudo abrir el documento. Intentá nuevamente.";
+};
+
+const openArticleDocument = async (postId, button) => {
   const post = getAllPosts().find((item) => item.id === postId);
-  if (!post?.storagePath || !storage) return;
+  const documentUrl = getArticleDocumentUrl(post);
+  const documentPath = getArticleDocumentPath(post);
+  if (!post || (!documentUrl && !documentPath)) {
+    showBitacoraNotice("Esta publicación no tiene un documento asociado.", "warning");
+    return;
+  }
   setActionBusy(button, true, "Abriendo...");
   try {
-    const blob = await getBlob(storageRef(storage, post.storagePath));
-    const blobUrl = window.URL.createObjectURL(blob);
-    const opened = window.open(blobUrl, "_blank", "noopener,noreferrer");
-    window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60_000);
+    const url = documentUrl || (storage && documentPath ? await getDownloadURL(storageRef(storage, documentPath)) : "");
+    if (!url) {
+      showBitacoraNotice("No se pudo abrir el documento. Intentá nuevamente.", "error");
+      return;
+    }
+    const opened = window.open(url, "_blank", "noopener,noreferrer");
     if (!opened) {
-      showArticleActionError("El navegador bloqueó la apertura del PDF. Permití ventanas emergentes para verlo.");
+      showBitacoraNotice("El navegador bloqueó la apertura del documento. Permití ventanas emergentes para verlo.", "warning");
     }
   } catch (error) {
-    showArticleActionError("No se pudo abrir el PDF. Verificá permisos o conexión.");
+    console.warn("[Bitácora] No se pudo abrir el documento.", {
+      code: error?.code || "",
+      articleId: postId,
+      hasStoragePath: Boolean(documentPath),
+      hasDocumentUrl: Boolean(documentUrl)
+    });
+    showBitacoraNotice(getDocumentOpenErrorMessage(error), "error");
   } finally {
     setActionBusy(button, false);
   }
@@ -2326,16 +2844,40 @@ const setSaveBusy = (button, busy) => {
 const setActionBusy = (button, busy, busyText = "Procesando...") => {
   if (!button) return;
   button.disabled = busy;
-  button.dataset.originalText = button.dataset.originalText || button.textContent.trim();
-  button.textContent = busy ? busyText : button.dataset.originalText;
+  button.dataset.originalHtml = button.dataset.originalHtml || button.innerHTML;
+  button.textContent = busy ? busyText : "";
+  if (!busy) {
+    button.innerHTML = button.dataset.originalHtml;
+    if (window.lucide) window.lucide.createIcons();
+  }
+};
+
+const showBitacoraNotice = (message, type = "info") => {
+  const text = String(message || "").trim();
+  if (!text) return;
+  if (!els.noticeRegion) {
+    console.warn("[Bitácora] Aviso:", text);
+    return;
+  }
+  window.clearTimeout(state.noticeTimeout);
+  const safeType = ["info", "success", "warning", "error"].includes(type) ? type : "info";
+  els.noticeRegion.innerHTML = `
+    <div class="bitacora-notice bitacora-notice--${escapeHtml(safeType)}" role="${safeType === "error" ? "alert" : "status"}">
+      <span>${escapeHtml(text)}</span>
+      <button type="button" class="bitacora-notice__close" aria-label="Cerrar aviso">Cerrar</button>
+    </div>
+  `;
+  els.noticeRegion.querySelector(".bitacora-notice__close")?.addEventListener("click", () => {
+    window.clearTimeout(state.noticeTimeout);
+    els.noticeRegion.innerHTML = "";
+  });
+  state.noticeTimeout = window.setTimeout(() => {
+    if (els.noticeRegion) els.noticeRegion.innerHTML = "";
+  }, safeType === "error" ? 7000 : 5000);
 };
 
 const showArticleActionError = (message) => {
-  if (window.Swal?.fire) {
-    window.Swal.fire("No se pudo completar", message, "error");
-    return;
-  }
-  window.alert(message);
+  showBitacoraNotice(message, "error");
 };
 
 const setReauthError = (message = "") => {
@@ -2623,8 +3165,8 @@ const bindEvents = () => {
       openReauthModal({ action: "delete", postId, trigger: actionButton });
       return;
     }
-    if (action === "view-pdf") {
-      handleViewPdf(postId, actionButton);
+    if (action === "view-document") {
+      openArticleDocument(postId, actionButton);
       return;
     }
     if (action === "toggle-like") {
@@ -2720,6 +3262,12 @@ const bindEvents = () => {
   $$("[data-open-scientific-sources]").forEach((trigger) => {
     trigger.addEventListener("click", () => openModal(els.sourcesModal, trigger));
   });
+  $$("[data-open-methodology-guide]").forEach((trigger) => {
+    trigger.addEventListener("click", () => openModal(els.methodologyGuideModal, trigger));
+  });
+  els.methodologyGuideContent?.addEventListener("click", handleMethodologyGuideNavigation);
+  els.methodologyGuideContent?.addEventListener("click", handleMethodologyGuideTermInteraction);
+  els.methodologyGuideContent?.addEventListener("scroll", handleMethodologyGuideScroll);
   $$("[data-open-add-article]").forEach((trigger) => {
     trigger.addEventListener("click", () => openAddArticleModal(trigger));
   });
@@ -2854,6 +3402,7 @@ const boot = async () => {
   renderFilterOptions();
   renderSourceScopeControls();
   renderSources();
+  renderMethodologyGuide();
   renderPosts();
   bindEvents();
   initArticleRepository();

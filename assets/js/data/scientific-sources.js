@@ -188,7 +188,9 @@ const INTERNATIONAL_SOURCES = [
     fallbackLogoUrl: favicon("https://www.mayoclinicproceedings.org/"),
     initials: "MC",
     logoAlt: "Mayo Clinic Proceedings",
-    logoSize: 54
+    logoSize: 54,
+    logoOffsetX: -3,
+    logoOffsetY: -3
   },
   {
     id: "plos-medicine",
@@ -256,7 +258,9 @@ const INTERNATIONAL_SOURCES = [
     fallbackLogoUrl: favicon("https://scielo.org/"),
     initials: "SC",
     logoAlt: "SciELO",
-    logoSize: 55
+    logoSize: 55,
+    logoOffsetX: -3,
+    logoOffsetY: -3
   },
   {
     id: "joem-acoem",

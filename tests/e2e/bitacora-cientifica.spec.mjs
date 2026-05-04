@@ -116,6 +116,13 @@ test("scientific logbook renders as operational hub with modals and article crea
     if (message.type() === "error") consoleErrors.push(message.text());
   });
   page.on("pageerror", (error) => consoleErrors.push(error.message));
+  await page.addInitScript(() => {
+    window.__bitacoraOpenCalls = [];
+    window.open = (url, target, features) => {
+      window.__bitacoraOpenCalls.push({ url, target, features });
+      return { closed: false, focus: () => {} };
+    };
+  });
   await page.route("**/api/extractScientificArticleDocument", async (route) => {
     const request = route.request();
     const payload = request.postDataJSON();
@@ -615,6 +622,104 @@ test("scientific logbook renders as operational hub with modals and article crea
   await sourcesModal.getByRole("button", { name: "Cerrar" }).click();
   await expect(sourcesModal).toBeHidden();
 
+  const methodologyTrigger = page.getByRole("button", { name: "Guía Metodológica" });
+  await expect(methodologyTrigger).toBeVisible();
+  if ((page.viewportSize()?.width || 0) >= 900) {
+    const positions = await page.locator(".bitacora-hero__actions").evaluate((node) => {
+      const [sources, methodology] = Array.from(node.querySelectorAll("button")).map((button) =>
+        Math.round(button.getBoundingClientRect().left)
+      );
+      return { sources, methodology };
+    });
+    expect(positions.methodology).toBeGreaterThan(positions.sources);
+  }
+  await methodologyTrigger.click();
+  const methodologyModal = page.locator("#methodology-guide-modal");
+  await expect(methodologyModal).toBeVisible();
+  await expect(methodologyModal.getByRole("dialog")).toBeVisible();
+  await expect(methodologyModal.getByRole("heading", { name: "Metodología de estudios científicos" })).toBeVisible();
+  await expect(methodologyModal).toContainText("Cómo interpretar rápidamente un diseño");
+  const methodologyGuideNav = methodologyModal.getByRole("navigation", { name: "Navegación de guía metodológica" });
+  await expect(methodologyGuideNav).toBeVisible();
+  for (const item of ["Fórmula", "Diferencias clave", "Familias", "Clasificaciones", "Diseños", "Checklist", "Medidas", "Guías"]) {
+    await expect(methodologyGuideNav.getByRole("button", { name: item })).toBeVisible();
+  }
+  await methodologyGuideNav.scrollIntoViewIfNeeded();
+  const navHasVisibleHeight = await methodologyGuideNav.evaluate((nav) => {
+    const firstButton = nav.querySelector("button");
+    if (!firstButton) return false;
+    const navRect = nav.getBoundingClientRect();
+    const buttonRect = firstButton.getBoundingClientRect();
+    return navRect.height >= 52 && buttonRect.height >= 30;
+  });
+  expect(navHasVisibleHeight).toBe(true);
+  await expect(methodologyModal).toContainText("1 Diseño");
+  await expect(methodologyModal).toContainText("Fórmula visual");
+  await expect(methodologyModal).toContainText("8 Análisis");
+  if ((page.viewportSize()?.width || 0) >= 900) {
+    const workflowFitsOneRow = await methodologyModal.locator(".methodology-guide-workflow").evaluate((workflow) => {
+      const steps = Array.from(workflow.querySelectorAll(".methodology-guide-workflow__step"));
+      const tops = new Set(steps.map((step) => Math.round(step.getBoundingClientRect().top)));
+      return steps.length === 8 && tops.size === 1;
+    });
+    expect(workflowFitsOneRow).toBe(true);
+  }
+  await expect(methodologyModal).toContainText("Diferencias clave");
+  await expect(methodologyModal).toContainText("Prospectivo vs retrospectivo");
+  await expect(methodologyModal).toContainText("Grandes familias de estudios");
+  await expect(methodologyModal).toContainText("Revisión sistemática ≠ Metaanálisis");
+  await expect(methodologyModal).toContainText("Clasificaciones clave");
+  await expect(methodologyModal.getByRole("button", { name: "Ver definición de Prospectivo" })).toBeVisible();
+  await expect(methodologyModal.getByRole("button", { name: "Ver definición de Retrospectivo" })).toBeVisible();
+  await expect(methodologyModal.getByRole("button", { name: "Ver definición de Ambispectivo" })).toBeVisible();
+  await expect(methodologyModal).toContainText("Diseños más frecuentes");
+  await expect(methodologyModal).toContainText("Parámetros mínimos");
+  await expect(methodologyModal).toContainText("Medidas frecuentes");
+  await expect(methodologyModal).toContainText("Guías de reporte");
+  await expect(methodologyModal).toContainText("CONSORT");
+  await expect(methodologyModal).toContainText("Una buena metodología permite interpretar la validez");
+  const guideScrolls = await methodologyModal.locator(".methodology-guide-modal__body").evaluate((node) => {
+    const styles = getComputedStyle(node);
+    return styles.overflowY === "auto" || styles.overflowY === "scroll";
+  });
+  expect(guideScrolls).toBe(true);
+  await methodologyModal.locator(".methodology-guide-modal__body").evaluate((node) => {
+    node.scrollTop = 0;
+  });
+  const beforeGuideNavScroll = await methodologyModal.locator(".methodology-guide-modal__body").evaluate((node) => node.scrollTop);
+  await methodologyModal.getByRole("button", { name: "Diseños" }).click();
+  await expect(methodologyModal.locator("#methodology-guide-section-designs")).toBeInViewport();
+  const afterGuideNavScroll = await methodologyModal.locator(".methodology-guide-modal__body").evaluate((node) => node.scrollTop);
+  expect(afterGuideNavScroll).toBeGreaterThan(beforeGuideNavScroll);
+  await methodologyModal.getByRole("button", { name: "Clasificaciones" }).click();
+  const prospectivoTerm = methodologyModal.getByRole("button", { name: "Ver definición de Prospectivo" });
+  await expect(prospectivoTerm).toBeInViewport();
+  await prospectivoTerm.click();
+  const termPopover = methodologyModal.locator("#methodology-term-popover");
+  await expect(termPopover).toBeVisible();
+  await expect(termPopover.getByRole("dialog", { name: "Prospectivo" })).toBeVisible();
+  await expect(termPopover).toContainText("Recolecta datos hacia adelante");
+  await expect(termPopover).toContainText("Cohorte que sigue pacientes durante 12 meses");
+  await expect(termPopover).toContainText("Tiempo");
+  await page.keyboard.press("Escape");
+  await expect(termPopover).toBeHidden();
+  await expect(prospectivoTerm).toBeFocused();
+  await methodologyModal.getByRole("button", { name: "Ver definición de Retrospectivo" }).click();
+  await expect(termPopover).toBeVisible();
+  await expect(termPopover.getByRole("dialog", { name: "Retrospectivo" })).toBeVisible();
+  await expect(termPopover).toContainText("Analiza datos ya ocurridos");
+  await methodologyModal.locator(".methodology-guide-modal__body").click({ position: { x: 12, y: 12 } });
+  await expect(termPopover).toBeHidden();
+  await expect(methodologyModal).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(methodologyModal).toBeHidden();
+  await expect(methodologyTrigger).toBeFocused();
+  await methodologyTrigger.click();
+  await expect(methodologyModal).toBeVisible();
+  await methodologyModal.click({ position: { x: 6, y: 6 } });
+  await expect(methodologyModal).toBeHidden();
+  await expectNoHorizontalOverflow(page);
+
   await page.getByRole("button", { name: "Agregar artículo" }).click();
   const articleModal = page.locator("#add-article-modal");
   await expect(articleModal).toBeVisible();
@@ -695,8 +800,23 @@ test("scientific logbook renders as operational hub with modals and article crea
     return Math.round(title.getBoundingClientRect().top - sourceLine.getBoundingClientRect().bottom);
   });
   expect(sourceTitleGap).toBeGreaterThanOrEqual(5);
-  await expect(pdfPost.getByRole("button", { name: "Ver PDF" })).toBeVisible();
-  await expect(pdfPost.getByRole("link", { name: "Ver fuente original" })).toHaveAttribute("href", "https://doi.org/10.1000/documento");
+  await expect(pdfPost).not.toContainText("Ver PDF");
+  await expect(pdfPost).not.toContainText("Leer análisis");
+  const pdfDocumentButton = pdfPost.getByRole("button", { name: "Ver documento asociado" });
+  await expect(pdfDocumentButton).toBeVisible();
+  await expect(pdfDocumentButton).toContainText("Ver Documento");
+  await expect(pdfDocumentButton.locator("svg")).toHaveCount(1);
+  await pdfDocumentButton.click();
+  await expect
+    .poll(() => page.evaluate(() => window.__bitacoraOpenCalls?.length || 0), { timeout: 15_000 })
+    .toBeGreaterThan(0);
+  const documentOpenCall = await page.evaluate(() => window.__bitacoraOpenCalls.at(-1));
+  expect(documentOpenCall.url).toMatch(/(firebasestorage|127\.0\.0\.1:9199|localhost:9199)/);
+  expect(documentOpenCall.target).toBe("_blank");
+  expect(documentOpenCall.features).toContain("noopener");
+  const pdfSourceLink = pdfPost.getByRole("link", { name: "Ver fuente original" });
+  await expect(pdfSourceLink).toHaveAttribute("href", "https://doi.org/10.1000/documento");
+  await expect(pdfSourceLink.locator("svg")).toHaveCount(1);
   const articleLikeButton = pdfPost.locator("[data-bitacora-action='toggle-like']").first();
   await expect(articleLikeButton).toHaveAttribute("aria-pressed", "false");
   await expect(pdfPost.locator("[data-bitacora-like-count]")).toHaveText("0");
@@ -712,7 +832,7 @@ test("scientific logbook renders as operational hub with modals and article crea
   const articleCommentButton = pdfPost.locator("[data-bitacora-action='focus-comments']").first();
   await expect(articleCommentButton).toHaveAccessibleName("0 comentarios en esta publicación");
   await expect(articleCommentButton).not.toContainText("Comentarios");
-  await pdfPost.getByRole("button", { name: "Leer análisis" }).click();
+  await pdfPost.getByRole("button", { name: "Resumen Técnico" }).click();
   await expect(pdfPost.locator(".bitacora-analysis")).toContainText("Descripción ampliada en español generada desde PDF.");
   await expect(pdfPost.locator(".bitacora-analysis")).toContainText("Ficha metodológica");
   await expect(pdfPost.locator(".bitacora-analysis")).toContainText("Marco de implementación");
@@ -877,9 +997,11 @@ test("scientific logbook renders as operational hub with modals and article crea
     "https://pubmed.ncbi.nlm.nih.gov/123456/"
   );
   await expect(newPost.getByRole("link", { name: "Ver fuente original" })).toHaveAttribute("target", "_blank");
+  await expect(newPost.getByRole("link", { name: "Ver fuente original" }).locator("svg")).toHaveCount(1);
+  await expect(newPost.getByRole("button", { name: "Ver documento asociado" })).toHaveCount(0);
 
-  await newPost.getByRole("button", { name: "Leer análisis" }).click();
-  await expect(newPost.getByRole("button", { name: "Ocultar análisis" })).toHaveAttribute("aria-expanded", "true");
+  await newPost.getByRole("button", { name: "Resumen Técnico" }).click();
+  await expect(newPost.getByRole("button", { name: "Ocultar Resumen Técnico" })).toHaveAttribute("aria-expanded", "true");
   await expect(newPost.locator(".bitacora-analysis")).toBeVisible();
   await expect(newPost.locator(".bitacora-analysis")).toContainText(
     "Descripción ampliada generada por IA desde Playwright."
@@ -892,9 +1014,9 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(newPost.locator(".bitacora-analysis")).not.toContainText("Usuario");
   await page.keyboard.press("Escape");
   await expect(newPost.locator(".bitacora-analysis")).toBeHidden();
-  await newPost.getByRole("button", { name: "Leer análisis" }).click();
-  await newPost.getByRole("button", { name: "Ocultar análisis" }).click();
-  await expect(newPost.getByRole("button", { name: "Leer análisis" })).toHaveAttribute("aria-expanded", "false");
+  await newPost.getByRole("button", { name: "Resumen Técnico" }).click();
+  await newPost.getByRole("button", { name: "Ocultar Resumen Técnico" }).click();
+  await expect(newPost.getByRole("button", { name: "Resumen Técnico" })).toHaveAttribute("aria-expanded", "false");
   await expect(newPost.locator(".bitacora-analysis")).toBeHidden();
 
   await expect(newPost.getByRole("button", { name: "Editar publicación" })).toBeVisible();
