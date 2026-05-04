@@ -27,6 +27,17 @@ const {
   validateScientificUrl
 } = require("../scientificArticleExtraction");
 
+const {
+  buildEvidencePacket: buildDocumentEvidencePacket,
+  buildOpenAiDocumentPayload,
+  callDocumentExtractionAI,
+  computeExtractionStatus: computeDocumentExtractionStatus,
+  detectDoi: detectDocumentDoi,
+  detectLanguage: detectDocumentLanguage,
+  resolveScientificArticleDocument,
+  validateStoragePathForUid
+} = require("../scientificArticleDocumentExtraction");
+
 const articleUrl = new URL("https://www.thelancet.com/journals/lanam/article/PIIS2667-193X(25)00322-9/fulltext");
 
 const completeAiArticle = {
@@ -465,4 +476,184 @@ test("resolveScientificArticle uses pasted abstract as manual evidence with warn
   assert.equal(result.extractionStatus, "ai_draft");
   assert.equal(result.article.title, "Título aportado");
   assert.ok(result.article.warnings.some((warning) => /aportada manualmente/i.test(warning)));
+});
+
+test("document resolver validates storage ownership and detects PDF/text metadata", async () => {
+  assert.equal(validateStoragePathForUid("bitacora/article-documents/user-a/paper.pdf", "user-a").ok, true);
+  assert.equal(validateStoragePathForUid("bitacora/article-documents/user-b/paper.pdf", "user-a").ok, false);
+  assert.equal(validateStoragePathForUid("../paper.pdf", "user-a").ok, false);
+
+  const text = `
+    HEARTS quality: a policy framework to strengthen hypertension and cardiovascular risk management
+    Esteban Londoño, Reena Gupta
+    The Lancet Regional Health - Americas
+    DOI: 10.1016/j.lana.2025.101311
+    Abstract
+    HEARTS in the Americas is a regional implementation framework for primary healthcare quality improvement.
+    Methods
+    The document synthesizes implementation lessons and defines quality indicators.
+    Results
+    It describes objectives and indicators for institutionalizing quality improvement.
+    Conclusions
+    The framework supports scale-up and equitable outcomes.
+  `;
+  const packet = buildDocumentEvidencePacket({
+    mode: "pasted_text",
+    text,
+    officialUrl: "https://example.org/paper",
+    pastedSource: "The Lancet Regional Health - Americas"
+  });
+
+  assert.equal(packet.detectedMetadata.doi, "10.1016/j.lana.2025.101311");
+  assert.equal(packet.detectedMetadata.sourceName, "The Lancet Regional Health - Americas");
+  assert.equal(detectDocumentDoi(text), "10.1016/j.lana.2025.101311");
+  assert.equal(detectDocumentLanguage(text), "en");
+  assert.ok(packet.sections.some((section) => /Abstract/i.test(section.heading)));
+});
+
+test("document OpenAI payload uses strict schema and Spanish anti-hallucination prompt", () => {
+  const packet = buildDocumentEvidencePacket({
+    mode: "pasted_text",
+    text: "Official title\nAbstract\nThis document reports methods, results and conclusions for a scientific review. ".repeat(20),
+    pastedSource: "Journal"
+  });
+  const payload = buildOpenAiDocumentPayload(packet);
+
+  assert.equal(payload.response_format.type, "json_schema");
+  assert.equal(payload.response_format.json_schema.strict, true);
+  assert.ok(payload.messages[0].content.includes("Todo texto explicativo debe estar en español"));
+  assert.ok(payload.messages[0].content.includes("No inventes datos"));
+});
+
+test("document AI output is normalized and empty output is not ai_draft", async () => {
+  const packet = buildDocumentEvidencePacket({
+    mode: "pasted_text",
+    text: "HEARTS quality title\nThe Lancet Regional Health - Americas\nAbstract\nScientific content with methods, results and conclusions for review. ".repeat(20),
+    pastedSource: "The Lancet Regional Health - Americas"
+  });
+  const complete = {
+    title: "HEARTS quality title",
+    sourceName: "The Lancet Regional Health - Americas",
+    journal: "The Lancet Regional Health - Americas",
+    authors: ["Autora A"],
+    officialUrl: "",
+    doi: "",
+    publicationDate: "",
+    originalLanguage: "en",
+    articleType: "Artículo científico",
+    studyType: "Marco de política sanitaria",
+    evidenceType: "Política sanitaria",
+    accessType: "Pendiente",
+    cardSummaryEs: "Ficha breve en español para revisión del equipo médico.",
+    executiveSummaryEs: "Resumen ejecutivo en español basado exclusivamente en el texto aportado.",
+    abstractSummaryEs: "Resumen del abstract en español.",
+    clinicalQuestionEs: "Qué marco fortalece la gestión de hipertensión en atención primaria.",
+    mainResultEs: "El documento organiza indicadores y objetivos de calidad.",
+    methodologyEs: "Síntesis documental de implementación regional.",
+    keyPointsEs: ["Calidad", "Atención primaria"],
+    limitationsEs: "No especifica resultados clínicos individuales.",
+    localApplicabilityEs: "Requiere adaptación institucional.",
+    occupationalHealthRelevanceEs: "Puede orientar gestión sanitaria poblacional.",
+    tags: ["hipertensión", "calidad"],
+    sourcePages: [],
+    warnings: [],
+    extractionConfidence: 0.86
+  };
+  const fetchImpl = async () => ({
+    ok: true,
+    status: 200,
+    text: async () => JSON.stringify({ choices: [{ message: { content: JSON.stringify(complete) } }] })
+  });
+
+  const result = await callDocumentExtractionAI(packet, { apiKey: "test-key", fetchImpl });
+  assert.equal(result.ok, true);
+  assert.equal(result.article.executiveSummaryEs.includes("español"), true);
+  assert.equal(computeDocumentExtractionStatus(result.article), "ai_draft");
+
+  const emptyStatus = computeDocumentExtractionStatus({
+    title: "",
+    sourceName: "",
+    journal: "",
+    cardSummaryEs: "",
+    extractionConfidence: 0
+  });
+  assert.equal(emptyStatus, "failed");
+});
+
+test("document resolver processes pasted text, rejects short text and handles PDF low text", async () => {
+  const aiArticle = {
+    title: "Scientific document title",
+    sourceName: "Institutional Journal",
+    journal: "Institutional Journal",
+    authors: [],
+    officialUrl: "",
+    doi: "",
+    publicationDate: "2026",
+    originalLanguage: "en",
+    articleType: "Artículo científico",
+    studyType: "Revisión narrativa",
+    evidenceType: "Revisión",
+    accessType: "Pendiente",
+    cardSummaryEs: "Resumen breve en español para la tarjeta científica.",
+    executiveSummaryEs: "Resumen ejecutivo en español basado en el documento aportado.",
+    abstractSummaryEs: "Abstract sintetizado en español.",
+    clinicalQuestionEs: "Qué pregunta científica aborda el documento.",
+    mainResultEs: "Resultado principal derivado del texto aportado.",
+    methodologyEs: "Metodología descrita en el documento.",
+    keyPointsEs: ["Punto clave"],
+    limitationsEs: "",
+    localApplicabilityEs: "",
+    occupationalHealthRelevanceEs: "",
+    tags: ["revisión"],
+    sourcePages: [],
+    warnings: [],
+    extractionConfidence: 0.78
+  };
+  const fetchImpl = async () => ({
+    ok: true,
+    status: 200,
+    text: async () => JSON.stringify({ choices: [{ message: { content: JSON.stringify(aiArticle) } }] })
+  });
+
+  const pasted = await resolveScientificArticleDocument(
+    {
+      mode: "pasted_text",
+      pastedText: "Scientific document title\nAbstract\nThis document contains methods, results and conclusions for a review. ".repeat(30),
+      pastedSource: "Institutional Journal"
+    },
+    { uid: "user-a", user: { uid: "user-a" }, apiKey: "test-key", fetchImpl }
+  );
+  assert.equal(pasted.extractionStatus, "ai_draft");
+  assert.match(pasted.article.executiveSummaryEs, /español/);
+  assert.equal(pasted.rawEvidence.mode, "pasted_text");
+
+  const short = await resolveScientificArticleDocument(
+    { mode: "pasted_text", pastedText: "too short" },
+    { uid: "user-a", user: { uid: "user-a" }, apiKey: "test-key", fetchImpl }
+  );
+  assert.equal(short.extractionStatus, "failed");
+
+  const fakeBucket = {
+    file: () => ({
+      getMetadata: async () => [{ contentType: "application/pdf", size: "1200" }],
+      download: async () => [Buffer.from("%PDF")]
+    })
+  };
+  const lowPdf = await resolveScientificArticleDocument(
+    {
+      mode: "pdf",
+      storagePath: "bitacora/article-documents/user-a/scan.pdf",
+      originalFileName: "scan.pdf"
+    },
+    {
+      uid: "user-a",
+      user: { uid: "user-a" },
+      bucket: fakeBucket,
+      apiKey: "test-key",
+      pdfParseImpl: async () => ({ text: "short", numpages: 1 }),
+      fetchImpl
+    }
+  );
+  assert.equal(lowPdf.extractionStatus, "failed");
+  assert.match(lowPdf.article.warnings.join(" "), /PDF no contiene texto extraíble/);
 });

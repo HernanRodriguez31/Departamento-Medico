@@ -21,11 +21,75 @@ const expectNoHorizontalOverflow = async (page) => {
 test("scientific logbook renders as operational hub with modals and article creation", async ({ page }, testInfo) => {
   const articleTitle = `Artículo QA Bitácora ${testInfo.project.name}`;
   const extractionRequests = [];
+  const documentExtractionRequests = [];
   const consoleErrors = [];
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
   });
   page.on("pageerror", (error) => consoleErrors.push(error.message));
+  await page.route("**/api/extractScientificArticleDocument", async (route) => {
+    const request = route.request();
+    const payload = request.postDataJSON();
+    documentExtractionRequests.push({
+      mode: payload?.mode || "",
+      storagePath: payload?.storagePath || "",
+      pastedText: payload?.pastedText || "",
+      authorization: request.headers().authorization || ""
+    });
+    const isTextMode = payload?.mode === "pasted_text";
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        extractionStatus: "ai_draft",
+        article: {
+          title: isTextMode ? "Texto QA traducido" : "PDF QA Bitácora",
+          sourceName: isTextMode ? payload.pastedSource || "Revista Texto" : "Revista PDF",
+          journal: isTextMode ? payload.pastedSource || "Revista Texto" : "Revista PDF",
+          authors: ["Equipo QA"],
+          officialUrl: payload.officialUrl || "",
+          doi: "10.1000/documento",
+          publicationDate: "2026-05-04",
+          originalLanguage: "en",
+          articleType: "Artículo científico",
+          studyType: "Revisión narrativa",
+          evidenceType: "Revisión científica",
+          accessType: "Pendiente",
+          cardSummaryEs: isTextMode
+            ? "Resumen breve en español desde texto pegado."
+            : "Resumen breve en español desde PDF.",
+          executiveSummaryEs: isTextMode
+            ? "Resumen ejecutivo en español generado desde texto pegado."
+            : "Resumen ejecutivo en español generado desde PDF.",
+          abstractSummaryEs: "Abstract sintetizado y traducido al español.",
+          clinicalQuestionEs: "Pregunta científica sintetizada en español.",
+          mainResultEs: "Resultado o mensaje principal en español.",
+          methodologyEs: "Metodología resumida en español.",
+          keyPointsEs: ["Punto clave uno", "Punto clave dos"],
+          limitationsEs: "Limitaciones sintetizadas en español.",
+          localApplicabilityEs: "Aplicabilidad local para revisión del equipo.",
+          occupationalHealthRelevanceEs: "Relevancia para salud ocupacional y gestión sanitaria.",
+          tags: ["PDF", "IA", "Revisión", "QA", "Documento"],
+          sourcePages: [{ field: "executiveSummaryEs", pages: [1] }],
+          extractionConfidence: 0.86,
+          warnings: ["Revisión humana obligatoria antes de publicar."]
+        },
+        rawEvidence: {
+          mode: payload?.mode || "pdf",
+          originalFileName: payload?.originalFileName || "",
+          detectedLanguage: "en",
+          pageCount: payload?.mode === "pdf" ? 4 : 0,
+          textLength: payload?.mode === "pasted_text" ? payload.pastedText.length : 5600,
+          contentHash: "b".repeat(64),
+          storagePath: payload?.storagePath || "",
+          detectedFields: ["title", "doi", "sourceName"],
+          extractedSections: ["Abstract", "Methods", "Results"],
+          qualitySignals: { hasTitle: true, hasAbstractOrSummary: true }
+        }
+      })
+    });
+  });
   await page.route("**/api/extractScientificArticle", async (route) => {
     const request = route.request();
     const payload = request.postDataJSON();
@@ -409,13 +473,11 @@ test("scientific logbook renders as operational hub with modals and article crea
   const articleModal = page.locator("#add-article-modal");
   await expect(articleModal).toBeVisible();
   await expect(articleModal.getByRole("dialog")).toBeVisible();
-  await expect(articleModal.getByLabel("URL del artículo o paper")).toBeVisible();
+  await expect(articleModal.getByRole("tab", { name: "Desde PDF" })).toBeVisible();
+  await expect(articleModal.getByRole("tab", { name: "Texto pegado" })).toBeVisible();
+  await expect(articleModal.getByRole("tab", { name: "Datos manuales" })).toBeVisible();
   await expect(articleModal).toContainText("Cargado por");
   await expect(articleModal).toContainText("Pendiente de revisión");
-
-  await articleModal.getByLabel("URL del artículo o paper").fill("javascript:alert(1)");
-  await articleModal.getByRole("button", { name: "Analizar enlace con IA" }).click();
-  await expect(articleModal.locator("#article-url-error")).toContainText("URL", { timeout: 10_000 });
 
   const saveArticleButton = articleModal.getByRole("button", { name: "Guardar artículo" });
   await expect(saveArticleButton).toBeVisible();
@@ -430,13 +492,84 @@ test("scientific logbook renders as operational hub with modals and article crea
   });
   expect(saveButtonInsideModal).toBe(true);
 
+  await articleModal.getByRole("button", { name: "Guardar como borrador" }).click();
+  await expect(articleModal).toBeHidden({ timeout: 30_000 });
+  const incompleteDraft = page.locator(".bitacora-post").filter({ hasText: "Borrador científico sin título" }).first();
+  await expect(incompleteDraft).toBeVisible({ timeout: 30_000 });
+  await expect(incompleteDraft).toContainText("Borrador incompleto");
+  page.once("dialog", (dialog) => dialog.accept());
+  await incompleteDraft.getByRole("button", { name: "Eliminar" }).click();
+  await expect(page.locator(".bitacora-post")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Agregar artículo" }).click();
+  await expect(articleModal).toBeVisible();
+
+  await articleModal.locator("#article-pdf-input").setInputFiles({
+    name: "paper-qa.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF")
+  });
+  await expect(articleModal.locator("#article-pdf-file")).toBeVisible();
+  await expect(articleModal.locator("#article-pdf-name")).toHaveText("paper-qa.pdf");
+  await articleModal.getByRole("button", { name: "Analizar PDF con IA" }).click();
+  await expect(articleModal.locator("#article-ai-status")).toContainText("Ficha generada por IA", {
+    timeout: 30_000
+  });
+  await expect(articleModal.getByLabel("Título")).toHaveValue("PDF QA Bitácora");
+  await expect(articleModal.getByLabel("Resumen breve para tarjeta")).toHaveValue("Resumen breve en español desde PDF.");
+  await expect(articleModal.getByLabel("Resumen ejecutivo")).toHaveValue("Resumen ejecutivo en español generado desde PDF.");
+  await saveArticleButton.click();
+  await expect(articleModal).toBeHidden({ timeout: 30_000 });
+
+  const pdfPost = page.locator(".bitacora-post").filter({ hasText: "PDF QA Bitácora" }).first();
+  await expect(pdfPost).toBeVisible({ timeout: 30_000 });
+  await expect(pdfPost).toContainText("PDF");
+  await expect(pdfPost).toContainText("Resumen breve en español desde PDF.");
+  await expect(pdfPost.getByRole("button", { name: "Ver PDF" })).toBeVisible();
+  await pdfPost.getByRole("button", { name: "Leer análisis" }).click();
+  await expect(pdfPost.locator(".bitacora-analysis")).toContainText("Abstract sintetizado y traducido al español.");
+  page.once("dialog", (dialog) => dialog.accept());
+  await pdfPost.getByRole("button", { name: "Eliminar" }).click();
+  await expect(page.locator(".bitacora-post")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Agregar artículo" }).click();
+  await expect(articleModal).toBeVisible();
+  await articleModal.getByRole("tab", { name: "Texto pegado" }).click();
+  const pastedText =
+    "Title from pasted text. Abstract. This scientific document includes methods, results, discussion and conclusions for review. ".repeat(8);
+  await articleModal.getByLabel("Texto del artículo o documento").fill(pastedText);
+  await articleModal.locator("#article-pasted-source").fill("Revista Texto QA");
+  await articleModal.getByRole("button", { name: "Analizar texto con IA" }).click();
+  await expect(articleModal.locator("#article-ai-status")).toContainText("Ficha generada por IA", {
+    timeout: 30_000
+  });
+  await expect(articleModal.getByLabel("Título")).toHaveValue("Texto QA traducido");
+  await expect(articleModal.getByLabel("Resumen ejecutivo")).toHaveValue("Resumen ejecutivo en español generado desde texto pegado.");
+  await articleModal.getByRole("button", { name: "Guardar como borrador" }).click();
+  await expect(articleModal).toBeHidden({ timeout: 30_000 });
+  const textDraft = page.locator(".bitacora-post").filter({ hasText: "Texto QA traducido" }).first();
+  await expect(textDraft).toBeVisible({ timeout: 30_000 });
+  await expect(textDraft).toContainText("Texto pegado");
+  page.once("dialog", (dialog) => dialog.accept());
+  await textDraft.getByRole("button", { name: "Eliminar" }).click();
+  await expect(page.locator(".bitacora-post")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Agregar artículo" }).click();
+  await expect(articleModal).toBeVisible();
+  await articleModal.getByRole("tab", { name: "Datos manuales" }).click();
+  await expect(articleModal.getByLabel("URL del artículo o paper")).toBeVisible();
+
+  await articleModal.getByLabel("URL del artículo o paper").fill("javascript:alert(1)");
+  await articleModal.getByRole("button", { name: "Analizar enlace con IA" }).click();
+  await expect(articleModal.locator("#article-url-error")).toContainText("URL", { timeout: 10_000 });
+
   await articleModal.getByLabel("URL del artículo o paper").fill("https://example.org/partial");
   await articleModal.getByRole("button", { name: "Analizar enlace con IA" }).click();
   await expect(articleModal.locator("#article-ai-status")).not.toContainText("Datos cargados por IA", {
     timeout: 10_000
   });
   await expect(articleModal.locator("#article-ai-status")).toContainText("Se detectaron metadatos básicos");
-  await expect(articleModal.getByLabel("Fuente / revista / sitio científico")).toHaveValue("Revista parcial");
+  await expect(articleModal.locator("#article-source-name")).toHaveValue("Revista parcial");
   await expect(articleModal.getByLabel("Título")).toHaveValue("");
   await saveArticleButton.click();
   await expect(articleModal.locator("#article-form-error")).toContainText("Ingresá el título");
@@ -456,19 +589,6 @@ test("scientific logbook renders as operational hub with modals and article crea
     timeout: 10_000
   });
   await expect(articleModal.getByLabel("Título")).toHaveValue("Título manual preservado");
-  await expect(articleModal.locator("#article-assisted-zone")).toBeVisible();
-  await expect(articleModal.getByRole("button", { name: /El sitio bloqueó/ })).toHaveAttribute("aria-expanded", "true");
-  await articleModal.getByLabel("DOI").fill("10.1000/asistido");
-  await articleModal.getByLabel("Nombre visible del artículo").fill("Artículo asistido");
-  await articleModal.getByLabel("Fuente visible").fill("Fuente asistida");
-  await articleModal.getByLabel("Abstract / Summary visible").fill("Texto científico visible pegado con objetivo, resultados y conclusiones para análisis.");
-  await articleModal.getByRole("button", { name: "Analizar datos pegados" }).click();
-  await expect(articleModal.locator("#article-ai-status")).toContainText("Borrador cargado por IA", {
-    timeout: 10_000
-  });
-  await expect(articleModal.getByLabel("Título")).toHaveValue("Artículo asistido");
-  await expect(articleModal.getByLabel("Resumen ejecutivo")).toHaveValue("Resumen asistido en español desde datos pegados.");
-
   await articleModal.getByLabel("URL del artículo o paper").fill("https://pubmed.ncbi.nlm.nih.gov/123456/");
   await expect(articleModal.locator("#article-domain-detected")).toContainText("pubmed.ncbi.nlm.nih.gov");
   await articleModal.getByRole("button", { name: "Analizar enlace con IA" }).click();
@@ -476,21 +596,26 @@ test("scientific logbook renders as operational hub with modals and article crea
     timeout: 30_000
   });
   await expect(articleModal.getByLabel("Título")).toHaveValue(articleTitle);
-  await expect(articleModal.getByLabel("Fuente / revista / sitio científico")).toHaveValue("PubMed / MEDLINE");
+  await expect(articleModal.locator("#article-source-name")).toHaveValue("PubMed / MEDLINE");
   await expect(articleModal.getByLabel("Tipo de estudio")).toHaveValue("Ensayo clínico");
   await expect(articleModal.getByLabel("Tipo de evidencia")).toHaveValue("Investigación clínica");
   await expect(articleModal.getByLabel("Fecha de publicación")).toHaveValue("2026-05-03");
   await expect(articleModal.getByLabel("Pregunta que busca responder")).toHaveValue("Pregunta clínica generada por IA.");
-  await expect(articleModal.getByLabel("Resultado principal")).toHaveValue("Resultado principal generado por IA.");
+  await expect(articleModal.getByLabel("Resultado o mensaje principal")).toHaveValue("Resultado principal generado por IA.");
   await expect(articleModal.getByLabel("Etiquetas")).toHaveValue("QA, Lectura crítica, PubMed, IA");
   await expect(articleModal.getByLabel("Acceso")).toHaveValue("Resumen disponible");
   await expect(articleModal.getByLabel("Resumen ejecutivo")).toHaveValue("Resumen generado por IA desde Playwright.");
-  expect(extractionRequests).toHaveLength(5);
+  expect(documentExtractionRequests).toHaveLength(2);
+  expect(documentExtractionRequests[0].mode).toBe("pdf");
+  expect(documentExtractionRequests[0].storagePath).toMatch(/^bitacora\/article-documents\/.+\/.+paper-qa\.pdf$/);
+  expect(documentExtractionRequests[1].mode).toBe("pasted_text");
+  expect(documentExtractionRequests[1].pastedText).toContain("Title from pasted text");
+  expect(documentExtractionRequests.every((entry) => /^Bearer\s+/.test(entry.authorization))).toBe(true);
+  expect(extractionRequests).toHaveLength(4);
   expect(extractionRequests[0].url).toBe("https://example.org/partial");
   expect(extractionRequests[1].url).toBe("https://example.org/auth");
   expect(extractionRequests[2].url).toBe("https://example.org/failed");
-  expect(extractionRequests[3].pastedAbstract).toContain("Texto científico visible pegado");
-  expect(extractionRequests[4].url).toBe("https://pubmed.ncbi.nlm.nih.gov/123456/");
+  expect(extractionRequests[3].url).toBe("https://pubmed.ncbi.nlm.nih.gov/123456/");
   expect(extractionRequests.every((entry) => /^Bearer\s+/.test(entry.authorization))).toBe(true);
   await articleModal.getByLabel("Comentario breve del usuario").fill("Comentario interno de prueba.");
   await saveArticleButton.click();

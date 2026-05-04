@@ -43,6 +43,10 @@ const {
   scoreExtractionCompleteness,
   validateScientificUrl,
 } = require("./scientificArticleExtraction");
+const {
+  resolveScientificArticleDocument,
+  scoreDocumentArticle,
+} = require("./scientificArticleDocumentExtraction");
 
 // Inicializacion
 admin.initializeApp();
@@ -68,6 +72,7 @@ const AI_RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const AI_RATE_LIMIT_MAX = 20;
 const ARTICLE_EXTRACTION_RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const ARTICLE_EXTRACTION_RATE_LIMIT_MAX = 8;
+const ARTICLE_DOCUMENT_EXTRACTION_RATE_LIMIT_MAX = 6;
 const PUSH_MESSAGE_BODY = "Tienes un nuevo mensaje";
 const PUSH_ACTIVITY_BODY = "Hay nueva actividad en la aplicación";
 const PUSH_NOTIFICATION_BODY = "Tienes una nueva notificación";
@@ -153,6 +158,18 @@ function allowArticleExtractionRequest(uid) {
   recent.push(now);
   articleExtractionRateLimitByUid.set(uid, recent);
   return recent.length <= ARTICLE_EXTRACTION_RATE_LIMIT_MAX;
+}
+
+function allowArticleDocumentExtractionRequest(uid) {
+  if (!uid) return false;
+  const now = Date.now();
+  const windowStart = now - ARTICLE_EXTRACTION_RATE_LIMIT_WINDOW_MS;
+  const recent = (articleExtractionRateLimitByUid.get(`document:${uid}`) || []).filter(
+    (ts) => ts > windowStart
+  );
+  recent.push(now);
+  articleExtractionRateLimitByUid.set(`document:${uid}`, recent);
+  return recent.length <= ARTICLE_DOCUMENT_EXTRACTION_RATE_LIMIT_MAX;
 }
 
 function extractOutputTextFromResponsesApi(data) {
@@ -1098,6 +1115,165 @@ const extractScientificArticleHandler = async (req, res) => {
   }
 };
 
+const extractScientificArticleDocumentHandler = async (req, res) => {
+  const startedAt = Date.now();
+  const requestId =
+    cleanString(req.get("x-cloud-trace-context")).split("/")[0] ||
+    `doc-extract-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  let uid = null;
+
+  const logDocumentExtraction = (status, extra = {}) => {
+    functions.logger.info("extractScientificArticleDocument", {
+      requestId,
+      uid,
+      status,
+      timestamp: new Date().toISOString(),
+      durationMs: Date.now() - startedAt,
+      ...extra,
+    });
+  };
+
+  setCorsHeaders(req, res);
+  if (req.method === "OPTIONS") return res.status(204).send("");
+  if (req.method !== "POST") {
+    logDocumentExtraction(405, { error: "method_not_allowed" });
+    return res.status(405).json({
+      ok: false,
+      error: { code: "method_not_allowed", message: "Método no permitido." },
+    });
+  }
+
+  try {
+    uid = await verifyBearerUid(req);
+  } catch (error) {
+    logDocumentExtraction(401, { error: "invalid_auth" });
+    return res.status(401).json({
+      ok: false,
+      error: { code: "auth_invalid", message: "La autenticación no es válida." },
+    });
+  }
+
+  if (!uid) {
+    logDocumentExtraction(401, { error: "missing_auth" });
+    return res.status(401).json({
+      ok: false,
+      error: { code: "auth_required", message: "Necesitás iniciar sesión para analizar documentos." },
+    });
+  }
+
+  if (!allowArticleDocumentExtractionRequest(uid)) {
+    logDocumentExtraction(429, { error: "rate_limited" });
+    return res.status(429).json({
+      ok: false,
+      error: { code: "rate_limited", message: "Se alcanzó el límite de análisis. Reintentá más tarde." },
+    });
+  }
+
+  let body = {};
+  if (req.body && typeof req.body === "object") {
+    body = req.body;
+  } else if (typeof req.body === "string") {
+    try {
+      body = JSON.parse(req.body);
+    } catch (error) {
+      body = {};
+    }
+  }
+
+  try {
+    let authUser = null;
+    try {
+      authUser = await admin.auth().getUser(uid);
+    } catch (error) {
+      authUser = null;
+    }
+    const result = await resolveScientificArticleDocument(body, {
+      uid,
+      user: {
+        uid,
+        displayName: authUser?.displayName || "",
+        email: authUser?.email || "",
+      },
+      bucket: admin.storage().bucket(),
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+    const article = result.article || {};
+    const rawEvidence = result.rawEvidence || {};
+    const quality = scoreDocumentArticle(article);
+    logDocumentExtraction(200, {
+      mode: rawEvidence.mode || body.mode || "",
+      originalFileName: rawEvidence.originalFileName || body.originalFileName || "",
+      fileSize: rawEvidence.fileSize || 0,
+      pageCount: rawEvidence.pageCount || 0,
+      textLength: rawEvidence.textLength || 0,
+      detectedLanguage: rawEvidence.detectedLanguage || "",
+      detectedTitle: Boolean(article.title),
+      detectedDOI: Boolean(article.doi),
+      detectedSource: Boolean(article.sourceName || article.journal),
+      sectionsDetected: rawEvidence.extractedSections || [],
+      extractionStatus: result.extractionStatus,
+      extractionConfidence: article.extractionConfidence || 0,
+      completedFields: quality.completedFields || [],
+      warnings: article.warnings || [],
+      agentDurations: rawEvidence.agentDurations || {},
+      error: result.error?.code,
+    });
+    return res.status(200).json(result);
+  } catch (error) {
+    const message = cleanString(error?.message).slice(0, 160);
+    logDocumentExtraction(200, {
+      error: "unexpected_document_extraction_error",
+      message,
+    });
+    return res.status(200).json({
+      ok: false,
+      extractionStatus: "failed",
+      article: {
+        title: "",
+        sourceName: "",
+        journal: "",
+        authors: [],
+        officialUrl: "",
+        doi: "",
+        publicationDate: "",
+        originalLanguage: "",
+        articleType: "",
+        studyType: "",
+        evidenceType: "",
+        accessType: "Pendiente",
+        cardSummaryEs: "",
+        executiveSummaryEs: "",
+        abstractSummaryEs: "",
+        clinicalQuestionEs: "",
+        mainResultEs: "",
+        methodologyEs: "",
+        keyPointsEs: [],
+        limitationsEs: "",
+        localApplicabilityEs: "",
+        occupationalHealthRelevanceEs: "",
+        tags: [],
+        sourcePages: [],
+        extractionConfidence: 0,
+        warnings: ["No se pudo analizar el documento. Podés completar la publicación manualmente."],
+      },
+      rawEvidence: {
+        mode: body.mode || "",
+        originalFileName: body.originalFileName || "",
+        detectedLanguage: "und",
+        pageCount: 0,
+        textLength: 0,
+        detectedFields: [],
+        extractedSections: [],
+        qualitySignals: {},
+      },
+      error: {
+        code: "unexpected_document_extraction_error",
+        message: "No se pudo analizar el documento. Podés completar la publicación manualmente.",
+      },
+    });
+  }
+};
+
 const aiChatHandler = async (req, res) => {
     const startedAt = Date.now();
     let uid = null;
@@ -1409,6 +1585,11 @@ exports.aiChat = onRequest(
 exports.extractScientificArticle = onRequest(
   { secrets: ["OPENAI_API_KEY"] },
   extractScientificArticleHandler
+);
+
+exports.extractScientificArticleDocument = onRequest(
+  { secrets: ["OPENAI_API_KEY"] },
+  extractScientificArticleDocumentHandler
 );
 
 exports.aiChat_v2 = onRequest(

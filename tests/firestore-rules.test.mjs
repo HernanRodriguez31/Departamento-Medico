@@ -177,6 +177,8 @@ const unauthedDb = () => testEnv.unauthenticatedContext().firestore();
 const validBitacoraPayload = (uid = "user-b") => ({
   title: "Artículo nuevo",
   sourceName: "PubMed / MEDLINE",
+  journal: "Revista de prueba",
+  authors: ["Dra. Prueba", "Dr. Revisión"],
   sourceDomain: "pubmed.ncbi.nlm.nih.gov",
   officialUrl: "https://pubmed.ncbi.nlm.nih.gov/789/",
   doi: "",
@@ -187,13 +189,31 @@ const validBitacoraPayload = (uid = "user-b") => ({
   studyType: "Cohorte",
   evidenceType: "Investigación clínica",
   publicationDate: "2026-05-03",
+  originalLanguage: "en",
+  articleType: "Artículo científico",
   studyLocation: "Contexto laboral",
+  cardSummaryEs: "Resumen breve de tarjeta para revisión institucional.",
   executiveSummary: "Resumen para revisión.",
+  executiveSummaryEs: "Resumen ejecutivo en español para revisión.",
+  abstractSummaryEs: "Abstract sintetizado en español.",
   clinicalQuestion: "Pregunta de revisión.",
+  clinicalQuestionEs: "Pregunta de revisión en español.",
   mainResult: "Resultado documentado.",
+  mainResultEs: "Resultado principal documentado.",
+  methodologyEs: "Metodología resumida del documento.",
+  keyPointsEs: ["Punto clave uno", "Punto clave dos"],
+  limitationsEs: "Limitaciones indicadas por el documento.",
+  localApplicabilityEs: "Aplicabilidad local a evaluar por el equipo.",
+  occupationalHealthRelevanceEs: "Relevancia para salud ocupacional.",
   tags: ["QA", "Evidencia"],
   accessType: "Open access",
   userComment: "Comentario del usuario.",
+  sourcePages: [],
+  extractionSource: "pdf",
+  originalFileName: "articulo.pdf",
+  storagePath: `bitacora/article-documents/${uid}/articulo.pdf`,
+  contentHash: "a".repeat(64),
+  pageCount: 8,
   status: "pending_review",
   extractionStatus: "manual",
   extractionWarnings: [],
@@ -360,6 +380,50 @@ test("bitacoraArticles allow authenticated reads and valid own creates only", as
     setDoc(doc(authedDb("user-b"), "bitacoraArticles", "article-metadata-only"), {
       ...validBitacoraPayload("user-b"),
       extractionStatus: "metadata_only"
+    })
+  );
+  await assertSucceeds(
+    setDoc(doc(authedDb("user-b"), "bitacoraArticles", "article-document-no-url"), {
+      ...validBitacoraPayload("user-b"),
+      officialUrl: "",
+      extractionSource: "pasted_text",
+      storagePath: "",
+      originalFileName: "",
+      pageCount: 0
+    })
+  );
+  await assertSucceeds(
+    setDoc(doc(authedDb("user-b"), "bitacoraArticles", "article-incomplete-draft"), {
+      ...validBitacoraPayload("user-b"),
+      title: "Borrador científico sin título",
+      sourceName: "",
+      journal: "",
+      cardSummaryEs: "",
+      executiveSummary: "",
+      executiveSummaryEs: "",
+      clinicalQuestion: "",
+      clinicalQuestionEs: "",
+      mainResult: "",
+      mainResultEs: "",
+      methodologyEs: "",
+      evidenceType: "",
+      studyType: "",
+      status: "draft"
+    })
+  );
+  await assertFails(
+    setDoc(doc(authedDb("user-b"), "bitacoraArticles", "article-empty-final"), {
+      ...validBitacoraPayload("user-b"),
+      sourceName: "",
+      journal: "",
+      cardSummaryEs: "",
+      executiveSummary: "",
+      executiveSummaryEs: "",
+      clinicalQuestion: "",
+      clinicalQuestionEs: "",
+      mainResult: "",
+      mainResultEs: "",
+      methodologyEs: ""
     })
   );
   await assertFails(

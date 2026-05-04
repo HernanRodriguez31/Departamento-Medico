@@ -8,6 +8,10 @@ import {
   query,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import {
+  deleteObject,
+  ref as storageRef
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const COLLECTION_NAME = "bitacoraArticles";
 
@@ -55,6 +59,8 @@ const buildPayload = (input = {}, user) => {
   const payload = {
     title: cleanString(input.title),
     sourceName: cleanString(input.sourceName),
+    journal: cleanString(input.journal),
+    authors: cleanStringList(input.authors),
     sourceDomain: cleanString(input.sourceDomain),
     officialUrl: cleanString(input.officialUrl),
     doi: cleanString(input.doi),
@@ -65,13 +71,31 @@ const buildPayload = (input = {}, user) => {
     studyType: cleanString(input.studyType),
     evidenceType: cleanString(input.evidenceType),
     publicationDate: cleanString(input.publicationDate),
+    originalLanguage: cleanString(input.originalLanguage),
+    articleType: cleanString(input.articleType),
     studyLocation: cleanString(input.studyLocation),
+    cardSummaryEs: cleanString(input.cardSummaryEs),
     executiveSummary: cleanString(input.executiveSummary),
+    executiveSummaryEs: cleanString(input.executiveSummaryEs),
+    abstractSummaryEs: cleanString(input.abstractSummaryEs),
     clinicalQuestion: cleanString(input.clinicalQuestion),
+    clinicalQuestionEs: cleanString(input.clinicalQuestionEs),
     mainResult: cleanString(input.mainResult),
+    mainResultEs: cleanString(input.mainResultEs),
+    methodologyEs: cleanString(input.methodologyEs),
+    keyPointsEs: cleanStringList(input.keyPointsEs),
+    limitationsEs: cleanString(input.limitationsEs),
+    localApplicabilityEs: cleanString(input.localApplicabilityEs),
+    occupationalHealthRelevanceEs: cleanString(input.occupationalHealthRelevanceEs),
     tags: cleanStringList(input.tags),
     accessType: cleanString(input.accessType) || "Pendiente",
     userComment: cleanString(input.userComment),
+    sourcePages: Array.isArray(input.sourcePages) ? input.sourcePages.slice(0, 20) : [],
+    extractionSource: cleanString(input.extractionSource) || "manual",
+    originalFileName: cleanString(input.originalFileName),
+    storagePath: cleanString(input.storagePath),
+    contentHash: cleanString(input.contentHash),
+    pageCount: Number.isFinite(Number(input.pageCount)) ? Math.max(0, Number(input.pageCount)) : 0,
     status,
     extractionStatus,
     extractionWarnings: cleanStringList(input.extractionWarnings),
@@ -92,6 +116,8 @@ export const normalizeBitacoraArticle = (id, data = {}, meta = {}) => ({
   id,
   title: cleanString(data.title),
   sourceName: cleanString(data.sourceName),
+  journal: cleanString(data.journal),
+  authors: cleanStringList(data.authors),
   sourceDomain: cleanString(data.sourceDomain),
   officialUrl: cleanString(data.officialUrl),
   doi: cleanString(data.doi),
@@ -102,13 +128,31 @@ export const normalizeBitacoraArticle = (id, data = {}, meta = {}) => ({
   studyType: cleanString(data.studyType),
   evidenceType: cleanString(data.evidenceType),
   publicationDate: cleanString(data.publicationDate),
+  originalLanguage: cleanString(data.originalLanguage),
+  articleType: cleanString(data.articleType),
   studyLocation: cleanString(data.studyLocation),
+  cardSummaryEs: cleanString(data.cardSummaryEs),
   executiveSummary: cleanString(data.executiveSummary),
+  executiveSummaryEs: cleanString(data.executiveSummaryEs),
+  abstractSummaryEs: cleanString(data.abstractSummaryEs),
   clinicalQuestion: cleanString(data.clinicalQuestion),
+  clinicalQuestionEs: cleanString(data.clinicalQuestionEs),
   mainResult: cleanString(data.mainResult),
+  mainResultEs: cleanString(data.mainResultEs),
+  methodologyEs: cleanString(data.methodologyEs),
+  keyPointsEs: cleanStringList(data.keyPointsEs),
+  limitationsEs: cleanString(data.limitationsEs),
+  localApplicabilityEs: cleanString(data.localApplicabilityEs),
+  occupationalHealthRelevanceEs: cleanString(data.occupationalHealthRelevanceEs),
   tags: cleanStringList(data.tags),
   accessType: cleanString(data.accessType) || "Pendiente",
   userComment: cleanString(data.userComment),
+  sourcePages: Array.isArray(data.sourcePages) ? data.sourcePages : [],
+  extractionSource: cleanString(data.extractionSource) || "manual",
+  originalFileName: cleanString(data.originalFileName),
+  storagePath: cleanString(data.storagePath),
+  contentHash: cleanString(data.contentHash),
+  pageCount: Number.isFinite(Number(data.pageCount)) ? Number(data.pageCount) : 0,
   status: normalizeStatus(data.status),
   extractionStatus: normalizeExtractionStatus(data.extractionStatus),
   extractionConfidence: Number.isFinite(Number(data.extractionConfidence))
@@ -127,7 +171,7 @@ export const normalizeBitacoraArticle = (id, data = {}, meta = {}) => ({
   optimistic: Boolean(meta.optimistic)
 });
 
-export function createBitacoraArticleRepository({ db, auth } = {}) {
+export function createBitacoraArticleRepository({ db, auth, storage } = {}) {
   let memoryArticles = [];
   let subscriber = null;
   let mode = db ? "firestore" : "memory";
@@ -210,7 +254,7 @@ export function createBitacoraArticleRepository({ db, auth } = {}) {
     return localArticle;
   };
 
-  const deleteArticle = async (articleId = "") => {
+  const deleteArticle = async (articleId = "", { storagePath = "" } = {}) => {
     const id = cleanString(articleId);
     if (!id) return;
     const user = auth?.currentUser;
@@ -220,6 +264,15 @@ export function createBitacoraArticleRepository({ db, auth } = {}) {
 
     if (db && mode === "firestore") {
       await deleteDoc(doc(db, COLLECTION_NAME, id));
+      if (storage && cleanString(storagePath)) {
+        try {
+          await deleteObject(storageRef(storage, cleanString(storagePath)));
+        } catch (error) {
+          if (!String(error?.code || "").includes("object-not-found")) {
+            console.warn("[Bitácora] No se pudo eliminar el PDF asociado.", error);
+          }
+        }
+      }
       return;
     }
 

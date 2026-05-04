@@ -421,6 +421,12 @@ body.bitacora-modal-open {
   color: #92400e;
 }
 
+.bitacora-badge--source {
+  border-color: rgba(14, 165, 233, 0.2);
+  background: rgba(240, 249, 255, 0.94);
+  color: #0369a1;
+}
+
 .bitacora-badge--template {
   border-color: rgba(122, 184, 0, 0.28);
   background: rgba(247, 251, 240, 0.96);
@@ -936,6 +942,121 @@ body.bitacora-modal-open {
   background: rgba(248, 250, 252, 0.78);
 }
 
+.bitacora-document-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.32rem;
+  padding: 0.28rem;
+  border: 1px solid rgba(122, 184, 0, 0.22);
+  border-radius: 0.95rem;
+  background: rgba(247, 251, 240, 0.9);
+}
+
+.bitacora-document-tab {
+  min-height: 2.45rem;
+  border: 0;
+  border-radius: 0.72rem;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 850;
+  letter-spacing: 0;
+}
+
+.bitacora-document-tab.is-active,
+.bitacora-document-tab:focus-visible {
+  background: #fff;
+  color: #315f22;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+  outline: none;
+}
+
+.bitacora-document-panel[hidden] {
+  display: none;
+}
+
+.bitacora-pdf-dropzone {
+  display: grid;
+  min-height: 10rem;
+  place-items: center;
+  border: 1px dashed rgba(122, 184, 0, 0.5);
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--bitacora-ink);
+  cursor: pointer;
+  text-align: center;
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.bitacora-pdf-dropzone:hover,
+.bitacora-pdf-dropzone:focus-visible,
+.bitacora-pdf-dropzone.is-dragover {
+  border-color: rgba(74, 159, 47, 0.75);
+  background: rgba(247, 251, 240, 0.95);
+  box-shadow: 0 0 0 4px rgba(122, 184, 0, 0.12);
+  outline: none;
+}
+
+.bitacora-pdf-dropzone__content {
+  display: grid;
+  justify-items: center;
+  gap: 0.32rem;
+  padding: 1rem;
+}
+
+.bitacora-pdf-dropzone__content svg {
+  width: 2rem;
+  height: 2rem;
+  color: #4a9f2f;
+}
+
+.bitacora-pdf-dropzone__content strong {
+  font-size: 0.98rem;
+  font-weight: 850;
+}
+
+.bitacora-pdf-dropzone__content span {
+  color: var(--bitacora-muted);
+  font-size: 0.82rem;
+}
+
+.bitacora-pdf-file {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+  padding: 0.62rem 0.72rem;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.bitacora-pdf-file[hidden] {
+  display: none;
+}
+
+.bitacora-pdf-file span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--bitacora-ink);
+  font-size: 0.86rem;
+  font-weight: 820;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bitacora-pdf-file span:nth-child(2) {
+  color: var(--bitacora-muted);
+  font-size: 0.78rem;
+  font-weight: 780;
+}
+
 .bitacora-form-zone__header h3 {
   margin: 0;
   color: var(--bitacora-ink);
@@ -1038,6 +1159,18 @@ body.bitacora-modal-open {
   margin-top: 0.34rem;
 }
 
+.bitacora-analysis__list {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+  color: #475569;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.bitacora-analysis__list li + li {
+  margin-top: 0.28rem;
+}
+
 .bitacora-assisted-zone[hidden] {
   display: none;
 }
@@ -1127,7 +1260,8 @@ body.bitacora-modal-open {
   }
 
   .bitacora-url-row,
-  .bitacora-form-grid {
+  .bitacora-form-grid,
+  .bitacora-document-tabs {
     grid-template-columns: 1fr;
   }
 }

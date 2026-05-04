@@ -9,9 +9,22 @@ service firebase.storage {
       return signedIn() && request.auth.uid == uid;
     }
 
+    function isAdmin() {
+      return signedIn()
+             && (
+               (request.auth.token.keys().hasAny(["admin"]) && request.auth.token.admin == true)
+               || firestore.exists(/databases/(default)/documents/admin_whitelist/$(request.auth.uid))
+             );
+    }
+
     function isImageUpload() {
       return request.resource != null
              && request.resource.contentType.matches("image/.*");
+    }
+
+    function isPdfUpload() {
+      return request.resource != null
+             && request.resource.contentType == "application/pdf";
     }
 
     function underSize(maxBytes) {
@@ -32,6 +45,10 @@ service firebase.storage {
       return fileName == "avatar.jpg"
              || fileName == "avatar.jpeg"
              || fileName == "avatar.png";
+    }
+
+    function isAllowedBitacoraPdfName(fileName) {
+      return fileName.matches(".*\\.[Pp][Dd][Ff]");
     }
 
     match /dm_carousel/{uid}/{fileName} {
@@ -61,6 +78,15 @@ service firebase.storage {
                             && isImageUpload()
                             && underSize(5 * 1024 * 1024);
       allow delete: if false;
+    }
+
+    match /bitacora/article-documents/{uid}/{fileName} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create, update: if isOwner(uid)
+                            && isAllowedBitacoraPdfName(fileName)
+                            && isPdfUpload()
+                            && underSize(20 * 1024 * 1024);
+      allow delete: if isOwner(uid) || isAdmin();
     }
 
     match /{allPaths=**} {

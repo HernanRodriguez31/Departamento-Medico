@@ -578,6 +578,16 @@ service cloud.firestore {
         );
     }
 
+    function validBitacoraExtractionSource(data) {
+      return data.extractionSource is string
+        && (
+          data.extractionSource == "manual"
+          || data.extractionSource == "url"
+          || data.extractionSource == "pdf"
+          || data.extractionSource == "pasted_text"
+        );
+    }
+
     function validBitacoraCreatedByShape(data) {
       return data.createdBy is map
         && data.createdBy.keys().hasOnly(["uid", "displayName", "email", "photoURL"])
@@ -598,6 +608,8 @@ service cloud.firestore {
       return data.keys().hasOnly([
           "title",
           "sourceName",
+          "journal",
+          "authors",
           "sourceDomain",
           "officialUrl",
           "doi",
@@ -608,13 +620,31 @@ service cloud.firestore {
           "studyType",
           "evidenceType",
           "publicationDate",
+          "originalLanguage",
+          "articleType",
           "studyLocation",
+          "cardSummaryEs",
           "executiveSummary",
+          "executiveSummaryEs",
+          "abstractSummaryEs",
           "clinicalQuestion",
+          "clinicalQuestionEs",
           "mainResult",
+          "mainResultEs",
+          "methodologyEs",
+          "keyPointsEs",
+          "limitationsEs",
+          "localApplicabilityEs",
+          "occupationalHealthRelevanceEs",
           "tags",
           "accessType",
           "userComment",
+          "sourcePages",
+          "extractionSource",
+          "originalFileName",
+          "storagePath",
+          "contentHash",
+          "pageCount",
           "status",
           "extractionStatus",
           "extractionConfidence",
@@ -626,6 +656,8 @@ service cloud.firestore {
         && data.keys().hasAll([
           "title",
           "sourceName",
+          "journal",
+          "authors",
           "sourceDomain",
           "officialUrl",
           "doi",
@@ -636,13 +668,31 @@ service cloud.firestore {
           "studyType",
           "evidenceType",
           "publicationDate",
+          "originalLanguage",
+          "articleType",
           "studyLocation",
+          "cardSummaryEs",
           "executiveSummary",
+          "executiveSummaryEs",
+          "abstractSummaryEs",
           "clinicalQuestion",
+          "clinicalQuestionEs",
           "mainResult",
+          "mainResultEs",
+          "methodologyEs",
+          "keyPointsEs",
+          "limitationsEs",
+          "localApplicabilityEs",
+          "occupationalHealthRelevanceEs",
           "tags",
           "accessType",
           "userComment",
+          "sourcePages",
+          "extractionSource",
+          "originalFileName",
+          "storagePath",
+          "contentHash",
+          "pageCount",
           "status",
           "extractionStatus",
           "extractionWarnings",
@@ -651,14 +701,16 @@ service cloud.firestore {
           "updatedAt"
         ])
         && data.title is string
-        && data.title.size() > 0
         && data.title.size() <= 500
         && data.sourceName is string
         && data.sourceName.size() <= 180
+        && data.journal is string
+        && data.journal.size() <= 180
+        && data.authors is list
+        && data.authors.size() <= 30
         && data.sourceDomain is string
         && data.sourceDomain.size() <= 180
         && data.officialUrl is string
-        && data.officialUrl.size() > 0
         && data.officialUrl.size() <= 1200
         && data.doi is string
         && data.doi.size() <= 240
@@ -676,22 +728,73 @@ service cloud.firestore {
         && data.evidenceType.size() <= 180
         && data.publicationDate is string
         && data.publicationDate.size() <= 80
+        && data.originalLanguage is string
+        && data.originalLanguage.size() <= 80
+        && data.articleType is string
+        && data.articleType.size() <= 160
         && data.studyLocation is string
         && data.studyLocation.size() <= 260
+        && data.cardSummaryEs is string
+        && data.cardSummaryEs.size() <= 700
         && data.executiveSummary is string
         && data.executiveSummary.size() <= 8000
+        && data.executiveSummaryEs is string
+        && data.executiveSummaryEs.size() <= 8000
+        && data.abstractSummaryEs is string
+        && data.abstractSummaryEs.size() <= 8000
         && data.clinicalQuestion is string
         && data.clinicalQuestion.size() <= 3000
+        && data.clinicalQuestionEs is string
+        && data.clinicalQuestionEs.size() <= 3000
         && data.mainResult is string
         && data.mainResult.size() <= 4000
+        && data.mainResultEs is string
+        && data.mainResultEs.size() <= 4000
+        && data.methodologyEs is string
+        && data.methodologyEs.size() <= 5000
+        && data.keyPointsEs is list
+        && data.keyPointsEs.size() <= 12
+        && data.limitationsEs is string
+        && data.limitationsEs.size() <= 5000
+        && data.localApplicabilityEs is string
+        && data.localApplicabilityEs.size() <= 5000
+        && data.occupationalHealthRelevanceEs is string
+        && data.occupationalHealthRelevanceEs.size() <= 5000
         && data.tags is list
         && data.tags.size() <= 12
         && data.accessType is string
         && data.accessType.size() <= 80
         && data.userComment is string
         && data.userComment.size() <= 4000
+        && data.sourcePages is list
+        && data.sourcePages.size() <= 20
+        && validBitacoraExtractionSource(data)
+        && data.originalFileName is string
+        && data.originalFileName.size() <= 180
+        && data.storagePath is string
+        && data.storagePath.size() <= 500
+        && data.contentHash is string
+        && data.contentHash.size() <= 128
+        && data.pageCount is number
+        && data.pageCount >= 0
         && validBitacoraStatus(data)
         && validBitacoraExtractionStatus(data)
+        && (
+          data.status == "draft"
+          || (
+            data.title.size() > 0
+            && (data.sourceName.size() > 0 || data.journal.size() > 0)
+            && (data.cardSummaryEs.size() > 0 || data.executiveSummaryEs.size() > 0 || data.executiveSummary.size() > 0)
+            && (
+              data.executiveSummaryEs.size() > 0
+              || data.clinicalQuestionEs.size() > 0
+              || data.mainResultEs.size() > 0
+              || data.methodologyEs.size() > 0
+              || data.studyType.size() > 0
+              || data.evidenceType.size() > 0
+            )
+          )
+        )
         && data.extractionWarnings is list
         && data.extractionWarnings.size() <= 8
         && (

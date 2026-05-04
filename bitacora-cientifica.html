@@ -34,7 +34,7 @@
     <link rel="stylesheet" href="/assets/css/pages/index.css?v=20260502-portal-hover-state-1" />
     <link rel="stylesheet" href="/assets/css/core-contrast.css?v=20260502-committee-border-align-1" />
     <link rel="stylesheet" href="/assets/css/pages/galeriadearte.css?v=20260503-art-gallery-like-tooltip-1" />
-    <link rel="stylesheet" href="/assets/css/pages/bitacora-cientifica.css?v=20260504-bitacora-resolver-1" />
+    <link rel="stylesheet" href="/assets/css/pages/bitacora-cientifica.css?v=20260504-bitacora-document-agent-1" />
   </head>
   <body class="art-gallery-page bitacora-page ui-clarity">
     <div id="app">
@@ -292,7 +292,7 @@
             <div>
               <h2 id="add-article-title">Agregar artículo científico</h2>
               <p id="add-article-description">
-                Pegá el enlace oficial del artículo. El sistema intentará extraer los datos principales y podrás revisarlos antes de guardar.
+                Cargá un PDF o pegá el texto del documento. La IA generará una ficha en español para revisión antes de guardar.
               </p>
             </div>
             <button type="button" class="bitacora-modal__close" data-close-modal aria-label="Cerrar">
@@ -302,90 +302,84 @@
 
           <form id="bitacora-add-article-form" class="bitacora-article-form" novalidate>
             <div class="bitacora-modal__body bitacora-article-form__body">
-              <section class="bitacora-form-zone" aria-labelledby="article-link-zone-title">
+              <div class="bitacora-document-tabs" role="tablist" aria-label="Origen de carga">
+                <button type="button" class="bitacora-document-tab is-active" role="tab" aria-selected="true" aria-controls="article-tab-pdf" id="article-tab-pdf-control" data-article-tab="pdf">Desde PDF</button>
+                <button type="button" class="bitacora-document-tab" role="tab" aria-selected="false" aria-controls="article-tab-text" id="article-tab-text-control" data-article-tab="text">Texto pegado</button>
+                <button type="button" class="bitacora-document-tab" role="tab" aria-selected="false" aria-controls="article-tab-manual" id="article-tab-manual-control" data-article-tab="manual">Datos manuales</button>
+              </div>
+
+              <section id="article-tab-pdf" class="bitacora-form-zone bitacora-document-panel is-active" role="tabpanel" aria-labelledby="article-tab-pdf-control" data-article-panel="pdf">
                 <div class="bitacora-form-zone__header">
-                  <h3 id="article-link-zone-title">Link del artículo</h3>
-                  <p>Usar preferentemente enlaces oficiales: DOI, PubMed, PMC, revista científica o repositorio institucional.</p>
+                  <h3>Cargar PDF científico</h3>
+                  <p>Subí el PDF del paper, guía, revisión o publicación científica. La IA extraerá la información principal y generará una ficha en español.</p>
+                </div>
+                <div id="article-pdf-dropzone" class="bitacora-pdf-dropzone" tabindex="0" role="button" aria-describedby="article-pdf-help">
+                  <i data-lucide="file-text" aria-hidden="true"></i>
+                  <div>
+                    <strong>Arrastrá un PDF o seleccionalo desde tu equipo</strong>
+                    <span id="article-pdf-help">PDF único, máximo 20 MB. El procesamiento se realiza en backend.</span>
+                  </div>
+                  <button type="button" class="bitacora-btn bitacora-btn--secondary" data-select-pdf>Seleccionar PDF</button>
+                  <input id="article-pdf-input" type="file" accept="application/pdf,.pdf" hidden />
+                </div>
+                <div id="article-pdf-file" class="bitacora-pdf-file" hidden>
+                  <span id="article-pdf-name"></span>
+                  <span id="article-pdf-size"></span>
+                  <button type="button" class="bitacora-btn bitacora-btn--secondary" data-remove-pdf>Quitar archivo</button>
+                </div>
+                <button type="button" class="bitacora-btn bitacora-btn--primary" data-analyze-pdf>
+                  <i data-lucide="sparkles" aria-hidden="true"></i>
+                  <span>Analizar PDF con IA</span>
+                </button>
+              </section>
+
+              <section id="article-tab-text" class="bitacora-form-zone bitacora-document-panel" role="tabpanel" aria-labelledby="article-tab-text-control" data-article-panel="text" hidden>
+                <div class="bitacora-form-zone__header">
+                  <h3>Pegar texto del documento</h3>
+                  <p>Pegá el resumen, abstract, introducción o texto completo disponible. Puede estar en inglés o español; la salida será en español.</p>
+                </div>
+                <label class="bitacora-field bitacora-field--wide" for="article-pasted-text">
+                  <span>Texto del artículo o documento</span>
+                  <textarea id="article-pasted-text" rows="8" placeholder="Pegá aquí el contenido del artículo, abstract, documento Word o resumen científico…"></textarea>
+                </label>
+                <div class="bitacora-form-grid">
+                  <label class="bitacora-field" for="article-pasted-url">
+                    <span>Enlace oficial o DOI</span>
+                    <input id="article-pasted-url" type="text" inputmode="url" />
+                  </label>
+                  <label class="bitacora-field" for="article-pasted-source">
+                    <span>Fuente / revista / institución</span>
+                    <input id="article-pasted-source" type="text" />
+                  </label>
+                </div>
+                <button type="button" class="bitacora-btn bitacora-btn--primary" data-analyze-text>
+                  <i data-lucide="sparkles" aria-hidden="true"></i>
+                  <span>Analizar texto con IA</span>
+                </button>
+              </section>
+
+              <section id="article-tab-manual" class="bitacora-form-zone bitacora-document-panel" role="tabpanel" aria-labelledby="article-tab-manual-control" data-article-panel="manual" hidden>
+                <div class="bitacora-form-zone__header">
+                  <h3>Datos manuales / enlace oficial</h3>
+                  <p>El enlace oficial queda como apoyo complementario. También podés usarlo para extraer metadatos si no hay PDF o texto.</p>
                 </div>
                 <div class="bitacora-url-row">
                   <label class="bitacora-field" for="article-url">
                     <span>URL del artículo o paper</span>
-                    <input
-                      id="article-url"
-                      name="articleUrl"
-                      type="url"
-                      inputmode="url"
-                      placeholder="https://..."
-                      aria-describedby="article-url-help article-url-error article-domain-detected"
-                      required
-                    />
+                    <input id="article-url" name="articleUrl" type="url" inputmode="url" placeholder="https://..." aria-describedby="article-url-help article-url-error article-domain-detected" />
                   </label>
-                  <button type="button" class="bitacora-btn bitacora-btn--primary" data-analyze-article>
+                  <button type="button" class="bitacora-btn bitacora-btn--secondary" data-analyze-article>
                     <i data-lucide="sparkles" aria-hidden="true"></i>
                     <span>Analizar enlace con IA</span>
                   </button>
                 </div>
-                <p id="article-url-help" class="bitacora-help">
-                  Usá un enlace oficial. La IA completará los datos disponibles para revisión.
-                </p>
+                <p id="article-url-help" class="bitacora-help">Usá el enlace como respaldo de trazabilidad. La carga principal recomendada es PDF o texto pegado.</p>
                 <p id="article-domain-detected" class="bitacora-domain-detected" aria-live="polite"></p>
                 <p id="article-url-error" class="bitacora-form-error" hidden></p>
-                <p id="article-ai-status" class="bitacora-ai-status" aria-live="polite"></p>
-                <div id="article-ai-warnings" class="bitacora-ai-warning" hidden></div>
               </section>
 
-              <section
-                id="article-assisted-zone"
-                class="bitacora-form-zone bitacora-assisted-zone"
-                aria-labelledby="article-assisted-zone-title"
-                hidden
-              >
-                <button
-                  type="button"
-                  id="article-assisted-toggle"
-                  class="bitacora-assisted-zone__toggle"
-                  aria-expanded="false"
-                  aria-controls="article-assisted-fields"
-                >
-                  <span id="article-assisted-zone-title">El sitio bloqueó la lectura automática</span>
-                  <i data-lucide="chevron-down" aria-hidden="true"></i>
-                </button>
-                <div id="article-assisted-fields" class="bitacora-assisted-zone__fields" hidden>
-                  <p class="bitacora-help">
-                    Podés pegar DOI, PMID, PMCID, título, fuente o abstract visible para completar la carga sin evadir el bloqueo del sitio.
-                  </p>
-                  <div class="bitacora-form-grid">
-                    <label class="bitacora-field" for="article-assisted-doi">
-                      <span>DOI</span>
-                      <input id="article-assisted-doi" name="assistedDoi" type="text" inputmode="url" />
-                    </label>
-                    <label class="bitacora-field" for="article-assisted-pmid">
-                      <span>PMID</span>
-                      <input id="article-assisted-pmid" name="assistedPmid" type="text" inputmode="numeric" />
-                    </label>
-                    <label class="bitacora-field" for="article-assisted-pmcid">
-                      <span>PMCID</span>
-                      <input id="article-assisted-pmcid" name="assistedPmcid" type="text" />
-                    </label>
-                    <label class="bitacora-field" for="article-assisted-title">
-                      <span>Nombre visible del artículo</span>
-                      <input id="article-assisted-title" name="assistedTitle" type="text" />
-                    </label>
-                    <label class="bitacora-field" for="article-assisted-source">
-                      <span>Fuente visible</span>
-                      <input id="article-assisted-source" name="assistedSource" type="text" />
-                    </label>
-                    <label class="bitacora-field bitacora-field--wide" for="article-assisted-abstract">
-                      <span>Abstract / Summary visible</span>
-                      <textarea id="article-assisted-abstract" name="assistedAbstract" rows="4"></textarea>
-                    </label>
-                  </div>
-                  <button type="button" class="bitacora-btn bitacora-btn--secondary" data-analyze-assisted-article>
-                    <i data-lucide="sparkles" aria-hidden="true"></i>
-                    <span>Analizar datos pegados</span>
-                  </button>
-                </div>
-              </section>
+              <p id="article-ai-status" class="bitacora-ai-status" aria-live="polite"></p>
+              <div id="article-ai-warnings" class="bitacora-ai-warning" hidden></div>
 
               <section class="bitacora-form-zone" aria-labelledby="article-data-zone-title">
                 <div class="bitacora-form-zone__header">
@@ -398,12 +392,28 @@
                     <input id="article-title" name="title" type="text" required />
                   </label>
                   <label class="bitacora-field" for="article-source-name">
-                    <span>Fuente / revista / sitio científico</span>
+                    <span>Fuente / revista / institución</span>
                     <input id="article-source-name" name="sourceName" type="text" />
+                  </label>
+                  <label class="bitacora-field" for="article-journal">
+                    <span>Revista</span>
+                    <input id="article-journal" name="journal" type="text" />
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-authors">
+                    <span>Autores</span>
+                    <input id="article-authors" name="authors" type="text" placeholder="Separados por coma" />
                   </label>
                   <label class="bitacora-field" for="article-official-url">
                     <span>Enlace oficial</span>
-                    <input id="article-official-url" name="officialUrl" type="url" inputmode="url" required />
+                    <input id="article-official-url" name="officialUrl" type="url" inputmode="url" />
+                  </label>
+                  <label class="bitacora-field" for="article-doi">
+                    <span>DOI</span>
+                    <input id="article-doi" name="doi" type="text" />
+                  </label>
+                  <label class="bitacora-field" for="article-type">
+                    <span>Tipo de artículo</span>
+                    <input id="article-type" name="articleType" type="text" />
                   </label>
                   <label class="bitacora-field" for="article-study-type">
                     <span>Tipo de estudio</span>
@@ -417,21 +427,53 @@
                     <span>Fecha de publicación</span>
                     <input id="article-publication-date" name="publicationDate" type="text" placeholder="AAAA-MM-DD o texto de la fuente" />
                   </label>
+                  <label class="bitacora-field" for="article-original-language">
+                    <span>Idioma original</span>
+                    <input id="article-original-language" name="originalLanguage" type="text" />
+                  </label>
                   <label class="bitacora-field" for="article-study-location">
                     <span>Lugar / contexto del estudio</span>
                     <input id="article-study-location" name="studyLocation" type="text" />
                   </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-card-summary">
+                    <span>Resumen breve para tarjeta</span>
+                    <textarea id="article-card-summary" name="cardSummaryEs" rows="2"></textarea>
+                  </label>
                   <label class="bitacora-field bitacora-field--wide" for="article-executive-summary">
                     <span>Resumen ejecutivo</span>
                     <textarea id="article-executive-summary" name="executiveSummary" rows="4"></textarea>
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-abstract-summary">
+                    <span>Abstract / resumen traducido o sintetizado</span>
+                    <textarea id="article-abstract-summary" name="abstractSummaryEs" rows="4"></textarea>
                   </label>
                   <label class="bitacora-field bitacora-field--wide" for="article-clinical-question">
                     <span>Pregunta que busca responder</span>
                     <textarea id="article-clinical-question" name="clinicalQuestion" rows="3"></textarea>
                   </label>
                   <label class="bitacora-field bitacora-field--wide" for="article-main-result">
-                    <span>Resultado principal</span>
+                    <span>Resultado o mensaje principal</span>
                     <textarea id="article-main-result" name="mainResult" rows="3"></textarea>
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-methodology">
+                    <span>Metodología</span>
+                    <textarea id="article-methodology" name="methodologyEs" rows="3"></textarea>
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-key-points">
+                    <span>Puntos clave</span>
+                    <textarea id="article-key-points" name="keyPointsEs" rows="3" placeholder="Un punto por línea"></textarea>
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-limitations">
+                    <span>Limitaciones</span>
+                    <textarea id="article-limitations" name="limitationsEs" rows="3"></textarea>
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-local-applicability">
+                    <span>Aplicabilidad local</span>
+                    <textarea id="article-local-applicability" name="localApplicabilityEs" rows="3"></textarea>
+                  </label>
+                  <label class="bitacora-field bitacora-field--wide" for="article-occupational-relevance">
+                    <span>Relevancia para salud ocupacional / gestión sanitaria</span>
+                    <textarea id="article-occupational-relevance" name="occupationalHealthRelevanceEs" rows="3"></textarea>
                   </label>
                   <label class="bitacora-field" for="article-tags">
                     <span>Etiquetas</span>
@@ -537,7 +579,7 @@
       installFirebaseGlobals();
     </script>
     <script type="module" src="/assets/js/common/notifications.js"></script>
-    <script type="module" src="/assets/js/pages/bitacora-cientifica.js?v=20260504-bitacora-resolver-1"></script>
+    <script type="module" src="/assets/js/pages/bitacora-cientifica.js?v=20260504-bitacora-document-agent-1"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {

@@ -6,19 +6,25 @@ import {
   doc,
   getDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import {
+  getBlob,
+  ref as storageRef,
+  uploadBytes
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { BITACORA_POSTS } from "../data/bitacora-posts.js";
 import { NATIONAL_SELECTED_SOURCE_IDS, SCIENTIFIC_SOURCES } from "../data/scientific-sources.js";
-import { createBitacoraArticleRepository } from "../services/bitacora-article-repository.js?v=20260504-bitacora-resolver-1";
+import { createBitacoraArticleRepository } from "../services/bitacora-article-repository.js?v=20260504-bitacora-document-agent-1";
 import {
   inferSourceNameFromDomain,
   requestArticleExtraction,
+  requestArticleDocumentExtraction,
   validateArticleUrl
-} from "../services/bitacora-ai-extractor.js?v=20260504-bitacora-resolver-1";
+} from "../services/bitacora-ai-extractor.js?v=20260504-bitacora-document-agent-1";
 
-const { auth, db } = getFirebase();
+const { auth, db, storage } = getFirebase();
 
 const FILTER_ALL = "all";
-const COMPLETION_FALLBACK = "Completar al cargar una publicación real verificada.";
+const COMPLETION_FALLBACK = "No especificado en el documento.";
 const STATUS_FILTERS = [
   { label: "Todos los estados", value: FILTER_ALL },
   { label: "Pendiente de revisión", value: "pending_review" },
@@ -36,8 +42,17 @@ const EXTRACTION_LABELS = {
   ai_draft: "Borrador automático",
   metadata_only: "Metadatos básicos",
   failed: "Extracción fallida",
-  not_configured: "IA no configurada"
+  not_configured: "IA no configurada",
+  manual: "Manual"
 };
+const EXTRACTION_SOURCE_LABELS = {
+  pdf: "PDF",
+  pasted_text: "Texto pegado",
+  manual: "Manual",
+  url: "Enlace"
+};
+const MAX_PDF_BYTES = 20 * 1024 * 1024;
+const MIN_PASTED_TEXT_CHARS = 500;
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
@@ -60,6 +75,20 @@ const els = {
   sourcesModal: $("#scientific-sources-modal"),
   addArticleModal: $("#add-article-modal"),
   addArticleForm: $("#bitacora-add-article-form"),
+  articleTabs: $$("[data-article-tab]"),
+  articlePanels: $$("[data-article-panel]"),
+  pdfDropzone: $("#article-pdf-dropzone"),
+  pdfInput: $("#article-pdf-input"),
+  pdfFile: $("#article-pdf-file"),
+  pdfName: $("#article-pdf-name"),
+  pdfSize: $("#article-pdf-size"),
+  selectPdfButton: $("[data-select-pdf]"),
+  removePdfButton: $("[data-remove-pdf]"),
+  analyzePdfButton: $("[data-analyze-pdf]"),
+  pastedText: $("#article-pasted-text"),
+  pastedUrl: $("#article-pasted-url"),
+  pastedSource: $("#article-pasted-source"),
+  analyzeTextButton: $("[data-analyze-text]"),
   articleUrl: $("#article-url"),
   articleUrlError: $("#article-url-error"),
   articleDomain: $("#article-domain-detected"),
@@ -95,6 +124,7 @@ const state = {
   activeModalTrigger: null,
   articleDraftMeta: {
     extractionStatus: "manual",
+    extractionSource: "manual",
     extractionConfidence: null,
     extractionWarnings: [],
     sourceDomain: "",
@@ -103,8 +133,14 @@ const state = {
     pmcid: "",
     nctId: "",
     pii: "",
+    originalFileName: "",
+    storagePath: "",
+    contentHash: "",
+    pageCount: 0,
+    sourcePages: [],
     rawEvidence: null
-  }
+  },
+  selectedPdfFile: null
 };
 
 let repository = null;
@@ -186,6 +222,29 @@ const splitTags = (value = "") =>
     )
   ).slice(0, 12);
 
+const splitLines = (value = "") =>
+  String(value || "")
+    .split(/\n|;/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 12);
+
+const formatFileSize = (bytes = 0) => {
+  const size = Number(bytes) || 0;
+  if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  if (size >= 1024) return `${Math.round(size / 1024)} KB`;
+  return `${size} B`;
+};
+
+const safeStorageFileName = (value = "") =>
+  String(value || "documento.pdf")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9._-]+/gi, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[-.]+|[-.]+$/g, "")
+    .slice(0, 120) || "documento.pdf";
+
 const renderOptions = (select, values, label, currentValue = FILTER_ALL) => {
   if (!select) return;
   select.innerHTML = [
@@ -228,6 +287,8 @@ const renderUserArticle = (article) => ({
   id: article.id,
   title: article.title,
   sourceName: article.sourceName,
+  journal: article.journal,
+  authors: article.authors || [],
   sourceDomain: article.sourceDomain,
   officialUrl: article.officialUrl,
   doi: article.doi,
@@ -236,6 +297,8 @@ const renderUserArticle = (article) => ({
   nctId: article.nctId,
   pii: article.pii,
   publicationDate: article.publicationDate,
+  originalLanguage: article.originalLanguage,
+  articleType: article.articleType,
   createdAt: article.createdAt,
   createdAtLabel: formatDateTime(article.createdAt),
   createdByUid: article.createdBy?.uid || "",
@@ -244,14 +307,27 @@ const renderUserArticle = (article) => ({
   studyType: article.studyType,
   status: article.status,
   extractionStatus: article.extractionStatus,
+  extractionSource: article.extractionSource,
   extractionConfidence: article.extractionConfidence,
   accessType: article.accessType,
-  summary: article.executiveSummary || "Artículo cargado para revisión interna.",
-  executiveSummary: article.executiveSummary,
-  clinicalQuestion: article.clinicalQuestion,
-  mainResult: article.mainResult,
+  summary: article.cardSummaryEs || article.executiveSummaryEs || article.executiveSummary || "Artículo cargado para revisión interna.",
+  cardSummaryEs: article.cardSummaryEs,
+  executiveSummary: article.executiveSummaryEs || article.executiveSummary,
+  abstractSummaryEs: article.abstractSummaryEs,
+  clinicalQuestion: article.clinicalQuestionEs || article.clinicalQuestion,
+  mainResult: article.mainResultEs || article.mainResult,
+  methodologyEs: article.methodologyEs,
+  keyPointsEs: article.keyPointsEs || [],
+  limitationsEs: article.limitationsEs,
+  localApplicabilityEs: article.localApplicabilityEs,
+  occupationalHealthRelevanceEs: article.occupationalHealthRelevanceEs,
   userComment: article.userComment,
   studyLocation: article.studyLocation,
+  originalFileName: article.originalFileName,
+  storagePath: article.storagePath,
+  contentHash: article.contentHash,
+  pageCount: article.pageCount,
+  sourcePages: article.sourcePages || [],
   tags: article.tags || [],
   extractionWarnings: article.extractionWarnings || [],
   isTemplate: false
@@ -320,15 +396,27 @@ const getStatusBadgeClass = (post) => {
   return "bitacora-badge--status";
 };
 
+const hasMeaningfulAnalysisValue = (value = "") => {
+  const clean = normalizeText(value);
+  return Boolean(
+    clean &&
+      clean !== normalizeText(COMPLETION_FALLBACK) &&
+      clean !== normalizeText("Pendiente") &&
+      clean !== normalizeText("Artículo cargado para revisión interna.")
+  );
+};
+
 const isIncompleteDraft = (post) =>
   post.status === "draft" &&
   ![
     post.executiveSummary,
+    post.cardSummaryEs,
     post.clinicalQuestion,
     post.mainResult,
+    post.methodologyEs,
     post.studyType,
     post.evidenceType
-  ].some((value) => String(value || "").trim() && normalizeText(value) !== normalizeText(COMPLETION_FALLBACK));
+  ].some(hasMeaningfulAnalysisValue);
 
 const renderBadges = (post) => {
   const statusLabel = isIncompleteDraft(post)
@@ -337,6 +425,13 @@ const renderBadges = (post) => {
   const badges = [
     `<span class="bitacora-badge ${getStatusBadgeClass(post)}">${escapeHtml(statusLabel)}</span>`
   ];
+  if (post.extractionSource && EXTRACTION_SOURCE_LABELS[post.extractionSource]) {
+    badges.push(
+      `<span class="bitacora-badge bitacora-badge--source">${escapeHtml(
+        EXTRACTION_SOURCE_LABELS[post.extractionSource]
+      )}</span>`
+    );
+  }
   if (post.extractionStatus && EXTRACTION_LABELS[post.extractionStatus]) {
     badges.push(
       `<span class="bitacora-badge bitacora-badge--ai">${escapeHtml(
@@ -353,6 +448,19 @@ const renderAnalysisBlock = (analysisId, suffix, title, content) => `
     <p>${escapeHtml(getSafeField(content))}</p>
   </section>
 `;
+
+const renderAnalysisListBlock = (analysisId, suffix, title, items = []) => {
+  const cleanItems = (Array.isArray(items) ? items : []).map((item) => String(item || "").trim()).filter(Boolean);
+  if (!cleanItems.length) return renderAnalysisBlock(analysisId, suffix, title, "");
+  return `
+    <section aria-labelledby="${analysisId}-${suffix}">
+      <h3 id="${analysisId}-${suffix}">${escapeHtml(title)}</h3>
+      <ul class="bitacora-analysis__list">
+        ${cleanItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+      </ul>
+    </section>
+  `;
+};
 
 const renderWarnings = (warnings = []) => {
   const cleanWarnings = warnings.map((warning) => String(warning || "").trim()).filter(Boolean);
@@ -382,6 +490,14 @@ const renderTrace = (post) => `
       <dt>Estado</dt>
       <dd>${escapeHtml(STATUS_LABELS[post.status] || "Pendiente de revisión")}</dd>
     </div>
+    <div>
+      <dt>Documento</dt>
+      <dd>${escapeHtml(getSafeField(post.originalFileName || EXTRACTION_SOURCE_LABELS[post.extractionSource] || ""))}</dd>
+    </div>
+    <div>
+      <dt>Confianza</dt>
+      <dd>${post.extractionConfidence == null ? "No especificado" : `${Math.round(Number(post.extractionConfidence) * 100)}%`}</dd>
+    </div>
   </dl>
 `;
 
@@ -396,12 +512,18 @@ const canDeleteArticle = (post) =>
 const renderAnalysis = (post, analysisId, expanded) => `
   <div id="${analysisId}" class="bitacora-analysis bitacora-analysis-panel" ${expanded ? "" : "hidden"}>
     <div class="bitacora-analysis__grid">
-      ${renderAnalysisBlock(analysisId, "question", "Pregunta que busca responder", post.clinicalQuestion)}
-      ${renderAnalysisBlock(analysisId, "design", "Tipo de estudio", post.studyType)}
-      ${renderAnalysisBlock(analysisId, "result", "Resultado principal", post.mainResult)}
       ${renderAnalysisBlock(analysisId, "summary", "Resumen ejecutivo", post.executiveSummary || post.summary)}
-      ${renderAnalysisBlock(analysisId, "comment", "Comentario del usuario", post.userComment)}
+      ${renderAnalysisBlock(analysisId, "abstract", "Abstract / resumen en español", post.abstractSummaryEs)}
+      ${renderAnalysisBlock(analysisId, "question", "Pregunta que busca responder", post.clinicalQuestion)}
+      ${renderAnalysisBlock(analysisId, "methodology", "Metodología / tipo de estudio", post.methodologyEs || post.studyType)}
+      ${renderAnalysisBlock(analysisId, "result", "Resultado o mensaje principal", post.mainResult)}
+      ${renderAnalysisListBlock(analysisId, "keypoints", "Puntos clave", post.keyPointsEs)}
+      ${renderAnalysisBlock(analysisId, "limitations", "Limitaciones", post.limitationsEs)}
+      ${renderAnalysisBlock(analysisId, "local", "Aplicabilidad local", post.localApplicabilityEs)}
+      ${renderAnalysisBlock(analysisId, "occupational", "Relevancia para salud ocupacional / gestión sanitaria", post.occupationalHealthRelevanceEs)}
       ${renderAnalysisBlock(analysisId, "context", "Lugar / contexto", post.studyLocation)}
+      ${renderAnalysisBlock(analysisId, "bibliography", "Datos bibliográficos", [post.journal, post.doi, (post.authors || []).join(", ")].filter(Boolean).join(" · "))}
+      ${renderAnalysisBlock(analysisId, "comment", "Comentario del usuario", post.userComment)}
     </div>
     ${renderWarnings(post.extractionWarnings)}
     ${renderTrace(post)}
@@ -447,7 +569,7 @@ const renderPost = (post) => {
         </div>
         <p class="bitacora-post-card__summary">${escapeHtml(post.summary || COMPLETION_FALLBACK)}</p>
         <div class="bitacora-post-card__tags" aria-label="Etiquetas editoriales">
-          ${renderTags(post.tags || [], 3)}
+          ${renderTags(post.tags || [], 4)}
         </div>
         ${renderPostMeta(post)}
       </div>
@@ -464,6 +586,11 @@ const renderPost = (post) => {
         ${
           originalUrl
             ? `<a class="bitacora-btn bitacora-btn--secondary" href="${escapeHtml(originalUrl)}" target="_blank" rel="noopener noreferrer">Ver fuente original</a>`
+            : ""
+        }
+        ${
+          post.storagePath
+            ? `<button class="bitacora-btn bitacora-btn--secondary" type="button" data-bitacora-action="view-pdf">Ver PDF</button>`
             : ""
         }
         ${
@@ -715,6 +842,7 @@ const getCurrentUserLabel = () => {
 const resetArticleDraftMeta = () => {
   state.articleDraftMeta = {
     extractionStatus: "manual",
+    extractionSource: "manual",
     extractionConfidence: null,
     extractionWarnings: [],
     sourceDomain: "",
@@ -723,8 +851,14 @@ const resetArticleDraftMeta = () => {
     pmcid: "",
     nctId: "",
     pii: "",
+    originalFileName: "",
+    storagePath: "",
+    contentHash: "",
+    pageCount: 0,
+    sourcePages: [],
     rawEvidence: null
   };
+  state.selectedPdfFile = null;
 };
 
 const setArticleError = (element, message = "") => {
@@ -751,6 +885,21 @@ const setAssistedModeVisible = (visible, expanded = false) => {
   els.assistedFields.hidden = !(visible && expanded);
 };
 
+const setArticleTab = (tab = "pdf") => {
+  const target = ["pdf", "text", "manual"].includes(tab) ? tab : "pdf";
+  els.articleTabs.forEach((button) => {
+    const active = button.dataset.articleTab === target;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-selected", active ? "true" : "false");
+    button.tabIndex = active ? 0 : -1;
+  });
+  els.articlePanels.forEach((panel) => {
+    const active = panel.dataset.articlePanel === target;
+    panel.hidden = !active;
+    panel.classList.toggle("is-active", active);
+  });
+};
+
 const setFieldValue = (id, value = "", { overwrite = true } = {}) => {
   const field = $(`#${id}`);
   if (!field || (!overwrite && field.value)) return;
@@ -770,6 +919,12 @@ const resetArticleForm = () => {
   setAiStatus("");
   setAiWarnings([]);
   setAssistedModeVisible(false);
+  setArticleTab("pdf");
+  if (els.pdfInput) els.pdfInput.value = "";
+  if (els.pdfFile) els.pdfFile.hidden = true;
+  if (els.pdfName) els.pdfName.textContent = "";
+  if (els.pdfSize) els.pdfSize.textContent = "";
+  els.pdfDropzone?.classList.remove("is-dragover");
   if (els.articleDomain) els.articleDomain.textContent = "";
   setFieldValue("article-access-type", "Pendiente");
   syncArticleAudit();
@@ -782,6 +937,10 @@ const openAddArticleModal = (trigger) => {
 
 const syncUrlDerivedFields = () => {
   const value = els.articleUrl?.value || "";
+  if (!String(value || "").trim()) {
+    if (els.articleDomain) els.articleDomain.textContent = "";
+    return { ok: true, href: "", domain: "", sourceName: "" };
+  }
   const validation = validateArticleUrl(value);
   if (!validation.ok) {
     if (els.articleDomain) els.articleDomain.textContent = "";
@@ -796,11 +955,19 @@ const syncUrlDerivedFields = () => {
   return validation;
 };
 
+const validateOptionalArticleUrl = (value = "") => {
+  const clean = String(value || "").trim();
+  if (!clean) return { ok: true, href: "", domain: "", sourceName: "" };
+  return validateArticleUrl(clean);
+};
+
 const hasArticleEvidenceField = () =>
   [
     $("#article-executive-summary")?.value,
+    $("#article-card-summary")?.value,
     $("#article-clinical-question")?.value,
     $("#article-main-result")?.value,
+    $("#article-methodology")?.value,
     $("#article-study-type")?.value,
     $("#article-evidence-type")?.value
   ].some((value) => String(value || "").trim());
@@ -815,7 +982,7 @@ const validateArticleBeforeSave = (requestedStatus = "pending_review") => {
   setArticleError(els.articleUrlError, "");
 
   const officialUrl = $("#article-official-url")?.value || urlValidation.href;
-  const officialValidation = validateArticleUrl(officialUrl);
+  const officialValidation = validateOptionalArticleUrl(officialUrl);
   if (!officialValidation.ok) {
     setArticleError(els.articleFormError, "El enlace oficial debe ser una URL válida.");
     $("#article-official-url")?.focus();
@@ -824,28 +991,37 @@ const validateArticleBeforeSave = (requestedStatus = "pending_review") => {
 
   const title = ($("#article-title")?.value || "").trim();
   const sourceName = ($("#article-source-name")?.value || "").trim();
+  if (requestedStatus === "draft") {
+    setArticleError(els.articleFormError, "");
+    return {
+      urlInfo: officialValidation,
+      title: title || "Borrador científico sin título"
+    };
+  }
+
   if (!title) {
     setArticleError(els.articleFormError, "Ingresá el título del artículo antes de guardar.");
     $("#article-title")?.focus();
     return null;
   }
-  if (requestedStatus === "draft") {
-    setArticleError(els.articleFormError, "");
-    return {
-      urlInfo: officialValidation,
-      title
-    };
-  }
 
-  if (!sourceName) {
+  if (!sourceName && !($("#article-journal")?.value || "").trim()) {
     setArticleError(els.articleFormError, "Ingresá la fuente o revista antes de guardar el artículo.");
     $("#article-source-name")?.focus();
+    return null;
+  }
+  if (!($("#article-card-summary")?.value || $("#article-executive-summary")?.value || "").trim()) {
+    setArticleError(
+      els.articleFormError,
+      "Para guardar como artículo, agregá un resumen breve o resumen ejecutivo. Podés guardarlo como borrador si está incompleto."
+    );
+    $("#article-card-summary")?.focus();
     return null;
   }
   if (!hasArticleEvidenceField()) {
     setArticleError(
       els.articleFormError,
-      "Para guardar como artículo, agregá resumen, pregunta, resultado, tipo de estudio o tipo de evidencia. Podés guardarlo como borrador si está incompleto."
+      "Agregá al menos un campo de análisis científico antes de guardar como artículo."
     );
     $("#article-executive-summary")?.focus();
     return null;
@@ -859,17 +1035,30 @@ const validateArticleBeforeSave = (requestedStatus = "pending_review") => {
 };
 
 const fillArticleFromExtraction = (article = {}, rawEvidence = null) => {
+  const sourceName = article.sourceName || article.journal || "";
   const fieldMap = {
     "article-title": article.title,
-    "article-source-name": article.sourceName,
+    "article-source-name": sourceName,
+    "article-journal": article.journal,
+    "article-authors": (article.authors || []).join(", "),
     "article-official-url": article.officialUrl,
+    "article-doi": article.doi,
+    "article-type": article.articleType,
     "article-study-type": article.studyType,
     "article-evidence-type": article.evidenceType,
     "article-publication-date": article.publicationDate,
+    "article-original-language": article.originalLanguage,
     "article-study-location": article.studyLocation,
-    "article-executive-summary": article.executiveSummary,
-    "article-clinical-question": article.clinicalQuestion,
-    "article-main-result": article.mainResult,
+    "article-card-summary": article.cardSummaryEs,
+    "article-executive-summary": article.executiveSummaryEs || article.executiveSummary,
+    "article-abstract-summary": article.abstractSummaryEs,
+    "article-clinical-question": article.clinicalQuestionEs || article.clinicalQuestion,
+    "article-main-result": article.mainResultEs || article.mainResult,
+    "article-methodology": article.methodologyEs,
+    "article-key-points": (article.keyPointsEs || []).join("\n"),
+    "article-limitations": article.limitationsEs,
+    "article-local-applicability": article.localApplicabilityEs,
+    "article-occupational-relevance": article.occupationalHealthRelevanceEs,
     "article-tags": (article.tags || []).join(", "),
     "article-access-type": article.accessType
   };
@@ -886,6 +1075,9 @@ const fillArticleFromExtraction = (article = {}, rawEvidence = null) => {
   state.articleDraftMeta.pii = article.pii || state.articleDraftMeta.pii;
   state.articleDraftMeta.extractionConfidence = article.extractionConfidence ?? null;
   state.articleDraftMeta.extractionWarnings = article.warnings || [];
+  state.articleDraftMeta.contentHash = rawEvidence?.contentHash || state.articleDraftMeta.contentHash;
+  state.articleDraftMeta.pageCount = rawEvidence?.pageCount || state.articleDraftMeta.pageCount;
+  state.articleDraftMeta.sourcePages = article.sourcePages || state.articleDraftMeta.sourcePages || [];
   state.articleDraftMeta.rawEvidence = rawEvidence || state.articleDraftMeta.rawEvidence;
   setAiWarnings(article.warnings || []);
 };
@@ -903,6 +1095,14 @@ const setAnalyzeBusy = (busy) => {
     const label = $("span", els.assistedAnalyzeButton);
     if (label) label.textContent = busy ? "Analizando..." : "Analizar datos pegados";
   }
+};
+
+const setDocumentAnalyzeBusy = (button, busy, idleText) => {
+  if (!button) return;
+  button.disabled = busy;
+  button.setAttribute("aria-busy", busy ? "true" : "false");
+  const label = $("span", button);
+  if (label) label.textContent = busy ? "Analizando..." : idleText;
 };
 
 const applyExtractionResult = (result) => {
@@ -963,36 +1163,222 @@ const handleAnalyzeArticle = async (evidence = {}) => {
   }
 };
 
+const validatePdfFile = (file) => {
+  if (!file) return "Seleccioná un PDF para analizar.";
+  if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+    return "El archivo no es PDF.";
+  }
+  if (!file.size) return "El archivo PDF está vacío.";
+  if (file.size > MAX_PDF_BYTES) return "El archivo supera el tamaño permitido.";
+  return "";
+};
+
+const setSelectedPdfFile = (file) => {
+  const error = validatePdfFile(file);
+  if (error) {
+    setArticleError(els.articleFormError, error);
+    return false;
+  }
+  state.selectedPdfFile = file;
+  setArticleError(els.articleFormError, "");
+  if (els.pdfFile) els.pdfFile.hidden = false;
+  if (els.pdfName) els.pdfName.textContent = file.name;
+  if (els.pdfSize) els.pdfSize.textContent = formatFileSize(file.size);
+  return true;
+};
+
+const clearSelectedPdfFile = () => {
+  state.selectedPdfFile = null;
+  if (els.pdfInput) els.pdfInput.value = "";
+  if (els.pdfFile) els.pdfFile.hidden = true;
+  if (els.pdfName) els.pdfName.textContent = "";
+  if (els.pdfSize) els.pdfSize.textContent = "";
+};
+
+const uploadSelectedPdf = async () => {
+  const file = state.selectedPdfFile;
+  const error = validatePdfFile(file);
+  if (error) throw new Error(error);
+  if (!storage || !auth.currentUser) throw new Error("Necesitás iniciar sesión para analizar documentos.");
+  const path = `bitacora/article-documents/${auth.currentUser.uid}/${Date.now()}-${safeStorageFileName(file.name)}`;
+  const reference = storageRef(storage, path);
+  await uploadBytes(reference, file, {
+    contentType: "application/pdf",
+    customMetadata: {
+      uploadedBy: auth.currentUser.uid,
+      originalFileName: file.name,
+      purpose: "scientific-article-extraction"
+    }
+  });
+  return path;
+};
+
+const applyDocumentExtractionResult = (result, source) => {
+  fillArticleFromExtraction(result.article || {}, result.rawEvidence || null);
+  state.articleDraftMeta.extractionStatus = result.extractionStatus || "manual";
+  state.articleDraftMeta.extractionSource = source;
+  if (result.rawEvidence?.originalFileName) {
+    state.articleDraftMeta.originalFileName = result.rawEvidence.originalFileName;
+  }
+  if (result.rawEvidence?.storagePath) {
+    state.articleDraftMeta.storagePath = result.rawEvidence.storagePath;
+  }
+  if (result.rawEvidence?.contentHash) {
+    state.articleDraftMeta.contentHash = result.rawEvidence.contentHash;
+  }
+  if (result.rawEvidence?.pageCount) {
+    state.articleDraftMeta.pageCount = result.rawEvidence.pageCount;
+  }
+  if (result.extractionStatus === "ai_draft") {
+    setAiStatus(result.message || "Ficha generada por IA. Revisá la información antes de guardar.");
+  } else if (result.extractionStatus === "metadata_only") {
+    setAiStatus(result.message || "Se detectaron datos básicos, pero falta contenido suficiente. Completá los campos necesarios antes de guardar.");
+  } else if (result.extractionStatus === "not_configured") {
+    setAiStatus(result.error || "El servicio de IA no está configurado en backend.");
+  } else {
+    setAiStatus(result.error || "No se pudo analizar el documento. Podés completar la publicación manualmente.");
+  }
+};
+
+const handleAnalyzePdf = async () => {
+  const error = validatePdfFile(state.selectedPdfFile);
+  if (error) {
+    setArticleError(els.articleFormError, error);
+    return;
+  }
+  setArticleError(els.articleFormError, "");
+  setAiWarnings([]);
+  setDocumentAnalyzeBusy(els.analyzePdfButton, true, "Analizar PDF con IA");
+  try {
+    setAiStatus("Subiendo PDF…");
+    const storagePath = await uploadSelectedPdf();
+    state.articleDraftMeta.storagePath = storagePath;
+    state.articleDraftMeta.originalFileName = state.selectedPdfFile.name;
+    state.articleDraftMeta.extractionSource = "pdf";
+    setAiStatus("Extrayendo texto…");
+    const result = await requestArticleDocumentExtraction(
+      {
+        mode: "pdf",
+        storagePath,
+        originalFileName: state.selectedPdfFile.name,
+        officialUrl: $("#article-official-url")?.value || els.articleUrl?.value || ""
+      },
+      { auth }
+    );
+    setAiStatus("Generando ficha en español…");
+    applyDocumentExtractionResult(result, "pdf");
+  } catch (error) {
+    setAiStatus(error?.message || "No se pudo analizar el documento. Podés completar la publicación manualmente.");
+  } finally {
+    setDocumentAnalyzeBusy(els.analyzePdfButton, false, "Analizar PDF con IA");
+  }
+};
+
+const handleAnalyzePastedText = async () => {
+  const pastedText = els.pastedText?.value || "";
+  if (pastedText.trim().length < MIN_PASTED_TEXT_CHARS) {
+    setArticleError(els.articleFormError, "El texto pegado es demasiado breve para generar una ficha confiable.");
+    els.pastedText?.focus();
+    return;
+  }
+  setArticleError(els.articleFormError, "");
+  setAiWarnings([]);
+  setDocumentAnalyzeBusy(els.analyzeTextButton, true, "Analizar texto con IA");
+  try {
+    setAiStatus("Analizando texto…");
+    const result = await requestArticleDocumentExtraction(
+      {
+        mode: "pasted_text",
+        pastedText,
+        officialUrl: els.pastedUrl?.value || $("#article-official-url")?.value || "",
+        pastedSource: els.pastedSource?.value || $("#article-source-name")?.value || ""
+      },
+      { auth }
+    );
+    state.articleDraftMeta.extractionSource = "pasted_text";
+    setAiStatus("Generando ficha en español…");
+    applyDocumentExtractionResult(result, "pasted_text");
+  } finally {
+    setDocumentAnalyzeBusy(els.analyzeTextButton, false, "Analizar texto con IA");
+  }
+};
+
+const handlePdfDrop = (event) => {
+  event.preventDefault();
+  els.pdfDropzone?.classList.remove("is-dragover");
+  const file = event.dataTransfer?.files?.[0] || null;
+  if (file) setSelectedPdfFile(file);
+};
+
+const handleViewPdf = async (postId, button) => {
+  const post = getAllPosts().find((item) => item.id === postId);
+  if (!post?.storagePath || !storage) return;
+  setActionBusy(button, true, "Abriendo...");
+  try {
+    const blob = await getBlob(storageRef(storage, post.storagePath));
+    const blobUrl = window.URL.createObjectURL(blob);
+    const opened = window.open(blobUrl, "_blank", "noopener,noreferrer");
+    window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60_000);
+    if (!opened) {
+      showArticleActionError("El navegador bloqueó la apertura del PDF. Permití ventanas emergentes para verlo.");
+    }
+  } catch (error) {
+    showArticleActionError("No se pudo abrir el PDF. Verificá permisos o conexión.");
+  } finally {
+    setActionBusy(button, false);
+  }
+};
+
 const buildArticlePayload = (status) => {
   const officialUrl = ($("#article-official-url")?.value || els.articleUrl?.value || "").trim();
-  const urlInfo = validateArticleUrl(officialUrl);
+  const urlInfo = validateOptionalArticleUrl(officialUrl);
   const sourceDomain = urlInfo.ok
     ? urlInfo.domain
-    : state.articleDraftMeta.sourceDomain || validateArticleUrl(els.articleUrl?.value || "").domain || "";
+    : state.articleDraftMeta.sourceDomain || validateOptionalArticleUrl(els.articleUrl?.value || "").domain || "";
   const sourceName =
-    ($("#article-source-name")?.value || "").trim() ||
+    ($("#article-source-name")?.value || $("#article-journal")?.value || "").trim() ||
     (sourceDomain ? inferSourceNameFromDomain(sourceDomain) : "");
 
   return {
-    title: $("#article-title")?.value || "",
+    title: $("#article-title")?.value || (status === "draft" ? "Borrador científico sin título" : ""),
     sourceName,
+    journal: $("#article-journal")?.value || "",
+    authors: splitTags($("#article-authors")?.value || ""),
     sourceDomain,
     officialUrl,
-    doi: state.articleDraftMeta.doi || $("#article-assisted-doi")?.value || "",
+    doi: $("#article-doi")?.value || state.articleDraftMeta.doi || "",
     pmid: state.articleDraftMeta.pmid || $("#article-assisted-pmid")?.value || "",
     pmcid: state.articleDraftMeta.pmcid || $("#article-assisted-pmcid")?.value || "",
     nctId: state.articleDraftMeta.nctId || "",
     pii: state.articleDraftMeta.pii || "",
+    articleType: $("#article-type")?.value || "",
     studyType: $("#article-study-type")?.value || "",
     evidenceType: $("#article-evidence-type")?.value || "",
     publicationDate: $("#article-publication-date")?.value || "",
+    originalLanguage: $("#article-original-language")?.value || "",
     studyLocation: $("#article-study-location")?.value || "",
+    cardSummaryEs: $("#article-card-summary")?.value || "",
     executiveSummary: $("#article-executive-summary")?.value || "",
+    executiveSummaryEs: $("#article-executive-summary")?.value || "",
+    abstractSummaryEs: $("#article-abstract-summary")?.value || "",
     clinicalQuestion: $("#article-clinical-question")?.value || "",
+    clinicalQuestionEs: $("#article-clinical-question")?.value || "",
     mainResult: $("#article-main-result")?.value || "",
+    mainResultEs: $("#article-main-result")?.value || "",
+    methodologyEs: $("#article-methodology")?.value || "",
+    keyPointsEs: splitLines($("#article-key-points")?.value || ""),
+    limitationsEs: $("#article-limitations")?.value || "",
+    localApplicabilityEs: $("#article-local-applicability")?.value || "",
+    occupationalHealthRelevanceEs: $("#article-occupational-relevance")?.value || "",
     tags: splitTags($("#article-tags")?.value || ""),
     accessType: $("#article-access-type")?.value || "Pendiente",
     userComment: $("#article-user-comment")?.value || "",
+    sourcePages: state.articleDraftMeta.sourcePages || [],
+    extractionSource: state.articleDraftMeta.extractionSource || "manual",
+    originalFileName: state.articleDraftMeta.originalFileName || "",
+    storagePath: state.articleDraftMeta.storagePath || "",
+    contentHash: state.articleDraftMeta.contentHash || "",
+    pageCount: state.articleDraftMeta.pageCount || 0,
     status,
     extractionStatus: state.articleDraftMeta.extractionStatus || "manual",
     extractionConfidence: state.articleDraftMeta.extractionConfidence,
@@ -1052,7 +1438,7 @@ const handleDeleteArticle = async (postId, button) => {
   if (!confirmed) return;
   setActionBusy(button, true, "Eliminando...");
   try {
-    await repository.deleteArticle(post.id);
+    await repository.deleteArticle(post.id, { storagePath: post.storagePath || "" });
     state.userArticles = state.userArticles.filter((article) => article.id !== post.id);
     if (state.expandedPostId === post.id) state.expandedPostId = "";
     renderFilterOptions();
@@ -1172,6 +1558,10 @@ const bindEvents = () => {
       handleDeleteArticle(postId, actionButton);
       return;
     }
+    if (action === "view-pdf") {
+      handleViewPdf(postId, actionButton);
+      return;
+    }
     if (action !== "toggle-analysis") return;
     state.expandedPostId = state.expandedPostId === postId ? "" : postId;
     renderPosts();
@@ -1216,6 +1606,47 @@ const bindEvents = () => {
     setArticleError(els.articleUrlError, "");
     syncUrlDerivedFields();
   });
+  els.articleTabs.forEach((button) => {
+    button.addEventListener("click", () => setArticleTab(button.dataset.articleTab));
+  });
+  els.selectPdfButton?.addEventListener("click", () => els.pdfInput?.click());
+  els.pdfDropzone?.addEventListener("click", () => els.pdfInput?.click());
+  els.pdfDropzone?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    els.pdfInput?.click();
+  });
+  els.pdfDropzone?.addEventListener("dragenter", (event) => {
+    event.preventDefault();
+    els.pdfDropzone?.classList.add("is-dragover");
+  });
+  els.pdfDropzone?.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    els.pdfDropzone?.classList.add("is-dragover");
+  });
+  els.pdfDropzone?.addEventListener("dragleave", (event) => {
+    if (event.currentTarget === event.target) {
+      els.pdfDropzone?.classList.remove("is-dragover");
+    }
+  });
+  els.pdfDropzone?.addEventListener("drop", handlePdfDrop);
+  els.pdfInput?.addEventListener("change", (event) => {
+    const file = event.target.files?.[0] || null;
+    if (file) setSelectedPdfFile(file);
+  });
+  els.removePdfButton?.addEventListener("click", clearSelectedPdfFile);
+  els.analyzePdfButton?.addEventListener("click", handleAnalyzePdf);
+  els.analyzeTextButton?.addEventListener("click", handleAnalyzePastedText);
+  els.pastedUrl?.addEventListener("change", () => {
+    const validation = validateOptionalArticleUrl(els.pastedUrl?.value || "");
+    if (validation.ok && validation.href) {
+      setFieldValue("article-official-url", validation.href, { overwrite: false });
+      setFieldValue("article-source-name", validation.sourceName, { overwrite: false });
+    }
+  });
+  els.pastedSource?.addEventListener("change", () => {
+    setFieldValue("article-source-name", els.pastedSource?.value || "", { overwrite: false });
+  });
   els.analyzeButtons.forEach((button) => {
     button.addEventListener("click", () => handleAnalyzeArticle());
   });
@@ -1228,7 +1659,7 @@ const bindEvents = () => {
 };
 
 const initArticleRepository = () => {
-  repository = createBitacoraArticleRepository({ db, auth });
+  repository = createBitacoraArticleRepository({ db, auth, storage });
   unsubscribeArticles = repository.subscribe(
     (articles, meta = {}) => {
       state.repositoryMode = meta.mode || repository.getMode();

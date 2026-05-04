@@ -1,6 +1,9 @@
 const DEFAULT_ENDPOINT = "/api/extractScientificArticle";
 const PUBLISHED_FUNCTION_ENDPOINT =
   "https://us-central1-departamento-medico-brisa.cloudfunctions.net/extractScientificArticle";
+const DEFAULT_DOCUMENT_ENDPOINT = "/api/extractScientificArticleDocument";
+const PUBLISHED_DOCUMENT_FUNCTION_ENDPOINT =
+  "https://us-central1-departamento-medico-brisa.cloudfunctions.net/extractScientificArticleDocument";
 
 const KNOWN_SOURCE_NAMES = new Map([
   ["pubmed.ncbi.nlm.nih.gov", "PubMed / MEDLINE"],
@@ -31,6 +34,11 @@ const METADATA_ONLY_MESSAGE =
 const FAILED_MESSAGE =
   "No se pudo extraer información suficiente desde esta URL. Probá con DOI, PubMed, PMC, PDF open access o completá manualmente.";
 const AI_DRAFT_MESSAGE = "Borrador cargado por IA. Revisá la información antes de guardar.";
+const DOCUMENT_AUTH_MESSAGE = "Necesitás iniciar sesión para analizar documentos.";
+const DOCUMENT_FAILED_MESSAGE = "No se pudo analizar el documento. Podés completar la publicación manualmente.";
+const DOCUMENT_AI_DRAFT_MESSAGE = "Ficha generada por IA. Revisá la información antes de guardar.";
+const DOCUMENT_METADATA_ONLY_MESSAGE =
+  "Se detectaron datos básicos, pero falta contenido suficiente. Completá los campos necesarios antes de guardar.";
 
 const normalizeTags = (value = []) =>
   (Array.isArray(value) ? value : String(value || "").split(","))
@@ -146,6 +154,18 @@ const resolveExtractionEndpoint = (endpoint) => {
   return DEFAULT_ENDPOINT;
 };
 
+const resolveDocumentExtractionEndpoint = (endpoint) => {
+  if (endpoint) return endpoint;
+  if (typeof window === "undefined") return DEFAULT_DOCUMENT_ENDPOINT;
+  if (window.BITACORA_DOCUMENT_EXTRACT_ENDPOINT) return window.BITACORA_DOCUMENT_EXTRACT_ENDPOINT;
+  const host = window.location.hostname;
+  const port = window.location.port;
+  const isLocalHost = host === "localhost" || host === "127.0.0.1";
+  const isFirebaseEmulator = isLocalHost && port === "5002";
+  if (isLocalHost && !isFirebaseEmulator) return PUBLISHED_DOCUMENT_FUNCTION_ENDPOINT;
+  return DEFAULT_DOCUMENT_ENDPOINT;
+};
+
 const getEndpointErrorMessage = (status, payload) => {
   const code =
     typeof payload?.error === "string" ? payload.error : payload?.error?.code || "";
@@ -168,6 +188,28 @@ const getEndpointErrorMessage = (status, payload) => {
   return backendMessage || FAILED_MESSAGE;
 };
 
+const getDocumentEndpointErrorMessage = (status, payload) => {
+  const code =
+    typeof payload?.error === "string" ? payload.error : payload?.error?.code || "";
+  const backendMessage =
+    typeof payload?.error === "object" && typeof payload.error.message === "string"
+      ? payload.error.message
+      : "";
+  if (status === 401 || code === "auth_required" || code === "auth_invalid") {
+    return DOCUMENT_AUTH_MESSAGE;
+  }
+  if (status === 404 || status === 405) {
+    return NOT_CONFIGURED_MESSAGE;
+  }
+  if (status === 429 || code === "rate_limited") {
+    return RATE_LIMIT_MESSAGE;
+  }
+  if (code === "missing_openai_api_key" || code === "not_configured") {
+    return NOT_CONFIGURED_MESSAGE;
+  }
+  return backendMessage || DOCUMENT_FAILED_MESSAGE;
+};
+
 const getExtractionStatusMessage = (status) => {
   if (status === "ai_draft") return AI_DRAFT_MESSAGE;
   if (status === "metadata_only") {
@@ -180,6 +222,13 @@ const getExtractionStatusMessage = (status) => {
     return FAILED_MESSAGE;
   }
   return "";
+};
+
+const getDocumentStatusMessage = (status) => {
+  if (status === "ai_draft") return DOCUMENT_AI_DRAFT_MESSAGE;
+  if (status === "metadata_only") return DOCUMENT_METADATA_ONLY_MESSAGE;
+  if (status === "not_configured") return NOT_CONFIGURED_MESSAGE;
+  return DOCUMENT_FAILED_MESSAGE;
 };
 
 const normalizeExtractionArticle = (input = {}, urlInfo) => ({
@@ -232,6 +281,55 @@ const hasUsefulAiDraft = (article = {}) => {
 
 const hasMetadataDraft = (article = {}) =>
   Boolean(article.title || hasCanonicalSource(article) || article.publicationDate || article.doi || article.pmid || article.pmcid || article.nctId || article.pii);
+
+const normalizeDocumentArticle = (input = {}) => ({
+  title: firstText(input, ["title", "titulo", "articleTitle", "headline"]),
+  sourceName: firstText(input, ["sourceName", "source", "journal", "journalTitle", "institution", "fuente", "publisher"]),
+  journal: firstText(input, ["journal", "journalTitle", "revista"]),
+  authors: normalizeTags(input.authors || input.author || input.autores),
+  officialUrl: firstText(input, ["officialUrl", "url", "sourceUrl", "enlace"]),
+  doi: firstText(input, ["doi", "DOI"]),
+  publicationDate: firstText(input, ["publicationDate", "publishedAt", "datePublished", "fechaPublicacion"]),
+  originalLanguage: firstText(input, ["originalLanguage", "language", "idioma"]),
+  articleType: firstText(input, ["articleType", "documentType", "tipoArticulo", "tipo_de_articulo"]),
+  studyType: firstText(input, ["studyType", "typeOfStudy", "studyDesign", "tipoEstudio"]),
+  evidenceType: firstText(input, ["evidenceType", "typeOfEvidence", "tipoEvidencia"]),
+  accessType: firstText(input, ["accessType", "access", "acceso"]) || "Pendiente",
+  cardSummaryEs: firstText(input, ["cardSummaryEs", "cardSummary", "resumenBreve", "summaryCard"]),
+  executiveSummaryEs: firstText(input, ["executiveSummaryEs", "executiveSummary", "resumenEjecutivo"]),
+  abstractSummaryEs: firstText(input, ["abstractSummaryEs", "abstractSummary", "abstract", "resumenAbstract"]),
+  clinicalQuestionEs: firstText(input, ["clinicalQuestionEs", "clinicalQuestion", "researchQuestion", "preguntaClinica"]),
+  mainResultEs: firstText(input, ["mainResultEs", "mainResult", "result", "resultadoPrincipal"]),
+  methodologyEs: firstText(input, ["methodologyEs", "methodology", "methods", "metodologia"]),
+  keyPointsEs: normalizeTags(input.keyPointsEs || input.keyPoints || input.puntosClave),
+  limitationsEs: firstText(input, ["limitationsEs", "limitations", "limitaciones"]),
+  localApplicabilityEs: firstText(input, ["localApplicabilityEs", "localApplicability", "aplicabilidadLocal"]),
+  occupationalHealthRelevanceEs: firstText(input, ["occupationalHealthRelevanceEs", "occupationalHealthRelevance", "relevanciaOcupacional"]),
+  tags: normalizeTags(input.tags || input.keywords || input.etiquetas),
+  sourcePages: Array.isArray(input.sourcePages) ? input.sourcePages : [],
+  extractionConfidence: Number.isFinite(Number(input.extractionConfidence ?? input.confidence))
+    ? Math.max(0, Math.min(1, Number(input.extractionConfidence ?? input.confidence)))
+    : 0,
+  warnings: normalizeTags(input.warnings || input.extractionWarnings || input.advertencias)
+});
+
+const hasUsefulDocumentDraft = (article = {}) => {
+  const usefulFieldCount = [
+    cleanString(article.executiveSummaryEs).length >= 24,
+    cleanString(article.clinicalQuestionEs).length >= 24,
+    cleanString(article.mainResultEs).length >= 24,
+    cleanString(article.methodologyEs).length >= 24,
+    Boolean(cleanString(article.evidenceType)),
+    Boolean(cleanString(article.studyType))
+  ].filter(Boolean).length;
+  return Boolean(
+    cleanString(article.title) &&
+      cleanString(article.sourceName || article.journal) &&
+      cleanString(article.cardSummaryEs).length >= 20 &&
+      usefulFieldCount >= 2 &&
+      Number(article.extractionConfidence || 0) >= 0.55
+  );
+};
 
 export async function requestArticleExtraction(url, { auth, endpoint, evidence = {} } = {}) {
   const validation = validateArticleUrl(url);
@@ -327,5 +425,72 @@ export async function requestArticleExtraction(url, { auth, endpoint, evidence =
       "not_configured",
       NOT_CONFIGURED_MESSAGE
     );
+  }
+}
+
+export async function requestArticleDocumentExtraction(payload = {}, { auth, endpoint } = {}) {
+  const resolvedEndpoint = resolveDocumentExtractionEndpoint(endpoint);
+  let token = "";
+  try {
+    token = auth?.currentUser ? await auth.currentUser.getIdToken() : "";
+  } catch (error) {
+    token = "";
+  }
+  if (!token) {
+    return {
+      ok: false,
+      extractionStatus: "failed",
+      error: DOCUMENT_AUTH_MESSAGE,
+      article: null,
+      rawEvidence: null
+    };
+  }
+
+  try {
+    const response = await fetch(resolvedEndpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    });
+    let body = null;
+    try {
+      body = await response.json();
+    } catch (error) {
+      body = null;
+    }
+    if (!response.ok || body?.ok === false) {
+      const status = body?.extractionStatus || (response.status === 404 || response.status === 405 ? "not_configured" : "failed");
+      return {
+        ok: false,
+        extractionStatus: status,
+        error: getDocumentEndpointErrorMessage(response.status, body) || body?.error?.message || getDocumentStatusMessage(status),
+        article: normalizeDocumentArticle(body?.article || {}),
+        rawEvidence: body?.rawEvidence || null
+      };
+    }
+    const article = normalizeDocumentArticle(body.article || {});
+    let extractionStatus = body.extractionStatus || (hasUsefulDocumentDraft(article) ? "ai_draft" : "metadata_only");
+    if (extractionStatus === "ai_draft" && !hasUsefulDocumentDraft(article)) {
+      extractionStatus = article.title || article.sourceName || article.doi ? "metadata_only" : "failed";
+    }
+    return {
+      ok: extractionStatus === "ai_draft" || extractionStatus === "metadata_only",
+      extractionStatus,
+      message: getDocumentStatusMessage(extractionStatus),
+      article,
+      rawEvidence: body.rawEvidence || null,
+      error: body.error?.message || ""
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      extractionStatus: "failed",
+      error: DOCUMENT_FAILED_MESSAGE,
+      article: null,
+      rawEvidence: null
+    };
   }
 }

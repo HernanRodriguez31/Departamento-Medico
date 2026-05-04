@@ -50,6 +50,10 @@
         "function": "extractScientificArticle"
       },
       {
+        "source": "/api/extractScientificArticleDocument",
+        "function": "extractScientificArticleDocument"
+      },
+      {
         "source": "/galeriadearte",
         "destination": "/galeriadearte.html"
       },
