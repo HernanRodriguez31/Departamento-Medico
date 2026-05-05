@@ -66,7 +66,8 @@ test("desktop portal cube opens four accessible radial actions", async ({ page }
       const rect = link.getBoundingClientRect();
       return {
         x: Math.round(rect.left + rect.width / 2),
-        y: Math.round(rect.top + rect.height / 2)
+        y: Math.round(rect.top + rect.height / 2),
+        width: Math.round(rect.width)
       };
     });
     return {
@@ -79,11 +80,14 @@ test("desktop portal cube opens four accessible radial actions", async ({ page }
   expect(radialLayout.links.every((link) => link.x > radialLayout.centerX)).toBe(true);
   expect(new Set(radialLayout.links.map((link) => link.x)).size).toBeGreaterThan(1);
   expect(new Set(radialLayout.links.map((link) => link.y)).size).toBe(4);
+  expect(radialLayout.links[0].x).toBeLessThan(radialLayout.links[1].x);
+  expect(radialLayout.links[3].x).toBeLessThan(radialLayout.links[2].x);
   const adjacentDistances = radialLayout.links.slice(1).map((link, index) => {
     const previous = radialLayout.links[index];
     return Math.hypot(link.x - previous.x, link.y - previous.y);
   });
   expect(Math.max(...adjacentDistances) - Math.min(...adjacentDistances)).toBeLessThanOrEqual(4);
+  expect(Math.min(...adjacentDistances)).toBeGreaterThanOrEqual(radialLayout.links[0].width + 2);
 
   await expect(page.locator("#portal-gallery")).not.toBeFocused();
   await expectTooltipHidden(page.locator("#portal-gallery"));
