@@ -4472,23 +4472,23 @@ body.dm-modal-open .brisa-chat-panel {
 }
 
 .portal-link:nth-child(1) {
-  --portal-x: 4.25rem;
-  --portal-y: -5.05rem;
+  --portal-x: 5.2rem;
+  --portal-y: -4.45rem;
 }
 
 .portal-link:nth-child(2) {
-  --portal-x: 6.15rem;
-  --portal-y: -1.8rem;
+  --portal-x: 6.85rem;
+  --portal-y: -1.55rem;
 }
 
 .portal-link:nth-child(3) {
-  --portal-x: 6.15rem;
-  --portal-y: 1.8rem;
+  --portal-x: 6.85rem;
+  --portal-y: 1.55rem;
 }
 
 .portal-link:nth-child(4) {
-  --portal-x: 4.25rem;
-  --portal-y: 5.05rem;
+  --portal-x: 5.2rem;
+  --portal-y: 4.45rem;
 }
 
 .portal-link:hover,
