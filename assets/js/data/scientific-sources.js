@@ -535,7 +535,8 @@ const NATIONAL_SOURCE_CATALOG = [
     fallbackLogoUrl: favicon("https://www.ramr.org/"),
     logoAlt: "Revista Americana de Medicina Respiratoria",
     initials: "MR",
-    logoSize: 50
+    logoSize: 50,
+    logoOffsetX: -1.5
   }
 ];
 

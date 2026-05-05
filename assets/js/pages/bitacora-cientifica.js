@@ -2,6 +2,7 @@ import { getFirebase } from "../common/firebaseClient.js";
 import { initUserMenu } from "../common/user-menu.js?v=20260430-orgtree-avatars-1";
 import { requireAuth } from "../shared/authGate.js";
 import { initSessionGuard } from "../shared/sessionGuard.js?v=20260305-session-1";
+import { initAssistantShell } from "../shared/assistant-shell.js?v=20260306-chat-desktop-layout-1";
 import {
   doc,
   getDoc
@@ -19,17 +20,18 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { BITACORA_POSTS } from "../data/bitacora-posts.js";
 import { METHODOLOGY_GUIDE, METHODOLOGY_TERMS } from "../data/methodology-guide.js?v=20260504-methodology-guide-terms-1";
-import { NATIONAL_SELECTED_SOURCE_IDS, SCIENTIFIC_SOURCES } from "../data/scientific-sources.js?v=20260504-scientific-source-logo-align-1";
-import { createBitacoraArticleRepository } from "../services/bitacora-article-repository.js?v=20260504-bitacora-methodology-guide-document-fix-1";
+import { NATIONAL_SELECTED_SOURCE_IDS, SCIENTIFIC_SOURCES } from "../data/scientific-sources.js?v=20260504-ramr-logo-center-2";
+import { createBitacoraArticleRepository } from "../services/bitacora-article-repository.js?v=20260505-bitacora-pdf-save-expanded-fix-1";
 import {
   inferSourceNameFromDomain,
   requestArticleExtraction,
   requestArticleDocumentExtraction,
   validateArticleUrl
-} from "../services/bitacora-ai-extractor.js?v=20260504-bitacora-methodology-guide-document-fix-1";
+} from "../services/bitacora-ai-extractor.js?v=20260505-bitacora-pdf-save-expanded-fix-1";
 
 const { auth, db, storage } = getFirebase();
 
+const BITACORA_CHAT_MODULE_URL = "/js/chat.js?v=20260504-bitacora-cubes-hero-align-3";
 const FILTER_ALL = "all";
 const COMPLETION_FALLBACK = "No especificado en el documento.";
 const STATUS_FILTERS = [
@@ -175,6 +177,9 @@ const state = {
     contentHash: "",
     pageCount: 0,
     methodologyProfile: null,
+    expandedDescriptionSections: [],
+    expandedDescriptionQuality: "insufficient",
+    expandedDescriptionText: "",
     sourcePages: [],
     rawEvidence: null
   },
@@ -200,6 +205,32 @@ const state = {
 
 let repository = null;
 let unsubscribeArticles = null;
+let bitacoraChatLoadPromise = null;
+
+const resolveAssistantVariant = () => {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return "desktop";
+  return window.matchMedia("(min-width: 1024px)").matches ? "desktop" : "mobile";
+};
+
+const ensureBitacoraChatLoaded = () => {
+  if (typeof window === "undefined") return Promise.resolve(null);
+  if (window.BrisaChat) return Promise.resolve(window.BrisaChat);
+  const existingLoader = window.__ensureChatLoaded;
+  if (typeof existingLoader === "function" && existingLoader !== ensureBitacoraChatLoaded) {
+    return existingLoader().then(() => window.BrisaChat || null);
+  }
+  if (!bitacoraChatLoadPromise) {
+    bitacoraChatLoadPromise = import(BITACORA_CHAT_MODULE_URL)
+      .then(() => window.BrisaChat || null)
+      .catch((error) => {
+        bitacoraChatLoadPromise = null;
+        console.warn("[Bitácora] No se pudo cargar el chat flotante.", error);
+        return null;
+      });
+  }
+  window.__ensureChatLoaded = ensureBitacoraChatLoaded;
+  return bitacoraChatLoadPromise;
+};
 
 const escapeHtml = (value = "") =>
   String(value)
@@ -210,6 +241,25 @@ const escapeHtml = (value = "") =>
     .replace(/'/g, "&#039;");
 
 const cleanUserText = (value = "") => String(value || "").replace(/[<>]/g, "").trim();
+
+const EXPANDED_DESCRIPTION_QUALITY_VALUES = new Set(["complete", "partial", "insufficient"]);
+
+const normalizeExpandedDescriptionQuality = (value = "") =>
+  EXPANDED_DESCRIPTION_QUALITY_VALUES.has(cleanUserText(value)) ? cleanUserText(value) : "insufficient";
+
+const normalizeExpandedDescriptionSections = (items = []) =>
+  (Array.isArray(items) ? items : [])
+    .map((section) => ({
+      heading: cleanUserText(section?.heading).slice(0, 50),
+      body: cleanUserText(section?.body).slice(0, 1200)
+    }))
+    .filter((section) => section.heading && section.body)
+    .slice(0, 6);
+
+const expandedDescriptionSectionsToText = (sections = []) =>
+  normalizeExpandedDescriptionSections(sections)
+    .map((section) => `${section.heading}\n${section.body}`)
+    .join("\n\n");
 
 const normalizeText = (value = "") =>
   String(value)
@@ -444,7 +494,7 @@ const renderMethodologyGuide = () => {
             (item, index) => `
               <li class="methodology-guide-workflow__step">
                 <span class="methodology-guide-workflow__number">${index + 1}</span>
-                <span>${escapeHtml(item)}</span>
+                <span class="methodology-guide-workflow__label">${escapeHtml(item)}</span>
               </li>
             `
           )
@@ -814,6 +864,8 @@ const renderStaticPost = (post) => ({
   summary: post.summary || "",
   briefDescriptionEs: post.summary || "",
   expandedDescriptionEs: post.summary || "",
+  expandedDescriptionSections: [],
+  expandedDescriptionQuality: "partial",
   executiveSummary: post.summary || "",
   clinicalQuestion: post.clinicalQuestion || "",
   mainResult: post.mainResult || post.keyFinding || "",
@@ -870,6 +922,8 @@ const renderUserArticle = (article) => ({
     "Artículo cargado para revisión interna.",
   briefDescriptionEs: article.briefDescriptionEs || article.cardSummaryEs,
   expandedDescriptionEs: article.expandedDescriptionEs || article.executiveSummaryEs || article.executiveSummary,
+  expandedDescriptionSections: normalizeExpandedDescriptionSections(article.expandedDescriptionSections),
+  expandedDescriptionQuality: normalizeExpandedDescriptionQuality(article.expandedDescriptionQuality),
   cardSummaryEs: article.cardSummaryEs,
   executiveSummary: article.expandedDescriptionEs || article.executiveSummaryEs || article.executiveSummary,
   abstractSummaryEs: article.abstractSummaryEs,
@@ -915,6 +969,8 @@ const getSearchText = (post) =>
       post.studyType,
       STATUS_LABELS[post.status],
       post.summary,
+      post.expandedDescriptionEs,
+      expandedDescriptionSectionsToText(post.expandedDescriptionSections),
       post.executiveSummary,
       post.objectiveEs,
       post.clinicalQuestion,
@@ -990,6 +1046,58 @@ const renderAnalysisListBlock = (analysisId, suffix, title, items = []) => {
       <ul class="bitacora-analysis__list">
         ${cleanItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
       </ul>
+    </section>
+  `;
+};
+
+const splitExpandedDescriptionParagraphs = (value = "") =>
+  String(value || "")
+    .split(/\n{2,}|\r\n{2,}/)
+    .map((paragraph) => cleanUserText(paragraph))
+    .filter(Boolean)
+    .slice(0, 8);
+
+const renderExpandedDescription = (post, analysisId) => {
+  const sections = normalizeExpandedDescriptionSections(post.expandedDescriptionSections);
+  const text = cleanUserText(post.expandedDescriptionEs || post.executiveSummary);
+  if (!sections.length && !hasMeaningfulAnalysisValue(text)) return "";
+  const bodyId = `${analysisId}-expanded-description`;
+  const labelId = `${analysisId}-expanded-description-title`;
+  const bodyContent = sections.length
+    ? sections
+        .map(
+          (section, index) => `
+            <article class="bitacora-expanded-description__section" aria-labelledby="${bodyId}-section-${index}">
+              <h4 id="${bodyId}-section-${index}">${escapeHtml(section.heading)}</h4>
+              <p>${escapeHtml(section.body)}</p>
+            </article>
+          `
+        )
+        .join("")
+    : splitExpandedDescriptionParagraphs(text)
+        .map((paragraph) => `<p class="bitacora-expanded-description__paragraph">${escapeHtml(paragraph)}</p>`)
+        .join("");
+  return `
+    <section class="bitacora-expanded-description" aria-labelledby="${labelId}">
+      <button
+        type="button"
+        class="bitacora-expanded-description__toggle"
+        data-bitacora-action="toggle-expanded-description"
+        aria-expanded="false"
+        aria-controls="${bodyId}"
+      >
+        <span class="bitacora-expanded-description__toggle-copy">
+          <span id="${labelId}" class="bitacora-expanded-description__title">Descripción ampliada</span>
+          <small>Síntesis editorial del documento para comprender contexto, diseño, hallazgos y aplicabilidad.</small>
+        </span>
+        <span class="bitacora-expanded-description__toggle-action">
+          <span data-expanded-description-toggle-label>Ver descripción</span>
+          <i data-lucide="chevron-down" aria-hidden="true"></i>
+        </span>
+      </button>
+      <div id="${bodyId}" class="bitacora-expanded-description__body" hidden>
+        ${bodyContent}
+      </div>
     </section>
   `;
 };
@@ -1372,17 +1480,12 @@ const renderAnalysis = (post, analysisId, expanded) => `
       ${hasMeaningfulAnalysisValue(post.briefDescriptionEs || post.summary) ? `<p>${escapeHtml(post.briefDescriptionEs || post.summary)}</p>` : ""}
       ${hasMeaningfulAnalysisValue(post.mainMessageEs || post.mainResult) ? `<p class="bitacora-analysis__main-message">${escapeHtml(post.mainMessageEs || post.mainResult)}</p>` : ""}
     </section>
-    ${
-      hasMeaningfulAnalysisValue(post.expandedDescriptionEs || post.executiveSummary)
-        ? `<section class="bitacora-analysis__section bitacora-analysis__section--wide" aria-labelledby="${analysisId}-expanded">
-            <h3 id="${analysisId}-expanded">Descripción ampliada</h3>
-            <p>${escapeHtml(post.expandedDescriptionEs || post.executiveSummary)}</p>
-          </section>`
-        : ""
-    }
-    <div class="bitacora-analysis__grid">
+    <div class="bitacora-analysis__grid bitacora-analysis__grid--summary">
       ${renderAnalysisBlock(analysisId, "question", "Objetivo", post.objectiveEs || post.clinicalQuestion)}
       ${renderAnalysisListBlock(analysisId, "keypoints", "Puntos clave", post.keyPointsEs)}
+    </div>
+    ${renderExpandedDescription(post, analysisId)}
+    <div class="bitacora-analysis__grid">
       ${renderMethodologyGrid(analysisId, post)}
       ${renderMethodologyInterpretation(analysisId, post)}
       ${renderApplicability(analysisId, post)}
@@ -1512,6 +1615,27 @@ const renderPost = (post) => {
     </article>
   `;
 };
+
+const renderPostSeparator = (index) => `
+  <div
+    class="bitacora-post-separator"
+    aria-hidden="true"
+    data-bitacora-post-separator="${index + 1}"
+  >
+    <span class="bitacora-post-separator__line"></span>
+    <span class="bitacora-post-separator__mark">
+      <img
+        src="/assets/images/logo-brisa-heart.png"
+        alt=""
+        width="42"
+        height="50"
+        loading="lazy"
+        decoding="async"
+      />
+    </span>
+    <span class="bitacora-post-separator__line"></span>
+  </div>
+`;
 
 const updateResultCount = (count) => {
   if (!els.count) return;
@@ -1682,7 +1806,9 @@ const syncCommentLikeWatchers = () => {
 const renderPosts = () => {
   if (!els.posts) return;
   const filtered = sortPosts(getAllPosts().filter(matchesFilters));
-  els.posts.innerHTML = filtered.map(renderPost).join("");
+  els.posts.innerHTML = filtered
+    .map((post, index) => `${renderPost(post)}${index < filtered.length - 1 ? renderPostSeparator(index) : ""}`)
+    .join("");
   if (els.empty) els.empty.hidden = filtered.length > 0;
   updateResultCount(state.userArticles.length);
   updatePersistenceNote();
@@ -1908,6 +2034,9 @@ const resetArticleDraftMeta = () => {
     contentHash: "",
     pageCount: 0,
     methodologyProfile: null,
+    expandedDescriptionSections: [],
+    expandedDescriptionQuality: "insufficient",
+    expandedDescriptionText: "",
     sourcePages: [],
     rawEvidence: null
   };
@@ -2074,6 +2203,9 @@ const populateArticleFormForEdit = (post) => {
     contentHash: post.contentHash || "",
     pageCount: post.pageCount || 0,
     methodologyProfile: post.methodologyProfile || null,
+    expandedDescriptionSections: normalizeExpandedDescriptionSections(post.expandedDescriptionSections),
+    expandedDescriptionQuality: normalizeExpandedDescriptionQuality(post.expandedDescriptionQuality),
+    expandedDescriptionText: post.expandedDescriptionEs || post.executiveSummaryEs || post.executiveSummary || "",
     sourcePages: post.sourcePages || [],
     rawEvidence: null
   };
@@ -2287,6 +2419,9 @@ const fillArticleFromExtraction = (article = {}, rawEvidence = null) => {
   state.articleDraftMeta.extractionConfidence = article.extractionConfidence ?? null;
   state.articleDraftMeta.extractionWarnings = article.warnings || [];
   state.articleDraftMeta.methodologyProfile = article.methodologyProfile || state.articleDraftMeta.methodologyProfile;
+  state.articleDraftMeta.expandedDescriptionSections = normalizeExpandedDescriptionSections(article.expandedDescriptionSections);
+  state.articleDraftMeta.expandedDescriptionQuality = normalizeExpandedDescriptionQuality(article.expandedDescriptionQuality);
+  state.articleDraftMeta.expandedDescriptionText = article.expandedDescriptionEs || article.executiveSummaryEs || article.executiveSummary || "";
   state.articleDraftMeta.contentHash = rawEvidence?.contentHash || state.articleDraftMeta.contentHash;
   state.articleDraftMeta.pageCount = rawEvidence?.pageCount || state.articleDraftMeta.pageCount;
   state.articleDraftMeta.fileSize = rawEvidence?.fileSize || state.articleDraftMeta.fileSize;
@@ -2768,6 +2903,10 @@ const buildArticlePayload = (status) => {
   const studyLocationEs = $("#article-study-location-es")?.value || $("#article-study-location")?.value || "";
   const briefDescriptionEs = $("#article-brief-description")?.value || $("#article-card-summary")?.value || "";
   const expandedDescriptionEs = $("#article-expanded-description")?.value || $("#article-executive-summary")?.value || "";
+  const generatedExpandedSections = normalizeExpandedDescriptionSections(state.articleDraftMeta.expandedDescriptionSections);
+  const expandedDescriptionWasEdited =
+    cleanUserText(expandedDescriptionEs) !== cleanUserText(state.articleDraftMeta.expandedDescriptionText || "");
+  const expandedDescriptionSections = expandedDescriptionWasEdited ? [] : generatedExpandedSections;
 
   return {
     title: $("#article-title")?.value || (status === "draft" ? "Borrador científico sin título" : ""),
@@ -2794,6 +2933,10 @@ const buildArticlePayload = (status) => {
     studyPeriodEs: $("#article-study-period")?.value || "",
     briefDescriptionEs,
     expandedDescriptionEs,
+    expandedDescriptionSections,
+    expandedDescriptionQuality: expandedDescriptionWasEdited
+      ? "partial"
+      : normalizeExpandedDescriptionQuality(state.articleDraftMeta.expandedDescriptionQuality),
     cardSummaryEs: $("#article-card-summary")?.value || briefDescriptionEs,
     executiveSummary: $("#article-executive-summary")?.value || expandedDescriptionEs,
     executiveSummaryEs: $("#article-executive-summary")?.value || expandedDescriptionEs,
@@ -2839,6 +2982,20 @@ const setSaveBusy = (button, busy) => {
   button.disabled = busy;
   button.dataset.originalText = button.dataset.originalText || button.textContent.trim();
   button.textContent = busy ? "Guardando..." : button.dataset.originalText;
+};
+
+const getArticleSaveErrorMessage = (error = {}) => {
+  const code = String(error?.code || error?.message || "");
+  if (code === "AUTH_REQUIRED" || /unauthenticated|auth|token/i.test(code)) {
+    return "No se pudo guardar porque la sesión no está activa.";
+  }
+  if (code === "FIRESTORE_PERMISSION_DENIED" || /permission-denied|missing or insufficient permissions/i.test(code)) {
+    return "No se pudo guardar porque las reglas de Firestore aún no permiten estos campos. Actualizá reglas y reintentá.";
+  }
+  if (/unavailable|deadline-exceeded|network|offline/i.test(code)) {
+    return "No se pudo guardar por un problema de conexión. Revisá la red e intentá nuevamente.";
+  }
+  return "No se pudo guardar el artículo. Revisá la conexión e intentá nuevamente.";
 };
 
 const setActionBusy = (button, busy, busyText = "Procesando...") => {
@@ -3065,11 +3222,7 @@ const handleArticleSubmit = async (event) => {
     closeModal(els.addArticleModal);
     resetArticleForm();
   } catch (error) {
-    const message =
-      error?.message === "AUTH_REQUIRED"
-        ? "No se pudo guardar porque la sesión no está activa."
-        : "No se pudo guardar el artículo. Revisá la conexión e intentá nuevamente.";
-    setArticleError(els.articleFormError, message);
+    setArticleError(els.articleFormError, getArticleSaveErrorMessage(error));
   } finally {
     setSaveBusy(submitter, false);
   }
@@ -3113,6 +3266,55 @@ const initScrollUp = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   });
   sync();
+};
+
+const initBitacoraQuickDock = ({ assistantShell } = {}) => {
+  const dock = $("[data-bitacora-quick-dock]");
+  if (!dock) return;
+  const botButton = dock.querySelector("[data-bitacora-quick-action='bot']");
+
+  const getAssistantShell = () => assistantShell || window.__dmAssistantShell || null;
+  const syncAssistantButtonState = (event) => {
+    const shell = event?.detail?.api || getAssistantShell();
+    const stateSnapshot = shell?.state || {};
+    const isOpen = Boolean(stateSnapshot.pickerOpen || stateSnapshot.panelOpen);
+    botButton?.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    botButton?.classList.toggle("is-selected", isOpen);
+  };
+
+  window.addEventListener("dm:assistant-shell-state", syncAssistantButtonState);
+  syncAssistantButtonState();
+
+  dock.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-bitacora-quick-action]");
+    if (!button || !dock.contains(button)) return;
+    event.preventDefault();
+
+    const action = button.dataset.bitacoraQuickAction;
+    button.classList.add("is-pressed");
+    window.setTimeout(() => button.classList.remove("is-pressed"), 150);
+
+    if (action === "methodology") {
+      openModal(els.methodologyGuideModal, button);
+      return;
+    }
+
+    if (action === "sources") {
+      openModal(els.sourcesModal, button);
+      return;
+    }
+
+    if (action === "add-article") {
+      openAddArticleModal(button);
+      return;
+    }
+
+    if (action === "bot") {
+      const shell = getAssistantShell();
+      shell?.openPicker?.();
+      syncAssistantButtonState();
+    }
+  });
 };
 
 const bindEvents = () => {
@@ -3207,6 +3409,20 @@ const bindEvents = () => {
     if (action === "toggle-comment-like") {
       const commentId = actionButton.closest(".bitacora-comment")?.dataset?.commentId || "";
       handleToggleCommentLike(postId, commentId, actionButton);
+      return;
+    }
+    if (action === "toggle-expanded-description") {
+      const bodyId = actionButton.getAttribute("aria-controls") || "";
+      const body = bodyId ? document.getElementById(bodyId) : null;
+      if (!body) return;
+      const isOpen = actionButton.getAttribute("aria-expanded") === "true";
+      actionButton.setAttribute("aria-expanded", isOpen ? "false" : "true");
+      body.hidden = isOpen;
+      const label = actionButton.querySelector("[data-expanded-description-toggle-label]");
+      if (label) label.textContent = isOpen ? "Ver descripción" : "Ocultar descripción";
+      const icon = actionButton.querySelector("[data-lucide]");
+      if (icon) icon.setAttribute("data-lucide", isOpen ? "chevron-down" : "chevron-up");
+      if (window.lucide) window.lucide.createIcons();
       return;
     }
     if (action !== "toggle-analysis") return;
@@ -3397,8 +3613,10 @@ const boot = async () => {
   state.isAdmin = await resolveAdminStatus(currentUser);
   initSessionGuard({ auth, db });
   initUserMenu({ variant: "desktop" });
+  const assistantShell = initAssistantShell({ variant: resolveAssistantVariant() });
   initReturnHomeLink();
   initScrollUp();
+  initBitacoraQuickDock({ assistantShell });
   renderFilterOptions();
   renderSourceScopeControls();
   renderSources();
@@ -3406,6 +3624,7 @@ const boot = async () => {
   renderPosts();
   bindEvents();
   initArticleRepository();
+  ensureBitacoraChatLoaded();
   if (window.lucide) window.lucide.createIcons();
 };
 

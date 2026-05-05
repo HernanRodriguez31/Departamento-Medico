@@ -611,6 +611,20 @@ service cloud.firestore {
         );
     }
 
+    function validBitacoraExpandedDescriptionData(data) {
+      return (
+          !data.keys().hasAny(["expandedDescriptionSections"])
+          || (
+            data.expandedDescriptionSections is list
+            && data.expandedDescriptionSections.size() <= 8
+          )
+        )
+        && (
+          !data.keys().hasAny(["expandedDescriptionQuality"])
+          || data.expandedDescriptionQuality in ["complete", "partial", "insufficient"]
+        );
+    }
+
     function validBitacoraFinalCompleteness(data) {
       return data.status == "draft"
         || (
@@ -664,6 +678,8 @@ service cloud.firestore {
         "studyPeriodEs",
         "briefDescriptionEs",
         "expandedDescriptionEs",
+        "expandedDescriptionSections",
+        "expandedDescriptionQuality",
         "cardSummaryEs",
         "executiveSummary",
         "executiveSummaryEs",
@@ -718,6 +734,7 @@ service cloud.firestore {
         && (!data.keys().hasAny(["keyPointsEs"]) || (data.keyPointsEs is list && data.keyPointsEs.size() <= 12))
         && (!data.keys().hasAny(["sourcePages"]) || data.sourcePages is list)
         && validBitacoraMethodologyProfile(data)
+        && validBitacoraExpandedDescriptionData(data)
         && validBitacoraCreatedByShape(data)
         && validBitacoraUpdatedByShape(data)
         && data.createdAt is timestamp
@@ -757,6 +774,8 @@ service cloud.firestore {
         "studyPeriodEs",
         "briefDescriptionEs",
         "expandedDescriptionEs",
+        "expandedDescriptionSections",
+        "expandedDescriptionQuality",
         "cardSummaryEs",
         "executiveSummary",
         "executiveSummaryEs",
@@ -801,6 +820,7 @@ service cloud.firestore {
         && (!request.resource.data.keys().hasAny(["keyPointsEs"]) || (request.resource.data.keyPointsEs is list && request.resource.data.keyPointsEs.size() <= 12))
         && (!request.resource.data.keys().hasAny(["sourcePages"]) || request.resource.data.sourcePages is list)
         && validBitacoraMethodologyProfile(request.resource.data)
+        && validBitacoraExpandedDescriptionData(request.resource.data)
         && request.resource.data.updatedAt is timestamp
         && request.resource.data.updatedBy is map
         && request.resource.data.updatedBy.keys().hasOnly(["uid", "displayName", "email", "photoURL"])

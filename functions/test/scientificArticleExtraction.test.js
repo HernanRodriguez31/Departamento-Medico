@@ -121,6 +121,41 @@ const methodologyProfileFixture = (overrides = {}) => ({
   ...overrides
 });
 
+const expandedDescriptionSectionsFixture = () => [
+  {
+    heading: "Contexto",
+    body:
+      "El documento aborda un problema clínico y sanitario relevante para la lectura médica institucional, con foco en el modo en que la evidencia disponible ayuda a interpretar decisiones de prevención, diagnóstico, tratamiento o gestión."
+      + " Cuando corresponde, permite describir un marco regional sin confundirlo con un ensayo clínico primario. La síntesis mantiene una mirada editorial y explica por qué el tema importa para equipos que necesitan priorizar lectura crítica sin reemplazar el análisis completo de la fuente."
+  },
+  {
+    heading: "Diseño y población",
+    body:
+      "La ficha distingue el tipo de documento publicado del diseño o evidencia analizada, describe la población o ámbito cuando está especificado y evita clasificar como estudio primario aquello que corresponde a revisión, guía, consenso o política sanitaria. También conserva cautela cuando el tamaño muestral, país, institución o seguimiento no aparecen explícitamente en el texto."
+  },
+  {
+    heading: "Qué evaluó",
+    body:
+      "La síntesis resume el objetivo, la exposición, intervención, estrategia o fenómeno evaluado, junto con los métodos declarados por la fuente y las variables principales disponibles en el texto aportado. Cuando el documento describe una evidencia subyacente, separa esa evidencia del formato editorial de publicación para evitar una lectura metodológica simplificada."
+  },
+  {
+    heading: "Hallazgos relevantes",
+    body:
+      "El resumen identifica los mensajes y hallazgos principales sin copiar el abstract completo ni transformar asociaciones en causalidad cuando el diseño no lo permite. La redacción prioriza resultados, contribuciones o mensajes sustentados, evita frases genéricas y mantiene el alcance de la interpretación dentro de lo que el documento realmente informa."
+  },
+  {
+    heading: "Lectura práctica",
+    body:
+      "La interpretación final ubica la relevancia clínica, sanitaria u ocupacional y señala cautelas de aplicabilidad para que el equipo médico pueda decidir si debe leer el documento completo. Incluye la utilidad potencial para práctica clínica, gestión institucional, salud ocupacional o planificación sanitaria sin convertir la síntesis en una recomendación clínica automática."
+      + " También ayuda a separar lo que el documento demuestra de aquello que solo sugiere para discusión local."
+  }
+];
+
+const expandedDescriptionTextFixture = () =>
+  expandedDescriptionSectionsFixture()
+    .map((section) => `${section.heading}. ${section.body}`)
+    .join(" ");
+
 const completeAiArticle = {
   title: "Official clinical title",
   sourceName: "The Lancet Regional Health - Americas",
@@ -129,7 +164,9 @@ const completeAiArticle = {
   publicationDate: "2026-05-03",
   studyLocation: "América Latina",
   briefDescriptionEs: "Síntesis breve en español para orientar lectura científica.",
-  expandedDescriptionEs: "Descripción ampliada en español basada en el abstract público disponible.",
+  expandedDescriptionEs: expandedDescriptionTextFixture(),
+  expandedDescriptionSections: expandedDescriptionSectionsFixture(),
+  expandedDescriptionQuality: "complete",
   executiveSummary: "Resumen ejecutivo en español basado en el abstract público disponible.",
   clinicalQuestion: "Pregunta clínica en español derivada del objetivo del artículo.",
   mainResult: "Resultado principal en español derivado de los hallazgos del artículo.",
@@ -210,6 +247,9 @@ test("OpenAI extraction payload uses strict structured output and Spanish anti-h
   assert.ok(payload.messages[0].content.includes("Todo el texto libre debe estar en español"));
   assert.ok(payload.messages[0].content.includes("No inventes datos"));
   assert.ok(payload.messages[0].content.includes("No uses conocimiento externo"));
+  assert.ok(payload.messages[0].content.includes("350 a 550 palabras"));
+  assert.ok(payload.response_format.json_schema.schema.required.includes("expandedDescriptionSections"));
+  assert.ok(payload.response_format.json_schema.schema.required.includes("expandedDescriptionQuality"));
 });
 
 test("extracts citation metadata, Open Graph/Twitter and JSON-LD fields", () => {
@@ -543,7 +583,9 @@ test("resolveScientificArticle continues after publisher 403 and resolves Lancet
 	          evidenceType: "Marco de política sanitaria",
 	          studyLocation: "Américas",
 	          briefDescriptionEs: "Presenta HEARTS Quality como marco regional para fortalecer hipertensión en atención primaria.",
-	          expandedDescriptionEs: "El marco en español organiza objetivos e indicadores para fortalecer la calidad del manejo de hipertensión en atención primaria regional.",
+	          expandedDescriptionEs: expandedDescriptionTextFixture(),
+          expandedDescriptionSections: expandedDescriptionSectionsFixture(),
+          expandedDescriptionQuality: "complete",
 	          executiveSummary: "Resumen en español basado en la evidencia pública de PubMed y PMC.",
 	          clinicalQuestion: "Qué marco puede fortalecer la calidad del manejo de hipertensión en atención primaria.",
 	          mainResult: "El marco HEARTS Quality organiza objetivos e indicadores para fortalecer la implementación regional.",
@@ -563,7 +605,7 @@ test("resolveScientificArticle continues after publisher 403 and resolves Lancet
   assert.equal(result.article.pmid, "41438613");
   assert.equal(result.article.pmcid, "PMC12719693");
   assert.equal(result.article.sourceName, "The Lancet Regional Health - Americas");
-  assert.match(result.article.executiveSummary, /español/);
+  assert.match(result.article.executiveSummary, /clínico|sanitario|síntesis/i);
   assert.ok(result.rawEvidence.blockedResolvers.includes("publisher_html"));
   assert.ok(result.rawEvidence.successfulResolvers.includes("pubmed"));
   assert.ok(calls.some((url) => url.includes("esearch.fcgi")));
@@ -582,7 +624,9 @@ test("resolveScientificArticle uses pasted abstract as manual evidence with warn
 	              evidenceType: "Investigación clínica",
 	              studyLocation: "",
 	              briefDescriptionEs: "Resumen breve en español desde abstract pegado.",
-	              expandedDescriptionEs: "Descripción ampliada en español desde abstract pegado para revisión editorial.",
+	              expandedDescriptionEs: expandedDescriptionTextFixture(),
+              expandedDescriptionSections: expandedDescriptionSectionsFixture(),
+              expandedDescriptionQuality: "complete",
 	              executiveSummary: "Resumen en español desde abstract pegado.",
 	              clinicalQuestion: "Pregunta sintetizada desde el abstract pegado.",
 	              mainResult: "Resultado principal derivado del texto pegado.",
@@ -654,10 +698,13 @@ test("document OpenAI payload uses strict schema and Spanish anti-hallucination 
   assert.equal(payload.model, getConfiguredDocumentModels()[0]);
   assert.ok(payload.messages[0].content.includes("Todo texto editorial debe estar en español"));
   assert.ok(payload.messages[0].content.includes("No inventes datos"));
+  assert.ok(payload.messages[0].content.includes("350 a 550 palabras"));
   assert.ok(payload.response_format.json_schema.schema.required.includes("objectiveEs"));
   assert.ok(payload.response_format.json_schema.schema.required.includes("mainMessageEs"));
   assert.ok(payload.response_format.json_schema.schema.required.includes("studyDesignEs"));
   assert.ok(payload.response_format.json_schema.schema.required.includes("studyContextEs"));
+  assert.ok(payload.response_format.json_schema.schema.required.includes("expandedDescriptionSections"));
+  assert.ok(payload.response_format.json_schema.schema.required.includes("expandedDescriptionQuality"));
   assert.equal(payload.response_format.json_schema.schema.required.includes("clinicalQuestionEs"), false);
 });
 
@@ -699,9 +746,11 @@ References
     evidenceType: "Marco de política sanitaria / implementación en salud pública",
     accessType: "Open access",
     briefDescriptionEs: "Presenta el HEARTS Quality Framework para fortalecer el control de hipertensión en atención primaria de las Américas.",
-    expandedDescriptionEs: "El documento describe un marco regional para institucionalizar y escalar HEARTS en las Américas. Integra evidencia, experiencia de países y consenso experto para mejorar protocolos, equipos, dispositivos, medicamentos, monitoreo y gobernanza en atención primaria.",
+    expandedDescriptionEs: expandedDescriptionTextFixture(),
+    expandedDescriptionSections: expandedDescriptionSectionsFixture(),
+    expandedDescriptionQuality: "complete",
     cardSummaryEs: "Presenta el HEARTS Quality Framework para fortalecer la calidad de atención en hipertensión y riesgo cardiovascular en atención primaria.",
-    executiveSummaryEs: "El documento describe un marco regional para institucionalizar y escalar HEARTS en las Américas. Integra evidencia, experiencia de países y consenso experto para mejorar protocolos, equipos, dispositivos, medicamentos, monitoreo y gobernanza en atención primaria.",
+    executiveSummaryEs: expandedDescriptionTextFixture(),
     objectiveEs: "Describir y fundamentar un marco de calidad para institucionalizar y escalar HEARTS en las Américas.",
     studyDesignEs: "Health Policy basado en implementación regional, evidencia internacional, experiencia de países y consenso experto.",
     studyContextEs: "Marco desarrollado para países de las Américas, con foco en atención primaria, hipertensión y riesgo cardiovascular.",
@@ -777,6 +826,272 @@ References
   assert.doesNotMatch(bodySent, /This reference section should not be sent/);
 });
 
+test("document resolver separates PESA focus seminar from underlying prospective cohort", async () => {
+  const pesaText = `
+JACC Focus Seminar: The Best of Population Research Studies
+Focus Seminar
+The PESA study is an ongoing prospective cohort evaluating progression of subclinical atherosclerosis in asymptomatic middle-aged adults.
+The cohort enrolled 4,184 Banco Santander employees in Madrid, Spain, between 2010 and 2014.
+Participants undergo serial visits initially every three years with questionnaires, blood samples, ECG, accelerometry and multiterritorial non-invasive imaging.
+The review summarizes accumulated contributions of PESA and discusses early detection and cardiovascular risk stratification.
+`.repeat(4);
+  const pesaSections = [
+    {
+      heading: "Contexto",
+      body:
+        "El documento publicado corresponde a un Focus Seminar que revisa aportes acumulados del estudio PESA sobre aterosclerosis subclínica. No debe leerse como un ensayo clínico ni como un artículo primario simple, sino como una síntesis editorial de evidencia poblacional orientada a comprender detección temprana y estratificación de riesgo cardiovascular."
+        + " Esta distinción es importante porque el formato de publicación organiza una lectura panorámica del programa PESA y no equivale a presentar un único análisis causal o una intervención experimental."
+    },
+    {
+      heading: "Diseño y población",
+      body:
+        "La evidencia central analizada es PESA, una cohorte prospectiva en curso con 4.184 adultos asintomáticos de mediana edad, empleados del Banco Santander en Madrid, España. El enrolamiento se describe entre 2010 y 2014, con visitas seriadas inicialmente cada tres años y seguimiento prolongado según el texto fuente."
+        + " La población laboral y el ámbito geográfico deben conservarse explícitos para evitar extrapolaciones automáticas a otras comunidades clínicas."
+    },
+    {
+      heading: "Qué evaluó",
+      body:
+        "La cohorte evalúa presencia y progresión de aterosclerosis subclínica mediante entrevistas, cuestionarios, muestras biológicas, ECG, acelerometría e imágenes no invasivas multiterritoriales. La publicación revisa cómo esas mediciones permiten caracterizar trayectorias de enfermedad antes de síntomas clínicos y relacionarlas con factores de riesgo."
+        + " El énfasis metodológico está en mediciones seriadas, integración fenotípica y observación longitudinal de cambios subclínicos."
+    },
+    {
+      heading: "Hallazgos relevantes",
+      body:
+        "La lectura destaca contribuciones acumuladas de PESA para entender progresión aterosclerótica, carga subclínica y utilidad de mediciones seriadas. La síntesis evita presentar un resultado único porque el documento revisa un programa de investigación longitudinal, no un análisis aislado con una sola comparación."
+    },
+    {
+      heading: "Lectura práctica",
+      body:
+        "La relevancia práctica se ubica en prevención cardiovascular, detección temprana y discusión de herramientas de estratificación en población aparentemente sana. La aplicabilidad requiere cautela porque se trata de una cohorte específica de trabajadores en España y sus hallazgos deben interpretarse según contexto y representatividad."
+        + " La lectura es útil para equipos que evalúan vigilancia preventiva y comunicación del riesgo en personas sin síntomas."
+    }
+  ];
+  const pesaExpanded = pesaSections.map((section) => `${section.heading}. ${section.body}`).join(" ");
+  const aiArticle = {
+    title: "JACC Focus Seminar: The Best of Population Research Studies",
+    sourceName: "JACC",
+    journal: "JACC",
+    authors: ["Equipo PESA"],
+    officialUrl: "https://example.org/pesa",
+    doi: "",
+    publicationDate: "2026",
+    originalLanguage: "en",
+    articleType: "Focus Seminar / revisión narrativa",
+    evidenceType: "Revisión sobre cohorte prospectiva",
+    accessType: "Open access",
+    briefDescriptionEs: "Revisa aportes de PESA, cohorte prospectiva española sobre aterosclerosis subclínica y prevención cardiovascular.",
+    expandedDescriptionEs: pesaExpanded,
+    expandedDescriptionSections: pesaSections,
+    expandedDescriptionQuality: "complete",
+    cardSummaryEs: "Revisa aportes de PESA, cohorte prospectiva española sobre aterosclerosis subclínica y prevención cardiovascular.",
+    executiveSummaryEs: pesaExpanded,
+    objectiveEs: "Sintetizar contribuciones del estudio PESA para comprender aterosclerosis subclínica y riesgo cardiovascular.",
+    studyDesignEs: "Focus Seminar sobre cohorte prospectiva en curso.",
+    studyContextEs: "Cohorte PESA en empleados del Banco Santander, Madrid, España.",
+    studyPopulationEs: "4.184 adultos asintomáticos de mediana edad.",
+    studyLocationEs: "Madrid, España.",
+    studyPeriodEs: "2010-2014; seguimiento seriado posterior.",
+    mainMessageEs: "PESA aporta evidencia longitudinal para caracterizar aterosclerosis subclínica antes de síntomas clínicos.",
+    keyPointsEs: ["Focus Seminar, no ensayo clínico.", "Cohorte prospectiva subyacente.", "Imágenes no invasivas seriadas."],
+    limitationsEs: "Cohorte laboral específica; interpretar representatividad con cautela.",
+    localApplicabilityEs: "Útil para lectura crítica de prevención cardiovascular y estratificación de riesgo.",
+    occupationalHealthRelevanceEs: "Relevante para vigilancia preventiva en poblaciones laborales asintomáticas.",
+    methodologyProfile: methodologyProfileFixture({
+      studyFamily: "observational_analytical",
+      studyFamilyEs: "Estudio observacional analítico",
+      specificDesign: "Cohorte prospectiva",
+      designCategoryEs: "Cohorte prospectiva",
+      temporalDirection: "prospectivo",
+      centerScope: "institucional",
+      setting: "población laboral",
+      countryOrRegion: "España",
+      institutions: ["CNIC", "Banco Santander"],
+      studyPopulation: "Adultos asintomáticos de mediana edad",
+      sampleSize: "4.184 participantes",
+      sampleDescription: "Empleados del Banco Santander en Madrid.",
+      studyPeriod: "2010-2014",
+      followUpDuration: "Visitas inicialmente cada tres años",
+      dataSource: "Cuestionarios, muestras, ECG, acelerometría e imágenes no invasivas.",
+      interventionOrExposure: "Evaluación de aterosclerosis subclínica",
+      primaryOutcome: "Presencia y progresión de aterosclerosis subclínica",
+      classificationRationale: "El documento es un Focus Seminar; la evidencia subyacente principal es una cohorte prospectiva."
+    }),
+    tags: ["PESA", "Aterosclerosis", "Cohorte prospectiva"],
+    warnings: [],
+    extractionConfidence: 0.92
+  };
+  const fetchImpl = async () => ({
+    ok: true,
+    status: 200,
+    text: async () => JSON.stringify({ choices: [{ message: { content: JSON.stringify(aiArticle) } }] })
+  });
+
+  const result = await resolveScientificArticleDocument(
+    { mode: "pasted_text", pastedText: pesaText, pastedSource: "JACC", officialUrl: "https://example.org/pesa" },
+    { uid: "user-a", user: { uid: "user-a" }, apiKey: "test-key", fetchImpl }
+  );
+
+  assert.equal(result.extractionStatus, "ai_draft");
+  assert.match(result.article.articleType, /Focus Seminar|revisión/i);
+  assert.match(result.article.studyDesignEs, /cohorte prospectiva/i);
+  assert.equal(result.article.expandedDescriptionQuality, "complete");
+  assert.equal(result.article.expandedDescriptionSections.length >= 4, true);
+  assert.equal(result.article.expandedDescriptionEs.split(/\s+/).length >= 300, true);
+  assert.match(result.article.expandedDescriptionEs, /4\.184|Banco Santander|Madrid|2010/i);
+  assert.doesNotMatch(`${result.article.studyDesignEs} ${result.article.methodologyProfile.specificDesign}`, /ensayo clínico/i);
+});
+
+test("document resolver retries short expanded description and keeps ai_draft when retry succeeds", async () => {
+  const shortExpanded =
+    "El documento resume un problema clínico relevante, describe el objetivo general, menciona aspectos metodológicos y presenta mensajes útiles para revisión institucional. La ficha permite orientar una primera lectura, aunque esta versión inicial no desarrolla con suficiente detalle el contexto, la población, el diseño, la metodología, los hallazgos ni la aplicabilidad práctica para el equipo médico.";
+  const shortArticle = {
+    title: "Short editorial PDF",
+    sourceName: "Journal QA",
+    journal: "Journal QA",
+    authors: ["Autora QA"],
+    officialUrl: "https://doi.org/10.1111/short",
+    doi: "10.1111/short",
+    publicationDate: "2026",
+    originalLanguage: "en",
+    articleType: "Artículo científico",
+    evidenceType: "Investigación clínica",
+    accessType: "Open access",
+    briefDescriptionEs: "Evalúa evidencia clínica para orientar lectura crítica institucional.",
+    expandedDescriptionEs: shortExpanded,
+    expandedDescriptionSections: [],
+    expandedDescriptionQuality: "insufficient",
+    cardSummaryEs: "Evalúa evidencia clínica para orientar lectura crítica institucional.",
+    executiveSummaryEs: shortExpanded,
+    objectiveEs: "Sintetizar el objetivo clínico principal del documento.",
+    studyDesignEs: "Estudio observacional con análisis de resultados clínicos.",
+    studyContextEs: "Documento con resumen, métodos, resultados y discusión.",
+    studyPopulationEs: "Pacientes adultos descriptos en el documento.",
+    studyLocationEs: "No especificado en el documento.",
+    studyPeriodEs: "No especificado en el documento.",
+    mainMessageEs: "La evidencia debe interpretarse según diseño y contexto clínico.",
+    keyPointsEs: ["Contexto clínico", "Métodos disponibles", "Aplicabilidad prudente"],
+    localApplicabilityEs: "Útil para lectura crítica local.",
+    occupationalHealthRelevanceEs: "Puede orientar discusión sanitaria institucional.",
+    limitationsEs: "La primera descripción generada fue demasiado breve.",
+    methodologyProfile: methodologyProfileFixture({
+      studyFamily: "observational_analytical",
+      studyFamilyEs: "Estudio observacional analítico",
+      specificDesign: "Estudio observacional",
+      designCategoryEs: "Estudio observacional"
+    }),
+    tags: ["QA", "Descripción ampliada"],
+    warnings: [],
+    extractionConfidence: 0.82
+  };
+  const retryArticle = {
+    ...shortArticle,
+    expandedDescriptionEs: expandedDescriptionTextFixture(),
+    expandedDescriptionSections: expandedDescriptionSectionsFixture(),
+    expandedDescriptionQuality: "complete",
+    executiveSummaryEs: expandedDescriptionTextFixture()
+  };
+  const calls = [];
+  const fetchImpl = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    const content = body.messages.map((message) => message.content).join(" ");
+    calls.push({
+      schema: body.response_format?.json_schema?.name || "",
+      retry: /Regenerá una descripción editorial amplia|descripción ampliada insuficiente/i.test(content)
+    });
+    const article = calls.at(-1).retry ? retryArticle : shortArticle;
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ choices: [{ message: { content: JSON.stringify(article) } }] })
+    };
+  };
+
+  const result = await resolveScientificArticleDocument(
+    {
+      mode: "pasted_text",
+      pastedText:
+        "Short editorial PDF\nJournal QA\nAbstract\nThis document has clinical context, methods, participants, results, discussion, limitations and conclusion. ".repeat(35),
+      pastedSource: "Journal QA",
+      officialUrl: "https://doi.org/10.1111/short"
+    },
+    { uid: "user-a", user: { uid: "user-a" }, apiKey: "test-key", fetchImpl }
+  );
+
+  assert.equal(result.extractionStatus, "ai_draft");
+  assert.equal(result.article.expandedDescriptionQuality, "complete");
+  assert.equal(result.article.expandedDescriptionEs.split(/\s+/).length >= 280, true);
+  assert.equal(result.article.expandedDescriptionSections.length >= 4, true);
+  assert.equal(calls.some((call) => call.retry), true);
+  assert.match(result.article.warnings.join(" "), /regeneró la descripción ampliada/i);
+  assert.equal(Number(result.rawEvidence.agentDurations.expandedDescriptionRetryMs) >= 0, true);
+});
+
+test("document resolver downgrades to metadata_only when expanded description retry stays too short", async () => {
+  const shortExpanded =
+    "El documento presenta un resumen clínico útil, con objetivo, método general y mensajes principales. Sin embargo, la descripción no desarrolla contexto, población, metodología, hallazgos, limitaciones ni aplicabilidad con la profundidad mínima necesaria para una ficha editorial completa.";
+  const shortArticle = {
+    title: "Still short PDF",
+    sourceName: "Journal QA",
+    journal: "Journal QA",
+    authors: ["Autora QA"],
+    officialUrl: "https://doi.org/10.1111/still-short",
+    doi: "10.1111/still-short",
+    publicationDate: "2026",
+    originalLanguage: "en",
+    articleType: "Artículo científico",
+    evidenceType: "Investigación clínica",
+    accessType: "Open access",
+    briefDescriptionEs: "Resume evidencia clínica pero requiere revisión editorial.",
+    expandedDescriptionEs: shortExpanded,
+    expandedDescriptionSections: [],
+    expandedDescriptionQuality: "insufficient",
+    cardSummaryEs: "Resume evidencia clínica pero requiere revisión editorial.",
+    executiveSummaryEs: shortExpanded,
+    objectiveEs: "Sintetizar evidencia clínica del documento.",
+    studyDesignEs: "Estudio observacional.",
+    studyContextEs: "Documento con evidencia científica suficiente.",
+    studyPopulationEs: "Pacientes adultos.",
+    studyLocationEs: "",
+    studyPeriodEs: "",
+    mainMessageEs: "Requiere ampliación editorial antes de publicarse como ficha final.",
+    keyPointsEs: ["Objetivo", "Método", "Mensaje"],
+    localApplicabilityEs: "Debe revisarse localmente.",
+    occupationalHealthRelevanceEs: "",
+    limitationsEs: "Descripción ampliada insuficiente.",
+    methodologyProfile: methodologyProfileFixture(),
+    tags: ["QA"],
+    warnings: [],
+    extractionConfidence: 0.8
+  };
+  const calls = [];
+  const fetchImpl = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    const content = body.messages.map((message) => message.content).join(" ");
+    calls.push(/Regenerá una descripción editorial amplia|descripción ampliada insuficiente/i.test(content));
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ choices: [{ message: { content: JSON.stringify(shortArticle) } }] })
+    };
+  };
+
+  const result = await resolveScientificArticleDocument(
+    {
+      mode: "pasted_text",
+      pastedText:
+        "Still short PDF\nJournal QA\nAbstract\nThis document has enough scientific text with methods, participants, results, discussion, limitations and conclusions for editorial extraction. ".repeat(35),
+      pastedSource: "Journal QA",
+      officialUrl: "https://doi.org/10.1111/still-short"
+    },
+    { uid: "user-a", user: { uid: "user-a" }, apiKey: "test-key", fetchImpl }
+  );
+
+  assert.equal(result.extractionStatus, "metadata_only");
+  assert.equal(result.article.expandedDescriptionQuality, "insufficient");
+  assert.equal(calls.some(Boolean), true);
+  assert.match(result.article.warnings.join(" "), /no pudo regenerar una descripción ampliada suficiente|descripción ampliada suficiente/i);
+});
+
 test("document AI output is normalized and empty output is not ai_draft", async () => {
   const packet = buildDocumentEvidencePacket({
     mode: "pasted_text",
@@ -796,9 +1111,11 @@ test("document AI output is normalized and empty output is not ai_draft", async 
     evidenceType: "Política sanitaria",
     accessType: "Pendiente",
     briefDescriptionEs: "Ficha breve en español para revisión del equipo médico.",
-    expandedDescriptionEs: "Resumen ejecutivo en español basado exclusivamente en el texto aportado.",
+    expandedDescriptionEs: expandedDescriptionTextFixture(),
+    expandedDescriptionSections: expandedDescriptionSectionsFixture(),
+    expandedDescriptionQuality: "complete",
     cardSummaryEs: "Ficha breve en español para revisión del equipo médico.",
-    executiveSummaryEs: "Resumen ejecutivo en español basado exclusivamente en el texto aportado.",
+    executiveSummaryEs: expandedDescriptionTextFixture(),
     objectiveEs: "Presentar un marco que fortalece la gestión de hipertensión en atención primaria.",
     studyDesignEs: "Síntesis documental de implementación regional.",
     studyContextEs: "Documento de implementación regional en atención primaria.",
@@ -823,7 +1140,7 @@ test("document AI output is normalized and empty output is not ai_draft", async 
 
   const result = await callDocumentExtractionAI(packet, { apiKey: "test-key", fetchImpl });
   assert.equal(result.ok, true);
-  assert.equal(result.article.executiveSummaryEs.includes("español"), true);
+  assert.equal(result.article.executiveSummaryEs.includes("evidencia"), true);
   assert.equal(computeDocumentExtractionStatus(result.article), "ai_draft");
 
   const emptyStatus = computeDocumentExtractionStatus({
@@ -850,9 +1167,11 @@ test("document resolver keeps core ficha when advanced methodology extraction fa
     evidenceType: "Revisión científica",
     accessType: "Open access",
     briefDescriptionEs: "Ficha breve en español con valor editorial para la tarjeta.",
-    expandedDescriptionEs: "Descripción ampliada en español generada desde el resumen del documento con suficiente contexto metodológico.",
+    expandedDescriptionEs: expandedDescriptionTextFixture(),
+    expandedDescriptionSections: expandedDescriptionSectionsFixture(),
+    expandedDescriptionQuality: "complete",
     cardSummaryEs: "Ficha breve en español con valor editorial para la tarjeta.",
-    executiveSummaryEs: "Descripción ampliada en español generada desde el resumen del documento con suficiente contexto metodológico.",
+    executiveSummaryEs: expandedDescriptionTextFixture(),
     objectiveEs: "Sintetizar el propósito principal del documento científico aportado.",
     studyDesignEs: "Revisión científica.",
     studyContextEs: "Documento científico con resumen, métodos y conclusiones.",
@@ -918,9 +1237,11 @@ test("document AI falls back to secondary model when configured model fails", as
     evidenceType: "Revisión",
     accessType: "Pendiente",
     briefDescriptionEs: "Resumen breve en español para validar el fallback.",
-    expandedDescriptionEs: "Resumen ejecutivo en español basado en evidencia real del documento.",
+    expandedDescriptionEs: expandedDescriptionTextFixture(),
+    expandedDescriptionSections: expandedDescriptionSectionsFixture(),
+    expandedDescriptionQuality: "complete",
     cardSummaryEs: "Resumen breve en español para validar el fallback.",
-    executiveSummaryEs: "Resumen ejecutivo en español basado en evidencia real del documento.",
+    executiveSummaryEs: expandedDescriptionTextFixture(),
     objectiveEs: "Validar el funcionamiento del modelo documental secundario.",
     studyDesignEs: "Prueba de fallback con structured outputs.",
     studyContextEs: "Documento de prueba con evidencia textual suficiente.",
@@ -970,9 +1291,11 @@ test("document resolver processes pasted text, rejects short text and handles PD
     evidenceType: "Revisión",
     accessType: "Pendiente",
     briefDescriptionEs: "Resumen breve en español para la tarjeta científica.",
-    expandedDescriptionEs: "Resumen ejecutivo en español basado en el documento aportado.",
+    expandedDescriptionEs: expandedDescriptionTextFixture(),
+    expandedDescriptionSections: expandedDescriptionSectionsFixture(),
+    expandedDescriptionQuality: "complete",
     cardSummaryEs: "Resumen breve en español para la tarjeta científica.",
-    executiveSummaryEs: "Resumen ejecutivo en español basado en el documento aportado.",
+    executiveSummaryEs: expandedDescriptionTextFixture(),
     objectiveEs: "Describir qué propósito científico aborda el documento.",
     studyDesignEs: "Metodología descrita en el documento.",
     studyContextEs: "Documento con resumen, metodología, resultados y conclusiones.",
@@ -1004,7 +1327,7 @@ test("document resolver processes pasted text, rejects short text and handles PD
     { uid: "user-a", user: { uid: "user-a" }, apiKey: "test-key", fetchImpl }
   );
   assert.equal(pasted.extractionStatus, "ai_draft");
-  assert.match(pasted.article.executiveSummaryEs, /español/);
+  assert.match(pasted.article.executiveSummaryEs, /evidencia|documento/i);
   assert.equal(pasted.rawEvidence.mode, "pasted_text");
 
   const short = await resolveScientificArticleDocument(

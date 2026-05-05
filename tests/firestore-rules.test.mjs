@@ -272,6 +272,17 @@ const validBitacoraPayload = (uid = "user-b") => ({
   studyPeriodEs: "2026",
   briefDescriptionEs: "Descripción breve de tarjeta para revisión institucional.",
   expandedDescriptionEs: "Descripción ampliada en español para revisión clínica y metodológica.",
+  expandedDescriptionSections: [
+    {
+      heading: "Contexto",
+      body: "Síntesis editorial para orientar la lectura clínica del documento."
+    },
+    {
+      heading: "Diseño y población",
+      body: "Descripción estructurada del tipo de evidencia, población y ámbito disponibles."
+    }
+  ],
+  expandedDescriptionQuality: "complete",
   cardSummaryEs: "Resumen breve de tarjeta para revisión institucional.",
   executiveSummary: "Resumen para revisión.",
   executiveSummaryEs: "Resumen ejecutivo en español para revisión.",
@@ -540,6 +551,21 @@ test("bitacoraArticles allow authenticated reads and valid own creates only", as
     setDoc(doc(authedDb("user-b"), "bitacoraArticles", "article-extra"), {
       ...validBitacoraPayload("user-b"),
       unsafeHtml: "<script>"
+    })
+  );
+  await assertFails(
+    setDoc(doc(authedDb("user-b"), "bitacoraArticles", "article-invalid-expanded-quality"), {
+      ...validBitacoraPayload("user-b"),
+      expandedDescriptionQuality: "perfecta"
+    })
+  );
+  await assertFails(
+    setDoc(doc(authedDb("user-b"), "bitacoraArticles", "article-too-many-expanded-sections"), {
+      ...validBitacoraPayload("user-b"),
+      expandedDescriptionSections: Array.from({ length: 9 }, (_, index) => ({
+        heading: `Sección ${index + 1}`,
+        body: "Texto de sección ampliada para validar límite superficial."
+      }))
     })
   );
 });

@@ -24,6 +24,7 @@ const EXTRACTION_STATUS_VALUES = new Set(["manual", "ai_draft", "metadata_only",
 
 const cleanString = (value = "") => String(value || "").trim();
 const sanitizeCommentText = (value = "") => cleanString(value).replace(/[<>]/g, "").slice(0, 1000).trim();
+const EXPANDED_DESCRIPTION_QUALITY_VALUES = new Set(["complete", "partial", "insufficient"]);
 
 const cleanStringList = (items = []) =>
   Array.from(
@@ -33,6 +34,18 @@ const cleanStringList = (items = []) =>
         .filter(Boolean)
     )
   ).slice(0, 12);
+
+const cleanExpandedDescriptionQuality = (value = "") =>
+  EXPANDED_DESCRIPTION_QUALITY_VALUES.has(cleanString(value)) ? cleanString(value) : "insufficient";
+
+const cleanExpandedDescriptionSections = (items = []) =>
+  (Array.isArray(items) ? items : [])
+    .map((section) => ({
+      heading: cleanString(section?.heading).replace(/[<>]/g, "").slice(0, 50),
+      body: cleanString(section?.body).replace(/[<>]/g, "").slice(0, 1200)
+    }))
+    .filter((section) => section.heading && section.body)
+    .slice(0, 6);
 
 const METHODOLOGY_LIST_FIELDS = new Set([
   "countriesIncluded",
@@ -109,6 +122,22 @@ const normalizeStatus = (value) => (STATUS_VALUES.has(value) ? value : "pending_
 const normalizeExtractionStatus = (value) =>
   EXTRACTION_STATUS_VALUES.has(value) ? value : "manual";
 
+const getRepositoryErrorCode = (error = {}) =>
+  cleanString(error?.code || error?.name || error?.message);
+
+const isPermissionError = (error = {}) => /permission-denied|missing or insufficient permissions|PERMISSION_DENIED/i.test(
+  getRepositoryErrorCode(error)
+);
+
+const isSessionError = (error = {}) => /unauthenticated|auth|token|credential/i.test(getRepositoryErrorCode(error));
+
+const buildRepositoryError = (code, originalError) => {
+  const error = new Error(code);
+  error.code = code;
+  error.originalError = originalError;
+  return error;
+};
+
 const buildCreatedBy = (user) => {
   const createdBy = {
     uid: user.uid,
@@ -155,6 +184,8 @@ const buildPayload = (input = {}, user) => {
     studyPeriodEs: cleanString(input.studyPeriodEs),
     briefDescriptionEs: briefDescription,
     expandedDescriptionEs: expandedDescription,
+    expandedDescriptionSections: cleanExpandedDescriptionSections(input.expandedDescriptionSections),
+    expandedDescriptionQuality: cleanExpandedDescriptionQuality(input.expandedDescriptionQuality),
     cardSummaryEs: cleanString(input.cardSummaryEs) || briefDescription,
     executiveSummary: cleanString(input.executiveSummary) || expandedDescription,
     executiveSummaryEs: cleanString(input.executiveSummaryEs) || expandedDescription,
@@ -239,6 +270,8 @@ export const normalizeBitacoraArticle = (id, data = {}, meta = {}) => {
   studyPeriodEs: cleanString(data.studyPeriodEs),
   briefDescriptionEs: briefDescription,
   expandedDescriptionEs: expandedDescription,
+  expandedDescriptionSections: cleanExpandedDescriptionSections(data.expandedDescriptionSections),
+  expandedDescriptionQuality: cleanExpandedDescriptionQuality(data.expandedDescriptionQuality),
   cardSummaryEs: cleanString(data.cardSummaryEs) || briefDescription,
   executiveSummary: cleanString(data.executiveSummary) || expandedDescription,
   executiveSummaryEs: cleanString(data.executiveSummaryEs) || expandedDescription,
@@ -363,6 +396,12 @@ export function createBitacoraArticleRepository({ db, auth, storage } = {}) {
           { mode: "firestore", optimistic: true }
         );
       } catch (error) {
+        if (isPermissionError(error)) {
+          throw buildRepositoryError("FIRESTORE_PERMISSION_DENIED", error);
+        }
+        if (isSessionError(error)) {
+          throw buildRepositoryError("AUTH_REQUIRED", error);
+        }
         console.warn("[Bitácora] Firestore no disponible para guardar artículo. Se usa modo local.", error);
         mode = "memory";
       }
@@ -395,7 +434,17 @@ export function createBitacoraArticleRepository({ db, auth, storage } = {}) {
     const payload = buildUpdatePayload(input, user);
 
     if (db && mode === "firestore") {
-      await updateDoc(doc(db, COLLECTION_NAME, id), payload);
+      try {
+        await updateDoc(doc(db, COLLECTION_NAME, id), payload);
+      } catch (error) {
+        if (isPermissionError(error)) {
+          throw buildRepositoryError("FIRESTORE_PERMISSION_DENIED", error);
+        }
+        if (isSessionError(error)) {
+          throw buildRepositoryError("AUTH_REQUIRED", error);
+        }
+        throw error;
+      }
       return normalizeBitacoraArticle(
         id,
         {

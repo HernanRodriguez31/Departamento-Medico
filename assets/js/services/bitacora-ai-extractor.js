@@ -26,6 +26,7 @@ const KNOWN_SOURCE_NAMES = new Map([
 ]);
 
 const cleanString = (value = "") => String(value || "").trim();
+const EXPANDED_DESCRIPTION_QUALITY_VALUES = new Set(["complete", "partial", "insufficient"]);
 const AUTH_MESSAGE = "Necesitás iniciar sesión para analizar enlaces.";
 const RATE_LIMIT_MESSAGE = "Se alcanzó el límite de análisis. Reintentá más tarde.";
 const NOT_CONFIGURED_MESSAGE = "El servicio de IA no está configurado en backend.";
@@ -45,6 +46,18 @@ const normalizeTags = (value = []) =>
     .map((item) => cleanString(item))
     .filter(Boolean)
     .slice(0, 12);
+
+const normalizeExpandedDescriptionQuality = (value = "") =>
+  EXPANDED_DESCRIPTION_QUALITY_VALUES.has(cleanString(value)) ? cleanString(value) : "insufficient";
+
+const normalizeExpandedDescriptionSections = (value = []) =>
+  (Array.isArray(value) ? value : [])
+    .map((section) => ({
+      heading: cleanString(section?.heading).replace(/[<>]/g, "").slice(0, 50),
+      body: cleanString(section?.body).replace(/[<>]/g, "").slice(0, 1200)
+    }))
+    .filter((section) => section.heading && section.body)
+    .slice(0, 6);
 
 const METHODOLOGY_PROFILE_LIST_FIELDS = new Set([
   "countriesIncluded",
@@ -331,6 +344,8 @@ const normalizeExtractionArticle = (input = {}, urlInfo) => ({
   studyLocation: firstText(input, ["studyLocation", "location", "studyCountry", "setting", "lugar", "contexto"]),
   briefDescriptionEs: firstText(input, ["briefDescriptionEs", "cardSummaryEs", "briefDescription", "summaryCard", "resumenBreve"]),
   expandedDescriptionEs: firstText(input, ["expandedDescriptionEs", "executiveSummaryEs", "expandedDescription", "executiveSummary", "summary", "abstract", "resumenAmpliado"]),
+  expandedDescriptionSections: normalizeExpandedDescriptionSections(input.expandedDescriptionSections),
+  expandedDescriptionQuality: normalizeExpandedDescriptionQuality(input.expandedDescriptionQuality),
   executiveSummary: firstText(input, ["executiveSummary", "summary", "abstract", "resumen", "resumenEjecutivo", "resumen_ejecutivo"]),
   clinicalQuestion: firstText(input, ["clinicalQuestion", "question", "researchQuestion", "preguntaClinica", "pregunta_clinica", "pregunta"]),
   mainResult: firstText(input, ["mainResult", "result", "results", "findings", "conclusion", "resultadoPrincipal", "resultado_principal", "mainFinding"]),
@@ -355,6 +370,8 @@ const hasUsefulAiDraft = (article = {}) => {
   const hasTitleAndSource = Boolean(cleanString(article.title) && hasCanonicalSource(article) && cleanString(article.officialUrl));
   const usefulFieldCount = [
     cleanString(article.executiveSummary).length >= 24,
+    cleanString(article.expandedDescriptionEs).length >= 24 ||
+      (Array.isArray(article.expandedDescriptionSections) && article.expandedDescriptionSections.length >= 2),
     cleanString(article.clinicalQuestion).length >= 24,
     cleanString(article.mainResult).length >= 24,
     Boolean(cleanString(article.studyType)),
@@ -404,6 +421,8 @@ const normalizeDocumentArticle = (input = {}) => {
     accessType: firstText(input, ["accessType", "access", "acceso"]) || "Pendiente",
     briefDescriptionEs: firstText(input, ["briefDescriptionEs", "cardSummaryEs", "cardSummary", "resumenBreve", "summaryCard"]),
     expandedDescriptionEs: firstText(input, ["expandedDescriptionEs", "executiveSummaryEs", "executiveSummary", "resumenEjecutivo"]),
+    expandedDescriptionSections: normalizeExpandedDescriptionSections(input.expandedDescriptionSections),
+    expandedDescriptionQuality: normalizeExpandedDescriptionQuality(input.expandedDescriptionQuality),
     cardSummaryEs: firstText(input, ["cardSummaryEs", "briefDescriptionEs", "cardSummary", "resumenBreve", "summaryCard"]),
     executiveSummaryEs: firstText(input, ["executiveSummaryEs", "expandedDescriptionEs", "executiveSummary", "resumenEjecutivo"]),
     abstractSummaryEs: firstText(input, ["abstractSummaryEs", "abstractSummary", "abstract", "resumenAbstract"]),
@@ -444,7 +463,8 @@ const hasUsefulDocumentDraft = (article = {}) => {
       cleanString(article.title) &&
       cleanString(article.sourceName || article.journal) &&
       cleanString(article.briefDescriptionEs || article.cardSummaryEs).length >= 20 &&
-      cleanString(article.expandedDescriptionEs || article.executiveSummaryEs).length >= 24 &&
+      (cleanString(article.expandedDescriptionEs || article.executiveSummaryEs).length >= 24 ||
+        (Array.isArray(article.expandedDescriptionSections) && article.expandedDescriptionSections.length >= 2)) &&
       usefulFieldCount >= 2 &&
       Number(article.extractionConfidence || 0) >= 0.55
   );

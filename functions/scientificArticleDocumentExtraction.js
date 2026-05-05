@@ -23,6 +23,10 @@ const MAX_PASTED_TEXT_CHARS = 80000;
 const MAX_AI_TEXT_CHARS = 22000;
 const DEFAULT_DOCUMENT_EXTRACTION_MODEL = "gpt-5.5";
 const DOCUMENT_EXTRACTION_FALLBACK_MODEL = "gpt-4o-mini";
+const EXPANDED_DESCRIPTION_QUALITY_VALUES = ["complete", "partial", "insufficient"];
+const EXPANDED_DESCRIPTION_MIN_WORDS = 280;
+const EXPANDED_DESCRIPTION_COMPLETE_WORDS = 300;
+const EXPANDED_DESCRIPTION_MAX_WORDS = 650;
 const SECTION_HEADINGS = [
   "abstract",
   "summary",
@@ -30,9 +34,18 @@ const SECTION_HEADINGS = [
   "introducción",
   "introduction",
   "background",
+  "population",
+  "participants",
+  "setting",
+  "población",
+  "poblacion",
+  "participantes",
+  "ámbito",
+  "ambito",
   "methods",
   "methodology",
   "search strategy",
+  "selection criteria",
   "strategy",
   "métodos",
   "metodos",
@@ -71,6 +84,8 @@ const DOCUMENT_AI_ARTICLE_KEYS = [
   "accessType",
   "briefDescriptionEs",
   "expandedDescriptionEs",
+  "expandedDescriptionSections",
+  "expandedDescriptionQuality",
   "cardSummaryEs",
   "executiveSummaryEs",
   "objectiveEs",
@@ -104,6 +119,8 @@ const DOCUMENT_CORE_AI_ARTICLE_KEYS = [
   "accessType",
   "briefDescriptionEs",
   "expandedDescriptionEs",
+  "expandedDescriptionSections",
+  "expandedDescriptionQuality",
   "cardSummaryEs",
   "executiveSummaryEs",
   "objectiveEs",
@@ -130,6 +147,132 @@ const DOCUMENT_ARTICLE_KEYS = [
 ];
 
 const cleanString = (value = "") => String(value || "").replace(/\s+/g, " ").trim();
+
+const stripHtml = (value = "") =>
+  String(value || "")
+    .replace(/<script\b[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style\b[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ");
+
+const countWords = (value = "") =>
+  cleanString(value)
+    .split(/\s+/)
+    .filter((word) => /[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9]/.test(word)).length;
+
+const limitWords = (value = "", maxWords = EXPANDED_DESCRIPTION_MAX_WORDS) => {
+  const words = cleanString(value).split(/\s+/).filter(Boolean);
+  return words.length > maxWords ? words.slice(0, maxWords).join(" ") : words.join(" ");
+};
+
+const sanitizeEditorialText = (value = "", { maxChars = 6000, maxWords = 0 } = {}) => {
+  const clean = cleanString(stripHtml(value)).slice(0, maxChars);
+  return maxWords ? limitWords(clean, maxWords) : clean;
+};
+
+const normalizeExpandedDescriptionQuality = (value = "") =>
+  EXPANDED_DESCRIPTION_QUALITY_VALUES.includes(cleanString(value)) ? cleanString(value) : "";
+
+const normalizeExpandedDescriptionSections = (value = []) =>
+  (Array.isArray(value) ? value : [])
+    .map((section) => ({
+      heading: sanitizeEditorialText(section?.heading, { maxChars: 50 }),
+      body: sanitizeEditorialText(section?.body, { maxChars: 1200, maxWords: 130 })
+    }))
+    .filter((section) => section.heading && section.body)
+    .slice(0, 6);
+
+const buildExpandedDescriptionFromSections = (sections = []) =>
+  limitWords(
+    normalizeExpandedDescriptionSections(sections)
+      .map((section) => `${section.heading}\n${section.body}`)
+      .join("\n\n"),
+    EXPANDED_DESCRIPTION_MAX_WORDS
+  );
+
+const getExpandedDescriptionText = (article = {}) =>
+  sanitizeEditorialText(article.expandedDescriptionEs || article.executiveSummaryEs || "", {
+    maxChars: 6000,
+    maxWords: EXPANDED_DESCRIPTION_MAX_WORDS
+  });
+
+const hasSubstantialEvidenceForExpandedDescription = (packet = {}) => {
+  const signals = packet.qualitySignals || {};
+  const sectionCount = (packet.sections || []).filter((section) => cleanString(section.text).length >= 300).length;
+  return Boolean(
+    Number(packet.textLength || 0) >= 2500 ||
+      (Number(packet.textLength || 0) >= 1500 && (signals.hasAbstractOrSummary || signals.hasMethods || signals.hasResults)) ||
+      sectionCount >= 3
+  );
+};
+
+const isGenericExpandedDescription = (text = "") =>
+  /el documento trata sobre un tema importante|el estudio aporta información relevante|se recomienda leer el artículo completo|este artículo habla de/i.test(
+    cleanString(text)
+  );
+
+const scoreExpandedDescriptionCues = (text = "", article = {}) => {
+  const haystack = cleanString(`${text} ${article.studyDesignEs || ""} ${article.articleType || ""} ${article.evidenceType || ""}`).toLowerCase();
+  return [
+    /contexto|problema|antecedente|sanitari|clínic|clinico|salud/.test(haystack),
+    /tipo de documento|documento|revisión|revision|seminar|policy|guía|guia|consenso|cohorte|ensayo|transversal|metaanálisis|metaanalisis|diseño|diseno/.test(haystack),
+    /población|poblacion|participantes|pacientes|ámbito|ambito|centros|país|pais|región|region|instituci/.test(haystack),
+    /método|metodo|metodolog|evaluó|evaluo|variables|intervención|intervencion|exposición|exposicion|seguimiento|análisis|analisis/.test(haystack),
+    /hallazgo|resultado|mensaje|conclusi|encontró|encontro|identific/.test(haystack),
+    /aplicabilidad|relevancia|práctica|practica|implicancia|cautela|limitaci/.test(haystack)
+  ].filter(Boolean).length;
+};
+
+const validateExpandedDescriptionQuality = (article = {}, packet = {}) => {
+  const sections = normalizeExpandedDescriptionSections(article.expandedDescriptionSections);
+  const text = getExpandedDescriptionText(article) || buildExpandedDescriptionFromSections(sections);
+  const words = countWords(text);
+  const hasEvidence = hasSubstantialEvidenceForExpandedDescription(packet);
+  const repeatsBrief =
+    cleanString(article.briefDescriptionEs || article.cardSummaryEs).length >= 80 &&
+    cleanString(text).toLowerCase() === cleanString(article.briefDescriptionEs || article.cardSummaryEs).toLowerCase();
+  const cueCount = scoreExpandedDescriptionCues(text, article);
+
+  if (!text || isGenericExpandedDescription(text) || repeatsBrief) {
+    return { quality: "insufficient", wordCount: words, cueCount, sections };
+  }
+  if (
+    words >= EXPANDED_DESCRIPTION_COMPLETE_WORDS &&
+    words <= EXPANDED_DESCRIPTION_MAX_WORDS &&
+    sections.length >= 4 &&
+    sections.length <= 6 &&
+    cueCount >= 4
+  ) {
+    return { quality: "complete", wordCount: words, cueCount, sections };
+  }
+  if (hasEvidence && words < EXPANDED_DESCRIPTION_MIN_WORDS) {
+    return { quality: "insufficient", wordCount: words, cueCount, sections };
+  }
+  if (words >= 120 || sections.length >= 2 || cueCount >= 3) {
+    return { quality: "partial", wordCount: words, cueCount, sections };
+  }
+  return { quality: "insufficient", wordCount: words, cueCount, sections };
+};
+
+const finalizeExpandedDescriptionFields = (article = {}, packet = {}) => {
+  const next = { ...article };
+  next.briefDescriptionEs = sanitizeEditorialText(next.briefDescriptionEs || next.cardSummaryEs, { maxChars: 280 });
+  next.cardSummaryEs = sanitizeEditorialText(next.cardSummaryEs || next.briefDescriptionEs, { maxChars: 280 });
+  next.expandedDescriptionSections = normalizeExpandedDescriptionSections(next.expandedDescriptionSections);
+  const fromSections = buildExpandedDescriptionFromSections(next.expandedDescriptionSections);
+  next.expandedDescriptionEs = getExpandedDescriptionText(next) || fromSections;
+  next.executiveSummaryEs = sanitizeEditorialText(next.executiveSummaryEs || next.expandedDescriptionEs, {
+    maxChars: 6000,
+    maxWords: EXPANDED_DESCRIPTION_MAX_WORDS
+  });
+  if (!next.expandedDescriptionEs && next.executiveSummaryEs) next.expandedDescriptionEs = next.executiveSummaryEs;
+  if (!next.executiveSummaryEs && next.expandedDescriptionEs) next.executiveSummaryEs = next.expandedDescriptionEs;
+  const assessed = validateExpandedDescriptionQuality(next, packet);
+  next.expandedDescriptionQuality = normalizeExpandedDescriptionQuality(next.expandedDescriptionQuality) || assessed.quality;
+  if (assessed.quality === "insufficient" && hasSubstantialEvidenceForExpandedDescription(packet)) {
+    next.expandedDescriptionQuality = "insufficient";
+  }
+  return next;
+};
 
 const getConfiguredDocumentModels = ({ model = "" } = {}) =>
   Array.from(
@@ -312,6 +455,8 @@ const normalizeSectionHeading = (heading = "") => {
   const clean = cleanString(heading).toLowerCase();
   if (/summary|abstract|resumen/.test(clean)) return "Summary / Abstract";
   if (/intro|background|antecedentes/.test(clean)) return "Introduction / Background";
+  if (/population|participant|setting|poblaci|participante|ámbito|ambito/.test(clean)) return "Population / Setting";
+  if (/search|selection|criteria|búsqueda|busqueda|selección|seleccion/.test(clean)) return "Search strategy / Selection criteria";
   if (/method|método|metodo|strategy|estrategia/.test(clean)) return "Methodology / Strategy";
   if (/result|finding|hallazgo|framework|quality|implementation|implementaci/.test(clean)) return "Framework / Findings";
   if (/discussion|discusi|forward|conclusion|conclusi/.test(clean)) return "Discussion / Forward view / Conclusion";
@@ -323,10 +468,11 @@ const getSectionPriority = (heading = "") => {
   const normalized = normalizeSectionHeading(heading).toLowerCase();
   if (normalized.includes("summary") || normalized.includes("abstract")) return 0;
   if (normalized.includes("introduction") || normalized.includes("background")) return 1;
-  if (normalized.includes("methodology") || normalized.includes("strategy")) return 2;
-  if (normalized.includes("framework") || normalized.includes("findings")) return 3;
-  if (normalized.includes("discussion") || normalized.includes("conclusion") || normalized.includes("forward")) return 4;
-  if (normalized.includes("limitations")) return 5;
+  if (normalized.includes("population") || normalized.includes("setting")) return 2;
+  if (normalized.includes("methodology") || normalized.includes("strategy") || normalized.includes("selection")) return 3;
+  if (normalized.includes("framework") || normalized.includes("findings")) return 4;
+  if (normalized.includes("discussion") || normalized.includes("conclusion") || normalized.includes("forward")) return 5;
+  if (normalized.includes("limitations")) return 6;
   return 8;
 };
 
@@ -405,7 +551,18 @@ const buildDeterministicDocumentFallback = (packet = {}, {
   const taxonomyFamily = family ? SCIENTIFIC_METHODOLOGY_TAXONOMY[family] : null;
   const spanishSummaryAvailable = packet.detectedLanguage === "es";
   const briefDescriptionEs = spanishSummaryAvailable ? cleanString(summarySentences.slice(0, 1).join(" ")).slice(0, 280) : "";
-  const expandedDescriptionEs = spanishSummaryAvailable ? cleanString(summarySentences.slice(0, 4).join(" ")).slice(0, 1200) : "";
+  const expandedDescriptionEs = spanishSummaryAvailable
+    ? sanitizeEditorialText(summarySentences.slice(0, 8).join(" "), { maxChars: 3000, maxWords: EXPANDED_DESCRIPTION_MAX_WORDS })
+    : "";
+  const expandedDescriptionSections =
+    spanishSummaryAvailable && expandedDescriptionEs
+      ? [
+          {
+            heading: "Síntesis disponible",
+            body: expandedDescriptionEs
+          }
+        ]
+      : [];
   const objectiveEs = spanishSummaryAvailable ? cleanString(summarySentences.slice(0, 2).join(" ")).slice(0, 500) : "";
 
   const article = {
@@ -423,6 +580,8 @@ const buildDeterministicDocumentFallback = (packet = {}, {
     accessType: "Pendiente",
     briefDescriptionEs,
     expandedDescriptionEs,
+    expandedDescriptionSections,
+    expandedDescriptionQuality: expandedDescriptionEs ? "partial" : "insufficient",
     cardSummaryEs: briefDescriptionEs,
     executiveSummaryEs: expandedDescriptionEs,
     abstractSummaryEs: summaryText,
@@ -486,7 +645,7 @@ const buildEvidencePacket = ({
   const sections = extractSectionsFromText(cleanText);
   const prioritySections = [...sections]
     .sort((a, b) => getSectionPriority(a.heading) - getSectionPriority(b.heading))
-    .slice(0, 8)
+    .slice(0, 10)
     .map((section) => ({
       ...section,
       heading: normalizeSectionHeading(section.heading),
@@ -537,6 +696,8 @@ const buildEmptyArticle = () => ({
   accessType: "Pendiente",
   briefDescriptionEs: "",
   expandedDescriptionEs: "",
+  expandedDescriptionSections: [],
+  expandedDescriptionQuality: "insufficient",
   cardSummaryEs: "",
   executiveSummaryEs: "",
   abstractSummaryEs: "",
@@ -611,10 +772,18 @@ const normalizeAiDocumentOutput = (input = {}, packet = {}) => {
   article.studyType = cleanString(input.studyType);
   article.evidenceType = cleanString(input.evidenceType);
   article.accessType = ACCESS_TYPES.includes(input.accessType) ? input.accessType : "Pendiente";
-  article.briefDescriptionEs = cleanString(input.briefDescriptionEs || input.cardSummaryEs);
-  article.expandedDescriptionEs = cleanString(input.expandedDescriptionEs || input.executiveSummaryEs);
-  article.cardSummaryEs = cleanString(input.cardSummaryEs) || article.briefDescriptionEs;
-  article.executiveSummaryEs = cleanString(input.executiveSummaryEs) || article.expandedDescriptionEs;
+  article.briefDescriptionEs = sanitizeEditorialText(input.briefDescriptionEs || input.cardSummaryEs, { maxChars: 280 });
+  article.expandedDescriptionEs = sanitizeEditorialText(input.expandedDescriptionEs || input.executiveSummaryEs, {
+    maxChars: 6000,
+    maxWords: EXPANDED_DESCRIPTION_MAX_WORDS
+  });
+  article.expandedDescriptionSections = normalizeExpandedDescriptionSections(input.expandedDescriptionSections);
+  article.expandedDescriptionQuality = normalizeExpandedDescriptionQuality(input.expandedDescriptionQuality);
+  article.cardSummaryEs = sanitizeEditorialText(input.cardSummaryEs, { maxChars: 280 }) || article.briefDescriptionEs;
+  article.executiveSummaryEs = sanitizeEditorialText(input.executiveSummaryEs, {
+    maxChars: 6000,
+    maxWords: EXPANDED_DESCRIPTION_MAX_WORDS
+  }) || article.expandedDescriptionEs;
   article.abstractSummaryEs = cleanString(input.abstractSummaryEs);
   article.objectiveEs = cleanString(
     input.objectiveEs || input.objective || input.purposeEs || input.clinicalQuestionEs || input.clinicalQuestion
@@ -651,7 +820,7 @@ const normalizeAiDocumentOutput = (input = {}, packet = {}) => {
     ? Math.max(0, Math.min(1, Number(input.extractionConfidence)))
     : 0;
   article.warnings = normalizeList(input.warnings, 10);
-  return article;
+  return finalizeExpandedDescriptionFields(article, packet);
 };
 
 const validateStructuredAIOutput = (article = {}) => {
@@ -660,6 +829,17 @@ const validateStructuredAIOutput = (article = {}) => {
     if (!(key in article)) invalid.push(key);
   });
   if (!Array.isArray(article.authors)) invalid.push("authors_type");
+  if (!Array.isArray(article.expandedDescriptionSections)) invalid.push("expandedDescriptionSections_type");
+  if (Array.isArray(article.expandedDescriptionSections)) {
+    article.expandedDescriptionSections.forEach((section, index) => {
+      if (!section || typeof section !== "object" || Array.isArray(section)) invalid.push(`expandedDescriptionSections.${index}_type`);
+      if (typeof section?.heading !== "string") invalid.push(`expandedDescriptionSections.${index}.heading_type`);
+      if (typeof section?.body !== "string") invalid.push(`expandedDescriptionSections.${index}.body_type`);
+    });
+  }
+  if (!EXPANDED_DESCRIPTION_QUALITY_VALUES.includes(article.expandedDescriptionQuality)) {
+    invalid.push("expandedDescriptionQuality");
+  }
   if (!Array.isArray(article.keyPointsEs)) invalid.push("keyPointsEs_type");
   if (!Array.isArray(article.tags)) invalid.push("tags_type");
   if (!Array.isArray(article.warnings)) invalid.push("warnings_type");
@@ -703,6 +883,17 @@ const validateStructuredCoreAIOutput = (article = {}) => {
     if (!(key in article)) invalid.push(key);
   });
   if (!Array.isArray(article.authors)) invalid.push("authors_type");
+  if (!Array.isArray(article.expandedDescriptionSections)) invalid.push("expandedDescriptionSections_type");
+  if (Array.isArray(article.expandedDescriptionSections)) {
+    article.expandedDescriptionSections.forEach((section, index) => {
+      if (!section || typeof section !== "object" || Array.isArray(section)) invalid.push(`expandedDescriptionSections.${index}_type`);
+      if (typeof section?.heading !== "string") invalid.push(`expandedDescriptionSections.${index}.heading_type`);
+      if (typeof section?.body !== "string") invalid.push(`expandedDescriptionSections.${index}.body_type`);
+    });
+  }
+  if (!EXPANDED_DESCRIPTION_QUALITY_VALUES.includes(article.expandedDescriptionQuality)) {
+    invalid.push("expandedDescriptionQuality");
+  }
   if (!Array.isArray(article.keyPointsEs)) invalid.push("keyPointsEs_type");
   if (!Array.isArray(article.tags)) invalid.push("tags_type");
   if (!Array.isArray(article.warnings)) invalid.push("warnings_type");
@@ -723,7 +914,9 @@ const scoreDocumentArticle = (article = {}) => {
   const hasTitle = Boolean(cleanString(article.title));
   const hasSource = Boolean(cleanString(article.sourceName || article.journal));
   const hasCard = cleanString(article.briefDescriptionEs || article.cardSummaryEs).length >= 24;
-  const hasExecutiveSummary = cleanString(article.expandedDescriptionEs || article.executiveSummaryEs).length >= 32;
+  const hasExecutiveSummary =
+    cleanString(article.expandedDescriptionEs || article.executiveSummaryEs).length >= 32 ||
+    (Array.isArray(article.expandedDescriptionSections) && article.expandedDescriptionSections.length >= 2);
   return {
     usefulFieldCount: useful,
     hasTitle,
@@ -821,6 +1014,27 @@ const buildMethodologyProfileSchema = () => ({
   }, {})
 });
 
+const buildExpandedDescriptionSectionsSchema = () => ({
+  type: "array",
+  minItems: 0,
+  maxItems: 6,
+  items: {
+    type: "object",
+    additionalProperties: false,
+    required: ["heading", "body"],
+    properties: {
+      heading: {
+        type: "string",
+        description: "Subtítulo breve en español, máximo 50 caracteres."
+      },
+      body: {
+        type: "string",
+        description: "Cuerpo de sección en español, 45 a 110 palabras cuando haya evidencia."
+      }
+    }
+  }
+});
+
 const buildOpenAiDocumentPayload = (packet = {}, { model = "" } = {}) => ({
   model: cleanString(model) || DEFAULT_DOCUMENT_EXTRACTION_MODEL,
   temperature: 0.1,
@@ -851,7 +1065,16 @@ const buildOpenAiDocumentPayload = (packet = {}, { model = "" } = {}) => ({
           },
           expandedDescriptionEs: {
             type: "string",
-            description: "Descripción ampliada en español, 1 o 2 párrafos breves, máximo 180 palabras. No reemplaza la lectura del paper."
+            description: "Síntesis editorial ampliada en español, 350 a 550 palabras ideal, máximo 650. Debe unir contexto, tipo de documento, diseño/evidencia, población, metodología, hallazgos, cautelas y aplicabilidad sin inventar datos."
+          },
+          expandedDescriptionSections: {
+            ...buildExpandedDescriptionSectionsSchema(),
+            description: "4 a 6 secciones breves para renderizar la descripción ampliada. Usar [] solo si el documento no tiene evidencia suficiente."
+          },
+          expandedDescriptionQuality: {
+            type: "string",
+            enum: EXPANDED_DESCRIPTION_QUALITY_VALUES,
+            description: "complete si la descripción ampliada cumple extensión, secciones y contenido; partial si hay evidencia limitada; insufficient si falta contenido útil."
           },
           cardSummaryEs: {
             type: "string",
@@ -921,18 +1144,26 @@ const buildOpenAiDocumentPayload = (packet = {}, { model = "" } = {}) => ({
         [
           "Sos un agente experto en metodología de investigación clínica, epidemiología, salud pública, implementación sanitaria y comunicación científica médica.",
           "Tu tarea es analizar evidencia real extraída de un PDF o texto científico y generar una ficha en español para una Bitácora de Ciencia Médica.",
-          "Tu prioridad es identificar correctamente la metodología y estructura del trabajo.",
+          "Actuás como médico científico, metodólogo clínico, epidemiólogo, editor médico y comunicador científico en español.",
+          "Tu prioridad es generar una ficha editorial útil para lectores médicos, no solo extraer metadatos.",
           "Respondé solo JSON válido conforme al schema. Todo texto editorial debe estar en español.",
           "Conservá título oficial, autores, DOI, revista e instituciones tal como aparecen. No inventes datos y no uses conocimiento externo.",
+          "No inventes población, país, institución, tamaño muestral, duración, resultados, DOI ni conclusiones. Si un dato no está en el documento, dejalo vacío o indicá 'No especificado en el documento' de forma discreta.",
           "No fuerces todos los documentos a ensayo clínico, prospectivo, retrospectivo o multicéntrico.",
           "Si un documento es guía, consenso, health policy, informe técnico o marco de implementación, clasificalo como tal.",
+          "Diferenciá siempre el tipo de documento publicado del diseño o evidencia principal analizada. Si es una revisión o focus seminar sobre una cohorte, describí ambos sin confundir el paper con el estudio subyacente.",
           "Si un documento no es estudio clínico primario, usá 'no aplica' para temporalidad prospectivo/retrospectivo cuando corresponda.",
           "Si hay múltiples países o instituciones en implementación o política sanitaria, describilo como regional/internacional o alcance programático, no como multicéntrico clínico salvo que sea un estudio clínico multicéntrico.",
           "Si se puede inferir un diseño con soporte fuerte, usá supportLevel='inferido_con_soporte' y explicá la base. Si no hay soporte, usá 'No especificado en el documento'.",
           "Diferenciá: ensayo clínico, cohorte prospectiva, cohorte retrospectiva, caso-control, transversal, revisión sistemática/metaanálisis, guía/consenso, health policy/marco de implementación, quality improvement, evaluación económica, diagnóstico/pronóstico y modelo predictivo.",
           "Si no hay muestra clínica, no inventarla. Si hay alcance programático, usá sampleDescription. Si no hay duración, no la inventes.",
-          "La descripción breve debe ser concreta, máximo 280 caracteres, y responder de qué trata y por qué importa.",
-          "La descripción ampliada debe tener 1 o 2 párrafos breves, máximo 180 palabras, explicar contexto, población o ámbito y metodología si corresponde, sin reemplazar la lectura del paper.",
+          "La descripción breve debe tener 180 a 280 caracteres, una sola idea, sin subtítulos ni listas, y responder de qué trata y por qué importa.",
+          "La descripción ampliada es prioritaria: 350 a 550 palabras ideal, mínimo 280 si hay evidencia suficiente, máximo absoluto 650.",
+          "Dividí expandedDescriptionSections en 4 a 6 secciones con subtítulos claros como Contexto, Diseño y población, Qué evaluó, Hallazgos relevantes y Lectura práctica.",
+          "Cada sección debe tener 45 a 110 palabras cuando haya evidencia suficiente. Omití secciones sin evidencia o señalá 'No especificado en el documento' sin rellenar.",
+          "expandedDescriptionEs debe ser el texto plano equivalente a esas secciones, sin HTML ni markdown peligroso.",
+          "La descripción ampliada debe explicar contexto, objetivo, tipo de documento, diseño o evidencia, población, ámbito, período, metodología, variables o intervención, hallazgos/mensajes, limitaciones, relevancia y aplicabilidad cuando estén disponibles.",
+          "No repitas la descripción breve, no copies textualmente el abstract completo, no uses frases vagas y no conviertas asociaciones en causalidad.",
           "Evitá frases genéricas como 'El documento trata sobre' o 'Este artículo habla de'. La clasificación metodológica debe ayudar a un médico a entender qué tipo de evidencia está leyendo."
         ].join(" ")
     },
@@ -995,7 +1226,15 @@ const buildOpenAiDocumentCorePayload = (packet = {}, { model = "" } = {}) => ({
           },
           expandedDescriptionEs: {
             type: "string",
-            description: "Descripción ampliada en español, máximo 180 palabras."
+            description: "Síntesis editorial ampliada en español. Ideal 350 a 550 palabras cuando el evidencePacket tiene contenido suficiente; máximo 650."
+          },
+          expandedDescriptionSections: {
+            ...buildExpandedDescriptionSectionsSchema(),
+            description: "4 a 6 secciones breves para la descripción ampliada, o [] si no hay evidencia suficiente."
+          },
+          expandedDescriptionQuality: {
+            type: "string",
+            enum: EXPANDED_DESCRIPTION_QUALITY_VALUES
           },
           cardSummaryEs: { type: "string" },
           executiveSummaryEs: { type: "string" },
@@ -1020,12 +1259,14 @@ const buildOpenAiDocumentCorePayload = (packet = {}, { model = "" } = {}) => ({
       content:
         [
           "Sos un editor científico médico y comunicador clínico.",
-          "Generá primero una ficha editorial mínima útil en español para revisar antes de guardar.",
+          "Generá primero una ficha editorial útil en español para revisar antes de guardar.",
           "Respondé solo JSON válido conforme al schema.",
           "No inventes datos y no uses conocimiento externo.",
           "Conservá título, autores, DOI, revista, fecha y URL tal como aparecen.",
           "La descripción breve debe orientar de qué trata el documento y por qué importa, máximo 280 caracteres.",
-          "La descripción ampliada debe resumir contexto, población o ámbito, metodología general y mensaje principal, máximo 180 palabras.",
+          "La descripción ampliada debe ser una síntesis editorial técnica de 350 a 550 palabras cuando el evidencePacket tenga contenido suficiente, en 4 a 6 secciones breves.",
+          "Diferenciá tipo de documento publicado y diseño o evidencia principal analizada. No confundas una revisión o focus seminar con el estudio subyacente.",
+          "Incluí contexto, objetivo, población/ámbito, metodología, hallazgos o mensajes, cautelas y aplicabilidad cuando estén sustentados.",
           "Clasificá el tipo de documento en términos médicos útiles: ensayo, cohorte, revisión, guía, consenso, health policy, marco de implementación u otro.",
           "Si un dato no aparece, dejalo vacío o indicá 'No especificado en el documento' solo cuando sea necesario para entender la ficha.",
           "No completes metodología avanzada ni evidenceSupport en esta etapa."
@@ -1058,6 +1299,92 @@ const buildOpenAiDocumentCorePayload = (packet = {}, { model = "" } = {}) => ({
           inferredClaims: packet.preclassification?.inferredClaims || []
         },
         qualitySignals: packet.qualitySignals
+      })}`
+    }
+  ]
+});
+
+const buildOpenAiDocumentExpansionPayload = (packet = {}, { model = "", article = {} } = {}) => ({
+  model: cleanString(model) || DEFAULT_DOCUMENT_EXTRACTION_MODEL,
+  temperature: 0.1,
+  response_format: {
+    type: "json_schema",
+    json_schema: {
+      name: "scientific_article_core_card",
+      strict: true,
+      schema: buildOpenAiDocumentCorePayload({}, { model }).response_format.json_schema.schema
+    }
+  },
+  messages: [
+    {
+      role: "system",
+      content:
+        [
+          "Sos un editor médico científico especializado en síntesis editorial en español.",
+          "Corregí exclusivamente una ficha cuyo campo expandedDescriptionEs quedó demasiado corto.",
+          "Respondé solo JSON válido conforme al schema.",
+          "No uses conocimiento externo ni inventes datos ausentes.",
+          "Conservá metadatos, título, fuente, DOI, autores y clasificación cuando ya estén disponibles.",
+          "Generá expandedDescriptionEs de 350 a 550 palabras si el evidencePacket tiene contenido suficiente; mínimo 280 palabras, máximo 650.",
+          "Generá expandedDescriptionSections con 4 a 6 secciones breves: Contexto, Diseño y población, Qué evaluó, Hallazgos relevantes y Lectura práctica u otros subtítulos equivalentes.",
+          "Cada sección debe tener contenido concreto sustentado por la evidencia. Si falta un dato, indicá 'No especificado en el documento' de forma discreta.",
+          "Diferenciá tipo de documento publicado y diseño o evidencia principal analizada. No confundas focus seminar, revisión, guía o health policy con el estudio subyacente.",
+          "No repitas la descripción breve, no copies textualmente el abstract completo y no uses frases genéricas."
+        ].join(" ")
+    },
+    {
+      role: "user",
+      content: `La ficha actual tiene una descripción ampliada insuficiente. Regenerá una descripción editorial amplia y devolvé la ficha core completa.\n${JSON.stringify({
+        currentArticle: {
+          title: article.title || "",
+          sourceName: article.sourceName || article.journal || "",
+          journal: article.journal || "",
+          authors: article.authors || [],
+          officialUrl: article.officialUrl || packet.officialUrl || "",
+          doi: article.doi || "",
+          publicationDate: article.publicationDate || "",
+          originalLanguage: article.originalLanguage || packet.detectedLanguage || "",
+          articleType: article.articleType || "",
+          evidenceType: article.evidenceType || "",
+          accessType: article.accessType || "Pendiente",
+          briefDescriptionEs: article.briefDescriptionEs || article.cardSummaryEs || "",
+          expandedDescriptionEs: article.expandedDescriptionEs || article.executiveSummaryEs || "",
+          objectiveEs: article.objectiveEs || "",
+          studyDesignEs: article.studyDesignEs || article.methodologyEs || "",
+          studyContextEs: article.studyContextEs || "",
+          studyPopulationEs: article.studyPopulationEs || "",
+          studyLocationEs: article.studyLocationEs || "",
+          studyPeriodEs: article.studyPeriodEs || "",
+          mainMessageEs: article.mainMessageEs || article.mainResultEs || "",
+          keyPointsEs: article.keyPointsEs || [],
+          tags: article.tags || []
+        },
+        evidencePacket: {
+          mode: packet.mode,
+          originalFileName: packet.originalFileName,
+          officialUrl: packet.officialUrl,
+          detectedLanguage: packet.detectedLanguage,
+          pageCount: packet.pageCount,
+          textLength: packet.textLength,
+          detectedMetadata: packet.detectedMetadata,
+          sections: (packet.sections || []).map((section) => ({
+            heading: normalizeSectionHeading(section.heading),
+            text: cleanLongText(section.text).slice(0, getSectionPriority(section.heading) === 0 ? 6500 : 3600),
+            pages: section.pages || []
+          })),
+          snippets: (packet.snippets || []).map((snippet) => ({
+            label: snippet.label,
+            text: cleanLongText(snippet.text).slice(0, MAX_AI_TEXT_CHARS),
+            pages: snippet.pages || []
+          })),
+          methodologyHints: {
+            possibleFamilies: packet.preclassification?.possibleFamilies || [],
+            likelyDesigns: packet.preclassification?.likelyDesigns || [],
+            explicitClaims: packet.preclassification?.explicitClaims || [],
+            inferredClaims: packet.preclassification?.inferredClaims || []
+          },
+          qualitySignals: packet.qualitySignals
+        }
       })}`
     }
   ]
@@ -1134,6 +1461,80 @@ const callDocumentCoreExtractionAI = async (packet = {}, { apiKey = "", fetchImp
     validateOutput: validateStructuredCoreAIOutput,
     invalidSchemaMessage: "La IA devolvió una ficha core incompleta."
   });
+
+const shouldRetryExpandedDescription = (article = {}, packet = {}) => {
+  const assessment = validateExpandedDescriptionQuality(article, packet);
+  return Boolean(
+    hasSubstantialEvidenceForExpandedDescription(packet) &&
+      assessment.quality === "insufficient" &&
+      assessment.wordCount < EXPANDED_DESCRIPTION_MIN_WORDS
+  );
+};
+
+const retryExpandedDescriptionIfNeeded = async (
+  article = {},
+  packet = {},
+  { apiKey = "", fetchImpl = fetch, model = "" } = {}
+) => {
+  const current = finalizeExpandedDescriptionFields(article, packet);
+  if (!apiKey || !shouldRetryExpandedDescription(current, packet)) {
+    return { attempted: false, ok: false, article: current, error: null, modelUsed: "" };
+  }
+  const ai = await callOpenAiStructuredDocument({
+    packet,
+    apiKey,
+    fetchImpl,
+    model,
+    buildPayload: (retryPacket, { model: retryModel } = {}) =>
+      buildOpenAiDocumentExpansionPayload(retryPacket, { model: retryModel, article: current }),
+    validateOutput: validateStructuredCoreAIOutput,
+    invalidSchemaMessage: "La IA no pudo regenerar una descripción ampliada suficiente."
+  });
+  if (!ai.ok) {
+    return { attempted: true, ok: false, article: current, error: ai.error, modelUsed: ai.error?.modelUsed || "" };
+  }
+  const regenerated = normalizeAiDocumentOutput(ai.article, packet);
+  const next = finalizeExpandedDescriptionFields(
+    {
+      ...current,
+      briefDescriptionEs: regenerated.briefDescriptionEs || current.briefDescriptionEs,
+      cardSummaryEs: regenerated.cardSummaryEs || regenerated.briefDescriptionEs || current.cardSummaryEs,
+      expandedDescriptionEs: regenerated.expandedDescriptionEs || current.expandedDescriptionEs,
+      expandedDescriptionSections: regenerated.expandedDescriptionSections?.length
+        ? regenerated.expandedDescriptionSections
+        : current.expandedDescriptionSections,
+      expandedDescriptionQuality: regenerated.expandedDescriptionQuality,
+      executiveSummaryEs: regenerated.executiveSummaryEs || regenerated.expandedDescriptionEs || current.executiveSummaryEs,
+      objectiveEs: regenerated.objectiveEs || current.objectiveEs,
+      studyDesignEs: regenerated.studyDesignEs || current.studyDesignEs,
+      studyContextEs: regenerated.studyContextEs || current.studyContextEs,
+      studyPopulationEs: regenerated.studyPopulationEs || current.studyPopulationEs,
+      studyLocationEs: regenerated.studyLocationEs || current.studyLocationEs,
+      studyPeriodEs: regenerated.studyPeriodEs || current.studyPeriodEs,
+      mainMessageEs: regenerated.mainMessageEs || current.mainMessageEs,
+      keyPointsEs: regenerated.keyPointsEs?.length ? regenerated.keyPointsEs : current.keyPointsEs,
+      tags: regenerated.tags?.length ? regenerated.tags : current.tags,
+      warnings: [
+        ...(current.warnings || []),
+        "La IA regeneró la descripción ampliada porque la primera versión era demasiado breve."
+      ]
+    },
+    packet
+  );
+  if (shouldRetryExpandedDescription(next, packet)) {
+    return {
+      attempted: true,
+      ok: false,
+      article: next,
+      error: {
+        code: "expanded_description_retry_insufficient",
+        message: "El reintento editorial no alcanzó la extensión mínima de descripción ampliada."
+      },
+      modelUsed: ai.modelUsed || ""
+    };
+  }
+  return { attempted: true, ok: true, article: next, error: null, modelUsed: ai.modelUsed || "" };
+};
 
 const mergeDocumentExtractionResults = (coreArticle = {}, methodologyArticle = {}) => {
   const core = coreArticle || {};
@@ -1364,10 +1765,10 @@ const resolveScientificArticleDocument = async (input = {}, {
   }
 
   if (!apiKey) {
-    const article = buildDeterministicDocumentFallback(packet, {
+    const article = finalizeExpandedDescriptionFields(buildDeterministicDocumentFallback(packet, {
       warnings: ["El servicio de IA no está configurado en backend."],
       extractionConfidence: 0.18
-    });
+    }), packet);
     return buildDocumentExtractionResponse({
       extractionStatus: "not_configured",
       article,
@@ -1388,7 +1789,26 @@ const resolveScientificArticleDocument = async (input = {}, {
   agentDurations.aiMs = agentDurations.coreAiMs + agentDurations.methodologyAiMs;
   packet.modelUsed = [core.modelUsed, methodology.modelUsed].filter(Boolean).join(" + ");
 
-  let article = mergeDocumentExtractionResults(core.article, methodology.article);
+  let article = finalizeExpandedDescriptionFields(
+    mergeDocumentExtractionResults(core.article, methodology.ok ? methodology.article : {}),
+    packet
+  );
+  const expansionRetryStart = now();
+  const expansionRetry = await retryExpandedDescriptionIfNeeded(article, packet, {
+    apiKey,
+    fetchImpl,
+    model: documentModel
+  });
+  if (expansionRetry.attempted) {
+    agentDurations.expandedDescriptionRetryMs = now() - expansionRetryStart;
+    article = expansionRetry.article;
+    if (expansionRetry.modelUsed) {
+      packet.modelUsed = Array.from(new Set([packet.modelUsed, expansionRetry.modelUsed].filter(Boolean))).join(" + ");
+    }
+    if (!expansionRetry.ok) {
+      article.warnings.push("La IA no pudo regenerar una descripción ampliada suficiente en el reintento editorial.");
+    }
+  }
   if (!core.ok) {
     article.warnings.push("La IA no pudo generar una ficha editorial confiable.");
   }
@@ -1396,7 +1816,15 @@ const resolveScientificArticleDocument = async (input = {}, {
     article.warnings.push("No se pudo completar la metodología avanzada; se conservó la ficha editorial.");
   }
   article.warnings = Array.from(new Set([...(packet.warnings || []), ...(article.warnings || [])])).slice(0, 10);
-  const status = computeExtractionStatus(article);
+  let status = computeExtractionStatus(article);
+  if (
+    status === "ai_draft" &&
+    article.expandedDescriptionQuality === "insufficient" &&
+    hasSubstantialEvidenceForExpandedDescription(packet)
+  ) {
+    status = "metadata_only";
+    article.warnings.push("La IA no generó una descripción ampliada suficiente para publicar sin revisión editorial.");
+  }
   if (status !== "ai_draft") {
     article.warnings.push("La IA no detectó suficientes campos útiles para generar una ficha final.");
   }
@@ -1438,11 +1866,15 @@ module.exports = {
   extractSectionsFromText,
   extractCoreArticleFicha,
   extractMethodologyProfile,
+  finalizeExpandedDescriptionFields,
   getConfiguredDocumentModels,
+  hasSubstantialEvidenceForExpandedDescription,
   mergeDocumentExtractionResults,
   normalizeAiDocumentOutput,
+  normalizeExpandedDescriptionSections,
   parseJsonObjectFromText,
   resolveScientificArticleDocument,
   scoreDocumentArticle,
+  validateExpandedDescriptionQuality,
   validateStoragePathForUid
 };

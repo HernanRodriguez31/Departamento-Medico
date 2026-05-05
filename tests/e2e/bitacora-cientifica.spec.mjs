@@ -112,6 +112,32 @@ test("scientific logbook renders as operational hub with modals and article crea
     methodologyWarnings: ["No interpretar como ensayo clínico ni cohorte."],
     ...overrides
   });
+  const expandedDescriptionSections = (label = "documento") => [
+    {
+      heading: "Contexto",
+      body: `El ${label} se presenta como una síntesis editorial en español para orientar lectura médica, explicar el problema abordado y ubicar la relevancia clínica, sanitaria o institucional sin sustituir la revisión completa de la fuente original.`
+    },
+    {
+      heading: "Diseño y población",
+      body: "La ficha distingue el tipo de publicación del diseño o evidencia analizada, describe población, ámbito y período cuando están disponibles, y evita clasificar como ensayo clínico aquello que corresponde a revisión, guía o política sanitaria."
+    },
+    {
+      heading: "Qué evaluó",
+      body: "La descripción resume objetivo, metodología, exposición, intervención o estrategia evaluada, junto con variables principales y datos de soporte aportados por el documento o por la extracción automatizada."
+    },
+    {
+      heading: "Hallazgos relevantes",
+      body: "El bloque identifica mensajes principales y hallazgos útiles para lectura crítica, evitando repetir la descripción breve, copiar el abstract completo o exagerar conclusiones más allá del diseño disponible."
+    },
+    {
+      heading: "Lectura práctica",
+      body: "La sección final sintetiza aplicabilidad, cautelas y relevancia para práctica clínica, gestión sanitaria o salud ocupacional, manteniendo una redacción compacta y accionable para el equipo médico."
+    }
+  ];
+  const expandedDescriptionText = (label = "documento") =>
+    expandedDescriptionSections(label)
+      .map((section) => `${section.heading}. ${section.body}`)
+      .join(" ");
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
   });
@@ -122,6 +148,27 @@ test("scientific logbook renders as operational hub with modals and article crea
       window.__bitacoraOpenCalls.push({ url, target, features });
       return { closed: false, focus: () => {} };
     };
+  });
+  await page.route("**/asistente-ia/index.html**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "text/html",
+      body: `<!doctype html>
+        <html lang="es">
+          <body>
+            <main id="qa-assistant">Asistente IA QA</main>
+            <script>
+              window.parent.postMessage({ type: "dm-ai-ready" }, window.location.origin);
+              window.addEventListener("message", (event) => {
+                if (event.origin !== window.location.origin) return;
+                if (event.data && event.data.type === "dm-ai-select-model") {
+                  document.body.dataset.model = event.data.model || "";
+                }
+              });
+            </script>
+          </body>
+        </html>`
+    });
   });
   await page.route("**/api/extractScientificArticleDocument", async (route) => {
     const request = route.request();
@@ -163,15 +210,13 @@ test("scientific logbook renders as operational hub with modals and article crea
           briefDescriptionEs: isTextMode
             ? "Descripción breve en español desde documento aportado."
             : "Descripción breve en español desde PDF.",
-          expandedDescriptionEs: isTextMode
-            ? "Descripción ampliada en español generada desde documento aportado."
-            : "Descripción ampliada en español generada desde PDF.",
+          expandedDescriptionEs: expandedDescriptionText(isTextMode ? "documento aportado" : "PDF científico"),
+          expandedDescriptionSections: expandedDescriptionSections(isTextMode ? "documento aportado" : "PDF científico"),
+          expandedDescriptionQuality: "complete",
           cardSummaryEs: isTextMode
             ? "Descripción breve en español desde documento aportado."
             : "Descripción breve en español desde PDF.",
-          executiveSummaryEs: isTextMode
-            ? "Descripción ampliada en español generada desde documento aportado."
-            : "Descripción ampliada en español generada desde PDF.",
+          executiveSummaryEs: expandedDescriptionText(isTextMode ? "documento aportado" : "PDF científico"),
           abstractSummaryEs: "Abstract sintetizado y traducido al español.",
           objectiveEs: "Objetivo o pregunta sintetizada en español.",
           clinicalQuestionEs: "Objetivo o pregunta sintetizada en español.",
@@ -236,10 +281,12 @@ test("scientific logbook renders as operational hub with modals and article crea
             publicationDate: "2026-05-04",
             studyLocation: "Contexto asistido",
             briefDescriptionEs: "Descripción breve asistida en español desde datos pegados.",
-            expandedDescriptionEs: "Descripción ampliada asistida en español desde datos pegados.",
+            expandedDescriptionEs: expandedDescriptionText("artículo asistido"),
+            expandedDescriptionSections: expandedDescriptionSections("artículo asistido"),
+            expandedDescriptionQuality: "complete",
             cardSummaryEs: "Descripción breve asistida en español desde datos pegados.",
-            executiveSummary: "Descripción ampliada asistida en español desde datos pegados.",
-            executiveSummaryEs: "Descripción ampliada asistida en español desde datos pegados.",
+            executiveSummary: expandedDescriptionText("artículo asistido"),
+            executiveSummaryEs: expandedDescriptionText("artículo asistido"),
             clinicalQuestion: "Pregunta asistida en español.",
             mainResult: "Resultado asistido en español.",
             methodologyProfile: methodologyProfile({
@@ -370,10 +417,12 @@ test("scientific logbook renders as operational hub with modals and article crea
           publicationDate: "2026-05-03",
           studyLocation: "Contexto hospitalario",
           briefDescriptionEs: "Descripción breve generada por IA desde Playwright.",
-          expandedDescriptionEs: "Descripción ampliada generada por IA desde Playwright.",
+          expandedDescriptionEs: expandedDescriptionText("artículo PubMed"),
+          expandedDescriptionSections: expandedDescriptionSections("artículo PubMed"),
+          expandedDescriptionQuality: "complete",
           cardSummaryEs: "Descripción breve generada por IA desde Playwright.",
-          executiveSummary: "Descripción ampliada generada por IA desde Playwright.",
-          executiveSummaryEs: "Descripción ampliada generada por IA desde Playwright.",
+          executiveSummary: expandedDescriptionText("artículo PubMed"),
+          executiveSummaryEs: expandedDescriptionText("artículo PubMed"),
           clinicalQuestion: "Pregunta clínica generada por IA.",
           mainResult: "Resultado principal generado por IA.",
           methodologyProfile: methodologyProfile({
@@ -416,6 +465,25 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(page.locator(".art-gallery-header")).toBeVisible();
   await expect(page.locator(".art-gallery-header__logo img[alt='Brisa Salud y Bienestar']")).toBeVisible();
   await expect(page.locator(".art-gallery-header__brand")).toHaveText("Departamento Médico");
+  const headerAvatarLayout = await page.locator(".art-gallery-header .user-panel-trigger .user-panel-icon").evaluate((icon) => {
+    const image = icon.querySelector(".user-avatar-img");
+    const dropdownImage = document.querySelector(".art-gallery-header .user-panel-dropdown .user-menu__avatar .user-avatar-img");
+    const rect = icon.getBoundingClientRect();
+    const styles = getComputedStyle(icon);
+    return {
+      hasImage: Boolean(image),
+      triggerTransform: image ? getComputedStyle(image).transform : "",
+      dropdownTransform: dropdownImage ? getComputedStyle(dropdownImage).transform : "",
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+      overflow: styles.overflow
+    };
+  });
+  expect(headerAvatarLayout.hasImage).toBe(true);
+  expect(headerAvatarLayout.triggerTransform).not.toBe("none");
+  expect(headerAvatarLayout.dropdownTransform).toBe("none");
+  expect(headerAvatarLayout.width).toBe(headerAvatarLayout.height);
+  expect(headerAvatarLayout.overflow).toBe("hidden");
   await expect(page.locator(".footer")).toHaveCount(1);
   await expect(page.locator("#scroll-up")).toHaveCount(1);
   await expect(page.locator("#art-gallery-return-home")).toHaveText("Regresar a Página de Inicio");
@@ -439,12 +507,14 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(page.locator(".bitacora-breadcrumb")).toHaveText("Portal");
   await expect(page.locator(".bitacora-intro-segment")).not.toContainText("Evidencia médica curada");
   await expect(page.locator(".bitacora-intro-segment")).not.toContainText("Centralización de publicaciones");
-  const sourcesTrigger = page.getByRole("button", { name: "Fuentes recomendadas" });
-  await expect(sourcesTrigger).toBeVisible();
+  await expect(page.locator(".bitacora-hero__actions")).toHaveCount(0);
+  await expect(page.locator(".bitacora-hero__action--sources")).toHaveCount(0);
+  await expect(page.locator(".bitacora-hero__action--methodology")).toHaveCount(0);
   await expect(page.locator(".bitacora-publications-panel")).toBeVisible();
   await expect(page.locator(".bitacora-publications-panel")).toHaveCSS("background-color", /rgba?|rgb/);
   await expect(page.locator("#bitacora-publicaciones-title")).toHaveText("Publicaciones recomendadas");
-  await expect(page.getByRole("button", { name: "Agregar artículo" })).toBeVisible();
+  const addArticleTrigger = page.locator(".bitacora-add-article-button");
+  await expect(addArticleTrigger).toBeVisible();
   await expect(page.locator(".bitacora-filters-card")).toHaveCount(0);
   await expect(page.locator("#bitacora-search")).toHaveCount(0);
   await expect(page.locator("#bitacora-filter-evidence")).toHaveCount(0);
@@ -460,6 +530,138 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(page.locator("body")).not.toContainText("Advertencia sobre preprints y evidencia");
   await expect(page.locator(".scientific-source-card:visible")).toHaveCount(0);
 
+  const quickDock = page.locator("[data-bitacora-quick-dock]");
+  await expect(quickDock).toBeVisible();
+  const quickCubes = quickDock.locator("[data-bitacora-quick-action]");
+  await expect(quickCubes).toHaveCount(4);
+  await expect(quickCubes.nth(0)).toContainText("Guía");
+  await expect(quickCubes.nth(0)).toContainText("Metodológica");
+  await expect(quickCubes.nth(1)).toContainText("Fuentes");
+  await expect(quickCubes.nth(1)).toContainText("recomendadas");
+  await expect(quickCubes.nth(2)).toContainText("Agregar");
+  await expect(quickCubes.nth(2)).toContainText("artículo");
+  await expect(quickCubes.nth(3)).toContainText("Bot");
+  await expect(quickCubes.nth(3)).toContainText("IA");
+  await expect
+    .poll(() =>
+      quickCubes.evaluateAll((buttons) => buttons.map((button) => button.dataset.bitacoraQuickAction)),
+    )
+    .toEqual(["methodology", "sources", "add-article", "bot"]);
+  if ((page.viewportSize()?.width || 0) >= 1181) {
+    const dockDoesNotCoverContent = await page.evaluate(() => {
+      const dock = document.querySelector("[data-bitacora-quick-dock]");
+      const shell = document.querySelector(".bitacora-shell");
+      if (!dock || !shell) return false;
+      const dockRect = dock.getBoundingClientRect();
+      const shellRect = shell.getBoundingClientRect();
+      return dockRect.right <= shellRect.left - 8;
+    });
+    expect(dockDoesNotCoverContent).toBe(true);
+    const dockAlignsWithIntro = await page.evaluate(() => {
+      const dock = document.querySelector("[data-bitacora-quick-dock]");
+      const intro = document.querySelector(".bitacora-intro-segment");
+      if (!dock || !intro) return Number.POSITIVE_INFINITY;
+      return Math.abs(dock.getBoundingClientRect().top - intro.getBoundingClientRect().top);
+    });
+    expect(dockAlignsWithIntro).toBeLessThanOrEqual(1);
+  }
+
+  const dockMethodology = quickDock.locator("[data-bitacora-quick-action='methodology']");
+  const dockSources = quickDock.locator("[data-bitacora-quick-action='sources']");
+  const dockAddArticle = quickDock.locator("[data-bitacora-quick-action='add-article']");
+  const dockBot = quickDock.locator("[data-bitacora-quick-action='bot']");
+  await expect.poll(() =>
+    quickCubes.evaluateAll((buttons) => buttons.every((button) => button.classList.contains("dm-cube"))),
+  ).toBe(true);
+  if ((page.viewportSize()?.width || 0) >= 1181) {
+    const cubeMetrics = await quickCubes.evaluateAll((buttons) =>
+      buttons.map((button) => {
+        const rect = button.getBoundingClientRect();
+        return { width: Math.round(rect.width), height: Math.round(rect.height) };
+      }),
+    );
+    expect(cubeMetrics.every(({ width, height }) => width === 88 && height === 88)).toBe(true);
+    const botImageCoversTile = await dockBot.locator("img").evaluate((img) => {
+      const imageRect = img.getBoundingClientRect();
+      const buttonRect = img.closest("button").getBoundingClientRect();
+      return (
+        Math.abs(imageRect.left - buttonRect.left) <= 1 &&
+        Math.abs(imageRect.top - buttonRect.top) <= 1 &&
+        Math.abs(imageRect.width - buttonRect.width) <= 2 &&
+        Math.abs(imageRect.height - buttonRect.height) <= 2
+      );
+    });
+    expect(botImageCoversTile).toBe(true);
+  }
+  await dockMethodology.click();
+  const methodologyModalFromDock = page.locator("#methodology-guide-modal");
+  await expect(methodologyModalFromDock).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(methodologyModalFromDock).toBeHidden();
+  await dockSources.click();
+  const sourcesModalFromDock = page.locator("#scientific-sources-modal");
+  await expect(sourcesModalFromDock).toBeVisible();
+  const dockBehindModal = await page.evaluate(() => {
+    const modal = document.querySelector("#scientific-sources-modal");
+    const dock = document.querySelector("[data-bitacora-quick-dock]");
+    const modalZ = Number.parseInt(getComputedStyle(modal).zIndex || "0", 10);
+    const dockZ = Number.parseInt(getComputedStyle(dock).zIndex || "0", 10);
+    return modalZ > dockZ;
+  });
+  expect(dockBehindModal).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(sourcesModalFromDock).toBeHidden();
+  await dockAddArticle.click();
+  const articleModalFromDock = page.locator("#add-article-modal");
+  await expect(articleModalFromDock).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(articleModalFromDock).toBeHidden();
+  await expect(page.locator("[data-dm-ai-shell]")).toHaveCount(1);
+  await dockBot.click();
+  await expect(page.locator(".dm-ai-selector")).toHaveClass(/is-open/);
+  await expect(dockBot).toHaveAttribute("aria-expanded", "true");
+  await page.locator(".dm-ai-selector [data-dm-ai-model='gemini']").click();
+  await expect(page.locator("[data-dm-ai-shell]")).toHaveClass(/is-open/);
+  await expect(page.locator("[data-dm-ai-shell]")).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-dm-ai-shell]")).not.toHaveClass(/is-open/);
+
+  await expect(page.locator("#brisa-chat-root")).toHaveCount(1, { timeout: 30_000 });
+  await expect(page.locator("#brisa-chat-root")).toHaveAttribute("data-chat-context", "bitacora");
+  await expect(page.locator("#brisa-chat-delete-modal")).toBeHidden();
+  await expect(page.locator("#brisa-chat-delete-conv-modal")).toBeHidden();
+  const chatBubble = page.locator("#brisa-chat-bubble");
+  await expect(chatBubble).toBeVisible({ timeout: 30_000 });
+  const bubbleVisual = await chatBubble.evaluate((bubble) => {
+    const style = window.getComputedStyle(bubble);
+    const icon = bubble.querySelector(".brisa-chat-bubble-icon");
+    return {
+      backgroundImage: style.backgroundImage,
+      borderRadius: style.borderRadius,
+      boxShadow: style.boxShadow,
+      iconColor: icon ? window.getComputedStyle(icon).color : "",
+    };
+  });
+  expect(bubbleVisual.backgroundImage).toContain("radial-gradient");
+  expect(bubbleVisual.borderRadius).toBe("999px");
+  expect(bubbleVisual.iconColor).toBe("rgb(255, 255, 255)");
+  expect(bubbleVisual.boxShadow).toContain("rgba");
+  await chatBubble.click();
+  if ((page.viewportSize()?.width || 0) <= 640) {
+    await expect(page.locator("#brisa-chat-mobile-overlay:not(.hidden)")).toBeVisible();
+  } else {
+    await expect(page.locator("#brisa-chat-panel[data-chat-state='open']")).toBeVisible();
+  }
+  await expect(page.locator("#brisa-chat-root")).toHaveCount(1);
+  await expect(page.locator("[data-dm-ai-shell]")).toHaveCount(1);
+  await expect(page.locator("#brisa-chat-quick-ai")).toBeVisible();
+  await page.locator("#brisa-chat-quick-ai").click();
+  await expect(page.locator("[data-dm-ai-shell]")).toHaveClass(/is-open/);
+  await expect(page.locator("[data-dm-ai-shell]")).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-dm-ai-shell]")).not.toHaveClass(/is-open/);
+  await expectNoHorizontalOverflow(page);
+
   await expect.poll(() => page.locator(".bitacora-post").count(), { timeout: 30_000 }).toBe(1);
   await expect(page.locator("#bitacora-results-count")).toHaveText("0 artículos agregados");
   await expect(page.locator(".bitacora-post").first()).toHaveCSS("background-color", /rgba?|rgb/);
@@ -469,7 +671,7 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(page.locator("#bitacora-empty")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 
-  await sourcesTrigger.click();
+  await dockSources.click();
   const sourcesModal = page.locator("#scientific-sources-modal");
   await expect(sourcesModal).toBeVisible();
   await expect(sourcesModal.getByRole("dialog")).toBeVisible();
@@ -584,6 +786,28 @@ test("scientific logbook renders as operational hub with modals and article crea
   const ramrLogoWidth = await logoWidth("ramr");
   expect(ramrLogoWidth).toBeGreaterThanOrEqual(48);
   expect(ramrLogoWidth).toBeLessThanOrEqual(52);
+  const ramrLogoLayout = await sourcesModal.locator('.scientific-source-card[data-source-id="ramr"]').evaluate((card) => {
+    const image = card.querySelector(".scientific-source-logo img");
+    const container = card.querySelector(".scientific-source-logo");
+    const imageRect = image.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    return {
+      offsetX: getComputedStyle(card).getPropertyValue("--source-logo-offset-x").trim(),
+      containerOverflow: getComputedStyle(container).overflow,
+      imageShiftedLeft: imageRect.left < containerRect.left,
+      horizontalShiftWithinOffset:
+        imageRect.left >= containerRect.left - 2.5 &&
+        imageRect.right <= containerRect.right + 1,
+      imageVerticallyInsideContainer:
+        imageRect.top >= containerRect.top - 1 &&
+        imageRect.bottom <= containerRect.bottom + 1
+    };
+  });
+  expect(ramrLogoLayout.offsetX).toBe("-1.5px");
+  expect(ramrLogoLayout.containerOverflow).toBe("hidden");
+  expect(ramrLogoLayout.imageShiftedLeft).toBe(true);
+  expect(ramrLogoLayout.horizontalShiftWithinOffset).toBe(true);
+  expect(ramrLogoLayout.imageVerticallyInsideContainer).toBe(true);
   for (const name of [
     "Ministerio de Salud",
     "CONETEC",
@@ -617,23 +841,12 @@ test("scientific logbook renders as operational hub with modals and article crea
   await page.keyboard.press("Escape");
   await expect(sourcesModal).toBeHidden();
 
-  await sourcesTrigger.click();
+  await dockSources.click();
   await expect(sourcesModal).toBeVisible();
   await sourcesModal.getByRole("button", { name: "Cerrar" }).click();
   await expect(sourcesModal).toBeHidden();
 
-  const methodologyTrigger = page.getByRole("button", { name: "Guía Metodológica" });
-  await expect(methodologyTrigger).toBeVisible();
-  if ((page.viewportSize()?.width || 0) >= 900) {
-    const positions = await page.locator(".bitacora-hero__actions").evaluate((node) => {
-      const [sources, methodology] = Array.from(node.querySelectorAll("button")).map((button) =>
-        Math.round(button.getBoundingClientRect().left)
-      );
-      return { sources, methodology };
-    });
-    expect(positions.methodology).toBeGreaterThan(positions.sources);
-  }
-  await methodologyTrigger.click();
+  await dockMethodology.click();
   const methodologyModal = page.locator("#methodology-guide-modal");
   await expect(methodologyModal).toBeVisible();
   await expect(methodologyModal.getByRole("dialog")).toBeVisible();
@@ -656,13 +869,65 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(methodologyModal).toContainText("1 Diseño");
   await expect(methodologyModal).toContainText("Fórmula visual");
   await expect(methodologyModal).toContainText("8 Análisis");
+  const methodologyWorkflow = methodologyModal.locator(".methodology-guide-workflow");
+  await expect(methodologyWorkflow.locator(".methodology-guide-workflow__number")).toHaveCount(8);
+  await expect(methodologyWorkflow.locator(".methodology-guide-workflow__label")).toHaveCount(8);
   if ((page.viewportSize()?.width || 0) >= 900) {
-    const workflowFitsOneRow = await methodologyModal.locator(".methodology-guide-workflow").evaluate((workflow) => {
+    const workflowGeometry = await methodologyWorkflow.evaluate((workflow) => {
       const steps = Array.from(workflow.querySelectorAll(".methodology-guide-workflow__step"));
       const tops = new Set(steps.map((step) => Math.round(step.getBoundingClientRect().top)));
-      return steps.length === 8 && tops.size === 1;
+      const widths = steps.map((step) => step.getBoundingClientRect().width);
+      const shortWidths = [widths[0], widths[1], widths[4], widths[7]];
+      const longWidths = [widths[2], widths[3], widths[6]];
+      const numbers = Array.from(workflow.querySelectorAll(".methodology-guide-workflow__number"));
+      const labels = Array.from(workflow.querySelectorAll(".methodology-guide-workflow__label"));
+      return {
+        stepsInOneRow: steps.length === 8 && tops.size === 1,
+        numbersAreCircular: numbers.every((number) => {
+          const rect = number.getBoundingClientRect();
+          const styles = getComputedStyle(number);
+          return Math.abs(rect.width - rect.height) <= 1 && rect.width >= 20 && rect.width <= 24 && styles.borderRadius === "999px";
+        }),
+        numbersInsideSteps: numbers.every((number) => {
+          const numberRect = number.getBoundingClientRect();
+          const stepRect = number.closest(".methodology-guide-workflow__step").getBoundingClientRect();
+          return (
+            numberRect.left >= stepRect.left - 1 &&
+            numberRect.top >= stepRect.top - 1 &&
+            numberRect.right <= stepRect.right + 1 &&
+            numberRect.bottom <= stepRect.bottom + 1
+          );
+        }),
+        labelsInsideSteps: labels.every((label) => {
+          const labelRect = label.getBoundingClientRect();
+          const stepRect = label.closest(".methodology-guide-workflow__step").getBoundingClientRect();
+          return (
+            labelRect.left >= stepRect.left - 1 &&
+            labelRect.top >= stepRect.top - 1 &&
+            labelRect.right <= stepRect.right + 1 &&
+            labelRect.bottom <= stepRect.bottom + 1
+          );
+        }),
+        longColumnsWiderThanShortColumns: Math.min(...longWidths) > Math.max(...shortWidths)
+      };
     });
-    expect(workflowFitsOneRow).toBe(true);
+    expect(workflowGeometry.stepsInOneRow).toBe(true);
+    expect(workflowGeometry.numbersAreCircular).toBe(true);
+    expect(workflowGeometry.numbersInsideSteps).toBe(true);
+    expect(workflowGeometry.labelsInsideSteps).toBe(true);
+    expect(workflowGeometry.longColumnsWiderThanShortColumns).toBe(true);
+  }
+  if ((page.viewportSize()?.width || 0) <= 640) {
+    const workflowScrollsInternally = await methodologyWorkflow.evaluate((workflow) => {
+      const styles = getComputedStyle(workflow);
+      return (
+        styles.display === "flex" &&
+        styles.flexWrap === "nowrap" &&
+        (styles.overflowX === "auto" || styles.overflowX === "scroll") &&
+        workflow.scrollWidth > workflow.clientWidth
+      );
+    });
+    expect(workflowScrollsInternally).toBe(true);
   }
   await expect(methodologyModal).toContainText("Diferencias clave");
   await expect(methodologyModal).toContainText("Prospectivo vs retrospectivo");
@@ -713,14 +978,14 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(methodologyModal).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(methodologyModal).toBeHidden();
-  await expect(methodologyTrigger).toBeFocused();
-  await methodologyTrigger.click();
+  await expect(dockMethodology).toBeFocused();
+  await dockMethodology.click();
   await expect(methodologyModal).toBeVisible();
   await methodologyModal.click({ position: { x: 6, y: 6 } });
   await expect(methodologyModal).toBeHidden();
   await expectNoHorizontalOverflow(page);
 
-  await page.getByRole("button", { name: "Agregar artículo" }).click();
+  await addArticleTrigger.click();
   const articleModal = page.locator("#add-article-modal");
   await expect(articleModal).toBeVisible();
   await expect(articleModal.getByRole("dialog")).toBeVisible();
@@ -752,7 +1017,7 @@ test("scientific logbook renders as operational hub with modals and article crea
   await confirmDeleteAction(page);
   await expect(page.locator(".bitacora-post")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Agregar artículo" }).click();
+  await addArticleTrigger.click();
   await expect(articleModal).toBeVisible();
 
   const fileChooserPromise = page.waitForEvent("filechooser");
@@ -783,7 +1048,9 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(articleModal.locator("#article-advanced-zone")).toBeHidden();
   await expect(articleModal.getByLabel("Título")).toHaveValue("PDF QA Bitácora");
   await expect(articleModal.getByLabel("Descripción breve para tarjeta")).toHaveValue("Descripción breve en español desde PDF.");
-  await expect(articleModal.getByLabel("Descripción ampliada")).toHaveValue("Descripción ampliada en español generada desde PDF.");
+  await articleModal.getByRole("button", { name: "Editar detalles avanzados" }).click();
+  await expect(articleModal.locator("#article-advanced-zone")).toBeVisible();
+  await expect(articleModal.getByLabel("Descripción ampliada")).toHaveValue(/PDF científico/);
   await saveArticleButton.click();
   await expect(articleModal).toBeHidden({ timeout: 30_000 });
 
@@ -833,7 +1100,22 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(articleCommentButton).toHaveAccessibleName("0 comentarios en esta publicación");
   await expect(articleCommentButton).not.toContainText("Comentarios");
   await pdfPost.getByRole("button", { name: "Resumen Técnico" }).click();
-  await expect(pdfPost.locator(".bitacora-analysis")).toContainText("Descripción ampliada en español generada desde PDF.");
+  const pdfAnalysis = pdfPost.locator(".bitacora-analysis");
+  await expect(pdfAnalysis).toContainText("Objetivo");
+  await expect(pdfAnalysis).toContainText("Puntos clave");
+  await expect(pdfAnalysis).toContainText("Descripción ampliada");
+  const pdfExpandedToggle = pdfPost.locator(".bitacora-expanded-description__toggle").first();
+  const pdfExpandedBody = pdfPost.locator(".bitacora-expanded-description__body").first();
+  await expect(pdfExpandedToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(pdfExpandedBody).toBeHidden();
+  await pdfExpandedToggle.click();
+  await expect(pdfExpandedToggle).toHaveAttribute("aria-expanded", "true");
+  await expect(pdfExpandedBody).toBeVisible();
+  await expect(pdfExpandedBody.locator(".bitacora-expanded-description__section")).toHaveCount(5);
+  await expect(pdfExpandedBody).toContainText("PDF científico");
+  await pdfExpandedToggle.click();
+  await expect(pdfExpandedToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(pdfExpandedBody).toBeHidden();
   await expect(pdfPost.locator(".bitacora-analysis")).toContainText("Ficha metodológica");
   await expect(pdfPost.locator(".bitacora-analysis")).toContainText("Marco de implementación");
   await expect(pdfPost.locator(".bitacora-analysis")).toContainText("¿Multicéntrico?");
@@ -883,7 +1165,7 @@ test("scientific logbook renders as operational hub with modals and article crea
   await confirmDeleteAction(page);
   await expect(page.locator(".bitacora-post")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Agregar artículo" }).click();
+  await addArticleTrigger.click();
   await expect(articleModal).toBeVisible();
   await articleModal.getByRole("tab", { name: "Texto pegado" }).click();
   const pastedText =
@@ -897,10 +1179,10 @@ test("scientific logbook renders as operational hub with modals and article crea
     timeout: 30_000
   });
   await expect(articleModal.getByLabel("Título")).toHaveValue("Texto QA traducido");
-  await expect(articleModal.getByLabel("Descripción ampliada")).toHaveValue(
-    "Descripción ampliada en español generada desde documento aportado."
-  );
   await expect(articleModal.locator("#article-advanced-zone")).toBeHidden();
+  await articleModal.getByRole("button", { name: "Editar detalles avanzados" }).click();
+  await expect(articleModal.locator("#article-advanced-zone")).toBeVisible();
+  await expect(articleModal.getByLabel("Descripción ampliada")).toHaveValue(/documento aportado/);
   await articleModal.getByRole("button", { name: "Guardar como borrador" }).click();
   await expect(articleModal).toBeHidden({ timeout: 30_000 });
   const textDraft = page.locator(".bitacora-post").filter({ hasText: "Texto QA traducido" }).first();
@@ -910,7 +1192,7 @@ test("scientific logbook renders as operational hub with modals and article crea
   await confirmDeleteAction(page);
   await expect(page.locator(".bitacora-post")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Agregar artículo" }).click();
+  await addArticleTrigger.click();
   await expect(articleModal).toBeVisible();
   await articleModal.getByRole("tab", { name: "Datos manuales" }).click();
   const manualUrlInput = articleModal.locator("#article-tab-manual").getByLabel("URL oficial del artículo", { exact: true });
@@ -962,9 +1244,7 @@ test("scientific logbook renders as operational hub with modals and article crea
   await expect(articleModal.getByLabel("Tipo de evidencia")).toHaveValue("Investigación clínica");
   await expect(articleModal.getByLabel("Etiquetas")).toHaveValue("QA, Lectura crítica, PubMed, IA");
   await expect(articleModal.getByLabel("Acceso")).toHaveValue("Resumen disponible");
-  await expect(articleModal.getByLabel("Descripción ampliada")).toHaveValue(
-    "Descripción ampliada generada por IA desde Playwright."
-  );
+  await expect(articleModal.getByLabel("Descripción ampliada")).toHaveValue(/artículo PubMed/);
   expect(documentExtractionRequests).toHaveLength(2);
   expect(documentExtractionRequests[0].mode).toBe("pdf");
   expect(documentExtractionRequests[0].storagePath).toMatch(/^bitacora\/article-documents\/.+\/.+paper-qa\.pdf$/);
@@ -1003,9 +1283,14 @@ test("scientific logbook renders as operational hub with modals and article crea
   await newPost.getByRole("button", { name: "Resumen Técnico" }).click();
   await expect(newPost.getByRole("button", { name: "Ocultar Resumen Técnico" })).toHaveAttribute("aria-expanded", "true");
   await expect(newPost.locator(".bitacora-analysis")).toBeVisible();
-  await expect(newPost.locator(".bitacora-analysis")).toContainText(
-    "Descripción ampliada generada por IA desde Playwright."
-  );
+  const newPostExpandedToggle = newPost.locator(".bitacora-expanded-description__toggle").first();
+  const newPostExpandedBody = newPost.locator(".bitacora-expanded-description__body").first();
+  await expect(newPostExpandedToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(newPostExpandedBody).toBeHidden();
+  await newPostExpandedToggle.click();
+  await expect(newPostExpandedToggle).toHaveAttribute("aria-expanded", "true");
+  await expect(newPostExpandedBody).toBeVisible();
+  await expect(newPostExpandedBody).toContainText("artículo PubMed");
   await expect(newPost.locator(".bitacora-analysis")).toContainText("Ficha metodológica");
   await expect(newPost.locator(".bitacora-analysis")).toContainText("Ensayo clínico");
   await expect(newPost.locator(".bitacora-analysis")).toContainText("Hospital QA");
@@ -1051,6 +1336,20 @@ test("scientific logbook renders as operational hub with modals and article crea
   const reachedScrollThreshold = await page.evaluate(() => window.scrollY > 420);
   if (reachedScrollThreshold) {
     await expect(page.locator("#scroll-up")).toHaveClass(/show-scroll/);
+    const chatBubbleAndScrollUpDoNotOverlap = await page.evaluate(() => {
+      const bubble = document.querySelector("#brisa-chat-bubble");
+      const scrollUp = document.querySelector("#scroll-up");
+      if (!bubble || !scrollUp) return true;
+      const bubbleRect = bubble.getBoundingClientRect();
+      const scrollRect = scrollUp.getBoundingClientRect();
+      return (
+        bubbleRect.right <= scrollRect.left ||
+        scrollRect.right <= bubbleRect.left ||
+        bubbleRect.bottom <= scrollRect.top ||
+        scrollRect.bottom <= bubbleRect.top
+      );
+    });
+    expect(chatBubbleAndScrollUpDoNotOverlap).toBe(true);
     await page.locator("#scroll-up").click();
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThanOrEqual(20);
   }

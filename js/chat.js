@@ -43,6 +43,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   const ASSISTANT_MODEL_STORAGE_KEY = 'dm_ai_model';
   const ASSISTANT_DEFAULT_MODEL = 'gemini';
   const ASSISTANT_SHELL_MODULE_URL = '/assets/js/shared/assistant-shell.js?v=20260306-chat-desktop-layout-1';
+  const CHAT_STYLESHEET_URL = '/assets/css/shared/brisa-chat.css?v=20260504-bitacora-dock-chat-polish-2';
   const VIRTUAL_REPLIES = [
     'Estoy en línea, contame tu caso.',
     'Recibido, ¿algún detalle extra?',
@@ -64,6 +65,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     try {
       const pathname = window.location.pathname || '';
       if (pathname.startsWith('/app/')) return 'app';
+      if (pathname.endsWith('/bitacora-cientifica.html') || pathname.includes('/bitacora-cientifica')) return 'bitacora';
       if (pathname.includes('/pages/comites/')) return 'committee';
     } catch (error) {}
     return 'home';
@@ -217,6 +219,13 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   };
 
   const ensureChatStylesInjected = () => {
+    if (!document.querySelector('link[data-brisa-chat-css], link[href*="/assets/css/shared/brisa-chat.css"]')) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = CHAT_STYLESHEET_URL;
+      link.dataset.brisaChatCss = 'true';
+      document.head.appendChild(link);
+    }
     if (document.getElementById('brisa-chat-pulse-style')) return;
     const style = document.createElement('style');
     style.id = 'brisa-chat-pulse-style';
@@ -789,6 +798,18 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
           );
         }
 
+        #brisa-chat-root[data-chat-context="bitacora"] {
+          --dm-fab-bottom: 2rem;
+          --brisa-chat-fab-left: 32px;
+          --brisa-chat-window-left: calc(
+            var(--brisa-chat-fab-left, 32px) +
+            var(--dm-chat-fab-size, 58px) +
+            var(--brisa-chat-panel-gap, 16px) +
+            var(--brisa-chat-panel-width, 18rem) +
+            var(--brisa-chat-window-gap, 18px)
+          );
+        }
+
         #brisa-chat-root[data-chat-context="committee"] {
           --dm-fab-bottom: 18px;
           --brisa-chat-fab-left: 18px;
@@ -810,6 +831,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         }
 
         #brisa-chat-root[data-chat-context="home"] .brisa-chat-fab[data-side="left"] .brisa-chat-panel,
+        #brisa-chat-root[data-chat-context="bitacora"] .brisa-chat-fab[data-side="left"] .brisa-chat-panel,
         #brisa-chat-root[data-chat-context="app"] .brisa-chat-fab[data-side="left"] .brisa-chat-panel {
           left: calc(100% + var(--brisa-chat-panel-gap, 16px));
           right: auto;

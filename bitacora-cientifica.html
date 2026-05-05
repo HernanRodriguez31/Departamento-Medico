@@ -34,7 +34,8 @@
     <link rel="stylesheet" href="/assets/css/pages/index.css?v=20260502-portal-hover-state-1" />
     <link rel="stylesheet" href="/assets/css/core-contrast.css?v=20260502-committee-border-align-1" />
     <link rel="stylesheet" href="/assets/css/pages/galeriadearte.css?v=20260503-art-gallery-like-tooltip-1" />
-    <link rel="stylesheet" href="/assets/css/pages/bitacora-cientifica.css?v=20260504-methodology-guide-terms-1" />
+    <link rel="stylesheet" href="/assets/css/shared/brisa-chat.css?v=20260504-bitacora-cubes-hero-align-3" data-brisa-chat-css />
+    <link rel="stylesheet" href="/assets/css/pages/bitacora-cientifica.css?v=20260505-bitacora-post-separator-1" />
   </head>
   <body class="art-gallery-page bitacora-page ui-clarity">
     <div id="app">
@@ -166,33 +167,79 @@
 
       <main class="art-gallery-main bitacora-main">
         <div class="art-gallery-shell bitacora-shell">
+          <nav class="bitacora-quick-dock dm-cubes" data-bitacora-quick-dock aria-label="Accesos rápidos de Bitácora Científica">
+            <button
+              type="button"
+              class="bitacora-quick-cube dm-cube"
+              data-bitacora-quick-action="methodology"
+              aria-label="Abrir Guía Metodológica"
+              aria-haspopup="dialog"
+              aria-controls="methodology-guide-modal"
+              aria-expanded="false"
+              title="Abrir Guía Metodológica"
+            >
+              <span class="bitacora-quick-cube__content dm-cube__content">
+                <span class="bitacora-quick-cube__icon dm-cube__icon">
+                  <i data-lucide="clipboard-list" aria-hidden="true"></i>
+                </span>
+                <span class="bitacora-quick-cube__label dm-cube__label dm-cube__label--long">Guía<br />Metodológica</span>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              class="bitacora-quick-cube dm-cube"
+              data-bitacora-quick-action="sources"
+              aria-label="Abrir Fuentes recomendadas"
+              aria-haspopup="dialog"
+              aria-controls="scientific-sources-modal"
+              aria-expanded="false"
+              title="Ver Fuentes recomendadas"
+            >
+              <span class="bitacora-quick-cube__content dm-cube__content">
+                <span class="bitacora-quick-cube__icon dm-cube__icon">
+                  <i data-lucide="book-open" aria-hidden="true"></i>
+                </span>
+                <span class="bitacora-quick-cube__label dm-cube__label dm-cube__label--long">Fuentes<br />recomendadas</span>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              class="bitacora-quick-cube dm-cube"
+              data-bitacora-quick-action="add-article"
+              aria-label="Agregar artículo científico"
+              aria-haspopup="dialog"
+              aria-controls="add-article-modal"
+              aria-expanded="false"
+              title="Agregar artículo científico"
+            >
+              <span class="bitacora-quick-cube__content dm-cube__content">
+                <span class="bitacora-quick-cube__icon dm-cube__icon">
+                  <i data-lucide="file-plus-2" aria-hidden="true"></i>
+                </span>
+                <span class="bitacora-quick-cube__label dm-cube__label dm-cube__label--long">Agregar<br />artículo</span>
+              </span>
+            </button>
+
+            <button
+              id="dmAssistantFab"
+              type="button"
+              class="bitacora-quick-cube bitacora-quick-cube--bot dm-cube"
+              data-bitacora-quick-action="bot"
+              aria-label="Abrir asistente de inteligencia artificial"
+              aria-haspopup="dialog"
+              aria-expanded="false"
+              title="Abrir Bot IA"
+            >
+              <img src="/asistente-ia/boti-brisa.jpg" alt="" aria-hidden="true" loading="lazy" decoding="async" />
+              <span class="sr-only">Bot IA</span>
+            </button>
+          </nav>
+
           <section class="bitacora-intro-segment" aria-labelledby="bitacora-heading">
             <p class="bitacora-breadcrumb">Portal</p>
             <h1 class="art-gallery-title bitacora-title" id="bitacora-heading">Bitácora de Ciencia Médica</h1>
-            <div class="bitacora-hero__actions" aria-label="Herramientas de la Bitácora">
-              <button
-                type="button"
-                class="bitacora-hero__action bitacora-hero__action--sources bitacora-sources-trigger"
-                data-open-scientific-sources
-                aria-haspopup="dialog"
-                aria-controls="scientific-sources-modal"
-                aria-expanded="false"
-              >
-                <i data-lucide="book-open" aria-hidden="true"></i>
-                <span>Fuentes recomendadas</span>
-              </button>
-              <button
-                type="button"
-                class="bitacora-hero__action bitacora-hero__action--methodology"
-                data-open-methodology-guide
-                aria-haspopup="dialog"
-                aria-controls="methodology-guide-modal"
-                aria-expanded="false"
-              >
-                <i data-lucide="clipboard-list" aria-hidden="true"></i>
-                <span>Guía Metodológica</span>
-              </button>
-            </div>
           </section>
 
           <section
@@ -480,10 +527,6 @@
                     <span>Descripción breve para tarjeta</span>
                     <textarea id="article-card-summary" name="cardSummaryEs" rows="2"></textarea>
                   </label>
-                  <label class="bitacora-field bitacora-field--wide" for="article-executive-summary">
-                    <span>Descripción ampliada</span>
-                    <textarea id="article-executive-summary" name="executiveSummary" rows="3"></textarea>
-                  </label>
                   <label class="bitacora-field bitacora-field--wide" for="article-clinical-question">
                     <span>Objetivo / pregunta</span>
                     <textarea id="article-clinical-question" name="clinicalQuestion" rows="3"></textarea>
@@ -522,6 +565,10 @@
                   <p>Campos bibliográficos y análisis ampliado para revisión editorial.</p>
                 </div>
                 <div class="bitacora-form-grid">
+                  <label class="bitacora-field bitacora-field--wide" for="article-executive-summary">
+                    <span>Descripción ampliada</span>
+                    <textarea id="article-executive-summary" name="executiveSummary" rows="8"></textarea>
+                  </label>
                   <label class="bitacora-field" for="article-journal">
                     <span>Revista</span>
                     <input id="article-journal" name="journal" type="text" />
@@ -866,7 +913,7 @@
       installFirebaseGlobals();
     </script>
     <script type="module" src="/assets/js/common/notifications.js"></script>
-    <script type="module" src="/assets/js/pages/bitacora-cientifica.js?v=20260504-methodology-guide-terms-1"></script>
+    <script type="module" src="/assets/js/pages/bitacora-cientifica.js?v=20260505-bitacora-post-separator-1"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
