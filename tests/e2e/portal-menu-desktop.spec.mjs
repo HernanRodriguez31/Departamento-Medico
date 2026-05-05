@@ -79,6 +79,11 @@ test("desktop portal cube opens four accessible radial actions", async ({ page }
   expect(radialLayout.links.every((link) => link.x > radialLayout.centerX)).toBe(true);
   expect(new Set(radialLayout.links.map((link) => link.x)).size).toBeGreaterThan(1);
   expect(new Set(radialLayout.links.map((link) => link.y)).size).toBe(4);
+  const adjacentDistances = radialLayout.links.slice(1).map((link, index) => {
+    const previous = radialLayout.links[index];
+    return Math.hypot(link.x - previous.x, link.y - previous.y);
+  });
+  expect(Math.max(...adjacentDistances) - Math.min(...adjacentDistances)).toBeLessThanOrEqual(4);
 
   await expect(page.locator("#portal-gallery")).not.toBeFocused();
   await expectTooltipHidden(page.locator("#portal-gallery"));
