@@ -267,10 +267,7 @@ const finalizeExpandedDescriptionFields = (article = {}, packet = {}) => {
   if (!next.expandedDescriptionEs && next.executiveSummaryEs) next.expandedDescriptionEs = next.executiveSummaryEs;
   if (!next.executiveSummaryEs && next.expandedDescriptionEs) next.executiveSummaryEs = next.expandedDescriptionEs;
   const assessed = validateExpandedDescriptionQuality(next, packet);
-  next.expandedDescriptionQuality = normalizeExpandedDescriptionQuality(next.expandedDescriptionQuality) || assessed.quality;
-  if (assessed.quality === "insufficient" && hasSubstantialEvidenceForExpandedDescription(packet)) {
-    next.expandedDescriptionQuality = "insufficient";
-  }
+  next.expandedDescriptionQuality = assessed.quality;
   return next;
 };
 
@@ -742,6 +739,10 @@ const buildRawEvidence = (packet = {}) => ({
     .slice(0, 20),
   preclassification: packet.preclassification || {},
   qualitySignals: packet.qualitySignals || {},
+  expandedDescriptionQuality: packet.expandedDescriptionQuality || "",
+  expandedDescriptionWordCount: Number(packet.expandedDescriptionWordCount || 0),
+  expandedDescriptionSectionCount: Number(packet.expandedDescriptionSectionCount || 0),
+  expandedDescriptionRetryAttempted: Boolean(packet.expandedDescriptionRetryAttempted),
   modelUsed: cleanString(packet.modelUsed || "")
 });
 
@@ -1777,16 +1778,41 @@ const resolveScientificArticleDocument = async (input = {}, {
     });
   }
 
+  const aiStart = now();
   const coreStart = now();
-  const core = await extractCoreArticleFicha(packet, { apiKey, fetchImpl, model: documentModel });
-  agentDurations.coreAiMs = now() - coreStart;
+  const corePromise = extractCoreArticleFicha(packet, { apiKey, fetchImpl, model: documentModel })
+    .finally(() => {
+      agentDurations.coreAiMs = now() - coreStart;
+    });
 
   const methodologyStart = now();
-  const methodology = core.ok
-    ? await extractMethodologyProfile(packet, { apiKey, fetchImpl, model: documentModel })
-    : { ok: false, article: buildEmptyArticle(), error: core.error, modelUsed: core.modelUsed };
-  agentDurations.methodologyAiMs = now() - methodologyStart;
-  agentDurations.aiMs = agentDurations.coreAiMs + agentDurations.methodologyAiMs;
+  const methodologyPromise = extractMethodologyProfile(packet, { apiKey, fetchImpl, model: documentModel })
+    .finally(() => {
+      agentDurations.methodologyAiMs = now() - methodologyStart;
+    });
+
+  const [coreSettled, methodologySettled] = await Promise.allSettled([corePromise, methodologyPromise]);
+  agentDurations.aiMs = now() - aiStart;
+  const buildSettledAgentResult = (settled, agentName) => {
+    if (settled.status === "fulfilled") return settled.value;
+    const message = cleanString(settled.reason?.message || settled.reason?.code || settled.reason);
+    return {
+      ok: false,
+      article:
+        agentName === "core"
+          ? buildDeterministicDocumentFallback(packet, {
+              warnings: ["La IA no pudo generar la ficha editorial core."]
+            })
+          : buildEmptyArticle(),
+      error: {
+        code: `${agentName}_agent_failed`,
+        message: message || `Falló el agente documental ${agentName}.`
+      },
+      modelUsed: ""
+    };
+  };
+  const core = buildSettledAgentResult(coreSettled, "core");
+  const methodology = buildSettledAgentResult(methodologySettled, "methodology");
   packet.modelUsed = [core.modelUsed, methodology.modelUsed].filter(Boolean).join(" + ");
 
   let article = finalizeExpandedDescriptionFields(
@@ -1802,6 +1828,7 @@ const resolveScientificArticleDocument = async (input = {}, {
   if (expansionRetry.attempted) {
     agentDurations.expandedDescriptionRetryMs = now() - expansionRetryStart;
     article = expansionRetry.article;
+    packet.expandedDescriptionRetryAttempted = true;
     if (expansionRetry.modelUsed) {
       packet.modelUsed = Array.from(new Set([packet.modelUsed, expansionRetry.modelUsed].filter(Boolean))).join(" + ");
     }
@@ -1816,6 +1843,11 @@ const resolveScientificArticleDocument = async (input = {}, {
     article.warnings.push("No se pudo completar la metodología avanzada; se conservó la ficha editorial.");
   }
   article.warnings = Array.from(new Set([...(packet.warnings || []), ...(article.warnings || [])])).slice(0, 10);
+  const finalDescriptionAssessment = validateExpandedDescriptionQuality(article, packet);
+  article.expandedDescriptionQuality = finalDescriptionAssessment.quality;
+  packet.expandedDescriptionQuality = finalDescriptionAssessment.quality;
+  packet.expandedDescriptionWordCount = finalDescriptionAssessment.wordCount;
+  packet.expandedDescriptionSectionCount = finalDescriptionAssessment.sections.length;
   let status = computeExtractionStatus(article);
   if (
     status === "ai_draft" &&

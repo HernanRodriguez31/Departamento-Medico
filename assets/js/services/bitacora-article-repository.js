@@ -402,8 +402,7 @@ export function createBitacoraArticleRepository({ db, auth, storage } = {}) {
         if (isSessionError(error)) {
           throw buildRepositoryError("AUTH_REQUIRED", error);
         }
-        console.warn("[Bitácora] Firestore no disponible para guardar artículo. Se usa modo local.", error);
-        mode = "memory";
+        throw buildRepositoryError("FIRESTORE_SAVE_FAILED", error);
       }
     }
 
@@ -443,7 +442,7 @@ export function createBitacoraArticleRepository({ db, auth, storage } = {}) {
         if (isSessionError(error)) {
           throw buildRepositoryError("AUTH_REQUIRED", error);
         }
-        throw error;
+        throw buildRepositoryError("FIRESTORE_SAVE_FAILED", error);
       }
       return normalizeBitacoraArticle(
         id,

@@ -1024,6 +1024,10 @@ test("document resolver retries short expanded description and keeps ai_draft wh
   assert.equal(calls.some((call) => call.retry), true);
   assert.match(result.article.warnings.join(" "), /regeneró la descripción ampliada/i);
   assert.equal(Number(result.rawEvidence.agentDurations.expandedDescriptionRetryMs) >= 0, true);
+  assert.equal(result.rawEvidence.expandedDescriptionQuality, "complete");
+  assert.equal(result.rawEvidence.expandedDescriptionWordCount >= 280, true);
+  assert.equal(result.rawEvidence.expandedDescriptionSectionCount >= 4, true);
+  assert.equal(result.rawEvidence.expandedDescriptionRetryAttempted, true);
 });
 
 test("document resolver downgrades to metadata_only when expanded description retry stays too short", async () => {
@@ -1089,6 +1093,10 @@ test("document resolver downgrades to metadata_only when expanded description re
   assert.equal(result.extractionStatus, "metadata_only");
   assert.equal(result.article.expandedDescriptionQuality, "insufficient");
   assert.equal(calls.some(Boolean), true);
+  assert.equal(result.article.title, "Still short PDF");
+  assert.equal(result.rawEvidence.expandedDescriptionQuality, "insufficient");
+  assert.equal(result.rawEvidence.expandedDescriptionWordCount < 280, true);
+  assert.equal(result.rawEvidence.expandedDescriptionRetryAttempted, true);
   assert.match(result.article.warnings.join(" "), /no pudo regenerar una descripción ampliada suficiente|descripción ampliada suficiente/i);
 });
 
@@ -1185,9 +1193,11 @@ test("document resolver keeps core ficha when advanced methodology extraction fa
     extractionConfidence: 0.78
   };
   let calls = 0;
-  const fetchImpl = async () => {
+  const fetchImpl = async (_url, options = {}) => {
     calls += 1;
-    if (calls === 1) {
+    const body = JSON.parse(options.body || "{}");
+    const prompt = (body.messages || []).map((message) => message.content || "").join("\n");
+    if (/No completes metodología avanzada/i.test(prompt)) {
       return {
         ok: true,
         status: 200,
@@ -1215,6 +1225,68 @@ test("document resolver keeps core ficha when advanced methodology extraction fa
   assert.equal(result.article.title, "Core PDF title");
   assert.equal(result.article.doi, "10.5555/core");
   assert.match(result.article.warnings.join(" "), /metodología avanzada/i);
+  assert.ok(calls >= 2);
+});
+
+test("document resolver preserves core ficha when methodology transport rejects", async () => {
+  const coreArticle = {
+    title: "Core survives transport error",
+    sourceName: "Transport Journal",
+    journal: "Transport Journal",
+    authors: ["Equipo QA"],
+    officialUrl: "https://doi.org/10.5555/transport",
+    doi: "10.5555/transport",
+    publicationDate: "2026-05-04",
+    originalLanguage: "en",
+    articleType: "Artículo científico",
+    evidenceType: "Revisión científica",
+    accessType: "Open access",
+    briefDescriptionEs: "Ficha breve en español para confirmar que el core sobrevive.",
+    expandedDescriptionEs: expandedDescriptionTextFixture(),
+    expandedDescriptionSections: expandedDescriptionSectionsFixture(),
+    expandedDescriptionQuality: "complete",
+    cardSummaryEs: "Ficha breve en español para confirmar que el core sobrevive.",
+    executiveSummaryEs: expandedDescriptionTextFixture(),
+    objectiveEs: "Validar resiliencia del análisis documental ante fallos parciales.",
+    studyDesignEs: "Revisión científica.",
+    studyContextEs: "Documento con contenido suficiente para extracción editorial.",
+    studyPopulationEs: "Población documental indicada por el texto de prueba.",
+    studyLocationEs: "Contexto QA.",
+    studyPeriodEs: "2026",
+    mainMessageEs: "La falla metodológica no debe impedir guardar la ficha.",
+    keyPointsEs: ["Core completo", "Fallo metodológico aislado", "Guardado posible"],
+    tags: ["Core", "Resiliencia"],
+    warnings: [],
+    extractionConfidence: 0.82
+  };
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls += 1;
+    if (calls === 1) {
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ choices: [{ message: { content: JSON.stringify(coreArticle) } }] })
+      };
+    }
+    throw new Error("methodology transport down");
+  };
+
+  const result = await resolveScientificArticleDocument(
+    {
+      mode: "pasted_text",
+      pastedText: "Core transport title\nTransport Journal\nAbstract\nThis document has enough scientific content, methods, results and conclusions for extraction. ".repeat(30),
+      pastedSource: "Transport Journal",
+      officialUrl: "https://doi.org/10.5555/transport"
+    },
+    { uid: "user-a", user: { uid: "user-a" }, apiKey: "test-key", fetchImpl }
+  );
+
+  assert.equal(result.extractionStatus, "ai_draft");
+  assert.equal(result.article.title, "Core survives transport error");
+  assert.equal(result.article.expandedDescriptionQuality, "complete");
+  assert.match(result.article.warnings.join(" "), /metodología avanzada/i);
+  assert.equal(Number(result.rawEvidence.agentDurations.methodologyAiMs) >= 0, true);
   assert.ok(calls >= 2);
 });
 

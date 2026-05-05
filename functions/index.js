@@ -1214,6 +1214,11 @@ const extractScientificArticleDocumentHandler = async (req, res) => {
       apiKey: process.env.OPENAI_API_KEY,
       documentModel: process.env.OPENAI_DOCUMENT_MODEL || process.env.OPENAI_MODEL || "",
     });
+    result.requestId = requestId;
+    result.rawEvidence = {
+      ...(result.rawEvidence || {}),
+      requestId,
+    };
     const article = result.article || {};
     const rawEvidence = result.rawEvidence || {};
     const quality = scoreDocumentArticle(article);
@@ -1239,6 +1244,12 @@ const extractScientificArticleDocumentHandler = async (req, res) => {
       extractionStatus: result.extractionStatus,
       extractionConfidence: article.extractionConfidence || 0,
       modelUsed: rawEvidence.modelUsed || "",
+      expandedDescriptionQuality: article.expandedDescriptionQuality || rawEvidence.expandedDescriptionQuality || "",
+      expandedDescriptionWordCount: rawEvidence.expandedDescriptionWordCount || 0,
+      expandedDescriptionSectionCount:
+        rawEvidence.expandedDescriptionSectionCount ||
+        (Array.isArray(article.expandedDescriptionSections) ? article.expandedDescriptionSections.length : 0),
+      expandedDescriptionRetryAttempted: Boolean(rawEvidence.expandedDescriptionRetryAttempted),
       completedFields: quality.completedFields || [],
       missingCriticalFields,
       warnings: article.warnings || [],
@@ -1298,6 +1309,7 @@ const extractScientificArticleDocumentHandler = async (req, res) => {
       rawEvidence: {
         mode: body.mode || "",
         originalFileName: body.originalFileName || "",
+        requestId,
         detectedLanguage: "und",
         pageCount: 0,
         fileSize: 0,
@@ -1311,6 +1323,7 @@ const extractScientificArticleDocumentHandler = async (req, res) => {
         code: "unexpected_document_extraction_error",
         message: "No se pudo analizar el documento. Podés completar la publicación manualmente.",
       },
+      requestId,
     });
   }
 };
@@ -1631,7 +1644,7 @@ exports.extractScientificArticle = onRequest(
 exports.extractScientificArticleDocument = onRequest(
   {
     secrets: ["OPENAI_API_KEY"],
-    timeoutSeconds: 180,
+    timeoutSeconds: 300,
     memory: "512MiB",
   },
   extractScientificArticleDocumentHandler

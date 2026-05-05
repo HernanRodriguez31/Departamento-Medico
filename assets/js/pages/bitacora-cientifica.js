@@ -21,13 +21,13 @@ import {
 import { BITACORA_POSTS } from "../data/bitacora-posts.js";
 import { METHODOLOGY_GUIDE, METHODOLOGY_TERMS } from "../data/methodology-guide.js?v=20260504-methodology-guide-terms-1";
 import { NATIONAL_SELECTED_SOURCE_IDS, SCIENTIFIC_SOURCES } from "../data/scientific-sources.js?v=20260504-ramr-logo-center-2";
-import { createBitacoraArticleRepository } from "../services/bitacora-article-repository.js?v=20260505-bitacora-pdf-save-expanded-fix-1";
+import { createBitacoraArticleRepository } from "../services/bitacora-article-repository.js?v=20260505-bitacora-pdf-load-save-reliability-2";
 import {
   inferSourceNameFromDomain,
   requestArticleExtraction,
   requestArticleDocumentExtraction,
   validateArticleUrl
-} from "../services/bitacora-ai-extractor.js?v=20260505-bitacora-pdf-save-expanded-fix-1";
+} from "../services/bitacora-ai-extractor.js?v=20260505-bitacora-pdf-load-save-reliability-2";
 
 const { auth, db, storage } = getFirebase();
 
@@ -115,6 +115,10 @@ const els = {
   articleAiWarnings: $("#article-ai-warnings"),
   articleAiProcessingOverlay: $("#article-ai-processing-overlay"),
   previewZone: $("#article-preview-zone"),
+  previewAiSummary: $("#article-preview-analysis-summary"),
+  previewExpandedDescription: $("#article-preview-expanded-description"),
+  previewExpandedToggle: $("#article-preview-expanded-toggle"),
+  previewExpandedBody: $("#article-preview-expanded-body"),
   advancedZone: $("#article-advanced-zone"),
   advancedToggle: $("#article-advanced-toggle"),
   assistedZone: $("#article-assisted-zone"),
@@ -2093,6 +2097,161 @@ const setAdvancedVisible = (visible) => {
   }
 };
 
+const countWords = (value = "") =>
+  cleanUserText(value)
+    .split(/\s+/)
+    .filter(Boolean).length;
+
+const getArticleExpandedDescriptionText = (article = {}) =>
+  cleanUserText(
+    article.expandedDescriptionEs ||
+      article.executiveSummaryEs ||
+      article.executiveSummary ||
+      expandedDescriptionSectionsToText(article.expandedDescriptionSections)
+  );
+
+const getExtractionRequestId = (result = {}) =>
+  cleanUserText(result.rawEvidence?.requestId || result.requestId || result.article?.requestId || "");
+
+const buildExtractionQualitySummary = (result = {}, extractionStatus = "manual", source = "manual") => {
+  const article = result.article || {};
+  const sections = normalizeExpandedDescriptionSections(article.expandedDescriptionSections);
+  const expandedText = getArticleExpandedDescriptionText(article);
+  const wordCount = Number(result.rawEvidence?.expandedDescriptionWordCount) || countWords(expandedText);
+  const sectionCount = Number(result.rawEvidence?.expandedDescriptionSectionCount) || sections.length;
+  const fileName = cleanUserText(result.rawEvidence?.originalFileName || state.articleDraftMeta.originalFileName);
+  const statusLabel =
+    extractionStatus === "ai_draft"
+      ? "Borrador automático"
+      : extractionStatus === "metadata_only"
+        ? "Ficha preliminar"
+        : "Revisión manual";
+  const sourceLabel =
+    source === "pdf"
+      ? "PDF"
+      : source === "pasted_text"
+        ? "Texto pegado"
+        : "IA documental";
+  return {
+    statusLabel,
+    sourceLabel,
+    fileName,
+    wordCount,
+    sectionCount,
+    quality: normalizeExpandedDescriptionQuality(article.expandedDescriptionQuality),
+    requestId: getExtractionRequestId(result)
+  };
+};
+
+const renderPreviewAiSummary = (result = {}, extractionStatus = "manual", source = "manual") => {
+  if (!els.previewAiSummary) return;
+  const summary = buildExtractionQualitySummary(result, extractionStatus, source);
+  const chips = [
+    summary.statusLabel,
+    summary.sourceLabel,
+    summary.quality === "complete"
+      ? "Calidad completa"
+      : summary.quality === "partial"
+        ? "Revisión editorial"
+        : "Descripción insuficiente",
+    summary.wordCount ? `${summary.wordCount} palabras` : "",
+    summary.sectionCount ? `${summary.sectionCount} secciones` : "",
+    summary.fileName ? summary.fileName : "",
+    summary.requestId ? `ID ${summary.requestId}` : ""
+  ].filter(Boolean);
+  els.previewAiSummary.hidden = !chips.length;
+  els.previewAiSummary.innerHTML = chips
+    .map((chip) => `<span class="bitacora-preview-ai-summary__chip">${escapeHtml(chip)}</span>`)
+    .join("");
+};
+
+const resetPreviewExpandedDescription = () => {
+  if (els.previewExpandedDescription) els.previewExpandedDescription.hidden = true;
+  if (els.previewExpandedBody) {
+    els.previewExpandedBody.hidden = true;
+    els.previewExpandedBody.innerHTML = "";
+  }
+  if (els.previewExpandedToggle) {
+    els.previewExpandedToggle.setAttribute("aria-expanded", "false");
+    const label = els.previewExpandedToggle.querySelector("[data-preview-expanded-label]");
+    if (label) label.textContent = "Ver descripción";
+    const icon = els.previewExpandedToggle.querySelector("[data-lucide]");
+    if (icon) icon.setAttribute("data-lucide", "chevron-down");
+  }
+};
+
+const renderPreviewExpandedDescription = (article = {}) => {
+  resetPreviewExpandedDescription();
+  if (!els.previewExpandedDescription || !els.previewExpandedBody) return;
+  const sections = normalizeExpandedDescriptionSections(article.expandedDescriptionSections);
+  const text = getArticleExpandedDescriptionText(article);
+  if (!sections.length && !text) return;
+  const content = sections.length
+    ? sections
+        .map(
+          (section) => `
+            <article class="bitacora-preview-expanded-description__section">
+              <h4>${escapeHtml(section.heading)}</h4>
+              <p>${escapeHtml(section.body)}</p>
+            </article>
+          `
+        )
+        .join("")
+    : splitExpandedDescriptionParagraphs(text)
+        .map((paragraph) => `<p class="bitacora-preview-expanded-description__paragraph">${escapeHtml(paragraph)}</p>`)
+        .join("");
+  if (!content) return;
+  els.previewExpandedBody.innerHTML = content;
+  els.previewExpandedDescription.hidden = false;
+  if (window.lucide) window.lucide.createIcons();
+};
+
+const togglePreviewExpandedDescription = () => {
+  if (!els.previewExpandedToggle || !els.previewExpandedBody) return;
+  const isOpen = els.previewExpandedToggle.getAttribute("aria-expanded") === "true";
+  els.previewExpandedToggle.setAttribute("aria-expanded", isOpen ? "false" : "true");
+  els.previewExpandedBody.hidden = isOpen;
+  const label = els.previewExpandedToggle.querySelector("[data-preview-expanded-label]");
+  if (label) label.textContent = isOpen ? "Ver descripción" : "Ocultar descripción";
+  const icon = els.previewExpandedToggle.querySelector("[data-lucide]");
+  if (icon) icon.setAttribute("data-lucide", isOpen ? "chevron-down" : "chevron-up");
+  if (window.lucide) window.lucide.createIcons();
+};
+
+const scrollPreviewIntoView = () => {
+  if (!els.previewZone) return;
+  window.requestAnimationFrame(() => {
+    els.previewZone?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+};
+
+const verifyArticleFieldsAfterExtraction = (article = {}, result = {}) => {
+  const checks = [
+    { label: "título", expected: article.title, selector: "#article-title" },
+    { label: "fuente", expected: article.sourceName || article.journal, selector: "#article-source-name" },
+    { label: "descripción breve", expected: article.briefDescriptionEs || article.cardSummaryEs, selector: "#article-card-summary" },
+    { label: "objetivo", expected: article.objectiveEs || article.clinicalQuestionEs || article.clinicalQuestion, selector: "#article-clinical-question" },
+    { label: "puntos clave", expected: (article.keyPointsEs || []).join("\n"), selector: "#article-key-points" },
+    { label: "descripción ampliada", expected: getArticleExpandedDescriptionText(article), selector: "#article-executive-summary" }
+  ];
+  const missing = checks
+    .filter((check) => cleanUserText(check.expected))
+    .filter((check) => !cleanUserText($(check.selector)?.value))
+    .map((check) => check.label);
+  if (!missing.length) {
+    setArticleError(els.articleFormError, "");
+    return true;
+  }
+  const requestId = getExtractionRequestId(result);
+  setArticleError(
+    els.articleFormError,
+    `La IA respondió, pero no se cargaron estos campos en el formulario: ${missing.join(", ")}.${
+      requestId ? ` ID técnico: ${requestId}.` : ""
+    }`
+  );
+  return false;
+};
+
 const setArticleTab = (tab = "pdf") => {
   const target = ["pdf", "text", "manual"].includes(tab) ? tab : "pdf";
   els.articleTabs.forEach((button) => {
@@ -2163,6 +2322,11 @@ const resetArticleForm = () => {
   setAiProcessingOverlay(false);
   setAssistedModeVisible(false);
   setPreviewVisible(false);
+  if (els.previewAiSummary) {
+    els.previewAiSummary.hidden = true;
+    els.previewAiSummary.innerHTML = "";
+  }
+  resetPreviewExpandedDescription();
   setAdvancedVisible(false);
   setArticleTab("pdf");
   if (els.pdfInput) els.pdfInput.value = "";
@@ -2428,6 +2592,7 @@ const fillArticleFromExtraction = (article = {}, rawEvidence = null) => {
   state.articleDraftMeta.documentContentType = rawEvidence?.documentContentType || state.articleDraftMeta.documentContentType;
   state.articleDraftMeta.sourcePages = article.sourcePages || state.articleDraftMeta.sourcePages || [];
   state.articleDraftMeta.rawEvidence = rawEvidence || state.articleDraftMeta.rawEvidence;
+  renderPreviewExpandedDescription(article);
   setAiWarnings(article.warnings || []);
 };
 
@@ -2618,13 +2783,38 @@ const applyDocumentExtractionResult = (result, source) => {
     state.articleDraftMeta.documentContentType = result.rawEvidence.documentContentType;
   }
   if (extractionStatus === "ai_draft") {
-    setAiStatus(result.message || "Ficha generada por IA. Revisá la información antes de guardar.");
+    const summary = buildExtractionQualitySummary({ ...result, article }, extractionStatus, source);
+    const qualityText = [
+      summary.wordCount ? `${summary.wordCount} palabras` : "",
+      summary.sectionCount ? `${summary.sectionCount} secciones` : ""
+    ]
+      .filter(Boolean)
+      .join(", ");
+    setAiStatus(
+      result.message ||
+        `Ficha generada por IA${qualityText ? ` con descripción ampliada de ${qualityText}` : ""}. Revisá la información antes de guardar.`
+    );
   } else if (extractionStatus === "metadata_only") {
-    setAiStatus(result.message || "Se detectaron datos básicos, pero falta contenido suficiente. Completá los campos necesarios antes de guardar.");
+    const summary = buildExtractionQualitySummary({ ...result, article }, extractionStatus, source);
+    setAiStatus(
+      result.message ||
+        `Se cargó una ficha preliminar${
+          summary.wordCount ? ` con ${summary.wordCount} palabras de descripción ampliada` : ""
+        }. Revisá y completá la información antes de guardar.`
+    );
   } else if (extractionStatus === "not_configured") {
     setAiStatus(result.error || "El servicio de IA no está configurado en backend.");
   } else {
     setAiStatus(result.error || "No se pudo analizar el documento. Podés completar la publicación manualmente.");
+  }
+  if (extractionStatus === "ai_draft" || extractionStatus === "metadata_only") {
+    renderPreviewAiSummary({ ...result, article }, extractionStatus, source);
+    renderPreviewExpandedDescription(article);
+    verifyArticleFieldsAfterExtraction(article, result);
+    scrollPreviewIntoView();
+  } else {
+    renderPreviewAiSummary({ ...result, article }, extractionStatus, source);
+    renderPreviewExpandedDescription(article);
   }
 };
 
@@ -2646,7 +2836,7 @@ const handleAnalyzePdf = async () => {
     state.articleDraftMeta.fileSize = state.selectedPdfFile.size || 0;
     state.articleDraftMeta.documentContentType = state.selectedPdfFile.type || "application/pdf";
     state.articleDraftMeta.extractionSource = "pdf";
-    setAiStatus("Extrayendo texto…");
+    setAiStatus("Analizando documento con IA. Puede tardar hasta 3 minutos…");
     const result = await requestArticleDocumentExtraction(
       {
         mode: "pdf",
@@ -2992,6 +3182,12 @@ const getArticleSaveErrorMessage = (error = {}) => {
   if (code === "FIRESTORE_PERMISSION_DENIED" || /permission-denied|missing or insufficient permissions/i.test(code)) {
     return "No se pudo guardar porque las reglas de Firestore aún no permiten estos campos. Actualizá reglas y reintentá.";
   }
+  if (code === "FIRESTORE_SAVE_FAILED") {
+    return "No se pudo confirmar el guardado en Firestore. La publicación quedó abierta para que puedas reintentar sin perder la ficha.";
+  }
+  if (/invalid-argument|failed-precondition|payload|document/i.test(code)) {
+    return "No se pudo guardar porque Firestore rechazó el contenido de la ficha. Revisá los campos generados e intentá nuevamente.";
+  }
   if (/unavailable|deadline-exceeded|network|offline/i.test(code)) {
     return "No se pudo guardar por un problema de conexión. Revisá la red e intentá nuevamente.";
   }
@@ -3219,6 +3415,12 @@ const handleArticleSubmit = async (event) => {
     }
     renderFilterOptions();
     renderPosts();
+    showBitacoraNotice(
+      article?.repositoryMode === "memory"
+        ? "Artículo guardado localmente porque Firebase no está disponible en esta sesión."
+        : "Artículo guardado en la Bitácora.",
+      article?.repositoryMode === "memory" ? "warning" : "success"
+    );
     closeModal(els.addArticleModal);
     resetArticleForm();
   } catch (error) {
@@ -3562,6 +3764,7 @@ const bindEvents = () => {
     const expanded = els.advancedToggle.getAttribute("aria-expanded") === "true";
     setAdvancedVisible(!expanded);
   });
+  els.previewExpandedToggle?.addEventListener("click", togglePreviewExpandedDescription);
   els.assistedToggle?.addEventListener("click", () => {
     const expanded = els.assistedToggle.getAttribute("aria-expanded") === "true";
     setAssistedModeVisible(true, !expanded);

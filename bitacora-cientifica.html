@@ -35,7 +35,7 @@
     <link rel="stylesheet" href="/assets/css/core-contrast.css?v=20260502-committee-border-align-1" />
     <link rel="stylesheet" href="/assets/css/pages/galeriadearte.css?v=20260503-art-gallery-like-tooltip-1" />
     <link rel="stylesheet" href="/assets/css/shared/brisa-chat.css?v=20260504-bitacora-cubes-hero-align-3" data-brisa-chat-css />
-    <link rel="stylesheet" href="/assets/css/pages/bitacora-cientifica.css?v=20260505-bitacora-post-separator-1" />
+    <link rel="stylesheet" href="/assets/css/pages/bitacora-cientifica.css?v=20260505-bitacora-pdf-load-save-reliability-2" />
   </head>
   <body class="art-gallery-page bitacora-page ui-clarity">
     <div id="app">
@@ -494,6 +494,7 @@
                   <h3 id="article-preview-zone-title">Vista previa generada</h3>
                   <p>Revisá la ficha breve. Podés editar estos campos antes de guardar.</p>
                 </div>
+                <div id="article-preview-analysis-summary" class="bitacora-preview-ai-summary" hidden></div>
                 <div class="bitacora-preview-grid">
                   <label class="bitacora-field bitacora-field--wide" for="article-title">
                     <span>Título</span>
@@ -548,6 +549,31 @@
                     <textarea id="article-key-points" name="keyPointsEs" rows="3" placeholder="Un punto por línea"></textarea>
                   </label>
                 </div>
+                <section
+                  id="article-preview-expanded-description"
+                  class="bitacora-preview-expanded-description"
+                  aria-labelledby="article-preview-expanded-description-title"
+                  hidden
+                >
+                  <button
+                    id="article-preview-expanded-toggle"
+                    type="button"
+                    class="bitacora-preview-expanded-description__toggle"
+                    aria-expanded="false"
+                    aria-controls="article-preview-expanded-body"
+                    data-preview-expanded-toggle
+                  >
+                    <span>
+                      <strong id="article-preview-expanded-description-title">Descripción ampliada generada</strong>
+                      <small>Contenido editorial recibido desde la IA documental.</small>
+                    </span>
+                    <span class="bitacora-preview-expanded-description__action">
+                      <span data-preview-expanded-label>Ver descripción</span>
+                      <i data-lucide="chevron-down" aria-hidden="true"></i>
+                    </span>
+                  </button>
+                  <div id="article-preview-expanded-body" class="bitacora-preview-expanded-description__body" hidden></div>
+                </section>
                 <button
                   id="article-advanced-toggle"
                   type="button"
@@ -913,7 +939,7 @@
       installFirebaseGlobals();
     </script>
     <script type="module" src="/assets/js/common/notifications.js"></script>
-    <script type="module" src="/assets/js/pages/bitacora-cientifica.js?v=20260505-bitacora-post-separator-1"></script>
+    <script type="module" src="/assets/js/pages/bitacora-cientifica.js?v=20260505-bitacora-pdf-load-save-reliability-2"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
