@@ -1059,7 +1059,7 @@ const medicalStructure = {
             createMedicalPerson('Alberto Marty', { role: 'Médico especialista asociado', forceInitials: true }),
             createMedicalPerson('Alejandro García', { role: 'Médico especialista asociado', forceInitials: true }),
             createMedicalPerson('Luis Caro', { role: 'Médico especialista asociado', forceInitials: true }),
-            createMedicalPerson('Franchela Jorge', { role: 'Médico especialista asociado', forceInitials: true })
+            createMedicalPerson('Franchella Jorge', { role: 'Médico especialista asociado', forceInitials: true })
         ]
     }
 };

@@ -10,7 +10,7 @@ const EXPECTED_NAMES = [
   "Alberto Marty",
   "Alejandro García",
   "Luis Caro",
-  "Franchela Jorge"
+  "Franchella Jorge"
 ];
 const EXPECTED_INITIALS = ["JM", "FR", "LP", "AL", "AM", "AG", "LC", "FJ"];
 const EXPECTED_NEUQUEN_VISIBLE_SECTORS = [
