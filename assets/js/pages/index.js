@@ -2815,6 +2815,20 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
       event?.preventDefault();
       return;
     }
+    if (action.dataset.portalAction === "hobbies") {
+      event?.preventDefault();
+      closePortalMenu();
+      if (window.Swal?.fire) {
+        window.Swal.fire({
+          title: "Intereses y Hobbies del Equipo",
+          text: "Este espacio estará disponible próximamente.",
+          icon: "info",
+          confirmButtonColor: "#7AB800",
+          confirmButtonText: "Entendido"
+        });
+      }
+      return;
+    }
     if (action.tagName === "A") {
       const params = new URLSearchParams(window.location.search || "");
       const href = action.getAttribute("href") || "";
