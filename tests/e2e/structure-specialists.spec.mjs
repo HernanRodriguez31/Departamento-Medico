@@ -9,9 +9,10 @@ const EXPECTED_NAMES = [
   "Alberto Lambierto",
   "Alberto Marty",
   "Alejandro García",
-  "Luis Caro"
+  "Luis Caro",
+  "Franchela Jorge"
 ];
-const EXPECTED_INITIALS = ["JM", "FR", "LP", "AL", "AM", "AG", "LC"];
+const EXPECTED_INITIALS = ["JM", "FR", "LP", "AL", "AM", "AG", "LC", "FJ"];
 const EXPECTED_NEUQUEN_VISIBLE_SECTORS = [
   "ECOR I",
   "Lindero Oriental",
@@ -39,6 +40,16 @@ const login = async (page, next) => {
   await page.locator("#email").fill(QA_EMAIL);
   await page.locator("#password").fill(QA_PASSWORD);
   await page.locator("#login-form").evaluate((form) => form.requestSubmit());
+};
+
+const waitForDesktopStructureRoute = async (page) => {
+  await page.waitForURL(
+    (url) =>
+      url.pathname.endsWith("/index.html") &&
+      url.hash === "#estructura" &&
+      url.searchParams.get("dmEmulators") === "1",
+    { timeout: 30_000 }
+  );
 };
 
 const ensureStructureOpen = async (page) => {
@@ -222,7 +233,7 @@ test("desktop structure renders direct specialists group", async ({ page }, test
   test.skip(testInfo.project.name !== "desktop-1440", "Desktop audit only.");
 
   await login(page, "/index.html?desktop=1&dmEmulators=1#estructura");
-  await page.waitForURL(/\/index\.html\?desktop=1&dmEmulators=1#estructura$/, { timeout: 30_000 });
+  await waitForDesktopStructureRoute(page);
   await ensureStructureOpen(page);
   const { group, header } = await openSpecialistsGroup(page);
 
@@ -237,7 +248,7 @@ test("desktop structure renders direct specialists group", async ({ page }, test
   expect(payload.ariaExpanded).toBe("true");
   expect(payload.headerExpanded).toBe("true");
   expect(payload.activeGroupCount).toBe(1);
-  expect(payload.staffCount).toBe(7);
+  expect(payload.staffCount).toBe(8);
   expect(payload.columnCount).toBe(2);
   expect(payload.names).toEqual(EXPECTED_NAMES);
   expect(payload.initials).toEqual(EXPECTED_INITIALS);
@@ -248,7 +259,7 @@ test("desktop structure renders direct specialists group", async ({ page }, test
   expect(maxMetricSpread(payload.badgeMetrics, "avatarLeftOffset")).toBeLessThanOrEqual(4);
   expect(maxMetricSpread(payload.badgeMetrics, "nameLeftOffset")).toBeLessThanOrEqual(4);
   expect(maxAbsMetric(payload.badgeMetrics, "visualCenterDelta")).toBeLessThanOrEqual(12);
-  expect(payload.lastBadgeCentered).toBe(true);
+  expect(payload.lastBadgeCentered).toBe(false);
   expect(payload.noHorizontalOverflow).toBe(true);
 
   await group.locator(".direct-staff-grid .structure-avatar").first().click();
@@ -294,7 +305,7 @@ test("mobile structure keeps specialists direct staff readable", async ({ page }
 
   const payload = await collectSpecialistsPayload(page);
   expect(payload.groupCount).toBe(4);
-  expect(payload.staffCount).toBe(7);
+  expect(payload.staffCount).toBe(8);
   expect(payload.directStaffHeaderText).toBe("Staff médico");
   expect(payload.hasDirectStaffCount).toBe(false);
   expect(payload.directStaffHeaderCenterDelta).toBeLessThanOrEqual(5);
@@ -315,7 +326,7 @@ test("desktop structure adds Veronica Rodriguez as Neuquen relief doctor", async
   test.skip(testInfo.project.name !== "desktop-1440", "Desktop audit only.");
 
   await login(page, "/index.html?desktop=1&dmEmulators=1#estructura");
-  await page.waitForURL(/\/index\.html\?desktop=1&dmEmulators=1#estructura$/, { timeout: 30_000 });
+  await waitForDesktopStructureRoute(page);
   await ensureStructureOpen(page);
   const { group } = await openStructureGroup(page, "upstream");
   await openRegion(page, group, "Neuquén");

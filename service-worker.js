@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "brisa-root-";
-const CACHE_VERSION = "v139";
+const CACHE_VERSION = "v140";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const OFFLINE_URL = "/offline.html";
 const PRECACHE_URLS = [
@@ -33,7 +33,7 @@ const PRECACHE_URLS = [
   "/assets/images/logo-brisa-heart.png",
   "/assets/images/RAMR.png",
   "/assets/images/Rev%20Arg%20Medicina.png",
-  "/js/app.js?v=20260502-neuquen-veronica-rodriguez-1",
+  "/js/app.js?v=20260505-specialists-franchela-jorge-1",
   "/js/chat.js?v=20260504-bitacora-cubes-hero-align-3",
   "/assets/js/common/firebaseClient.js",
   "/assets/js/common/notifications.js",
