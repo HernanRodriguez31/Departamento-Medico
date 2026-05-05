@@ -60,6 +60,10 @@
       {
         "source": "/bitacora-cientifica",
         "destination": "/bitacora-cientifica.html"
+      },
+      {
+        "source": "/intereses-hobbies",
+        "destination": "/intereses-hobbies.html"
       }
     ],
     "headers": [
@@ -127,6 +131,15 @@
       },
       {
         "source": "/bitacora-cientifica",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, max-age=0, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/intereses-hobbies",
         "headers": [
           {
             "key": "Cache-Control",

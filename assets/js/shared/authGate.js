@@ -13,6 +13,8 @@ const SAFE_PATHS = new Set([
   "/app/index.html",
   "/galeriadearte",
   "/galeriadearte.html",
+  "/intereses-hobbies",
+  "/intereses-hobbies.html",
   "/bitacora-cientifica",
   "/bitacora-cientifica.html"
 ]);

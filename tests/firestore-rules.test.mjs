@@ -1390,6 +1390,62 @@ test("dm_carousel allows authenticated art gallery posts with scoped metadata", 
   );
 });
 
+test("dm_carousel allows authenticated team hobbies posts with scoped metadata", async () => {
+  const ownerDb = authedDb("user-a");
+
+  await assertSucceeds(
+    setDoc(doc(ownerDb, "dm_carousel", "hobby-post-a"), {
+      type: "team_hobbies",
+      title: "Caminata del equipo",
+      text: "Foto compartida por un integrante del equipo.",
+      briefDescription: "Foto compartida por un integrante del equipo.",
+      longDescription: "",
+      artAuthor: "",
+      artYear: "",
+      artWorkType: "Foto del equipo",
+      artLocation: "",
+      imageUrl: "https://example.test/hobby.jpg",
+      imagePath: "dm_carousel/user-a/hobby.jpg",
+      thumbUrl: "https://example.test/hobby.jpg",
+      imageAspect: "landscape",
+      imageWidth: 1200,
+      imageHeight: 800,
+      authorUid: "user-a",
+      authorName: "Dr. Usuario A",
+      createdByUid: "user-a",
+      createdByName: "Dr. Usuario A",
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+      likesCount: 0,
+      likedBy: [],
+      likedNames: [],
+      commentCount: 0
+    })
+  );
+
+  await assertFails(
+    setDoc(doc(ownerDb, "dm_carousel", "hobby-post-other-owner"), {
+      type: "team_hobbies",
+      title: "Dueño ajeno",
+      imageUrl: "https://example.test/hobby.jpg",
+      authorUid: "user-b",
+      createdByUid: "user-b",
+      createdAt: Timestamp.now()
+    })
+  );
+
+  await assertFails(
+    setDoc(doc(ownerDb, "dm_carousel", "hobby-post-extra"), {
+      type: "team_hobbies",
+      title: "Campo no permitido",
+      imageUrl: "https://example.test/hobby.jpg",
+      authorUid: "user-a",
+      createdAt: Timestamp.now(),
+      hobbyCategory: "deporte"
+    })
+  );
+});
+
 test("dm_carousel comments still allow legit comment create delete and block direct like-map updates", async () => {
   const ownerDb = authedDb("user-a");
   const otherDb = authedDb("user-b");

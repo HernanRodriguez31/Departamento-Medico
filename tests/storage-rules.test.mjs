@@ -49,6 +49,7 @@ const storageFor = (uid, claims = {}) =>
 const unauthedStorage = () => testEnv.unauthenticatedContext().storage(BUCKET_URL);
 
 const pdfBytes = () => new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34]);
+const imageBytes = () => new Uint8Array([0xff, 0xd8, 0xff, 0xdb, 0x00, 0x43, 0x00, 0xff, 0xd9]);
 
 test("bitacora PDF storage allows authenticated reads and only owner PDF uploads", async () => {
   const owner = storageFor("user-a");
@@ -92,4 +93,28 @@ test("bitacora PDF storage allows owner delete and admin read/delete", async () 
   await assertSucceeds(secondRef.put(pdfBytes(), { contentType: "application/pdf" }));
   await assertFails(storageFor("user-b").ref("bitacora/article-documents/user-a/owner-delete.pdf").delete());
   await assertSucceeds(secondRef.delete());
+});
+
+test("dm_carousel storage allows authenticated reads and owner-only image writes", async () => {
+  const owner = storageFor("user-a");
+  const other = storageFor("user-b");
+  const photoRef = owner.ref("dm_carousel/user-a/hobby.jpg");
+
+  await assertSucceeds(photoRef.put(imageBytes(), { contentType: "image/jpeg" }));
+  await assertSucceeds(photoRef.getMetadata());
+  await assertSucceeds(other.ref("dm_carousel/user-a/hobby.jpg").getMetadata());
+  await assertFails(unauthedStorage().ref("dm_carousel/user-a/hobby.jpg").getMetadata());
+  await assertFails(
+    other.ref("dm_carousel/user-a/other.jpg").put(imageBytes(), { contentType: "image/jpeg" })
+  );
+  await assertFails(
+    owner.ref("dm_carousel/user-a/not-image.pdf").put(pdfBytes(), { contentType: "application/pdf" })
+  );
+  await assertFails(
+    owner.ref("dm_carousel/user-a/big.jpg").put(new Uint8Array(25 * 1024 * 1024 + 1), {
+      contentType: "image/jpeg"
+    })
+  );
+  await assertFails(other.ref("dm_carousel/user-a/hobby.jpg").delete());
+  await assertSucceeds(photoRef.delete());
 });

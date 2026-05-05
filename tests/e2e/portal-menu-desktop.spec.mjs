@@ -57,7 +57,7 @@ test("desktop portal cube opens four accessible radial actions", async ({ page }
     "https://brisasaludybienestar.com/"
   );
   await expect(page.locator("#portal-gallery")).toHaveAttribute("href", "/galeriadearte.html");
-  await expect(page.locator("#portal-hobbies")).toHaveAttribute("href", "#intereses-hobbies");
+  await expect(page.locator("#portal-hobbies")).toHaveAttribute("href", "/intereses-hobbies.html");
   await expect(page.locator("#portal-logbook")).toHaveAttribute("href", "/bitacora-cientifica.html");
 
   const radialLayout = await page.locator("#portal-wrapper").evaluate((wrapper) => {
@@ -131,6 +131,12 @@ test("desktop portal cube opens four accessible radial actions", async ({ page }
   await page.locator("#portal-gallery").click();
   await page.waitForURL(/\/galeriadearte\.html\?dmEmulators=1$/, { timeout: 30_000 });
   await expect(page.locator("#art-gallery-heading")).toHaveText("Galería de Arte");
+
+  await page.goto(PORTAL_URL);
+  await openPortalMenu(page);
+  await page.locator("#portal-hobbies").click();
+  await page.waitForURL(/\/intereses-hobbies\.html\?dmEmulators=1$/, { timeout: 30_000 });
+  await expect(page.locator("#team-hobbies-heading")).toHaveText("Intereses y Hobbies del Equipo");
 
   await page.goto(PORTAL_URL);
   await openPortalMenu(page);

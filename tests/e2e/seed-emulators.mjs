@@ -142,6 +142,35 @@ const seed = async () => {
     });
   }
 
+  await addDoc(postsRef, {
+    type: "team_hobbies",
+    title: "Caminata de integración QA",
+    text: "Registro compartido para validar el muro de intereses y hobbies del equipo.",
+    briefDescription: "Registro compartido para validar el muro de intereses y hobbies del equipo.",
+    longDescription:
+      "Una publicación de prueba con título y descripción para confirmar persistencia, comentarios y separadores.",
+    artAuthor: DISPLAY_NAME,
+    artYear: "2026",
+    artWorkType: "Foto del equipo",
+    artLocation: "Departamento Médico",
+    imageUrl: "/assets/images/og-dto-medico.jpg",
+    thumbUrl: "/assets/images/og-dto-medico.jpg",
+    imagePath: `dm_carousel/${user.uid}/team-hobby-qa-1.jpg`,
+    imageAspect: "landscape",
+    imageWidth: 1200,
+    imageHeight: 760,
+    authorUid: user.uid,
+    authorName: DISPLAY_NAME,
+    createdByUid: user.uid,
+    createdByName: DISPLAY_NAME,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    likedBy: [],
+    likedNames: [],
+    likesCount: 0,
+    commentCount: 0
+  });
+
   const otherUser = await signInOrCreateUser({
     email: OTHER_EMAIL,
     password: OTHER_PASSWORD,
@@ -170,6 +199,33 @@ const seed = async () => {
     imageUrl: "/assets/images/og-dto-medico.jpg",
     thumbUrl: "/assets/images/og-dto-medico.jpg",
     imagePath: `dm_carousel/${otherUser.uid}/art-other-qa.jpg`,
+    imageAspect: "square",
+    imageWidth: 900,
+    imageHeight: 900,
+    authorUid: otherUser.uid,
+    authorName: OTHER_DISPLAY_NAME,
+    createdByUid: otherUser.uid,
+    createdByName: OTHER_DISPLAY_NAME,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    likedBy: [],
+    likedNames: [],
+    likesCount: 0,
+    commentCount: 0
+  });
+  await addDoc(postsRef, {
+    type: "team_hobbies",
+    title: "Hobby Ajeno QA",
+    text: "Publicación de otro usuario para validar permisos de edición y eliminación.",
+    briefDescription: "Publicación de otro usuario para validar permisos de edición y eliminación.",
+    longDescription: "Esta foto no debe mostrar acciones de edición ni borrado al usuario QA principal.",
+    artAuthor: OTHER_DISPLAY_NAME,
+    artYear: "2026",
+    artWorkType: "Foto personal",
+    artLocation: "Departamento Médico",
+    imageUrl: "/assets/images/og-dto-medico.jpg",
+    thumbUrl: "/assets/images/og-dto-medico.jpg",
+    imagePath: `dm_carousel/${otherUser.uid}/team-hobby-other-qa.jpg`,
     imageAspect: "square",
     imageWidth: 900,
     imageHeight: 900,
