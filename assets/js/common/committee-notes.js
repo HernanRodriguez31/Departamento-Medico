@@ -243,8 +243,8 @@ export function createCommitteeNotesController({
     syncElements();
     if (!els.panel) return;
     const header = els.panel.querySelector(".committee-board-panel__header");
-    if (header && header.dataset.decorated !== "identity-v2") {
-      header.dataset.decorated = "identity-v2";
+    if (header && header.dataset.decorated !== "identity-v3") {
+      header.dataset.decorated = "identity-v3";
       header.innerHTML = `
         <div class="committee-board-panel__identity">
           <img id="committee-board-logo" class="committee-board-panel__logo" alt="" hidden>
@@ -253,7 +253,10 @@ export function createCommitteeNotesController({
           </div>
         </div>
         <div class="committee-board-panel__heading">
-          <h3 class="committee-board-panel__title">Pizarra de comunicaciones</h3>
+          <h3 class="committee-board-panel__title">
+            <i data-lucide="notebook-pen" aria-hidden="true"></i>
+            <span>Pizarra de comunicaciones</span>
+          </h3>
         </div>
         <div class="committee-board-panel__right">
           <p class="committee-board-panel__department">Departamento Médico</p>
