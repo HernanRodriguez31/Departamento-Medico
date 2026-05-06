@@ -52,7 +52,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
     
     <link rel="stylesheet" href="../../assets/css/shared/department-calendar.css?v=20260506-committee-calendars-1">
-    <link rel="stylesheet" href="../../assets/css/pages/comite.css?v=20260506-committee-integrated-1">
+    <link rel="stylesheet" href="../../assets/css/pages/comite.css?v=20260506-committee-project-cards-1">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/es.js"></script>
 <!-- Firebase SDKs -->
@@ -393,6 +393,7 @@
             }
         };
         const STAGE_LABELS = ['Planificación', 'Programación', 'Desarrollo', 'Ejecución', 'Finalizado'];
+        const STEP_SHORT_LABELS = ['Plan.', 'Prog.', 'Des.', 'Ejec.', 'Fin.'];
         const COMMITTEE_MEMBER_GROUP_EMPTY_LABELS = {
             referentes: 'Sin referentes',
             secretaria: 'Sin secretaría',
@@ -590,54 +591,69 @@
         }
 
         function renderProjectMeetingChip(topic) {
+            const meetingValue = topic.nextMeeting ? formatDate(topic.nextMeeting) : 'Sin fecha';
             if (isAdmin) {
                 return `
-                    <label class="committee-project-card__meta-item committee-project-card__meta-item--date">
+                    <label class="committee-project-card__meta-item committee-project-card__meta-item--meeting">
                         <span class="committee-project-card__meta-label">Próxima reunión</span>
                         <input
                             type="date"
                             onchange="window.updateTopicDate(${safeInlineJsString(topic.id)}, this.value)"
                             class="committee-project-card__date-input"
                             value="${escapeAttribute(topic.nextMeeting || '')}"
-                            title="Definir fecha">
+                            aria-label="Próxima reunión del proyecto ${escapeAttribute(topic.title || 'sin título')}"
+                            title="Definir próxima reunión">
                     </label>
                 `;
             }
 
-            if (topic.nextMeeting) {
-                return `
-                    <span class="committee-project-card__meta-item">
-                        <span class="committee-project-card__meta-label">Próxima reunión</span>
-                        <span class="committee-project-card__meta-value">${escapeHTML(formatDate(topic.nextMeeting))}</span>
-                    </span>
-                `;
-            }
-
             return `
-                <span class="committee-project-card__meta-item committee-project-card__meta-item--muted">
+                <span class="committee-project-card__meta-item committee-project-card__meta-item--meeting${topic.nextMeeting ? '' : ' committee-project-card__meta-item--muted'}">
                     <span class="committee-project-card__meta-label">Próxima reunión</span>
-                    <span class="committee-project-card__meta-value">Sin fecha</span>
+                    <span class="committee-project-card__meta-value">${escapeHTML(meetingValue)}</span>
                 </span>
             `;
         }
 
         function renderProjectSegments(topic, stageMeta) {
             return `
-                <div class="committee-project-card__segments" role="group" aria-label="Progreso del proyecto ${escapeAttribute(topic.title || 'sin título')}">
+                <div class="committee-project-card__progress-panel">
+                    <div class="committee-project-card__progress-head">
+                        <span class="committee-project-card__progress-label">Proceso de avance</span>
+                        <span class="committee-project-card__progress-percent">${stageMeta.percent}%</span>
+                    </div>
+                    <div class="committee-project-card__current-stage" data-stage="${stageMeta.stage}">
+                        <span class="committee-project-card__current-stage-label">Etapa actual</span>
+                        <strong>${escapeHTML(stageMeta.label)}</strong>
+                    </div>
+                    <div class="committee-project-card__stepper" role="group" aria-label="Progreso del proyecto ${escapeAttribute(topic.title || 'sin título')}">
                     ${stageMeta.segments.map((segment) => {
-                const segmentClass = `committee-project-card__segment${segment.active ? ' is-active' : ''}${segment.current ? ' is-current' : ''}`;
+                const label = STAGE_LABELS[segment.step - 1];
+                const shortLabel = STEP_SHORT_LABELS[segment.step - 1] || label;
+                const segmentClass = `committee-project-card__step${segment.active ? ' is-active' : ''}${segment.current ? ' is-current' : ''}${segment.step < stageMeta.stage ? ' is-complete' : ''}`;
+                const stepContent = `
+                                <span class="committee-project-card__step-dot" aria-hidden="true">${segment.step}</span>
+                                <span class="committee-project-card__step-label">${escapeHTML(shortLabel)}</span>
+                            `;
                 if (!isAdmin) {
-                    return `<span class="${segmentClass}" aria-hidden="true"></span>`;
+                    return `
+                            <span class="${segmentClass}" aria-label="${segment.step}. ${escapeAttribute(label)}${segment.current ? ', etapa actual' : ''}">
+                                ${stepContent}
+                            </span>
+                        `;
                 }
                 return `
                             <button
                                 type="button"
                                 onclick="event.stopPropagation(); window.updateTopicStage(${safeInlineJsString(topic.id)}, ${segment.step})"
                                 class="${segmentClass}"
-                                title="Mover a ${STAGE_LABELS[segment.step - 1]}">
+                                aria-label="Mover a ${segment.step}. ${escapeAttribute(label)}"
+                                title="Mover a ${escapeAttribute(label)}">
+                                ${stepContent}
                             </button>
                         `;
             }).join('')}
+                    </div>
                 </div>
             `;
         }
@@ -811,7 +827,6 @@
                                 <div class="committee-project-card__header">
                                     <div class="committee-project-card__title-block">
                                         <h4 class="committee-project-card__title" title="${escapeAttribute(topic.title || '')}">${escapeHTML(topic.title || 'Sin título')}</h4>
-                                        <span class="committee-project-card__stage-badge" data-stage="${stageMeta.stage}">${stageMeta.label}</span>
                                     </div>
                                     ${renderProjectActionCluster(topic)}
                                 </div>
@@ -824,17 +839,13 @@
                                     </div>
                                     <div class="committee-project-card__meta-row committee-project-card__meta-row--dates">
                                         <span class="committee-project-card__meta-item committee-project-card__meta-item--start">
-                                            <span class="committee-project-card__meta-label">Inicio</span>
+                                            <span class="committee-project-card__meta-label">Inicio del proyecto</span>
                                             <span class="committee-project-card__meta-value">${escapeHTML(formatDate(topic.startDate) || '—')}</span>
                                         </span>
                                         ${renderProjectMeetingChip(topic)}
                                     </div>
                                 </div>
                                 <div class="committee-project-card__progress">
-                                    <div class="committee-project-card__progress-head">
-                                        <span class="committee-project-card__progress-label">Avance</span>
-                                        <span class="committee-project-card__progress-percent">${stageMeta.percent}%</span>
-                                    </div>
                                     ${renderProjectSegments(topic, stageMeta)}
                                 </div>
                                 ${renderProjectDocumentActions(topic)}
@@ -2047,7 +2058,7 @@ async function joinCurrentCommittee() {
     </script>
 </head>
 
-<body class="bg-gray-50/50 font-sans text-gray-800 flex flex-col min-h-screen comite-bioetica--compact-v2 comite-detail-premium-v2">
+<body class="bg-gray-50/50 font-sans text-gray-800 flex flex-col min-h-screen comite-detail-premium-v2">
 
     <!-- Header -->
     <header

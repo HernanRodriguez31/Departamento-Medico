@@ -924,811 +924,10 @@ body.comite-variant-alt .project-stage-dot.is-inactive {
     }
 }
 
-body.comite-bioetica--compact-v2 .committee-projects-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.88rem;
-    align-items: stretch;
-}
-
-body.comite-bioetica--compact-v2 .committee-projects-section {
-    background: linear-gradient(135deg, rgba(236, 241, 246, 0.96) 0%, rgba(242, 246, 250, 0.98) 42%, rgba(248, 250, 252, 0.99) 100%);
-    border-color: rgba(226, 232, 240, 0.94);
-    box-shadow: 0 18px 44px rgba(15, 23, 42, 0.055), inset 0 1px 0 rgba(255, 255, 255, 0.55);
-}
-
-body.comite-bioetica--compact-v2 .committee-projects-section__header {
-    margin-bottom: 1.55rem;
-    padding-bottom: 1.05rem;
-    border-bottom-color: rgba(226, 232, 240, 0.72);
-}
-
-body.comite-bioetica--compact-v2 .committee-projects-section__header .rounded-lg {
-    background: rgba(255, 255, 255, 0.56);
-    border: 1px solid rgba(226, 232, 240, 0.58);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.52);
-}
-
-body.comite-bioetica--compact-v2 #projects-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card {
-    display: flex;
-    flex-direction: column;
-    gap: 0.64rem;
-    min-height: 100%;
-    padding: 0.82rem 0.82rem 0.78rem;
-    border-radius: 1rem;
-    border: 1px solid rgba(226, 232, 240, 0.78);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.995), rgba(252, 253, 255, 0.985));
-    box-shadow: 0 2px 4px rgba(15, 23, 42, 0.02), 0 12px 28px rgba(15, 23, 42, 0.06);
-    transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card:hover {
-    transform: translateY(-1px);
-    border-color: rgba(207, 216, 226, 0.96);
-    box-shadow: 0 3px 6px rgba(15, 23, 42, 0.022), 0 16px 32px rgba(15, 23, 42, 0.072);
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 0.65rem;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__title-block {
-    min-width: 0;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 0.32rem;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__title {
-    margin: 0;
-    max-width: 100%;
-    font-size: 1.02rem;
-    line-height: 1.26;
-    font-weight: 820;
-    letter-spacing: -0.012em;
-    color: #111827;
-    display: -webkit-box;
-    overflow: hidden;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__stage-badge {
-    width: fit-content;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.18rem 0.48rem;
-    border-radius: 999px;
-    border: 1px solid rgba(226, 232, 240, 0.82);
-    background: rgba(248, 250, 252, 0.92);
-    color: #475569;
-    font-size: 0.6rem;
-    font-weight: 780;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__stage-badge[data-stage="1"] {
-    border-color: rgba(226, 232, 240, 0.84);
-    background: rgba(249, 250, 251, 0.95);
-    color: #475569;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__stage-badge[data-stage="2"] {
-    border-color: rgba(226, 232, 240, 0.84);
-    background: rgba(241, 245, 249, 0.9);
-    color: #5b6777;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__stage-badge[data-stage="3"] {
-    border-color: rgba(214, 226, 232, 0.84);
-    background: rgba(243, 247, 248, 0.92);
-    color: #596f71;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__stage-badge[data-stage="4"] {
-    border-color: rgba(221, 233, 213, 0.84);
-    background: rgba(244, 248, 239, 0.92);
-    color: #637357;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__stage-badge[data-stage="5"] {
-    border-color: rgba(213, 231, 221, 0.84);
-    background: rgba(241, 248, 244, 0.92);
-    color: #5a7268;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__actions {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.22rem;
-    flex-shrink: 0;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__icon-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.68rem;
-    height: 1.68rem;
-    border: 1px solid rgba(226, 232, 240, 0.5);
-    border-radius: 0.65rem;
-    background: rgba(255, 255, 255, 0.86);
-    color: #d1d9e4;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.035);
-    transition: background 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__icon-button svg {
-    width: 0.82rem;
-    height: 0.82rem;
-    stroke-width: 1.85;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__icon-button:hover {
-    border-color: rgba(203, 213, 225, 0.64);
-    background: rgba(248, 250, 252, 0.92);
-    color: #a3afbf;
-    box-shadow: 0 2px 4px rgba(15, 23, 42, 0.05);
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__icon-button--danger:hover {
-    border-color: rgba(254, 226, 226, 0.68);
-    background: rgba(254, 242, 242, 0.82);
-    color: #dc6a6a;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__meta {
-    display: grid;
-    gap: 0.26rem;
-    padding-top: 0.02rem;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__meta-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.72rem;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__meta-row--lead {
-    padding-bottom: 0.04rem;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__meta-row--dates {
-    gap: 0.62rem 0.8rem;
-    align-items: baseline;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__meta-item {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 0.32rem;
-    min-width: 0;
-    font-size: 0.73rem;
-    line-height: 1.24;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__meta-item--lead {
-    min-width: 0;
-    max-width: 100%;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__meta-item--start {
-    min-width: max-content;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__meta-item--muted .committee-project-card__meta-value {
-    color: #a6afbb;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__meta-label {
-    font-size: 0.61rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: #9aa5b1;
-    flex-shrink: 0;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__meta-value {
-    color: #4b5563;
-    font-weight: 600;
-    min-width: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__date-input {
-    width: max-content;
-    max-width: 8.4rem;
-    border: none;
-    background: transparent;
-    padding: 0;
-    font-size: 0.73rem;
-    font-weight: 600;
-    color: #4b5563;
-    outline: none;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__progress {
-    display: flex;
-    flex-direction: column;
-    gap: 0.34rem;
-    margin-top: auto;
-    padding-top: 0.5rem;
-    border-top: 1px solid rgba(221, 228, 237, 0.76);
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__progress-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 0.75rem;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__progress-label {
-    font-size: 0.68rem;
-    font-weight: 700;
-    color: #6b7280;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__progress-percent {
-    font-size: 0.82rem;
-    font-weight: 780;
-    font-variant-numeric: tabular-nums;
-    color: #374151;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__segments {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 0.28rem;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__segment {
-    appearance: none;
-    border: none;
-    height: 0.34rem;
-    border-radius: 999px;
-    background: #e7edf3;
-    padding: 0;
-    margin: 0;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
-}
-
-body.comite-bioetica--compact-v2 button.committee-project-card__segment {
-    cursor: pointer;
-    transition: opacity 150ms ease, background 150ms ease, box-shadow 150ms ease;
-}
-
-body.comite-bioetica--compact-v2 button.committee-project-card__segment:hover {
-    opacity: 0.92;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__segment.is-active {
-    background: #9bb86a;
-}
-
-body.comite-bioetica--compact-v2 .committee-project-card__segment.is-current {
-    box-shadow: 0 0 0 1px rgba(155, 184, 106, 0.18);
-}
-
-body.comite-bioetica--compact-v2 .committee-projects-empty {
-    border: 1px dashed rgba(219, 234, 254, 0.9);
-    border-radius: 1rem;
-    background: rgba(250, 252, 254, 0.86);
-    padding: 0.92rem 1.12rem;
-    text-align: center;
-    color: #94a3b8;
-    font-size: 0.8rem;
-    font-style: italic;
-}
-
-body.comite-bioetica--compact-v2 .committee-projects-section__legend {
-    margin-top: 1.45rem;
-    padding-top: 0.8rem;
-    border-top-color: rgba(226, 232, 240, 0.72);
-    background: linear-gradient(180deg, rgba(244, 247, 250, 0), rgba(244, 247, 250, 0.56));
-}
-
-body.comite-bioetica--compact-v2 .committee-projects-section__legend .stage-pill {
-    border: 1px solid rgba(226, 232, 240, 0.72);
-    background: rgba(250, 252, 254, 0.78);
-    color: #94a3b8;
-}
-
-body.comite-bioetica--compact-v2 .committee-projects-section__composer {
-    margin-top: 1.35rem;
-    border-color: rgba(216, 224, 233, 0.88);
-    background: linear-gradient(180deg, rgba(245, 248, 251, 0.94), rgba(248, 250, 252, 0.92));
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58);
-}
-
-body.comite-bioetica--compact-v2 .committee-projects-section__composer .dm-accordion-toggle {
-    color: #1f2937;
-}
-
-body.comite-bioetica--compact-v2 .committee-projects-section__composer .dm-accordion-toggle span:first-child::before {
-    background: linear-gradient(135deg, rgba(122, 184, 0, 0.82), rgba(155, 184, 106, 0.88));
-    box-shadow: 0 0 0 3px rgba(122, 184, 0, 0.12);
-}
-
-body.comite-bioetica--compact-v2 .committee-projects-section__composer .dm-accordion-panel form {
-    background: rgba(250, 252, 254, 0.78);
-    border-color: rgba(226, 232, 240, 0.84);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.56);
-}
-
-body.comite-bioetica--compact-v2 #integrantes {
-    overflow: visible;
-    background: linear-gradient(180deg, rgba(251, 253, 255, 0.98), rgba(245, 248, 251, 0.98));
-}
-
-body.comite-bioetica--compact-v2 #integrantes .comite__members-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 1rem;
-    padding-bottom: 0.9rem;
-    border-bottom-color: rgba(226, 232, 240, 0.68);
-}
-
-body.comite-bioetica--compact-v2 #integrantes .comite__members-title {
-    min-width: 0;
-    gap: 0.75rem;
-}
-
-body.comite-bioetica--compact-v2 #integrantes .comite__members-heading {
-    min-width: 0;
-}
-
-body.comite-bioetica--compact-v2 #integrantes .comite__members-title-line {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.48rem;
-    min-width: 0;
-}
-
-body.comite-bioetica--compact-v2 #integrantes .comite__members-title-line h3 {
-    margin: 0;
-}
-
-body.comite-bioetica--compact-v2 #integrantes .comite__members-actions {
-    justify-self: auto;
-    flex-shrink: 0;
-}
-
-body.comite-bioetica--compact-v2 #integrantes .comite__join-actions {
-    position: relative;
-}
-
-body.comite-bioetica--compact-v2 #integrantes .comite__members-count {
-    min-width: 1.58rem;
-    height: 1.58rem;
-    padding: 0 0.44rem;
-    border-radius: 999px;
-    border: 1px solid rgba(219, 226, 235, 0.92);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(243, 247, 251, 0.98));
-    color: #5f7186;
-    font-size: 0.68rem;
-    font-weight: 800;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
-}
-
-body.comite-bioetica--compact-v2 #integrantes .comite__join-btn.is-options {
-    width: 2.08rem;
-    height: 2.08rem;
-    padding: 0;
-    border-radius: 0.78rem;
-    border: 1px solid rgba(219, 226, 235, 0.94);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(246, 248, 251, 0.98));
-    color: #8a97a8;
-    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.045);
-}
-
-body.comite-bioetica--compact-v2 #integrantes .comite__join-btn.is-options:hover {
-    border-color: rgba(203, 213, 225, 0.98);
-    background: rgba(255, 255, 255, 0.99);
-    color: #64748b;
-    box-shadow: 0 8px 16px rgba(15, 23, 42, 0.055);
-}
-
-body.comite-bioetica--compact-v2 #integrantes .comite__join-btn.is-options svg {
-    width: 0.96rem;
-    height: 0.96rem;
-}
-
-body.comite-bioetica--compact-v2 #integrantes .comite__join-menu {
-    top: calc(100% + 0.45rem);
-    right: 0;
-    left: auto;
-}
-
-body.comite-bioetica--compact-v2 .committee-members-hierarchy {
-    position: relative;
-    width: min(100%, 68rem);
-}
-
-body.comite-bioetica--compact-v2 .committee-members-hierarchy__rail {
-    position: absolute;
-    top: 0.68rem;
-    bottom: 0.68rem;
-    left: 1.05rem;
-    width: 1px;
-    border-radius: 999px;
-    background: linear-gradient(180deg, rgba(214, 223, 233, 0.18), rgba(203, 213, 225, 0.72) 18%, rgba(203, 213, 225, 0.72) 82%, rgba(214, 223, 233, 0.18));
-    pointer-events: none;
-}
-
-body.comite-bioetica--compact-v2 .committee-members-hierarchy__rows {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: 0.72rem;
-}
-
-body.comite-bioetica--compact-v2 .committee-members-level-row {
-    display: grid;
-    grid-template-columns: 11.2rem minmax(0, 1fr);
-    gap: 1rem;
-    align-items: start;
-    min-width: 0;
-}
-
-body.comite-bioetica--compact-v2 .committee-members-level-row__label {
-    position: relative;
-    min-width: 0;
-    padding-left: 1.95rem;
-    padding-top: 0.22rem;
-}
-
-body.comite-bioetica--compact-v2 .committee-members-level-row__marker {
-    position: absolute;
-    left: 0.73rem;
-    top: 0.58rem;
-    width: 0.62rem;
-    height: 0.62rem;
-    border-radius: 999px;
-    border: 1px solid rgba(210, 218, 227, 0.92);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(241, 245, 249, 0.96));
-    box-shadow: 0 0 0 4px rgba(248, 250, 252, 0.9);
-}
-
-body.comite-bioetica--compact-v2 .committee-members-level-row__heading {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.44rem;
-    flex-wrap: wrap;
-}
-
-body.comite-bioetica--compact-v2 .committee-members-level-row__title {
-    margin: 0;
-    font-size: 0.68rem;
-    font-weight: 800;
-    letter-spacing: 0.09em;
-    text-transform: uppercase;
-    color: #59677a;
-}
-
-body.comite-bioetica--compact-v2 .committee-members-level-row__count {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 1.38rem;
-    height: 1.38rem;
-    padding: 0 0.4rem;
-    border-radius: 999px;
-    border: 1px solid rgba(226, 232, 240, 0.92);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 248, 251, 0.96));
-    color: #64748b;
-    font-size: 0.64rem;
-    font-weight: 800;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
-}
-
-body.comite-bioetica--compact-v2 .committee-members-level-row__content {
-    min-width: 0;
-    display: flex;
-    align-items: flex-start;
-    justify-content: flex-start;
-}
-
-body.comite-bioetica--compact-v2 .committee-members-level-row__nodes {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.48rem;
-    align-items: stretch;
-}
-
-body.comite-bioetica--compact-v2 .committee-members-level-row__nodes > .committee-member-card--lane {
-    flex: 0 1 16rem;
-    width: min(100%, 16rem);
-    max-width: 16.75rem;
-}
-
-body.comite-bioetica--compact-v2 .committee-members-level-row__grid {
-    width: 100%;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.56rem;
-    align-items: stretch;
-}
-
-body.comite-bioetica--compact-v2 .committee-members-level-row__grid > .committee-member-card--lane {
-    min-width: 0;
-    width: 100%;
-}
-
-body.comite-bioetica--compact-v2 .committee-members-level-row__placeholder {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 1.42rem;
-    padding: 0.18rem 0.62rem;
-    border-radius: 999px;
-    border: 1px solid rgba(226, 232, 240, 0.84);
-    background: rgba(247, 250, 252, 0.88);
-    color: #9aa6b2;
-    font-size: 0.65rem;
-    font-weight: 650;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84);
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card--lane {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
-    gap: 0.4rem;
-    padding: 0.5rem 0.58rem;
-    border-radius: 0.86rem;
-    border-color: rgba(220, 228, 236, 0.98);
-    background: linear-gradient(180deg, rgba(243, 247, 250, 0.98), rgba(238, 243, 247, 0.98));
-    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.038);
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card--lane:hover {
-    transform: translateY(-1px);
-    border-color: rgba(208, 218, 229, 0.98);
-    box-shadow: 0 12px 22px rgba(15, 23, 42, 0.046);
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card--lane .committee-member-card__main {
-    gap: 0.08rem;
-    min-width: 0;
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card--lane .committee-member-card__identity {
-    align-items: flex-start;
-    gap: 0.5rem;
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card--lane .committee-member-card__avatar {
-    width: 1.56rem;
-    height: 1.56rem;
-    border-width: 1px;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card--lane .committee-member-card__avatar[data-committee-role="referente"] {
-    border-color: rgba(214, 223, 233, 0.98);
-    background: linear-gradient(180deg, rgba(241, 245, 249, 0.98), rgba(235, 241, 246, 0.98));
-    color: #607086;
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card--lane .committee-member-card__avatar[data-committee-role="secretario"] {
-    border-color: rgba(214, 223, 233, 0.98);
-    background: linear-gradient(180deg, rgba(241, 245, 249, 0.98), rgba(236, 242, 247, 0.98));
-    color: #5d7380;
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card--lane .committee-member-card__avatar[data-committee-role="vocal"] {
-    border-color: rgba(214, 223, 233, 0.98);
-    background: linear-gradient(180deg, rgba(244, 247, 250, 0.98), rgba(238, 242, 247, 0.98));
-    color: #6c7b8c;
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card--lane .committee-member-card__details {
-    min-width: 0;
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 0.08rem;
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card--lane .committee-member-card__name {
-    font-size: 0.9rem;
-    line-height: 1.16;
-    letter-spacing: -0.017em;
-    color: #1f2937;
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card--lane .committee-member-card__meta {
-    gap: 0.1rem 0.22rem;
-    font-size: 0.65rem;
-    line-height: 1.24;
-    color: #8b97a5;
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card--lane .committee-member-card__badges {
-    gap: 0.2rem;
-    margin-top: 0.08rem;
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card--lane .committee-member-pill {
-    font-size: 0.55rem;
-    line-height: 1.08;
-    font-weight: 700;
-    padding: 0.16rem 0.36rem;
-    border-color: rgba(210, 218, 227, 0.92);
-    box-shadow: none;
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card--lane .committee-member-pill--primary[data-committee-role="referente"] {
-    background: rgba(233, 238, 244, 0.92);
-    color: #4a5a6d;
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card--lane .committee-member-pill--primary[data-committee-role="secretario"] {
-    background: rgba(235, 240, 244, 0.92);
-    color: #526575;
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card--lane .committee-member-pill--primary[data-committee-role="vocal"] {
-    background: rgba(239, 243, 247, 0.94);
-    color: #607086;
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card--lane .committee-member-pill--secondary[data-department-role="directora"],
-body.comite-bioetica--compact-v2 .committee-member-card--lane .committee-member-pill--secondary[data-department-role="subdirector"],
-body.comite-bioetica--compact-v2 .committee-member-card--lane .committee-member-pill--secondary[data-department-role="coordinador"] {
-    background: rgba(245, 247, 250, 0.96);
-    color: #7b8794;
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card__tools {
-    display: flex;
-    align-items: flex-start;
-    justify-content: flex-end;
-    flex-shrink: 0;
-    padding-left: 0.02rem;
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card__menu-trigger {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.52rem;
-    height: 1.52rem;
-    border: 1px solid rgba(214, 223, 233, 0.84);
-    border-radius: 0.62rem;
-    background: rgba(255, 255, 255, 0.82);
-    color: #a8b3bf;
-    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
-    transition: border-color 150ms ease, color 150ms ease, box-shadow 150ms ease, background 150ms ease;
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card__menu-trigger:hover,
-body.comite-bioetica--compact-v2 .committee-member-card__tools.is-open .committee-member-card__menu-trigger {
-    border-color: rgba(203, 213, 225, 0.94);
-    color: #748395;
-    background: rgba(255, 255, 255, 0.98);
-    box-shadow: 0 8px 16px rgba(15, 23, 42, 0.06);
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card__menu-trigger:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.14);
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card__menu {
-    position: fixed;
-    top: 0;
-    left: 0;
-    z-index: 1200;
-    min-width: 12rem;
-    padding: 0.32rem;
-    border: 1px solid rgba(220, 228, 236, 0.96);
-    border-radius: 0.86rem;
-    background: rgba(255, 255, 255, 0.985);
-    box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16);
-    display: grid;
-    grid-auto-flow: row;
-    gap: 0.08rem;
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
-    transform: translateY(4px);
-    transition: opacity 140ms ease, transform 140ms ease, visibility 140ms ease;
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card__menu.is-open {
-    opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
-    transform: translateY(0);
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card__menu[data-placement="top"] {
-    transform: translateY(-4px);
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card__menu[data-placement="top"].is-open {
-    transform: translateY(0);
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card__menu.is-loading {
-    opacity: 0.72;
-    pointer-events: none;
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card__menu-item {
-    width: 100%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.6rem;
-    border: none;
-    background: transparent;
-    color: #475569;
-    border-radius: 0.62rem;
-    padding: 0.48rem 0.56rem;
-    font-size: 0.72rem;
-    font-weight: 650;
-    cursor: pointer;
-    transition: background 150ms ease, color 150ms ease;
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card__menu-item:hover {
-    background: rgba(248, 250, 252, 0.98);
-    color: #111827;
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card__menu-item.is-current {
-    background: rgba(248, 250, 252, 0.98);
-    color: #111827;
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card__menu-item:disabled {
-    cursor: default;
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card__menu-item svg {
-    color: #94a3b8;
-    flex-shrink: 0;
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card__menu-separator {
-    height: 1px;
-    margin: 0.16rem 0;
-    background: rgba(226, 232, 240, 0.92);
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card__menu-item--danger {
-    color: #b45353;
-}
-
-body.comite-bioetica--compact-v2 .committee-member-card__menu-item--danger:hover {
-    background: rgba(254, 242, 242, 0.92);
-    color: #991b1b;
-}
-
 body.comite-detail-premium-v2 .committee-projects-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.88rem;
+    gap: 1.05rem;
     align-items: stretch;
 }
 
@@ -1751,103 +950,56 @@ body.comite-detail-premium-v2 .committee-projects-section__header .rounded-lg {
 }
 
 body.comite-detail-premium-v2 #projects-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
+    display: block;
 }
 
 body.comite-detail-premium-v2 .committee-project-card {
-    display: flex;
-    flex-direction: column;
-    gap: 0.64rem;
-    min-height: 100%;
-    padding: 0.82rem 0.82rem 0.78rem;
-    border-radius: 1rem;
-    border: 1px solid rgba(226, 232, 240, 0.78);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.995), rgba(252, 253, 255, 0.985));
-    box-shadow: 0 2px 4px rgba(15, 23, 42, 0.02), 0 12px 28px rgba(15, 23, 42, 0.06);
-    transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+    display: grid;
+    grid-template-rows: auto auto 1fr auto;
+    gap: 0.62rem;
+    min-width: 0;
+    aspect-ratio: 1 / 1;
+    padding: 0.95rem;
+    border-radius: 0.82rem;
+    border: 1px solid rgba(218, 226, 236, 0.86);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(250, 252, 254, 0.98));
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.025), 0 12px 26px rgba(15, 23, 42, 0.052);
+    overflow: hidden;
+    transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease, background 180ms ease;
 }
 
 body.comite-detail-premium-v2 .committee-project-card:hover {
     transform: translateY(-1px);
-    border-color: rgba(207, 216, 226, 0.96);
-    box-shadow: 0 3px 6px rgba(15, 23, 42, 0.022), 0 16px 32px rgba(15, 23, 42, 0.072);
+    border-color: rgba(198, 209, 222, 0.96);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(251, 253, 255, 0.99));
+    box-shadow: 0 2px 5px rgba(15, 23, 42, 0.028), 0 16px 34px rgba(15, 23, 42, 0.068);
 }
 
 body.comite-detail-premium-v2 .committee-project-card__header {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 0.65rem;
+    gap: 0.7rem;
+    min-width: 0;
 }
 
 body.comite-detail-premium-v2 .committee-project-card__title-block {
     min-width: 0;
     flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 0.32rem;
 }
 
 body.comite-detail-premium-v2 .committee-project-card__title {
     margin: 0;
     max-width: 100%;
-    font-size: 1.02rem;
-    line-height: 1.26;
+    font-size: 1rem;
+    line-height: 1.23;
     font-weight: 820;
-    letter-spacing: -0.012em;
+    letter-spacing: 0;
     color: #111827;
     display: -webkit-box;
     overflow: hidden;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
-}
-
-body.comite-detail-premium-v2 .committee-project-card__stage-badge {
-    width: fit-content;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.18rem 0.48rem;
-    border-radius: 999px;
-    border: 1px solid rgba(226, 232, 240, 0.82);
-    background: rgba(248, 250, 252, 0.92);
-    color: #475569;
-    font-size: 0.6rem;
-    font-weight: 780;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-}
-
-body.comite-detail-premium-v2 .committee-project-card__stage-badge[data-stage="1"] {
-    border-color: rgba(226, 232, 240, 0.84);
-    background: rgba(249, 250, 251, 0.95);
-    color: #475569;
-}
-
-body.comite-detail-premium-v2 .committee-project-card__stage-badge[data-stage="2"] {
-    border-color: rgba(226, 232, 240, 0.84);
-    background: rgba(241, 245, 249, 0.9);
-    color: #5b6777;
-}
-
-body.comite-detail-premium-v2 .committee-project-card__stage-badge[data-stage="3"] {
-    border-color: rgba(214, 226, 232, 0.84);
-    background: rgba(243, 247, 248, 0.92);
-    color: #596f71;
-}
-
-body.comite-detail-premium-v2 .committee-project-card__stage-badge[data-stage="4"] {
-    border-color: rgba(221, 233, 213, 0.84);
-    background: rgba(244, 248, 239, 0.92);
-    color: #637357;
-}
-
-body.comite-detail-premium-v2 .committee-project-card__stage-badge[data-stage="5"] {
-    border-color: rgba(213, 231, 221, 0.84);
-    background: rgba(241, 248, 244, 0.92);
-    color: #5a7268;
 }
 
 body.comite-detail-premium-v2 .committee-project-card__actions {
@@ -1892,32 +1044,34 @@ body.comite-detail-premium-v2 .committee-project-card__icon-button--danger:hover
 
 body.comite-detail-premium-v2 .committee-project-card__meta {
     display: grid;
-    gap: 0.26rem;
-    padding-top: 0.02rem;
+    gap: 0.44rem;
+    min-width: 0;
 }
 
 body.comite-detail-premium-v2 .committee-project-card__meta-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.72rem;
+    display: grid;
+    min-width: 0;
 }
 
 body.comite-detail-premium-v2 .committee-project-card__meta-row--lead {
-    padding-bottom: 0.04rem;
+    padding: 0;
 }
 
 body.comite-detail-premium-v2 .committee-project-card__meta-row--dates {
-    gap: 0.62rem 0.8rem;
-    align-items: baseline;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.46rem;
 }
 
 body.comite-detail-premium-v2 .committee-project-card__meta-item {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 0.32rem;
+    display: grid;
+    gap: 0.16rem;
     min-width: 0;
-    font-size: 0.73rem;
-    line-height: 1.24;
+    padding: 0.42rem 0.48rem;
+    border: 1px solid rgba(226, 232, 240, 0.76);
+    border-radius: 0.62rem;
+    background: rgba(248, 250, 252, 0.68);
+    font-size: 0.68rem;
+    line-height: 1.2;
 }
 
 body.comite-detail-premium-v2 .committee-project-card__meta-item--lead {
@@ -1926,7 +1080,7 @@ body.comite-detail-premium-v2 .committee-project-card__meta-item--lead {
 }
 
 body.comite-detail-premium-v2 .committee-project-card__meta-item--start {
-    min-width: max-content;
+    min-width: 0;
 }
 
 body.comite-detail-premium-v2 .committee-project-card__meta-item--muted .committee-project-card__meta-value {
@@ -1934,17 +1088,17 @@ body.comite-detail-premium-v2 .committee-project-card__meta-item--muted .committ
 }
 
 body.comite-detail-premium-v2 .committee-project-card__meta-label {
-    font-size: 0.61rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
+    font-size: 0.56rem;
+    font-weight: 760;
+    letter-spacing: 0;
     text-transform: uppercase;
     color: #9aa5b1;
-    flex-shrink: 0;
 }
 
 body.comite-detail-premium-v2 .committee-project-card__meta-value {
-    color: #4b5563;
-    font-weight: 600;
+    color: #485465;
+    font-size: 0.71rem;
+    font-weight: 670;
     min-width: 0;
     white-space: nowrap;
     overflow: hidden;
@@ -1952,111 +1106,237 @@ body.comite-detail-premium-v2 .committee-project-card__meta-value {
 }
 
 body.comite-detail-premium-v2 .committee-project-card__date-input {
-    width: max-content;
-    max-width: 8.4rem;
+    width: 100%;
+    min-width: 0;
     border: none;
     background: transparent;
     padding: 0;
-    font-size: 0.73rem;
-    font-weight: 600;
-    color: #4b5563;
+    font-size: 0.71rem;
+    font-weight: 670;
+    color: #485465;
     outline: none;
 }
 
 body.comite-detail-premium-v2 .committee-project-card__progress {
-    display: flex;
-    flex-direction: column;
-    gap: 0.34rem;
-    margin-top: auto;
-    padding-top: 0.5rem;
-    border-top: 1px solid rgba(221, 228, 237, 0.76);
+    min-width: 0;
+    align-self: stretch;
+}
+
+body.comite-detail-premium-v2 .committee-project-card__progress-panel {
+    display: grid;
+    grid-template-rows: auto auto 1fr;
+    gap: 0.5rem;
+    height: 100%;
+    min-height: 0;
+    padding: 0.58rem 0.62rem 0.54rem;
+    border: 1px solid rgba(220, 229, 236, 0.9);
+    border-radius: 0.72rem;
+    background: linear-gradient(180deg, rgba(248, 250, 252, 0.82), rgba(244, 248, 251, 0.7));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
 }
 
 body.comite-detail-premium-v2 .committee-project-card__progress-head {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
-    gap: 0.75rem;
+    gap: 0.65rem;
 }
 
 body.comite-detail-premium-v2 .committee-project-card__progress-label {
-    font-size: 0.68rem;
-    font-weight: 700;
-    color: #6b7280;
+    font-size: 0.6rem;
+    font-weight: 780;
+    letter-spacing: 0;
+    text-transform: uppercase;
+    color: #7b8796;
 }
 
 body.comite-detail-premium-v2 .committee-project-card__progress-percent {
-    font-size: 0.82rem;
-    font-weight: 780;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.4rem;
+    padding: 0.13rem 0.42rem;
+    border-radius: 999px;
+    background: rgba(122, 184, 0, 0.11);
+    color: #527b17;
+    font-size: 0.68rem;
+    font-weight: 820;
     font-variant-numeric: tabular-nums;
-    color: #374151;
 }
 
-body.comite-detail-premium-v2 .committee-project-card__segments {
+body.comite-detail-premium-v2 .committee-project-card__current-stage {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    min-width: 0;
+}
+
+body.comite-detail-premium-v2 .committee-project-card__current-stage-label {
+    color: #9aa5b1;
+    font-size: 0.56rem;
+    font-weight: 760;
+    letter-spacing: 0;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+body.comite-detail-premium-v2 .committee-project-card__current-stage strong {
+    min-width: 0;
+    padding: 0.18rem 0.5rem;
+    border: 1px solid rgba(190, 213, 155, 0.56);
+    border-radius: 999px;
+    background: rgba(247, 251, 242, 0.9);
+    color: #557a1d;
+    font-size: 0.62rem;
+    font-weight: 820;
+    letter-spacing: 0;
+    text-transform: uppercase;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+body.comite-detail-premium-v2 .committee-project-card__stepper {
+    position: relative;
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 0.28rem;
+    align-items: start;
+    gap: 0;
+    min-width: 0;
 }
 
-body.comite-detail-premium-v2 .committee-project-card__segment {
+body.comite-detail-premium-v2 .committee-project-card__step {
     appearance: none;
+    position: relative;
+    z-index: 1;
+    display: grid;
+    justify-items: center;
+    align-content: start;
+    gap: 0.25rem;
+    min-width: 0;
     border: none;
-    height: 0.34rem;
-    border-radius: 999px;
-    background: #e7edf3;
     padding: 0;
     margin: 0;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    background: transparent;
+    color: #9aa5b1;
+    text-align: center;
 }
 
-body.comite-detail-premium-v2 button.committee-project-card__segment {
+body.comite-detail-premium-v2 .committee-project-card__step:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    top: 0.58rem;
+    left: calc(50% + 0.6rem);
+    right: calc(-50% + 0.6rem);
+    height: 2px;
+    border-radius: 999px;
+    background: rgba(218, 226, 236, 0.92);
+    z-index: -1;
+}
+
+body.comite-detail-premium-v2 .committee-project-card__step.is-complete::after {
+    background: rgba(122, 184, 0, 0.56);
+}
+
+body.comite-detail-premium-v2 .committee-project-card__step-dot {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.2rem;
+    height: 1.2rem;
+    border: 1px solid rgba(203, 213, 225, 0.96);
+    border-radius: 999px;
+    background: #fff;
+    color: #9aa5b1;
+    font-size: 0.56rem;
+    font-weight: 820;
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+body.comite-detail-premium-v2 .committee-project-card__step-label {
+    max-width: 100%;
+    color: inherit;
+    font-size: 0.49rem;
+    font-weight: 720;
+    line-height: 1.06;
+    letter-spacing: 0;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: clip;
+    overflow-wrap: normal;
+}
+
+body.comite-detail-premium-v2 button.committee-project-card__step {
     cursor: pointer;
-    transition: opacity 150ms ease, background 150ms ease, box-shadow 150ms ease;
+    transition: color 150ms ease, transform 150ms ease;
 }
 
-body.comite-detail-premium-v2 button.committee-project-card__segment:hover {
-    opacity: 0.92;
+body.comite-detail-premium-v2 button.committee-project-card__step:hover {
+    color: #6f9f21;
+    transform: translateY(-1px);
 }
 
-body.comite-detail-premium-v2 .committee-project-card__segment.is-active {
-    background: #9bb86a;
+body.comite-detail-premium-v2 .committee-project-card__step.is-active {
+    color: #6f8f2d;
 }
 
-body.comite-detail-premium-v2 .committee-project-card__segment.is-current {
-    box-shadow: 0 0 0 1px rgba(155, 184, 106, 0.18);
+body.comite-detail-premium-v2 .committee-project-card__step.is-active .committee-project-card__step-dot {
+    border-color: rgba(122, 184, 0, 0.52);
+    background: rgba(122, 184, 0, 0.12);
+    color: #5f8726;
+}
+
+body.comite-detail-premium-v2 .committee-project-card__step.is-current {
+    color: #466d13;
+}
+
+body.comite-detail-premium-v2 .committee-project-card__step.is-current .committee-project-card__step-dot {
+    border-color: rgba(122, 184, 0, 0.74);
+    background: #7ab800;
+    color: #fff;
+    box-shadow: 0 0 0 3px rgba(122, 184, 0, 0.14), 0 4px 10px rgba(122, 184, 0, 0.18);
 }
 
 body.comite-detail-premium-v2 .committee-project-card__doc-actions {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.7rem;
-    padding-top: 0.58rem;
-    border-top: 1px solid rgba(221, 228, 237, 0.72);
+    gap: 0.75rem;
+    min-width: 0;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(221, 228, 237, 0.76);
 }
 
 body.comite-detail-premium-v2 .committee-project-card__doc-label {
-    color: #8b96a5;
-    font-size: 0.62rem;
-    font-weight: 760;
-    letter-spacing: 0.055em;
+    color: #8d98a8;
+    font-size: 0.58rem;
+    font-weight: 780;
+    letter-spacing: 0;
     text-transform: uppercase;
 }
 
 body.comite-detail-premium-v2 .committee-project-card__doc-icons {
     margin-top: 0;
-    gap: 0.45rem;
+    gap: 0.38rem;
     flex-shrink: 0;
 }
 
 body.comite-detail-premium-v2 .committee-project-card__doc-icons .doc-icon {
-    width: 1.8rem;
-    height: 1.8rem;
-    border: 1px solid rgba(203, 213, 225, 0.72);
-    border-radius: 0.7rem;
+    width: 1.86rem;
+    height: 1.86rem;
+    border: 1px solid rgba(203, 213, 225, 0.76);
+    border-radius: 0.66rem;
     background: rgba(255, 255, 255, 0.9);
     color: #9aa5b1;
     box-shadow: 0 1px 2px rgba(15, 23, 42, 0.035);
+}
+
+body.comite-detail-premium-v2 .committee-project-card__doc-icons .doc-icon:disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
 }
 
 body.comite-detail-premium-v2 .committee-project-card__doc-icons .doc-icon:hover {
@@ -2670,50 +1950,6 @@ body.comite-detail-premium-v2 .committee-member-card__menu-item--danger:hover {
     color: #991b1b;
 }
 
-body.comite-bioetica--compact-v2 .committee-doc-card__progress-meta {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    margin-bottom: 0.45rem;
-}
-
-body.comite-bioetica--compact-v2 .committee-doc-card__progress-label {
-    font-size: 0.72rem;
-    font-weight: 700;
-    color: #64748b;
-}
-
-body.comite-bioetica--compact-v2 .committee-doc-card__progress-percent {
-    font-size: 0.72rem;
-    font-weight: 800;
-    color: #111827;
-}
-
-body.comite-bioetica--compact-v2 .committee-doc-card__progress-track {
-    width: 100%;
-    height: 0.28rem;
-    border-radius: 999px;
-    background: #e5e7eb;
-    overflow: hidden;
-    margin-bottom: 1rem;
-}
-
-body.comite-bioetica--compact-v2 .committee-doc-card__progress-track.is-neutral {
-    background: #e5e7eb;
-}
-
-body.comite-bioetica--compact-v2 .committee-doc-card__progress-bar {
-    height: 100%;
-    border-radius: inherit;
-    background: linear-gradient(90deg, rgba(122, 184, 0, 0.92), rgba(122, 184, 0, 0.68));
-    transition: width 0.45s ease;
-}
-
-body.comite-bioetica--compact-v2 .committee-doc-card__progress-bar.is-finished {
-    background: linear-gradient(90deg, rgba(20, 184, 166, 0.9), rgba(13, 148, 136, 0.72));
-}
-
 @media (max-width: 1200px) {
     body.comite-detail-premium-v2 .committee-projects-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2755,36 +1991,41 @@ body.comite-bioetica--compact-v2 .committee-doc-card__progress-bar.is-finished {
         grid-template-columns: 1fr;
     }
 
+    body.comite-detail-premium-v2 .committee-project-card {
+        aspect-ratio: auto;
+        min-height: 0;
+        padding: 1rem;
+    }
+
     body.comite-detail-premium-v2 .committee-project-card__header,
     body.comite-detail-premium-v2 .committee-project-card__progress-head {
         gap: 0.55rem;
     }
 
-    body.comite-detail-premium-v2 .committee-project-card__header {
-        flex-direction: column;
-    }
-
-    body.comite-detail-premium-v2 .committee-project-card__actions {
-        align-self: flex-end;
-    }
-
     body.comite-detail-premium-v2 .committee-project-card__doc-actions {
-        align-items: flex-start;
-        flex-direction: column;
+        align-items: center;
+        flex-direction: row;
     }
 
     body.comite-detail-premium-v2 .committee-project-card__meta {
-        gap: 0.32rem;
+        gap: 0.42rem;
     }
 
-    body.comite-detail-premium-v2 .committee-project-card__meta-row {
-        flex-direction: column;
-        gap: 0.26rem;
+    body.comite-detail-premium-v2 .committee-project-card__meta-row--dates {
+        grid-template-columns: 1fr;
     }
 
     body.comite-detail-premium-v2 .committee-project-card__date-input {
-        width: auto;
+        width: 100%;
         min-width: 0;
+    }
+
+    body.comite-detail-premium-v2 .committee-project-card__progress-panel {
+        min-height: 8.2rem;
+    }
+
+    body.comite-detail-premium-v2 .committee-project-card__step-label {
+        font-size: 0.49rem;
     }
 
     body.comite-detail-premium-v2 #integrantes .comite__members-header {
