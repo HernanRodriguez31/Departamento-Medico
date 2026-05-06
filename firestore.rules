@@ -530,6 +530,90 @@ service cloud.firestore {
         );
     }
 
+    function validCommitteeNoteText(data) {
+      return data.text is string
+        && data.text.size() > 0
+        && data.text.size() <= 2000;
+    }
+
+    function validCommitteeNoteScope(data) {
+      return data.scope in ["committee", "project"]
+        && (
+          (
+            data.scope == "committee"
+            && data.projectId == null
+            && data.projectTitle is string
+            && data.projectTitle.size() <= 1
+          )
+          || (
+            data.scope == "project"
+            && data.projectId is string
+            && data.projectId.size() > 0
+            && data.projectId.size() <= 160
+            && data.projectTitle is string
+            && data.projectTitle.size() > 0
+            && data.projectTitle.size() <= 220
+          )
+        );
+    }
+
+    function validCommitteeNoteCreate() {
+      return signedIn()
+        && onlyKeys([
+          "committeeId",
+          "scope",
+          "projectId",
+          "projectTitle",
+          "text",
+          "authorUid",
+          "authorName",
+          "createdAt",
+          "updatedAt"
+        ])
+        && request.resource.data.committeeId is string
+        && validCommitteeCalendarId(request.resource.data.committeeId)
+        && validCommitteeNoteScope(request.resource.data)
+        && validCommitteeNoteText(request.resource.data)
+        && request.resource.data.authorUid == request.auth.uid
+        && request.resource.data.authorName is string
+        && request.resource.data.authorName.size() > 0
+        && request.resource.data.authorName.size() <= 140
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp;
+    }
+
+    function validCommitteeNoteUpdate() {
+      return (isOwnedByCurrentUser(resource.data) || isAdmin())
+        && request.resource.data.keys().hasOnly([
+          "committeeId",
+          "scope",
+          "projectId",
+          "projectTitle",
+          "text",
+          "authorUid",
+          "authorName",
+          "createdAt",
+          "updatedAt",
+          "updatedByUid",
+          "updatedByName"
+        ])
+        && changedOnly(["text", "updatedAt", "updatedByUid", "updatedByName"])
+        && request.resource.data.committeeId == resource.data.committeeId
+        && request.resource.data.scope == resource.data.scope
+        && request.resource.data.projectId == resource.data.projectId
+        && request.resource.data.projectTitle == resource.data.projectTitle
+        && request.resource.data.authorUid == resource.data.authorUid
+        && request.resource.data.authorName == resource.data.authorName
+        && request.resource.data.createdAt == resource.data.createdAt
+        && validCommitteeNoteScope(request.resource.data)
+        && validCommitteeNoteText(request.resource.data)
+        && request.resource.data.updatedAt is timestamp
+        && request.resource.data.updatedByUid == request.auth.uid
+        && request.resource.data.updatedByName is string
+        && request.resource.data.updatedByName.size() > 0
+        && request.resource.data.updatedByName.size() <= 140;
+    }
+
     function validCommitteeMemberSelfJoin() {
       return signedIn()
         && onlyKeys([
@@ -1340,6 +1424,13 @@ service cloud.firestore {
       allow read: if signedIn();
       allow create: if validCommitteeMessageCreate();
       allow update: if validCommitteeMessageUpdate();
+      allow delete: if isOwnedByCurrentUser(resource.data) || isAdmin();
+    }
+
+    match /artifacts/{appId}/public/data/committee_notes/{noteId} {
+      allow read: if signedIn();
+      allow create: if validCommitteeNoteCreate();
+      allow update: if validCommitteeNoteUpdate();
       allow delete: if isOwnedByCurrentUser(resource.data) || isAdmin();
     }
 

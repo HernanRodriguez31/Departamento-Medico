@@ -118,6 +118,20 @@ beforeEach(async () => {
       }
     );
     await setDoc(
+      doc(db, "artifacts", APP_ID, "public", "data", "committee_notes", "flat-note-a"),
+      {
+        committeeId: "comite_bioetica",
+        scope: "project",
+        projectId: "flat-topic-a",
+        projectTitle: "Proyecto A",
+        text: "Nota sembrada del proyecto.",
+        authorUid: "user-a",
+        authorName: "Dr. Usuario A",
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      }
+    );
+    await setDoc(
       doc(db, "artifacts", APP_ID, "public", "data", "calendar_events", "event-a"),
       {
         title: "Reunión de seguimiento",
@@ -396,6 +410,12 @@ test("authenticated users can read source committee collections", async () => {
   );
   await assertSucceeds(
     getDocs(query(collection(db, "artifacts", APP_ID, "public", "data", "committee_messages"), limit(10)))
+  );
+  await assertSucceeds(
+    getDoc(doc(db, "artifacts", APP_ID, "public", "data", "committee_notes", "flat-note-a"))
+  );
+  await assertSucceeds(
+    getDocs(query(collection(db, "artifacts", APP_ID, "public", "data", "committee_notes"), limit(10)))
   );
 });
 
@@ -1326,6 +1346,108 @@ test("non-admin cannot create committee_topics and admin can create them", async
   );
 });
 
+test("authenticated users can create own committee_notes and only owner or admin can edit them", async () => {
+  const ownerDb = authedDb("user-b");
+  const otherDb = authedDb("user-c");
+  const adminDb = authedAdminDb("admin-a");
+  const notePath = ["artifacts", APP_ID, "public", "data", "committee_notes", "note-b"];
+
+  await assertSucceeds(
+    setDoc(doc(ownerDb, ...notePath), {
+      committeeId: "comite_bioetica",
+      scope: "project",
+      projectId: "flat-topic-a",
+      projectTitle: "Proyecto A",
+      text: "Nota inicial del proyecto.",
+      authorUid: "user-b",
+      authorName: "Dr. Usuario B",
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    })
+  );
+
+  await assertSucceeds(
+    setDoc(doc(ownerDb, "artifacts", APP_ID, "public", "data", "committee_notes", "note-committee"), {
+      committeeId: "comite_bioetica",
+      scope: "committee",
+      projectId: null,
+      projectTitle: "",
+      text: "Nota general de comité.",
+      authorUid: "user-b",
+      authorName: "Dr. Usuario B",
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    })
+  );
+
+  await assertFails(
+    setDoc(doc(ownerDb, "artifacts", APP_ID, "public", "data", "committee_notes", "note-invalid-committee"), {
+      committeeId: "comite_inexistente",
+      scope: "committee",
+      projectId: null,
+      projectTitle: "",
+      text: "Nota con comité inválido.",
+      authorUid: "user-b",
+      authorName: "Dr. Usuario B",
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    })
+  );
+
+  await assertFails(
+    setDoc(doc(ownerDb, "artifacts", APP_ID, "public", "data", "committee_notes", "note-forged-owner"), {
+      committeeId: "comite_bioetica",
+      scope: "committee",
+      projectId: null,
+      projectTitle: "",
+      text: "Nota con dueño falso.",
+      authorUid: "user-a",
+      authorName: "Dr. Usuario A",
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    })
+  );
+
+  await assertSucceeds(
+    updateDoc(doc(ownerDb, ...notePath), {
+      text: "Nota editada por el autor.",
+      updatedAt: Timestamp.now(),
+      updatedByUid: "user-b",
+      updatedByName: "Dr. Usuario B"
+    })
+  );
+
+  await assertFails(
+    updateDoc(doc(otherDb, ...notePath), {
+      text: "Intento de edición por tercero.",
+      updatedAt: Timestamp.now(),
+      updatedByUid: "user-c",
+      updatedByName: "Dr. Usuario C"
+    })
+  );
+
+  await assertFails(
+    updateDoc(doc(ownerDb, ...notePath), {
+      projectId: "otro-proyecto",
+      updatedAt: Timestamp.now(),
+      updatedByUid: "user-b",
+      updatedByName: "Dr. Usuario B"
+    })
+  );
+
+  await assertSucceeds(
+    updateDoc(doc(adminDb, ...notePath), {
+      text: "Nota moderada por admin.",
+      updatedAt: Timestamp.now(),
+      updatedByUid: "admin-a",
+      updatedByName: "Admin"
+    })
+  );
+
+  await assertFails(deleteDoc(doc(otherDb, ...notePath)));
+  await assertSucceeds(deleteDoc(doc(adminDb, ...notePath)));
+});
+
 test("unauthenticated user cannot read or write source committee routes", async () => {
   await assertFails(
     getDoc(doc(unauthedDb(), "artifacts", APP_ID, "public", "data", "committee_messages", "flat-foro-msg"))
@@ -1335,6 +1457,9 @@ test("unauthenticated user cannot read or write source committee routes", async 
   );
   await assertFails(
     getDoc(doc(unauthedDb(), "artifacts", APP_ID, "public", "data", "committee_members", "flat-member-a"))
+  );
+  await assertFails(
+    getDoc(doc(unauthedDb(), "artifacts", APP_ID, "public", "data", "committee_notes", "flat-note-a"))
   );
   await assertFails(
     setDoc(
@@ -1374,6 +1499,22 @@ test("unauthenticated user cannot read or write source committee routes", async 
         committeeId: "comite_bioetica",
         title: "Proyecto invitado",
         createdAt: Timestamp.now()
+      }
+    )
+  );
+  await assertFails(
+    setDoc(
+      doc(unauthedDb(), "artifacts", APP_ID, "public", "data", "committee_notes", "note-guest"),
+      {
+        committeeId: "comite_bioetica",
+        scope: "committee",
+        projectId: null,
+        projectTitle: "",
+        text: "Nota invitada",
+        authorUid: "guest",
+        authorName: "Invitado",
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
       }
     )
   );

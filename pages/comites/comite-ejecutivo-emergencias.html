@@ -52,7 +52,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
     
     <link rel="stylesheet" href="../../assets/css/shared/department-calendar.css?v=20260506-committee-calendars-1">
-    <link rel="stylesheet" href="../../assets/css/pages/comite.css?v=20260506-committee-project-cards-1">
+    <link rel="stylesheet" href="../../assets/css/pages/comite.css?v=20260506-committee-pizarron-1">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/es.js"></script>
 <!-- Firebase SDKs -->
@@ -73,7 +73,9 @@
         import { hydrateAvatars, resolveUidForAuthor } from "../../assets/js/common/user-profiles.js?v=20260426-profile-avatars-1";
         import { escapeHTML, escapeAttribute } from "../../assets/js/utils/safe-dom.js";
         import { initSessionGuard, performManagedLogout } from "../../assets/js/shared/sessionGuard.js?v=20260305-session-1";
+        import { initUserMenu } from "../../assets/js/common/user-menu.js?v=20260430-orgtree-avatars-1";
         import { initDepartmentCalendar } from "../../assets/js/common/department-calendar.js?v=20260506-committee-calendars-1";
+        import { createCommitteeNotesController } from "../../assets/js/common/committee-notes.js?v=20260506-pizarron-1";
 
         let db = null;
         let auth = null;
@@ -91,7 +93,9 @@
         if (auth) {
             initSessionGuard({ auth, db, loginPath: "../../login.html" });
         }
+        initUserMenu({ variant: "desktop" });
         let isAdmin = false;
+        let committeeNotesController = null;
 
         const resolveAdminStatus = async (user) => {
             if (!user) return false;
@@ -318,6 +322,10 @@
             const hasPpt = !!links.ppt;
             const modifier = variant === 'finished' ? ' committee-project-card__doc-actions--finished' : '';
             const label = variant === 'finished' ? 'Trabajo' : 'Documentos';
+            const noteButton = variant === 'finished' ? '' : `
+                        <button type="button" class="doc-icon doc-icon-note" onclick="event.stopPropagation(); window.openCommitteeProjectNote?.(${safeInlineJsString(topic.id)})" title="Nota del proyecto">
+                            <i data-lucide="notebook-pen"></i>
+                        </button>`;
             return `
                 <div class="committee-project-card__doc-actions${modifier}">
                     <span class="committee-project-card__doc-label">${label}</span>
@@ -330,7 +338,7 @@
                         </button>
                         <button type="button" class="doc-icon doc-icon-ppt" data-topic-id="${escapeAttribute(topic.id)}" data-doc-type="ppt" title="Presentación colaborativa" ${hasPpt ? '' : 'disabled'}>
                             <i data-lucide="presentation"></i>
-                        </button>
+                        </button>${noteButton}
                     </div>
                 </div>
             `;
@@ -667,11 +675,14 @@
                 <div class="committee-project-card__progress-panel">
                     <div class="committee-project-card__progress-head">
                         <span class="committee-project-card__progress-label">Proceso de avance</span>
-                        <span class="committee-project-card__progress-percent">${stageMeta.percent}%</span>
+                        <span class="committee-project-card__progress-stage">${escapeHTML(stageMeta.label)}</span>
                     </div>
                     <div class="committee-project-card__current-stage" data-stage="${stageMeta.stage}">
                         <span class="committee-project-card__current-stage-label">Etapa actual</span>
-                        <strong>${escapeHTML(stageMeta.label)}</strong>
+                        <strong>
+                            <span>${escapeHTML(stageMeta.label)}</span>
+                            <span class="committee-project-card__current-stage-percent">${stageMeta.percent}%</span>
+                        </strong>
                     </div>
                     <div class="committee-project-card__stepper" role="group" aria-label="Progreso del proyecto ${escapeAttribute(topic.title || 'sin título')}">
                     ${stageMeta.segments.map((segment) => {
@@ -839,6 +850,7 @@
             updateStats();
             attachStageTooltips();
             attachDocActions();
+            committeeNotesController?.render();
         }
 
         function updateStats() {
@@ -1683,6 +1695,17 @@ async function joinCurrentCommittee() {
                 state.topicsReady = false;
                 updateStats();
             };
+            committeeNotesController = createCommitteeNotesController({
+                db,
+                auth,
+                appId,
+                committeeId: COMMITTEE_ID,
+                getTopics: () => state.topics,
+                getIsAdmin: () => isAdmin,
+                onChange: () => updateStats()
+            });
+            committeeNotesController.init();
+
             const subscribeCommitteeData = () => {
                 if (!db) return;
                 clearCommitteeSubscriptions();
@@ -1758,19 +1781,19 @@ async function joinCurrentCommittee() {
                 state.topicsReady = true;
                 refreshAndPersist();
             }
-            setupUserPanel();
             if (auth) {
                 onAuthStateChanged(auth, async (user) => {
                     clearCommitteeSubscriptions();
+                    committeeNotesController?.unsubscribe();
                     if (!user) {
                         window.location.href = "../../login.html";
                         return;
                     }
                     await refreshAdminState(user);
                     await getUserDisplayName(user);
+                    committeeNotesController?.subscribe();
                     subscribeCommitteeData();
                     syncLegacyForumMessages();
-                    hydrateUserPanel();
                     updateJoinButtonState();
                 });
             }
@@ -2173,24 +2196,57 @@ async function joinCurrentCommittee() {
     <header
         class="bg-white shadow-sm sticky top-0 z-50 backdrop-blur-md bg-white/95 border-b border-gray-100 transition-all duration-300">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="relative flex justify-between items-center h-24">
-                <!-- Left: Logo -->
-                <div class="flex-shrink-0 flex items-center gap-3 z-10">
+            <div class="relative flex justify-between items-center h-24 committee-page-header__bar">
+                <div class="committee-page-header__left z-10">
                     <img src="../../assets/images/logo-brisa-transparent.png" alt="Brisa Logo"
                         class="h-[5.25rem] w-auto" width="900" height="500" decoding="async">
+                    <div class="committee-header-context" aria-label="Identidad del comité">
+                        <img src="../../assets/images/committees/logos/committee-emergencias-logo.png" alt="Logo del Comité Ejecutivo de Emergencias"
+                            class="committee-header-logo" width="512" height="512" decoding="async">
+                        <span id="committee-header-title" class="committee-header-context__title">Comité Ejecutivo de Emergencias</span>
+                    </div>
                 </div>
 
-                <!-- Center: Title (Absolute Centered) -->
-                <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div class="absolute inset-0 flex items-center justify-center pointer-events-none committee-page-header__center">
                     <h1 class="text-3xl md:text-4xl font-bold text-gray-900 tracking-tight whitespace-nowrap">
                         Departamento Médico</h1>
                 </div>
 
-                <!-- Right: Comités Icon (sin usuario) -->
-                <div class="flex-shrink-0 flex items-center gap-4 text-sm text-gray-500 font-medium z-10">
-                    <span id="committee-header-title" class="hidden sm:inline">Comités de Trabajo</span>
-                    <img src="../../assets/images/committees/logos/committee-emergencias-logo.png" alt="Logo del Comité Ejecutivo de Emergencias"
-                        class="committee-header-logo" width="512" height="512" decoding="async">
+                <div class="committee-page-header__right">
+                    <div class="user-panel" data-dm-user-menu data-variant="desktop">
+                        <button id="user-panel-trigger" class="user-panel-trigger" data-dm-user-trigger type="button" aria-haspopup="menu" aria-expanded="false">
+                            <span class="user-panel-icon" data-dm-user-avatar>
+                                <img class="user-avatar-img" data-dm-user-avatar-img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="Avatar" loading="lazy" decoding="async" hidden>
+                                <span class="user-avatar-initials" data-dm-user-avatar-initials>DM</span>
+                            </span>
+                            <span id="user-display-name" class="user-name" data-dm-user-trigger-name>Dr. …</span>
+                            <span id="user-info-trigger" class="ui-info" aria-label="Información usuario">i</span>
+                        </button>
+                        <div id="user-panel-dropdown" class="user-panel-dropdown" data-dm-user-dropdown role="menu" hidden>
+                            <div class="user-menu__row user-menu__row--primary">
+                                <span class="user-menu__avatar" data-dm-user-avatar>
+                                    <img class="user-avatar-img" data-dm-user-avatar-img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="Avatar" loading="lazy" decoding="async" hidden>
+                                    <span class="user-avatar-initials" data-dm-user-avatar-initials>DM</span>
+                                </span>
+                                <span id="user-panel-info" class="user-menu__user" data-dm-user-fullname>Usuario</span>
+                            </div>
+                            <div class="user-menu__row user-menu__row--subtle" data-dm-user-notif-toggle-row>
+                                <span class="user-menu__label">Notificaciones</span>
+                                <label class="push-switch">
+                                    <input id="push-toggle-menu" type="checkbox" aria-label="Notificaciones" data-dm-user-notif-toggle data-dm-user-notif-external="1">
+                                    <span class="push-slider"></span>
+                                </label>
+                                <span id="push-info-trigger" class="ui-info" aria-label="Información de notificaciones">i</span>
+                            </div>
+                            <div class="user-menu__row user-menu__row--subtle user-menu__row--photo" data-dm-user-avatar-upload-row>
+                                <span class="user-menu__label">Cambiar imagen de perfil</span>
+                                <label class="user-menu__action" for="profile-photo-input">Agregar</label>
+                                <input id="profile-photo-input" type="file" accept="image/*" data-dm-user-avatar-input hidden>
+                            </div>
+                            <div id="push-toggle-hint" class="push-toggle-hint"></div>
+                            <button id="user-panel-logout" class="user-menu__logout" type="button" data-dm-user-logout>Cerrar sesión</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -2288,6 +2344,42 @@ async function joinCurrentCommittee() {
                         <p class="text-xs text-gray-400">Proyectos activos y seguimiento</p>
                     </div>
                 </div>
+
+
+                <button id="committee-board-toggle" class="committee-board-bubble" type="button" aria-expanded="false" aria-controls="committee-board-panel">
+                    <i data-lucide="notebook-pen"></i>
+                    <span>Pizarrón</span>
+                    <span id="committee-board-count" class="committee-board-bubble__count">0</span>
+                </button>
+
+                <aside id="committee-board-panel" class="committee-board-panel" aria-label="Pizarrón del comité" hidden>
+                    <div class="committee-board-panel__header">
+                        <div>
+                            <p class="committee-board-panel__eyebrow">Seguimiento</p>
+                            <h3 class="committee-board-panel__title">Pizarrón</h3>
+                            <p class="committee-board-panel__subtitle">Notas del comité y de cada proyecto.</p>
+                        </div>
+                        <button type="button" class="committee-board-panel__close" data-committee-board-close aria-label="Cerrar pizarrón">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+                    <form id="committee-note-form" class="committee-board-form">
+                        <div class="committee-board-form__row">
+                            <label for="committee-note-scope">Destino de la nota</label>
+                            <select id="committee-note-scope"></select>
+                            <p id="committee-note-context-hint" class="committee-board-form__hint">La nota quedará asociada al comité.</p>
+                        </div>
+                        <div class="committee-board-form__row">
+                            <label for="committee-note-text">Nota</label>
+                            <textarea id="committee-note-text" placeholder="Escribir una nota breve..."></textarea>
+                        </div>
+                        <button type="submit" class="committee-board-form__submit">
+                            <i data-lucide="plus"></i>
+                            Agregar nota
+                        </button>
+                    </form>
+                    <div id="committee-board-notes" class="committee-board-notes" aria-live="polite"></div>
+                </aside>
 
                 <div id="projects-list" class="flex-col space-y-4">
                     <!-- Projects rendered here -->
