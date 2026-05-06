@@ -51,7 +51,8 @@
     <!-- Flatpickr (Custom Date Picker) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
     
-    <link rel="stylesheet" href="../../assets/css/pages/comite.css?v=20260307-chat-aladdin-1">
+    <link rel="stylesheet" href="../../assets/css/shared/department-calendar.css?v=20260506-committee-calendars-1">
+    <link rel="stylesheet" href="../../assets/css/pages/comite.css?v=20260506-committee-integrated-1">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/es.js"></script>
 <!-- Firebase SDKs -->
@@ -87,6 +88,7 @@
         import { hydrateAvatars, resolveUidForAuthor } from "../../assets/js/common/user-profiles.js?v=20260426-profile-avatars-1";
         import { escapeHTML, escapeAttribute } from "../../assets/js/utils/safe-dom.js";
         import { initSessionGuard } from "../../assets/js/shared/sessionGuard.js?v=20260305-session-1";
+        import { initDepartmentCalendar } from "../../assets/js/common/department-calendar.js?v=20260506-committee-calendars-1";
 
         let db = null;
         let auth = null;
@@ -307,6 +309,49 @@
             { id: 4, label: 'Ejecución' },
             { id: 5, label: 'Finalizado' }
         ];
+
+        function getManualDocLinks(topic) {
+            const links = topic?.docLinks && typeof topic.docLinks === 'object' ? topic.docLinks : {};
+            return {
+                folder: String(links.folder || '').trim(),
+                doc: String(links.doc || links.word || '').trim(),
+                ppt: String(links.ppt || '').trim()
+            };
+        }
+
+        function buildDocLinksFromValues(folder, doc, ppt) {
+            return {
+                folder: String(folder || '').trim(),
+                doc: String(doc || '').trim(),
+                ppt: String(ppt || '').trim()
+            };
+        }
+
+        function renderProjectDocumentActions(topic, variant = 'project') {
+            const links = getDocLinksForTopic(COMMITTEE_ID, topic);
+            const hasFolder = !!links.folder;
+            const hasDoc = !!links.doc;
+            const hasPpt = !!links.ppt;
+            const modifier = variant === 'finished' ? ' committee-project-card__doc-actions--finished' : '';
+            const label = variant === 'finished' ? 'Trabajo' : 'Documentos';
+            return `
+                <div class="committee-project-card__doc-actions${modifier}">
+                    <span class="committee-project-card__doc-label">${label}</span>
+                    <div class="doc-actions committee-project-card__doc-icons" aria-label="Accesos de trabajo de ${escapeAttribute(topic.title || 'proyecto')}">
+                        <button type="button" class="doc-icon doc-icon-folder" data-topic-id="${escapeAttribute(topic.id)}" data-doc-type="folder" title="Carpeta del proyecto" ${hasFolder ? '' : 'disabled'}>
+                            <i data-lucide="folder"></i>
+                        </button>
+                        <button type="button" class="doc-icon doc-icon-doc" data-topic-id="${escapeAttribute(topic.id)}" data-doc-type="word" title="Documento colaborativo" ${hasDoc ? '' : 'disabled'}>
+                            <i data-lucide="file-text"></i>
+                        </button>
+                        <button type="button" class="doc-icon doc-icon-ppt" data-topic-id="${escapeAttribute(topic.id)}" data-doc-type="ppt" title="Presentación colaborativa" ${hasPpt ? '' : 'disabled'}>
+                            <i data-lucide="presentation"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
         const STAGE_DEFINITIONS = {
             1: {
                 title: 'Planificación',
@@ -751,7 +796,6 @@
             renderProjects();
             renderFinished();
             renderMembers();
-            renderDocuments();
             renderForum();
             updateStats();
             attachStageTooltips();
@@ -818,6 +862,7 @@
                                     </div>
                                     ${renderProjectSegments(topic, stageMeta)}
                                 </div>
+                                ${renderProjectDocumentActions(topic)}
                             </article>
                         `;
             }).join('')}
@@ -845,6 +890,7 @@
                         <span class="text-sm font-semibold text-gray-700 whitespace-normal break-words leading-tight" title="${escapeAttribute(topic.title)}">${escapeHTML(topic.title)}</span>
                     </div>
                     <div class="flex items-center justify-end gap-1 flex-shrink-0">
+                        ${renderProjectDocumentActions(topic, 'finished')}
                         <button onclick="window.updateTopicStage(${safeInlineJsString(topic.id)}, 4)" class="text-gray-400 hover:text-teal-600 p-1 mr-1 bg-white rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110" title="Reabrir">
                             <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
                         </button>
@@ -1202,60 +1248,6 @@ async function joinCurrentCommittee() {
             }
         }
 
-        function renderDocuments() {
-            const container = document.getElementById('documents-grid');
-            const section = document.getElementById('documents-section');
-
-            if (state.topics.length === 0) {
-                section.classList.add('hidden');
-                return;
-            }
-            section.classList.remove('hidden');
-
-            container.innerHTML = state.topics.map(topic => {
-                const links = getDocLinksForTopic(COMMITTEE_ID, topic);
-                const hasFolder = !!links.folder;
-                const hasDoc = !!links.doc;
-                const hasPpt = !!links.ppt;
-
-                return `
-                    <div class="group bg-white border border-gray-100 rounded-xl p-6 shadow-sm hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 cursor-pointer flex flex-col justify-between h-full relative overflow-hidden">
-                        <div class="absolute top-0 left-0 w-1 h-full bg-brisa opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                        <div>
-                            <div class="flex items-center justify-between mb-4">
-                                <div class="p-3 rounded-lg transition-colors duration-300 ${topic.stage === 5 ? 'bg-teal-50' : 'bg-brisa/10 group-hover:bg-brisa'}">
-                                    <i data-lucide="layers" class="w-6 h-6 ${topic.stage === 5 ? 'text-teal-600' : 'text-brisa group-hover:text-white'}"></i>
-                                </div>
-                                <i data-lucide="external-link" class="w-4 h-4 text-gray-300 group-hover:text-brisa transition-colors"></i>
-                            </div>
-                            <h3 class="text-lg font-bold text-gray-800 mb-2 line-clamp-2 leading-tight">${escapeHTML(topic.title)}</h3>
-                            <p class="text-xs text-gray-500 mb-4 font-medium">
-                                ${topic.stage === 5 ? `Finalizado el: ${formatDate(topic.finishedDate)}` : "Documento de trabajo colaborativo en Teams."}
-                            </p>
-                            <div class="w-full bg-gray-100 rounded-full h-1 mb-4 overflow-hidden">
-                                <div class="h-1 rounded-full transition-all duration-700 ease-out ${topic.stage === 5 ? 'bg-teal-500' : 'bg-brisa'}" style="width: ${(topic.stage / 5) * 100}%"></div>
-                            </div>
-                        </div>
-                        <div class="mt-auto">
-                            <div class="doc-actions">
-                                <button type="button" class="doc-icon doc-icon-folder" data-topic-id="${escapeAttribute(topic.id)}" data-doc-type="folder" title="Carpeta" ${hasFolder ? '' : 'disabled'}>
-                                    <i data-lucide="folder"></i>
-                                </button>
-                                <button type="button" class="doc-icon doc-icon-doc" data-topic-id="${escapeAttribute(topic.id)}" data-doc-type="word" title="Documento" ${hasDoc ? '' : 'disabled'}>
-                                    <i data-lucide="file-text"></i>
-                                </button>
-                                <button type="button" class="doc-icon doc-icon-ppt" data-topic-id="${escapeAttribute(topic.id)}" data-doc-type="ppt" title="Presentación" ${hasPpt ? '' : 'disabled'}>
-                                    <i data-lucide="presentation"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-
-            if (window.lucide) window.lucide.createIcons();
-        }
-
         function renderForum() {
             const container = document.getElementById('forum-messages');
 
@@ -1396,27 +1388,58 @@ async function joinCurrentCommittee() {
             const current = state.topics.find(t => t.id === id);
             if (!current) return;
 
-            const currentTitle = current.title || '';
-            const currentStart = current.startDate || '';
-            const currentProposedBy = current.proposedBy || '';
+            const manualLinks = getManualDocLinks(current);
+            const result = await Swal.fire({
+                title: 'Editar proyecto',
+                html: `
+                    <div class="committee-project-edit-modal">
+                        <label class="committee-project-edit-modal__field">
+                            <span>Proyecto</span>
+                            <input data-edit-field="title" type="text" value="${escapeAttribute(current.title || '')}" placeholder="Nombre del proyecto">
+                        </label>
+                        <label class="committee-project-edit-modal__field">
+                            <span>Propuesto por</span>
+                            <input data-edit-field="proposedBy" type="text" value="${escapeAttribute(current.proposedBy || '')}" placeholder="Médico/s o equipo médico">
+                        </label>
+                        <label class="committee-project-edit-modal__field">
+                            <span>Fecha de inicio</span>
+                            <input data-edit-field="startDate" type="date" value="${escapeAttribute(current.startDate || '')}">
+                        </label>
+                        <div class="committee-project-edit-modal__links">
+                            <p>Accesos Teams del proyecto</p>
+                            <input data-edit-field="folder" type="url" value="${escapeAttribute(manualLinks.folder)}" placeholder="Link de carpeta">
+                            <input data-edit-field="doc" type="url" value="${escapeAttribute(manualLinks.doc)}" placeholder="Link de documento Word">
+                            <input data-edit-field="ppt" type="url" value="${escapeAttribute(manualLinks.ppt)}" placeholder="Link de PowerPoint">
+                        </div>
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'Guardar cambios',
+                cancelButtonText: 'Cancelar',
+                focusConfirm: false,
+                preConfirm: () => {
+                    const popup = Swal.getPopup();
+                    const read = (name) => popup?.querySelector(`[data-edit-field="${name}"]`)?.value.trim() || '';
+                    const title = read('title');
+                    if (!title) {
+                        Swal.showValidationMessage('Indicá el nombre del proyecto.');
+                        return false;
+                    }
+                    return {
+                        title,
+                        proposedBy: read('proposedBy'),
+                        startDate: read('startDate'),
+                        docLinks: buildDocLinksFromValues(read('folder'), read('doc'), read('ppt'))
+                    };
+                }
+            });
 
-            const newTitle = prompt('Editar título del proyecto:', currentTitle);
-            if (newTitle === null) return;
-
-            const newStart = prompt('Editar fecha de inicio (YYYY-MM-DD):', currentStart);
-            if (newStart === null) return;
-
-            const newProposedBy = prompt('Indicar quién propuso este proyecto (uno o varios médicos, o equipo médico del comité):', currentProposedBy);
-            if (newProposedBy === null) return;
+            if (!result.isConfirmed) return;
 
             try {
                 await updateDoc(
                     doc(db, 'artifacts', appId, 'public', 'data', 'committee_topics', id),
-                    {
-                        title: newTitle.trim(),
-                        startDate: newStart.trim(),
-                        proposedBy: newProposedBy.trim()
-                    }
+                    result.value
                 );
             } catch (e) {
                 console.error('Error actualizando proyecto:', e);
@@ -1740,6 +1763,11 @@ async function joinCurrentCommittee() {
                 const title = document.getElementById('new-topic-title').value;
                 const date = document.getElementById('new-topic-date').value;
                 const proposedBy = document.getElementById('new-topic-proposedBy').value.trim();
+                const docLinks = buildDocLinksFromValues(
+                    document.getElementById('new-topic-folder')?.value,
+                    document.getElementById('new-topic-doc')?.value,
+                    document.getElementById('new-topic-ppt')?.value
+                );
 
                 if (!title || !date) return;
 
@@ -1752,6 +1780,7 @@ async function joinCurrentCommittee() {
                             proposedBy,
                             committeeId: COMMITTEE_ID,
                             projectNumber,
+                            docLinks,
                             stage: 1,
                             createdAt: serverTimestamp()
                         });
@@ -1765,6 +1794,7 @@ async function joinCurrentCommittee() {
                         proposedBy,
                         committeeId: COMMITTEE_ID,
                         projectNumber: getNextProjectSlot(state.topics, COMMITTEE_ID),
+                        docLinks,
                         stage: 1,
                         createdAt: new Date(),
                         createdBy: 'mock-user'
@@ -1775,6 +1805,9 @@ async function joinCurrentCommittee() {
                 document.getElementById('new-topic-title').value = '';
                 document.getElementById('new-topic-date').value = '';
                 document.getElementById('new-topic-proposedBy').value = '';
+                document.getElementById('new-topic-folder').value = '';
+                document.getElementById('new-topic-doc').value = '';
+                document.getElementById('new-topic-ppt').value = '';
             });
 
             document.getElementById('form-add-member').addEventListener('submit', async (e) => {
@@ -2090,6 +2123,20 @@ async function joinCurrentCommittee() {
                 disableMobile: "true",
                 theme: "light"
             });
+
+            const committeeCalendarName = document.getElementById('committee-title')?.textContent.trim() || document.title.replace(/\s*\|.*$/, '').trim() || "Comité";
+            initDepartmentCalendar({
+                auth,
+                db,
+                appId,
+                rootSelector: "#committee-calendar-root",
+                pageVariant: "committee",
+                calendarContext: {
+                    scope: "committee",
+                    committeeId: COMMITTEE_ID,
+                    committeeName: committeeCalendarName
+                }
+            });
         });
     </script>
 </head>
@@ -2116,8 +2163,8 @@ async function joinCurrentCommittee() {
                 <!-- Right: Comités Icon -->
                 <div class="flex-shrink-0 flex items-center gap-4 text-sm text-gray-500 font-medium z-10">
                     <span id="committee-header-title" class="hidden sm:inline">Comités de Trabajo</span>
-                    <img src="../../assets/images/logo-brisa-heart.png" alt="Comités Icon"
-                        class="h-16 w-auto object-contain" width="873" height="1024" decoding="async">
+                    <img src="../../assets/images/committees/logos/committee-docencia-investigacion-logo.png" alt="Logo del Comité de Docencia e Investigación"
+                        class="committee-header-logo" width="512" height="512" decoding="async">
                 </div>
             </div>
         </div>
@@ -2195,7 +2242,6 @@ async function joinCurrentCommittee() {
                 <a class="comite-tab is-active" href="#proyectos" aria-current="page">Proyectos</a>
                 <a class="comite-tab" href="#finalizados">Finalizados</a>
                 <a class="comite-tab" href="#integrantes">Integrantes</a>
-                <a class="comite-tab" href="#documents-section">Documentos</a>
                 <a class="comite-tab" href="#foro">Foro</a>
             </div>
         </nav>
@@ -2249,6 +2295,14 @@ async function joinCurrentCommittee() {
                                 <input type="text" id="new-topic-proposedBy"
                                     placeholder="Propuesto por (médico/s o equipo médico del comité)..."
                                     class="w-full px-4 py-3 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brisa focus:bg-white transition-all">
+                                <div class="committee-project-doclink-fields">
+                                    <input type="url" id="new-topic-folder" placeholder="Link de carpeta en Teams (opcional)"
+                                        class="w-full px-4 py-3 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brisa focus:bg-white transition-all">
+                                    <input type="url" id="new-topic-doc" placeholder="Link de documento colaborativo (opcional)"
+                                        class="w-full px-4 py-3 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brisa focus:bg-white transition-all">
+                                    <input type="url" id="new-topic-ppt" placeholder="Link de PowerPoint colaborativo (opcional)"
+                                        class="w-full px-4 py-3 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brisa focus:bg-white transition-all">
+                                </div>
                                 <div class="flex gap-2">
                                     <div class="relative w-1/3">
                                         <div
@@ -2371,26 +2425,6 @@ async function joinCurrentCommittee() {
             </div>
         </div>
 
-        <!-- Documents Section -->
-        <div id="documents-section" class="section-card bg-white rounded-2xl p-8 mb-12 hidden comite-tab-section">
-            <div class="flex items-center justify-between mb-6">
-                <div class="flex items-center gap-3">
-                    <div class="p-2 bg-teal-50 rounded-lg">
-                        <i data-lucide="layers" class="w-6 h-6 text-teal-600"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-2xl font-bold text-gray-800">Documentos de Trabajo</h3>
-                        <p class="text-xs text-gray-400 mt-1">Gestión de conocimiento centralizado</p>
-                    </div>
-                </div>
-                <span class="pill">Repositorios</span>
-            </div>
-            <div class="divider-soft mb-6"></div>
-            <div id="documents-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- Documents rendered here -->
-            </div>
-        </div>
-
         <!-- Evidence Engine -->
         <div class="mt-20 mb-8">
             <div class="text-center mb-10">
@@ -2488,6 +2522,21 @@ async function joinCurrentCommittee() {
                         </button>
                     </form>
                 </div>
+            </div>
+        </div>
+
+
+        <!-- Committee Calendar -->
+        <div id="calendario-comite" class="committee-calendar-section mt-16 mb-8 max-w-5xl mx-auto w-full comite-tab-section">
+            <div class="calendar-header">
+                <h2 class="text-3xl font-extrabold text-gray-900 mb-2 tracking-tight flex items-center justify-center gap-3">
+                    <i data-lucide="calendar" class="w-8 h-8 text-brisa"></i>
+                    Calendario del Comité
+                </h2>
+                <p class="calendar-header__subtitle">Reuniones, hitos y actividades propias del comité.</p>
+            </div>
+            <div class="calendar-container">
+                <div id="committee-calendar-root" data-department-calendar></div>
             </div>
         </div>
 

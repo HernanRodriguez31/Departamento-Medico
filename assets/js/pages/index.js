@@ -40,7 +40,7 @@ import { initUserMenu } from "../common/user-menu.js?v=20260430-orgtree-avatars-
 import { hydrateAvatars } from "../common/user-profiles.js?v=20260430-orgtree-avatars-1";
 import { initSessionGuard } from "../shared/sessionGuard.js?v=20260305-session-1";
 import { initPdfViewer } from "../common/pdf-viewer.js";
-import { initDepartmentCalendar } from "../common/department-calendar.js";
+import { initDepartmentCalendar } from "../common/department-calendar.js?v=20260506-committee-calendars-1";
 import {
   toggleCarouselCommentLikeForCurrentUser,
   toggleCarouselLikeForCurrentUser,
@@ -3182,6 +3182,7 @@ const boot = () => {
     appId: APP_ID,
     rootSelector: "#department-calendar-root",
     pageVariant: "index",
+    calendarContext: { scope: "home" },
   });
   initPdfViewer();
   initUserMenu({ variant: "desktop" });

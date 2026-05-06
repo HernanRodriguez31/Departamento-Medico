@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "brisa-root-";
-const CACHE_VERSION = "v147";
+const CACHE_VERSION = "v149";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const OFFLINE_URL = "/offline.html";
 const PRECACHE_URLS = [
@@ -14,16 +14,19 @@ const PRECACHE_URLS = [
   OFFLINE_URL,
   "/css/style.css?v=20260428-desktop-orgtree-eyebrow-plus-1",
   "/assets/css/pages/index.css?v=20260505-team-hobbies-page-1",
+  "/assets/css/shared/department-calendar.css?v=20260506-committee-calendars-1",
   "/assets/css/shared/brisa-chat.css?v=20260504-bitacora-dock-chat-polish-2",
   "/assets/css/pages/galeriadearte.css?v=20260503-art-gallery-like-tooltip-1",
   "/assets/css/pages/intereses-hobbies.css?v=20260505-team-hobbies-image-comments-2",
   "/assets/css/pages/bitacora-cientifica.css?v=20260505-bitacora-pdf-load-save-reliability-2",
   "/css/structure.css?v=20260502-specialists-lorena-popup-card-1",
   "/assets/css/core-contrast.css?v=20260502-committee-border-align-1",
-  "/assets/js/pages/index.js?v=20260505-team-hobbies-isolation-color-1",
+  "/assets/js/pages/index.js?v=20260506-committee-calendars-1",
   "/assets/js/pages/galeriadearte.js?v=20260503-art-gallery-like-tooltip-1",
   "/assets/js/pages/intereses-hobbies.js?v=20260505-team-hobbies-image-comments-2",
   "/assets/js/pages/bitacora-cientifica.js?v=20260505-bitacora-pdf-load-save-reliability-2",
+  "/assets/js/common/department-calendar.js?v=20260506-committee-calendars-1",
+  "/assets/js/services/DepartmentCalendarService.js?v=20260506-committee-calendars-1",
   "/assets/js/data/bitacora-posts.js",
   "/assets/js/data/scientific-sources.js?v=20260504-ramr-logo-center-2",
   "/assets/js/data/methodology-guide.js?v=20260504-methodology-guide-terms-1",
@@ -47,7 +50,14 @@ const PRECACHE_URLS = [
   "/assets/images/committees/committee-salud-digital-innovacion.png?v=20260502-committee-cards-precision-1",
   "/assets/images/committees/committee-docencia-investigacion.png?v=20260502-committee-cards-precision-1",
   "/assets/images/committees/committee-farmacia-terapeutica.png?v=20260502-committee-cards-precision-1",
-  "/assets/images/committees/committee-bioetica.png?v=20260502-committee-cards-precision-1"
+  "/assets/images/committees/committee-bioetica.png?v=20260502-committee-cards-precision-1",
+  "/assets/images/committees/logos/committee-emergencias-logo.png",
+  "/assets/images/committees/logos/committee-salud-ocupacional-logo.png",
+  "/assets/images/committees/logos/committee-calidad-seguridad-logo.png",
+  "/assets/images/committees/logos/committee-salud-digital-innovacion-logo.png",
+  "/assets/images/committees/logos/committee-docencia-investigacion-logo.png",
+  "/assets/images/committees/logos/committee-farmacia-terapeutica-logo.png",
+  "/assets/images/committees/logos/committee-bioetica-logo.png"
 ];
 
 try {

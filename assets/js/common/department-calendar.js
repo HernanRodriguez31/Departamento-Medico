@@ -1,9 +1,10 @@
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
   CALENDAR_COLOR_KEYS,
+  COMMITTEE_CALENDAR_LABELS,
   DEFAULT_CALENDAR_COLOR_KEY,
   createDepartmentCalendarService,
-} from "../services/DepartmentCalendarService.js";
+} from "../services/DepartmentCalendarService.js?v=20260506-committee-calendars-1";
 import {
   formatTime24h,
   normalizeTimePartInput,
@@ -63,9 +64,42 @@ const COLOR_OPTIONS = Object.freeze([
   { key: "violet", label: "Violeta" },
   { key: "slate", label: "Pizarra" },
 ]);
+const CALENDAR_SCOPE_COMMITTEE = "committee";
+const CALENDAR_SCOPE_HOME = "home";
 
 const capitalize = (value) =>
   String(value || "").replace(/^\p{L}/u, (letter) => letter.toUpperCase());
+
+const normalizeCalendarContext = (context = {}) => {
+  const requestedScope = String(context?.scope || CALENDAR_SCOPE_HOME);
+  const committeeId = String(context?.committeeId || "");
+  if (
+    requestedScope === CALENDAR_SCOPE_COMMITTEE &&
+    Object.prototype.hasOwnProperty.call(COMMITTEE_CALENDAR_LABELS, committeeId)
+  ) {
+    return {
+      scope: CALENDAR_SCOPE_COMMITTEE,
+      committeeId,
+      committeeName: String(context?.committeeName || COMMITTEE_CALENDAR_LABELS[committeeId]).trim() ||
+        COMMITTEE_CALENDAR_LABELS[committeeId],
+    };
+  }
+  return { scope: CALENDAR_SCOPE_HOME };
+};
+
+const isCommitteeEvent = (event) =>
+  event?.calendarScope === CALENDAR_SCOPE_COMMITTEE && Boolean(event?.committeeId);
+
+const formatEventOriginLabel = (event) => {
+  if (!isCommitteeEvent(event)) return "";
+  return event.committeeName || COMMITTEE_CALENDAR_LABELS[event.committeeId] || "Comité";
+};
+
+const formatEventOriginChip = (event) =>
+  formatEventOriginLabel(event)
+    .replace(/^Comité Ejecutivo de\s+/i, "")
+    .replace(/^Comité de\s+/i, "")
+    .trim();
 
 const toDateKey = (date) => {
   const year = date.getFullYear();
@@ -306,11 +340,16 @@ const formatRegistrantMeta = (event) => {
   return parts.join(" · ");
 };
 
-const formatMonthChipLabel = (occurrence) => {
+const formatMonthChipLabel = (occurrence, { showOrigin = false } = {}) => {
   const event = occurrence.event;
   const title = truncateText(event.title, isMultiDayEvent(event) || event.allDay ? 24 : 18);
-  if (isMultiDayEvent(event) || event.allDay || !Number.isInteger(event.startMinutes)) return title;
-  return `${formatTime24h(event.startMinutes)} · ${title}`;
+  const baseLabel =
+    isMultiDayEvent(event) || event.allDay || !Number.isInteger(event.startMinutes)
+      ? title
+      : `${formatTime24h(event.startMinutes)} · ${title}`;
+  if (!showOrigin || !isCommitteeEvent(event)) return baseLabel;
+  const origin = truncateText(formatEventOriginChip(event), 14);
+  return origin ? `${origin} · ${baseLabel}` : baseLabel;
 };
 
 const iterateDateKeys = (startDateKey, endDateKey) => {
@@ -439,10 +478,12 @@ const getInitialCalendarDate = () => {
   };
 };
 
-const getInitialCalendarState = ({ pageVariant } = {}) => {
+const getInitialCalendarState = ({ pageVariant, calendarContext } = {}) => {
   const { visibleMonth, selectedDateKey } = getInitialCalendarDate();
   return {
     mode: HOME_PAGE_VARIANTS.has(pageVariant) ? MODE_MONTH : loadPersistedMode(),
+    calendarContext,
+    showEventOrigin: calendarContext?.scope !== CALENDAR_SCOPE_COMMITTEE,
     visibleMonth,
     selectedDateKey,
     currentUser: null,
@@ -740,8 +781,8 @@ const buildModalMarkup = () => `
   </div>
 `;
 
-function createState({ pageVariant } = {}) {
-  return getInitialCalendarState({ pageVariant });
+function createState({ pageVariant, calendarContext } = {}) {
+  return getInitialCalendarState({ pageVariant, calendarContext });
 }
 
 export function initDepartmentCalendar({
@@ -750,6 +791,7 @@ export function initDepartmentCalendar({
   appId,
   rootSelector = "#department-calendar-root",
   pageVariant = "index",
+  calendarContext: rawCalendarContext,
 } = {}) {
   const root = document.querySelector(rootSelector);
   if (!root) return null;
@@ -758,8 +800,9 @@ export function initDepartmentCalendar({
     root.__departmentCalendarCleanup();
   }
 
-  const service = createDepartmentCalendarService({ db, auth, appId });
-  const state = createState({ pageVariant });
+  const calendarContext = normalizeCalendarContext(rawCalendarContext);
+  const service = createDepartmentCalendarService({ db, auth, appId, calendarContext });
+  const state = createState({ pageVariant, calendarContext });
   root.innerHTML = buildShellMarkup(pageVariant);
 
   const shell = root.querySelector(".department-calendar");
@@ -985,9 +1028,16 @@ export function initDepartmentCalendar({
     setPending(false);
     modalTitle.textContent =
       mode === "create" ? "Nueva actividad" : readOnly ? "Detalle de actividad" : "Editar actividad";
+    const eventOriginLabel = event ? formatEventOriginLabel(event) : "";
+    const createContextLabel =
+      calendarContext.scope === CALENDAR_SCOPE_COMMITTEE
+        ? `Reunión o recordatorio del ${calendarContext.committeeName}.`
+        : "Nota, reunión o recordatorio interno del Departamento Médico.";
     modalMeta.textContent =
       mode === "create"
-        ? "Nota, reunión o recordatorio interno del Departamento Médico."
+        ? createContextLabel
+        : eventOriginLabel
+          ? `Actividad del ${eventOriginLabel}.`
         : isMultiDayEvent(event)
           ? "Actividad extendida visible en todos los días del rango."
           : "Actividad interna del Departamento Médico.";
@@ -1185,7 +1235,11 @@ export function initDepartmentCalendar({
         chip.dataset.calendarOccurrenceDateKey = occurrence.dateKey;
         chip.dataset.colorKey = occurrence.colorKey;
         chip.dataset.spanPosition = occurrence.spanPosition;
-        chip.textContent = formatMonthChipLabel(occurrence);
+        chip.textContent = formatMonthChipLabel(occurrence, {
+          showOrigin: state.showEventOrigin,
+        });
+        const originLabel = state.showEventOrigin ? formatEventOriginLabel(occurrence.event) : "";
+        chip.title = originLabel ? `${originLabel} · ${occurrence.event.title}` : occurrence.event.title;
         list.appendChild(chip);
       });
 
@@ -1307,6 +1361,13 @@ export function initDepartmentCalendar({
           const title = document.createElement("strong");
           title.textContent = event.title;
           topRow.appendChild(title);
+          const originLabel = state.showEventOrigin ? formatEventOriginLabel(event) : "";
+          if (originLabel) {
+            const origin = document.createElement("span");
+            origin.className = "department-calendar__origin-badge";
+            origin.textContent = originLabel;
+            topRow.appendChild(origin);
+          }
           body.appendChild(topRow);
 
           const rangeMeta = formatEventRangeMeta(event);

@@ -459,6 +459,32 @@ test("authenticated user can create valid own calendar event", async () => {
   );
 });
 
+test("authenticated user can create committee calendar event with valid origin", async () => {
+  await assertSucceeds(
+    setDoc(
+      doc(authedDb("user-b"), "artifacts", APP_ID, "public", "data", "calendar_events", "event-committee-bioetica"),
+      {
+        title: "Reunión de Bioética",
+        note: "Seguimiento de proyectos del comité.",
+        dateKey: "2026-06-08",
+        startDateKey: "2026-06-08",
+        endDateKey: "2026-06-08",
+        allDay: false,
+        startMinutes: 720,
+        endMinutes: 780,
+        colorKey: "green",
+        calendarScope: "committee",
+        committeeId: "comite_bioetica",
+        committeeName: "Comité de Bioética",
+        createdByUid: "user-b",
+        createdByName: "Dr. Usuario B",
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      }
+    )
+  );
+});
+
 test("bitacoraArticles allow authenticated reads and valid own creates only", async () => {
   await assertSucceeds(getDoc(doc(authedDb("user-a"), "bitacoraArticles", "article-a")));
   await assertSucceeds(getDocs(query(collection(authedDb("user-b"), "bitacoraArticles"), limit(10))));
@@ -1017,6 +1043,27 @@ test("calendar_events blocks forged owner, invalid ranges, invalid colors and in
   );
   await assertFails(
     setDoc(
+      doc(authedDb("user-b"), "artifacts", APP_ID, "public", "data", "calendar_events", "invalid-committee-origin"),
+      {
+        title: "Comité inválido",
+        note: "Origen rechazado.",
+        dateKey: "2026-06-05",
+        startDateKey: "2026-06-05",
+        endDateKey: "2026-06-05",
+        allDay: true,
+        colorKey: "green",
+        calendarScope: "committee",
+        committeeId: "comite_inexistente",
+        committeeName: "Comité inexistente",
+        createdByUid: "user-b",
+        createdByName: "Dr. Usuario B",
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      }
+    )
+  );
+  await assertFails(
+    setDoc(
       doc(authedDb("user-b"), "artifacts", APP_ID, "public", "data", "calendar_events", "out-of-range"),
       {
         title: "Evento fuera de rango",
@@ -1144,6 +1191,36 @@ test("calendar_events owner and admin can update/delete while foreign non-admin 
       endDateKey: "2026-04-13",
       colorKey: "slate",
       title: "Reunión administrada",
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertSucceeds(
+    setDoc(doc(ownerDb, "artifacts", APP_ID, "public", "data", "calendar_events", "event-origin-locked"), {
+      title: "Evento de comité",
+      note: "El origen no debe cambiar.",
+      dateKey: "2026-07-08",
+      startDateKey: "2026-07-08",
+      endDateKey: "2026-07-08",
+      allDay: true,
+      colorKey: "green",
+      calendarScope: "committee",
+      committeeId: "comite_bioetica",
+      committeeName: "Comité de Bioética",
+      createdByUid: "user-a",
+      createdByName: "Dr. Usuario A",
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertFails(
+    updateDoc(doc(ownerDb, "artifacts", APP_ID, "public", "data", "calendar_events", "event-origin-locked"), {
+      committeeId: "comite_calidad_seguridad",
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertFails(
+    updateDoc(doc(ownerDb, "artifacts", APP_ID, "public", "data", "calendar_events", "event-origin-locked"), {
+      calendarScope: "home",
       updatedAt: Timestamp.now()
     })
   );

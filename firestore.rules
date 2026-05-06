@@ -626,6 +626,41 @@ service cloud.firestore {
         );
     }
 
+    function validCommitteeCalendarId(committeeId) {
+      return committeeId in [
+        "comite_ejecutivo_emergencias",
+        "comite_salud_ocupacional",
+        "comite_calidad_seguridad",
+        "comite_salud_digital",
+        "comite_docencia_investigacion",
+        "comite_farmacia_terapeutica",
+        "comite_bioetica"
+      ];
+    }
+
+    function validCalendarOrigin(data) {
+      return (
+        !hasKey(data, "calendarScope")
+        && !hasKey(data, "committeeId")
+        && !hasKey(data, "committeeName")
+      )
+      || (
+        data.calendarScope == "home"
+        && !hasKey(data, "committeeId")
+        && !hasKey(data, "committeeName")
+      )
+      || (
+        data.calendarScope == "committee"
+        && hasKey(data, "committeeId")
+        && hasKey(data, "committeeName")
+        && data.committeeId is string
+        && validCommitteeCalendarId(data.committeeId)
+        && data.committeeName is string
+        && data.committeeName.size() > 0
+        && data.committeeName.size() <= 140
+      );
+    }
+
     function validCalendarEventCreate() {
       return signedIn()
         && request.resource.data.keys().hasOnly([
@@ -638,6 +673,9 @@ service cloud.firestore {
           "startMinutes",
           "endMinutes",
           "colorKey",
+          "calendarScope",
+          "committeeId",
+          "committeeName",
           "createdByUid",
           "createdByName",
           "createdAt",
@@ -666,7 +704,8 @@ service cloud.firestore {
         && validCalendarNote(request.resource.data)
         && validCalendarDateWindow(request.resource.data)
         && validCalendarColorKey(request.resource.data)
-        && validCalendarMinutes(request.resource.data);
+        && validCalendarMinutes(request.resource.data)
+        && validCalendarOrigin(request.resource.data);
     }
 
     function validCalendarEventUpdate() {
@@ -681,6 +720,9 @@ service cloud.firestore {
           "startMinutes",
           "endMinutes",
           "colorKey",
+          "calendarScope",
+          "committeeId",
+          "committeeName",
           "createdByUid",
           "createdByName",
           "createdAt",
@@ -706,7 +748,8 @@ service cloud.firestore {
         && validCalendarNote(request.resource.data)
         && validCalendarDateWindow(request.resource.data)
         && validCalendarColorKey(request.resource.data)
-        && validCalendarMinutes(request.resource.data);
+        && validCalendarMinutes(request.resource.data)
+        && validCalendarOrigin(request.resource.data);
     }
 
     function validBitacoraCreateStatus(data) {

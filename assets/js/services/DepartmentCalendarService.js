@@ -16,6 +16,18 @@ import {
 const USERS_COLLECTION = "usuarios";
 const CALENDAR_COLLECTION = "calendar_events";
 const DATE_KEY_PATTERN = /^(2026|2027)-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$/;
+const CALENDAR_SCOPE_HOME = "home";
+const CALENDAR_SCOPE_COMMITTEE = "committee";
+
+export const COMMITTEE_CALENDAR_LABELS = Object.freeze({
+  comite_ejecutivo_emergencias: "Comité Ejecutivo de Emergencias",
+  comite_salud_ocupacional: "Comité de Salud Ocupacional",
+  comite_calidad_seguridad: "Comité de Calidad y Seguridad",
+  comite_salud_digital: "Comité de Salud Digital e Innovación",
+  comite_docencia_investigacion: "Comité de Docencia e Investigación",
+  comite_farmacia_terapeutica: "Comité de Farmacia y Terapéutica",
+  comite_bioetica: "Comité de Bioética",
+});
 
 export const CALENDAR_COLOR_KEYS = Object.freeze([
   "green",
@@ -47,6 +59,36 @@ const normalizeColorKey = (value) =>
   CALENDAR_COLOR_KEYS.includes(String(value || ""))
     ? String(value)
     : DEFAULT_CALENDAR_COLOR_KEY;
+
+const normalizeCalendarContext = (context = {}) => {
+  const requestedScope = String(context?.scope || CALENDAR_SCOPE_HOME);
+  const committeeId = String(context?.committeeId || "");
+  if (
+    requestedScope === CALENDAR_SCOPE_COMMITTEE &&
+    Object.prototype.hasOwnProperty.call(COMMITTEE_CALENDAR_LABELS, committeeId)
+  ) {
+    return {
+      scope: CALENDAR_SCOPE_COMMITTEE,
+      committeeId,
+      committeeName: String(context?.committeeName || COMMITTEE_CALENDAR_LABELS[committeeId]).trim() ||
+        COMMITTEE_CALENDAR_LABELS[committeeId],
+    };
+  }
+  return { scope: CALENDAR_SCOPE_HOME };
+};
+
+const buildOriginCreatePayload = (calendarContext) => {
+  if (calendarContext.scope === CALENDAR_SCOPE_COMMITTEE) {
+    return {
+      calendarScope: CALENDAR_SCOPE_COMMITTEE,
+      committeeId: calendarContext.committeeId,
+      committeeName: calendarContext.committeeName,
+    };
+  }
+  return {
+    calendarScope: CALENDAR_SCOPE_HOME,
+  };
+};
 
 const normalizeDateWindow = (input) => {
   const fallbackDateKey = String(input?.startDateKey || input?.dateKey || "");
@@ -150,6 +192,15 @@ const normalizeStoredCalendarEvent = (eventId, input) => {
     startDateKey: dateWindow.startDateKey,
     endDateKey: dateWindow.endDateKey,
     allDay,
+    calendarScope: input?.calendarScope === CALENDAR_SCOPE_COMMITTEE
+      ? CALENDAR_SCOPE_COMMITTEE
+      : CALENDAR_SCOPE_HOME,
+    committeeId: input?.calendarScope === CALENDAR_SCOPE_COMMITTEE
+      ? String(input?.committeeId || "")
+      : "",
+    committeeName: input?.calendarScope === CALENDAR_SCOPE_COMMITTEE
+      ? String(input?.committeeName || "")
+      : "",
     colorKey: normalizeColorKey(input?.colorKey),
     ...(startMinutes !== null ? { startMinutes } : {}),
     ...(endMinutes !== null ? { endMinutes } : {}),
@@ -173,9 +224,10 @@ const calendarDataPath = (appId) => [
   CALENDAR_COLLECTION,
 ];
 
-export function createDepartmentCalendarService({ db, auth, appId }) {
+export function createDepartmentCalendarService({ db, auth, appId, calendarContext: rawCalendarContext }) {
   const eventsCollectionRef = () => collection(db, ...calendarDataPath(appId));
   const eventDocRef = (eventId) => doc(db, ...calendarDataPath(appId), eventId);
+  const calendarContext = normalizeCalendarContext(rawCalendarContext);
   let cachedUserMeta = null;
 
   const resolveCurrentUserMeta = async () => {
@@ -278,11 +330,19 @@ export function createDepartmentCalendarService({ db, auth, appId }) {
       return () => {};
     }
 
-    const eventsQuery = query(
-      eventsCollectionRef(),
-      where("dateKey", "<=", monthEndKey),
-      orderBy("dateKey"),
-    );
+    const eventsQuery =
+      calendarContext.scope === CALENDAR_SCOPE_COMMITTEE
+        ? query(
+            eventsCollectionRef(),
+            where("committeeId", "==", calendarContext.committeeId),
+            where("dateKey", "<=", monthEndKey),
+            orderBy("dateKey"),
+          )
+        : query(
+            eventsCollectionRef(),
+            where("dateKey", "<=", monthEndKey),
+            orderBy("dateKey"),
+          );
 
     return onSnapshot(
       eventsQuery,
@@ -311,6 +371,7 @@ export function createDepartmentCalendarService({ db, auth, appId }) {
     const optimisticCreatedAt = new Date();
     const docRef = await addDoc(eventsCollectionRef(), {
       ...payload,
+      ...buildOriginCreatePayload(calendarContext),
       createdByUid: user.uid,
       createdByName: meta.displayName,
       createdAt: serverTimestamp(),
@@ -319,6 +380,7 @@ export function createDepartmentCalendarService({ db, auth, appId }) {
 
     return normalizeStoredCalendarEvent(docRef.id, {
       ...payload,
+      ...buildOriginCreatePayload(calendarContext),
       createdByUid: user.uid,
       createdByName: meta.displayName,
       createdAt: optimisticCreatedAt,

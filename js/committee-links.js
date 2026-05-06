@@ -245,9 +245,15 @@ export function getNextProjectSlot(topics = [], committeeId) {
 
 export function getDocLinksForTopic(committeeId, topic) {
     if (!topic) return {};
+    const manualLinks = topic.docLinks && typeof topic.docLinks === 'object' ? topic.docLinks : {};
     const linksByCommittee = getLinksForCommittee(committeeId);
     const slot = Number(topic.projectNumber || topic.projectSlot || topic.slot);
-    return linksByCommittee[slot] || {};
+    const fallbackLinks = linksByCommittee[slot] || {};
+    return {
+        folder: manualLinks.folder || fallbackLinks.folder || '',
+        doc: manualLinks.doc || manualLinks.word || fallbackLinks.doc || '',
+        ppt: manualLinks.ppt || fallbackLinks.ppt || ''
+    };
 }
 
 export function getDocUrl(committeeId, topic, docType) {
