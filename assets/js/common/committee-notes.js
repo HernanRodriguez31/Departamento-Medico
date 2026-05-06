@@ -2,6 +2,7 @@ import {
   addDoc,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   onSnapshot,
   query,
@@ -14,6 +15,7 @@ import { escapeAttribute, escapeHTML } from "../utils/safe-dom.js";
 const LOCAL_NOTE_PREFIX = "local_note_";
 const NOTE_SCOPE_COMMITTEE = "committee";
 const NOTE_SCOPE_PROJECT = "project";
+const ORPHAN_PROJECT_COLUMN = "__orphan_project_notes__";
 
 const toMillis = (value) => {
   if (value && typeof value.toMillis === "function") return value.toMillis();
@@ -44,6 +46,22 @@ const resolveUserName = (user) => {
   return String(raw).trim() || "Usuario";
 };
 
+const normalizeLikedBy = (likedBy) => {
+  if (!likedBy || typeof likedBy !== "object" || Array.isArray(likedBy)) return {};
+  return Object.fromEntries(
+    Object.entries(likedBy)
+      .filter(([uid]) => uid)
+      .map(([uid, name]) => [uid, String(name || "Usuario").trim() || "Usuario"])
+  );
+};
+
+const formatLikeNames = (likedBy = {}) => {
+  const names = Object.values(normalizeLikedBy(likedBy)).filter(Boolean);
+  if (!names.length) return "Sin likes";
+  if (names.length <= 3) return names.join(", ");
+  return `${names.slice(0, 3).join(", ")} y ${names.length - 3} mas`;
+};
+
 const normalizeNote = (id, data = {}) => ({
   id,
   committeeId: data.committeeId || "",
@@ -56,7 +74,8 @@ const normalizeNote = (id, data = {}) => ({
   createdAt: data.createdAt || data.updatedAt || null,
   updatedAt: data.updatedAt || data.createdAt || null,
   updatedByUid: data.updatedByUid || "",
-  updatedByName: data.updatedByName || ""
+  updatedByName: data.updatedByName || "",
+  likedBy: normalizeLikedBy(data.likedBy)
 });
 
 export function createCommitteeNotesController({
@@ -72,11 +91,12 @@ export function createCommitteeNotesController({
   let unsubscribe = null;
   let initialized = false;
   let selectedProjectId = "";
+  let editingNoteId = "";
   const els = {};
 
   const getTopicList = () => {
     const topics = typeof getTopics === "function" ? getTopics() : [];
-    return Array.isArray(topics) ? topics : [];
+    return Array.isArray(topics) ? topics.filter((topic) => topic && topic.id) : [];
   };
 
   const getTopicById = (projectId) => getTopicList().find((topic) => topic.id === projectId) || null;
@@ -91,16 +111,37 @@ export function createCommitteeNotesController({
     return Boolean(getIsAdmin?.()) || note.authorUid === user.uid;
   };
 
+  const userLikedNote = (note) => {
+    const uid = auth?.currentUser?.uid;
+    return Boolean(uid && normalizeLikedBy(note.likedBy)[uid]);
+  };
+
   const syncElements = () => {
     els.toggle = document.getElementById("committee-board-toggle");
     els.panel = document.getElementById("committee-board-panel");
     els.close = document.querySelector("[data-committee-board-close]");
+    els.add = document.getElementById("committee-note-add");
+    els.columns = document.getElementById("committee-board-columns");
+    els.modal = document.getElementById("committee-note-modal");
+    els.modalClose = document.querySelector("[data-committee-note-modal-close]");
     els.form = document.getElementById("committee-note-form");
     els.scope = document.getElementById("committee-note-scope");
     els.text = document.getElementById("committee-note-text");
-    els.list = document.getElementById("committee-board-notes");
     els.count = document.getElementById("committee-board-count");
     els.hint = document.getElementById("committee-note-context-hint");
+    els.formTitle = document.getElementById("committee-note-modal-title");
+    els.submitLabel = document.getElementById("committee-note-submit-label");
+  };
+
+  const ensureBoardPortal = () => {
+    syncElements();
+    if (els.toggle && els.toggle.parentElement !== document.body) {
+      document.body.appendChild(els.toggle);
+    }
+    if (els.panel && els.panel.parentElement !== document.body) {
+      document.body.appendChild(els.panel);
+    }
+    syncElements();
   };
 
   const setOpenState = (open) => {
@@ -112,14 +153,28 @@ export function createCommitteeNotesController({
     } else {
       els.panel.setAttribute("hidden", "");
       els.toggle.setAttribute("aria-expanded", "false");
+      closeComposer();
+    }
+  };
+
+  const setComposerOpen = (open) => {
+    syncElements();
+    if (!els.modal) return;
+    if (open) {
+      els.modal.removeAttribute("hidden");
+    } else {
+      els.modal.setAttribute("hidden", "");
+      editingNoteId = "";
+      if (els.text) els.text.value = "";
+      if (els.scope) els.scope.disabled = false;
     }
   };
 
   const renderScopeOptions = () => {
     if (!els.scope) return;
-    const topics = getTopicList().filter((topic) => topic && topic.id);
+    const topics = getTopicList();
     const projectOptions = topics
-      .map((topic) => `<option value="${escapeAttribute(topic.id)}">${escapeHTML(topic.title || "Proyecto sin titulo")}</option>`)
+      .map((topic) => `<option value="${escapeAttribute(topic.id)}">Proyecto de ${escapeHTML(topic.title || "Proyecto sin titulo")}</option>`)
       .join("");
     els.scope.innerHTML = `
       <option value="">Nota de comité</option>
@@ -139,53 +194,126 @@ export function createCommitteeNotesController({
     const projectId = els.scope.value || "";
     const topic = projectId ? getTopicById(projectId) : null;
     els.hint.textContent = topic
-      ? `La nota quedará asociada a ${topic.title || "este proyecto"}.`
-      : "La nota quedará asociada al comité.";
+      ? `La nota quedara ubicada en la columna Proyecto de ${topic.title || "este proyecto"}.`
+      : "La nota quedara ubicada en la columna Nota de comité.";
   };
 
-  const renderNotes = () => {
-    if (!els.list) return;
-    sortNotes();
-    if (!notes.length) {
-      els.list.innerHTML = `
-        <div class="committee-board-empty">
-          <i data-lucide="clipboard-list"></i>
-          <span>No hay notas cargadas en el pizarrón.</span>
-        </div>
-      `;
-      return;
+  const getNotesForColumn = (column) => {
+    if (column.kind === NOTE_SCOPE_COMMITTEE) {
+      return notes.filter((note) => note.scope !== NOTE_SCOPE_PROJECT || !note.projectId);
     }
-    els.list.innerHTML = notes.map((note) => {
-      const topic = note.projectId ? getTopicById(note.projectId) : null;
-      const scopeLabel = note.scope === NOTE_SCOPE_PROJECT
-        ? (topic?.title || note.projectTitle || "Proyecto")
-        : "Nota de comité";
-      const editedLabel = note.updatedByName && toMillis(note.updatedAt) !== toMillis(note.createdAt)
-        ? `<span>Editado por ${escapeHTML(note.updatedByName)}</span>`
-        : "";
-      const safeNoteId = escapeAttribute(JSON.stringify(note.id));
+    if (column.id === ORPHAN_PROJECT_COLUMN) {
+      return notes.filter((note) => note.scope === NOTE_SCOPE_PROJECT && note.projectId && !getTopicById(note.projectId));
+    }
+    return notes.filter((note) => note.scope === NOTE_SCOPE_PROJECT && note.projectId === column.id);
+  };
+
+  const buildColumns = () => {
+    const topics = getTopicList();
+    const columns = [
+      {
+        id: NOTE_SCOPE_COMMITTEE,
+        kind: NOTE_SCOPE_COMMITTEE,
+        title: "Nota de comité",
+        subtitle: "Comentarios generales",
+        icon: "clipboard-list"
+      },
+      ...topics.map((topic) => ({
+        id: topic.id,
+        kind: NOTE_SCOPE_PROJECT,
+        title: topic.title || "Proyecto sin titulo",
+        subtitle: "Proyecto",
+        icon: "folder-kanban"
+      }))
+    ];
+    const hasOrphans = notes.some((note) => note.scope === NOTE_SCOPE_PROJECT && note.projectId && !getTopicById(note.projectId));
+    if (hasOrphans) {
+      columns.push({
+        id: ORPHAN_PROJECT_COLUMN,
+        kind: NOTE_SCOPE_PROJECT,
+        title: "Proyecto no disponible",
+        subtitle: "Notas sin proyecto activo",
+        icon: "folder-x"
+      });
+    }
+    return columns;
+  };
+
+  const renderNoteCard = (note, column) => {
+    const likedBy = normalizeLikedBy(note.likedBy);
+    const likeCount = Object.keys(likedBy).length;
+    const liked = userLikedNote(note);
+    const likeNames = formatLikeNames(likedBy);
+    const editedLabel = note.updatedByName && toMillis(note.updatedAt) !== toMillis(note.createdAt)
+      ? `<span>Editado por ${escapeHTML(note.updatedByName)}</span>`
+      : "";
+    const safeNoteId = escapeAttribute(JSON.stringify(note.id));
+    const destinationLabel = column.kind === NOTE_SCOPE_PROJECT
+      ? `Proyecto de ${column.title}`
+      : "Nota de comité";
+    return `
+      <article class="committee-board-note" data-note-id="${escapeAttribute(note.id)}">
+        <div class="committee-board-note__header">
+          <span class="committee-board-note__scope" title="${escapeAttribute(destinationLabel)}">${escapeHTML(destinationLabel)}</span>
+          ${canManageNote(note) ? `
+            <span class="committee-board-note__actions">
+              <button type="button" onclick="window.editCommitteeNote(${safeNoteId})" title="Editar nota">
+                <i data-lucide="pencil"></i>
+              </button>
+              <button type="button" onclick="window.deleteCommitteeNote(${safeNoteId})" title="Borrar nota">
+                <i data-lucide="trash-2"></i>
+              </button>
+            </span>
+          ` : ""}
+        </div>
+        <p class="committee-board-note__text">${escapeHTML(note.text)}</p>
+        <div class="committee-board-note__meta">
+          <span>${escapeHTML(note.authorName || "Usuario")}</span>
+          <span>${escapeHTML(formatNoteDate(note.createdAt || note.updatedAt))}</span>
+          ${editedLabel}
+        </div>
+        <div class="committee-board-note__footer">
+          <button
+            type="button"
+            class="committee-board-note__like${liked ? " is-active" : ""}"
+            onclick="window.toggleCommitteeNoteLike(${safeNoteId})"
+            aria-pressed="${liked ? "true" : "false"}"
+            title="${escapeAttribute(likeNames)}">
+            <i data-lucide="thumbs-up"></i>
+            <span>${likeCount}</span>
+          </button>
+          <span class="committee-board-note__like-names" title="${escapeAttribute(likeNames)}">${escapeHTML(likeNames)}</span>
+        </div>
+      </article>
+    `;
+  };
+
+  const renderColumns = () => {
+    if (!els.columns) return;
+    const columns = buildColumns();
+    els.columns.innerHTML = columns.map((column) => {
+      const columnNotes = getNotesForColumn(column);
       return `
-        <article class="committee-board-note" data-note-id="${escapeAttribute(note.id)}">
-          <div class="committee-board-note__header">
-            <span class="committee-board-note__scope">${escapeHTML(scopeLabel)}</span>
-            ${canManageNote(note) ? `
-              <span class="committee-board-note__actions">
-                <button type="button" onclick="window.editCommitteeNote(${safeNoteId})" title="Editar nota">
-                  <i data-lucide="pencil"></i>
-                </button>
-                <button type="button" onclick="window.deleteCommitteeNote(${safeNoteId})" title="Borrar nota">
-                  <i data-lucide="trash-2"></i>
-                </button>
-              </span>
-            ` : ""}
+        <section class="committee-board-column" data-board-column="${escapeAttribute(column.id)}">
+          <header class="committee-board-column__header">
+            <span class="committee-board-column__icon"><i data-lucide="${escapeAttribute(column.icon)}"></i></span>
+            <div>
+              <p class="committee-board-column__eyebrow">${escapeHTML(column.subtitle)}</p>
+              <h4 class="committee-board-column__title">${escapeHTML(column.title)}</h4>
+            </div>
+            <span class="committee-board-column__count">${columnNotes.length}</span>
+          </header>
+          <div class="committee-board-column__notes">
+            ${columnNotes.length
+              ? columnNotes.map((note) => renderNoteCard(note, column)).join("")
+              : `
+                <div class="committee-board-column__empty">
+                  <i data-lucide="message-square-text"></i>
+                  <span>Sin notas en esta columna.</span>
+                </div>
+              `}
           </div>
-          <p class="committee-board-note__text">${escapeHTML(note.text)}</p>
-          <div class="committee-board-note__meta">
-            <span>${escapeHTML(note.authorName || "Usuario")}</span>
-            <span>${escapeHTML(formatNoteDate(note.createdAt || note.updatedAt))}</span>
-            ${editedLabel}
-          </div>
-        </article>
+        </section>
       `;
     }).join("");
   };
@@ -194,7 +322,7 @@ export function createCommitteeNotesController({
     syncElements();
     if (els.count) els.count.textContent = String(notes.length);
     renderScopeOptions();
-    renderNotes();
+    renderColumns();
     if (window.lucide) window.lucide.createIcons();
   };
 
@@ -219,7 +347,8 @@ export function createCommitteeNotesController({
       authorUid: user.uid,
       authorName: resolveUserName(user),
       createdAt: db ? serverTimestamp() : nowIso,
-      updatedAt: db ? serverTimestamp() : nowIso
+      updatedAt: db ? serverTimestamp() : nowIso,
+      likedBy: {}
     };
 
     if (!db) {
@@ -232,32 +361,10 @@ export function createCommitteeNotesController({
     await addDoc(collection(db, "artifacts", appId, "public", "data", "committee_notes"), payload);
   };
 
-  const editNote = async (noteId) => {
-    const note = notes.find((item) => item.id === noteId);
+  const updateNoteText = async ({ note, text }) => {
     const user = auth?.currentUser;
-    if (!note || !user || !canManageNote(note)) {
-      if (window.Swal) {
-        await window.Swal.fire("Acceso restringido", "Solo podés editar tus notas o moderar como administrador.", "error");
-      }
-      return;
-    }
-
-    const result = window.Swal
-      ? await window.Swal.fire({
-          title: "Editar nota",
-          input: "textarea",
-          inputValue: note.text || "",
-          inputPlaceholder: "Escribí la nota",
-          showCancelButton: true,
-          confirmButtonText: "Guardar",
-          cancelButtonText: "Cancelar",
-          inputValidator: (value) => (!value || !value.trim() ? "Escribí una nota." : null)
-        })
-      : { isConfirmed: true, value: window.prompt("Editar nota", note.text || "") };
-
-    if (!result.isConfirmed) return;
-    const nextText = String(result.value || "").trim();
-    if (!nextText || nextText === String(note.text || "").trim()) return;
+    const nextText = String(text || "").trim();
+    if (!note || !user || !canManageNote(note) || !nextText || nextText === String(note.text || "").trim()) return;
 
     if (!db || note.id.startsWith(LOCAL_NOTE_PREFIX)) {
       notes = notes.map((item) => item.id === note.id
@@ -280,6 +387,39 @@ export function createCommitteeNotesController({
       updatedByUid: user.uid,
       updatedByName: resolveUserName(user)
     });
+  };
+
+  const openComposer = ({ projectId = "", note = null } = {}) => {
+    syncElements();
+    editingNoteId = note?.id || "";
+    selectedProjectId = note ? (note.projectId || "") : (projectId || "");
+    renderScopeOptions();
+    if (els.scope) {
+      els.scope.value = selectedProjectId || "";
+      els.scope.disabled = Boolean(note);
+    }
+    if (els.text) els.text.value = note?.text || "";
+    if (els.formTitle) els.formTitle.textContent = note ? "Editar nota" : "Agregar nota";
+    if (els.submitLabel) els.submitLabel.textContent = note ? "Guardar nota" : "Agregar nota";
+    renderContextHint();
+    setComposerOpen(true);
+    window.requestAnimationFrame(() => els.text?.focus());
+  };
+
+  function closeComposer() {
+    setComposerOpen(false);
+  }
+
+  const editNote = (noteId) => {
+    const note = notes.find((item) => item.id === noteId);
+    if (!note || !canManageNote(note)) {
+      if (window.Swal) {
+        window.Swal.fire("Acceso restringido", "Solo podés editar tus notas o moderar como administrador.", "error");
+      }
+      return;
+    }
+    setOpenState(true);
+    openComposer({ note });
   };
 
   const deleteNote = async (noteId) => {
@@ -308,18 +448,43 @@ export function createCommitteeNotesController({
     await deleteDoc(doc(db, "artifacts", appId, "public", "data", "committee_notes", note.id));
   };
 
-  const open = (projectId = "") => {
+  const toggleNoteLike = async (noteId) => {
+    const note = notes.find((item) => item.id === noteId);
+    const user = auth?.currentUser;
+    if (!note || !user) {
+      if (window.Swal) {
+        await window.Swal.fire("Acceso restringido", "Iniciá sesión para indicar like.", "warning");
+      }
+      return;
+    }
+    const likedBy = normalizeLikedBy(note.likedBy);
+    const liked = Boolean(likedBy[user.uid]);
+
+    if (!db || note.id.startsWith(LOCAL_NOTE_PREFIX)) {
+      const nextLikedBy = { ...likedBy };
+      if (liked) delete nextLikedBy[user.uid];
+      else nextLikedBy[user.uid] = resolveUserName(user);
+      notes = notes.map((item) => item.id === note.id ? { ...item, likedBy: nextLikedBy } : item);
+      render();
+      onChange?.();
+      return;
+    }
+
+    await updateDoc(doc(db, "artifacts", appId, "public", "data", "committee_notes", note.id), {
+      [`likedBy.${user.uid}`]: liked ? deleteField() : resolveUserName(user)
+    });
+  };
+
+  const open = (projectId = "", options = {}) => {
     selectedProjectId = projectId || "";
     render();
     setOpenState(true);
-    window.requestAnimationFrame(() => {
-      if (els.scope && selectedProjectId) {
-        els.scope.value = selectedProjectId;
-        renderContextHint();
-      }
-      els.text?.focus();
-    });
+    if (options.openComposer) {
+      window.requestAnimationFrame(() => openComposer({ projectId: selectedProjectId }));
+    }
   };
+
+  const openProjectNote = (projectId = "") => open(projectId, { openComposer: true });
 
   const close = () => setOpenState(false);
 
@@ -353,16 +518,22 @@ export function createCommitteeNotesController({
   const init = () => {
     if (initialized) return;
     initialized = true;
-    syncElements();
-    els.toggle?.addEventListener("click", (event) => {
+    ensureBoardPortal();
+    els.add?.addEventListener("click", (event) => {
       event.preventDefault();
-      const isOpen = els.panel && !els.panel.hasAttribute("hidden");
-      if (isOpen) close();
-      else open();
+      setOpenState(true);
+      openComposer({ projectId: "" });
     });
     els.close?.addEventListener("click", (event) => {
       event.preventDefault();
       close();
+    });
+    els.modalClose?.addEventListener("click", (event) => {
+      event.preventDefault();
+      closeComposer();
+    });
+    els.modal?.addEventListener("click", (event) => {
+      if (event.target === els.modal) closeComposer();
     });
     els.scope?.addEventListener("change", () => {
       selectedProjectId = els.scope.value || "";
@@ -370,11 +541,13 @@ export function createCommitteeNotesController({
     });
     els.form?.addEventListener("submit", async (event) => {
       event.preventDefault();
+      const note = editingNoteId ? notes.find((item) => item.id === editingNoteId) : null;
       const projectId = els.scope?.value || "";
       const text = els.text?.value || "";
       try {
-        await saveNote({ projectId, text });
-        if (els.text) els.text.value = "";
+        if (note) await updateNoteText({ note, text });
+        else await saveNote({ projectId, text });
+        closeComposer();
       } catch (error) {
         console.error("Error guardando nota del comité:", error);
         if (window.Swal) {
@@ -383,18 +556,30 @@ export function createCommitteeNotesController({
       }
     });
     document.addEventListener("click", (event) => {
+      const toggleTarget = event.target?.closest?.("#committee-board-toggle");
+      if (toggleTarget) {
+        event.preventDefault();
+        syncElements();
+        const isOpen = els.panel && !els.panel.hasAttribute("hidden");
+        if (isOpen) close();
+        else open();
+        return;
+      }
       if (!els.panel || els.panel.hasAttribute("hidden")) return;
       const target = event.target;
       if (els.panel.contains(target) || els.toggle?.contains(target)) return;
       close();
     });
     document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") close();
+      if (event.key !== "Escape") return;
+      if (els.modal && !els.modal.hasAttribute("hidden")) closeComposer();
+      else close();
     });
     window.openCommitteeBoard = open;
-    window.openCommitteeProjectNote = open;
+    window.openCommitteeProjectNote = openProjectNote;
     window.editCommitteeNote = editNote;
     window.deleteCommitteeNote = deleteNote;
+    window.toggleCommitteeNoteLike = toggleNoteLike;
     render();
   };
 

@@ -557,6 +557,35 @@ service cloud.firestore {
         );
     }
 
+    function validCommitteeNoteLikedByCreate(data) {
+      return !hasKey(data, "likedBy")
+        || (
+          data.likedBy is map
+          && data.likedBy.keys().size() == 0
+        );
+    }
+
+    function validCommitteeNoteLikedByValue(data) {
+      return !hasKey(data.likedBy, request.auth.uid)
+        || (
+          data.likedBy[request.auth.uid] is string
+          && data.likedBy[request.auth.uid].size() > 0
+          && data.likedBy[request.auth.uid].size() <= 140
+        );
+    }
+
+    function validCommitteeNoteLikedByOwnKeyChange() {
+      return (
+        !hasKey(resource.data, "likedBy")
+        && request.resource.data.likedBy.keys().hasOnly([request.auth.uid])
+      )
+        || (
+          hasKey(resource.data, "likedBy")
+          && resource.data.likedBy is map
+          && request.resource.data.likedBy.diff(resource.data.likedBy).affectedKeys().hasOnly([request.auth.uid])
+        );
+    }
+
     function validCommitteeNoteCreate() {
       return signedIn()
         && onlyKeys([
@@ -568,12 +597,14 @@ service cloud.firestore {
           "authorUid",
           "authorName",
           "createdAt",
-          "updatedAt"
+          "updatedAt",
+          "likedBy"
         ])
         && request.resource.data.committeeId is string
         && validCommitteeCalendarId(request.resource.data.committeeId)
         && validCommitteeNoteScope(request.resource.data)
         && validCommitteeNoteText(request.resource.data)
+        && validCommitteeNoteLikedByCreate(request.resource.data)
         && request.resource.data.authorUid == request.auth.uid
         && request.resource.data.authorName is string
         && request.resource.data.authorName.size() > 0
@@ -595,7 +626,8 @@ service cloud.firestore {
           "createdAt",
           "updatedAt",
           "updatedByUid",
-          "updatedByName"
+          "updatedByName",
+          "likedBy"
         ])
         && changedOnly(["text", "updatedAt", "updatedByUid", "updatedByName"])
         && request.resource.data.committeeId == resource.data.committeeId
@@ -612,6 +644,14 @@ service cloud.firestore {
         && request.resource.data.updatedByName is string
         && request.resource.data.updatedByName.size() > 0
         && request.resource.data.updatedByName.size() <= 140;
+    }
+
+    function validCommitteeNoteLikeUpdate() {
+      return signedIn()
+        && changedOnly(["likedBy"])
+        && request.resource.data.likedBy is map
+        && validCommitteeNoteLikedByOwnKeyChange()
+        && validCommitteeNoteLikedByValue(request.resource.data);
     }
 
     function validCommitteeMemberSelfJoin() {
@@ -1430,7 +1470,7 @@ service cloud.firestore {
     match /artifacts/{appId}/public/data/committee_notes/{noteId} {
       allow read: if signedIn();
       allow create: if validCommitteeNoteCreate();
-      allow update: if validCommitteeNoteUpdate();
+      allow update: if validCommitteeNoteUpdate() || validCommitteeNoteLikeUpdate();
       allow delete: if isOwnedByCurrentUser(resource.data) || isAdmin();
     }
 

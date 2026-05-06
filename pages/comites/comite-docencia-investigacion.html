@@ -52,7 +52,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
     
     <link rel="stylesheet" href="../../assets/css/shared/department-calendar.css?v=20260506-committee-calendars-1">
-    <link rel="stylesheet" href="../../assets/css/pages/comite.css?v=20260506-committee-pizarron-1">
+    <link rel="stylesheet" href="../../assets/css/pages/comite.css?v=20260506-committee-board-1">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/es.js"></script>
 <!-- Firebase SDKs -->
@@ -90,7 +90,7 @@
         import { initSessionGuard } from "../../assets/js/shared/sessionGuard.js?v=20260305-session-1";
         import { initUserMenu } from "../../assets/js/common/user-menu.js?v=20260430-orgtree-avatars-1";
         import { initDepartmentCalendar } from "../../assets/js/common/department-calendar.js?v=20260506-committee-calendars-1";
-        import { createCommitteeNotesController } from "../../assets/js/common/committee-notes.js?v=20260506-pizarron-1";
+        import { createCommitteeNotesController } from "../../assets/js/common/committee-notes.js?v=20260506-committee-board-1";
 
         let db = null;
         let auth = null;
@@ -2346,26 +2346,43 @@ async function joinCurrentCommittee() {
                             <h3 class="committee-board-panel__title">Pizarrón</h3>
                             <p class="committee-board-panel__subtitle">Notas del comité y de cada proyecto.</p>
                         </div>
-                        <button type="button" class="committee-board-panel__close" data-committee-board-close aria-label="Cerrar pizarrón">
-                            <i data-lucide="x"></i>
-                        </button>
+                        <div class="committee-board-panel__actions">
+                            <button id="committee-note-add" type="button" class="committee-board-panel__add">
+                                <i data-lucide="plus"></i>
+                                Agregar nota
+                            </button>
+                            <button type="button" class="committee-board-panel__close" data-committee-board-close aria-label="Cerrar pizarrón">
+                                <i data-lucide="x"></i>
+                            </button>
+                        </div>
                     </div>
-                    <form id="committee-note-form" class="committee-board-form">
-                        <div class="committee-board-form__row">
-                            <label for="committee-note-scope">Destino de la nota</label>
-                            <select id="committee-note-scope"></select>
-                            <p id="committee-note-context-hint" class="committee-board-form__hint">La nota quedará asociada al comité.</p>
-                        </div>
-                        <div class="committee-board-form__row">
-                            <label for="committee-note-text">Nota</label>
-                            <textarea id="committee-note-text" placeholder="Escribir una nota breve..."></textarea>
-                        </div>
-                        <button type="submit" class="committee-board-form__submit">
-                            <i data-lucide="plus"></i>
-                            Agregar nota
-                        </button>
-                    </form>
-                    <div id="committee-board-notes" class="committee-board-notes" aria-live="polite"></div>
+                    <div id="committee-board-columns" class="committee-board-columns" aria-live="polite"></div>
+                    <div id="committee-note-modal" class="committee-note-modal" hidden>
+                        <form id="committee-note-form" class="committee-board-form committee-note-modal__card">
+                            <div class="committee-note-modal__header">
+                                <div>
+                                    <p class="committee-board-panel__eyebrow">Nota</p>
+                                    <h4 id="committee-note-modal-title" class="committee-note-modal__title">Agregar nota</h4>
+                                </div>
+                                <button type="button" class="committee-note-modal__close" data-committee-note-modal-close aria-label="Cerrar formulario">
+                                    <i data-lucide="x"></i>
+                                </button>
+                            </div>
+                            <div class="committee-board-form__row">
+                                <label for="committee-note-scope">Destino de la nota</label>
+                                <select id="committee-note-scope"></select>
+                                <p id="committee-note-context-hint" class="committee-board-form__hint">La nota quedará ubicada en la columna Nota de comité.</p>
+                            </div>
+                            <div class="committee-board-form__row">
+                                <label for="committee-note-text">Nota</label>
+                                <textarea id="committee-note-text" placeholder="Escribir una nota breve..."></textarea>
+                            </div>
+                            <button type="submit" class="committee-board-form__submit">
+                                <i data-lucide="plus"></i>
+                                <span id="committee-note-submit-label">Agregar nota</span>
+                            </button>
+                        </form>
+                    </div>
                 </aside>
 
                 <div id="projects-list" class="flex-col space-y-4">

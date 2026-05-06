@@ -8,6 +8,7 @@ import {
 } from "@firebase/rules-unit-testing";
 import {
   collection,
+  deleteField,
   deleteDoc,
   doc,
   getDoc,
@@ -1351,6 +1352,7 @@ test("authenticated users can create own committee_notes and only owner or admin
   const otherDb = authedDb("user-c");
   const adminDb = authedAdminDb("admin-a");
   const notePath = ["artifacts", APP_ID, "public", "data", "committee_notes", "note-b"];
+  const likedNotePath = ["artifacts", APP_ID, "public", "data", "committee_notes", "note-with-empty-likes"];
 
   await assertSucceeds(
     setDoc(doc(ownerDb, ...notePath), {
@@ -1367,6 +1369,21 @@ test("authenticated users can create own committee_notes and only owner or admin
   );
 
   await assertSucceeds(
+    setDoc(doc(ownerDb, ...likedNotePath), {
+      committeeId: "comite_bioetica",
+      scope: "project",
+      projectId: "flat-topic-a",
+      projectTitle: "Proyecto A",
+      text: "Nota inicial con likes vacíos.",
+      authorUid: "user-b",
+      authorName: "Dr. Usuario B",
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+      likedBy: {}
+    })
+  );
+
+  await assertSucceeds(
     setDoc(doc(ownerDb, "artifacts", APP_ID, "public", "data", "committee_notes", "note-committee"), {
       committeeId: "comite_bioetica",
       scope: "committee",
@@ -1377,6 +1394,23 @@ test("authenticated users can create own committee_notes and only owner or admin
       authorName: "Dr. Usuario B",
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now()
+    })
+  );
+
+  await assertFails(
+    setDoc(doc(ownerDb, "artifacts", APP_ID, "public", "data", "committee_notes", "note-forged-like"), {
+      committeeId: "comite_bioetica",
+      scope: "committee",
+      projectId: null,
+      projectTitle: "",
+      text: "Nota con like inicial falso.",
+      authorUid: "user-b",
+      authorName: "Dr. Usuario B",
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+      likedBy: {
+        "user-b": "Dr. Usuario B"
+      }
     })
   );
 
@@ -1414,6 +1448,77 @@ test("authenticated users can create own committee_notes and only owner or admin
       updatedAt: Timestamp.now(),
       updatedByUid: "user-b",
       updatedByName: "Dr. Usuario B"
+    })
+  );
+
+  await assertSucceeds(
+    updateDoc(doc(otherDb, ...notePath), {
+      "likedBy.user-c": "Dr. Usuario C"
+    })
+  );
+
+  await assertSucceeds(
+    updateDoc(doc(otherDb, ...notePath), {
+      "likedBy.user-c": deleteField()
+    })
+  );
+
+  await assertFails(
+    updateDoc(doc(unauthedDb(), ...notePath), {
+      "likedBy.guest": "Invitado"
+    })
+  );
+
+  await assertFails(
+    updateDoc(doc(otherDb, ...notePath), {
+      text: "Intento de edición junto con like.",
+      "likedBy.user-c": "Dr. Usuario C"
+    })
+  );
+
+  await assertFails(
+    updateDoc(doc(otherDb, ...notePath), {
+      "likedBy.user-a": "Dr. Usuario A"
+    })
+  );
+
+  await assertFails(
+    updateDoc(doc(otherDb, ...notePath), {
+      likedBy: {
+        "user-a": "Dr. Usuario A",
+        "user-c": "Dr. Usuario C"
+      }
+    })
+  );
+
+  await assertFails(
+    updateDoc(doc(otherDb, ...notePath), {
+      likedBy: "valor inválido"
+    })
+  );
+
+  await assertSucceeds(
+    updateDoc(doc(otherDb, ...likedNotePath), {
+      "likedBy.user-c": "Dr. Usuario C"
+    })
+  );
+
+  await assertSucceeds(
+    updateDoc(doc(ownerDb, ...likedNotePath), {
+      text: "Nota con like editada por autor.",
+      updatedAt: Timestamp.now(),
+      updatedByUid: "user-b",
+      updatedByName: "Dr. Usuario B"
+    })
+  );
+
+  await assertFails(
+    updateDoc(doc(ownerDb, ...likedNotePath), {
+      text: "Intento de editar y cambiar likes.",
+      updatedAt: Timestamp.now(),
+      updatedByUid: "user-b",
+      updatedByName: "Dr. Usuario B",
+      "likedBy.user-b": "Dr. Usuario B"
     })
   );
 
