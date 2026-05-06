@@ -52,7 +52,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
     
     <link rel="stylesheet" href="../../assets/css/shared/department-calendar.css?v=20260506-committee-calendars-1">
-    <link rel="stylesheet" href="../../assets/css/pages/comite.css?v=20260506-committee-board-2">
+    <link rel="stylesheet" href="../../assets/css/pages/comite.css?v=20260506-committee-board-3">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/es.js"></script>
 <!-- Firebase SDKs -->
@@ -74,7 +74,7 @@
         import { initSessionGuard, performManagedLogout } from "../../assets/js/shared/sessionGuard.js?v=20260305-session-1";
         import { initUserMenu } from "../../assets/js/common/user-menu.js?v=20260430-orgtree-avatars-1";
         import { initDepartmentCalendar } from "../../assets/js/common/department-calendar.js?v=20260506-committee-calendars-1";
-        import { createCommitteeNotesController } from "../../assets/js/common/committee-notes.js?v=20260506-committee-board-2";
+        import { createCommitteeNotesController } from "../../assets/js/common/committee-notes.js?v=20260506-committee-board-3";
 
         let db = null;
         let auth = null;
@@ -238,7 +238,6 @@
         const metaSubtitleInput = document.getElementById('meta-subtitle-input');
         const metaSaveBtn = document.getElementById('meta-save-btn');
         const metaCancelBtn = document.getElementById('meta-cancel-btn');
-        const headerCommitteeTitle = document.getElementById('committee-header-title');
         const userPanelName = document.getElementById('user-panel-name');
         const userPanelInfo = document.getElementById('user-panel-info');
         const userPanelTrigger = document.getElementById('user-panel-trigger');
@@ -271,9 +270,6 @@
                 if (metaTitleInput && metaSubtitleInput) {
                     metaTitleInput.value = metaTitleEl.textContent.trim();
                     metaSubtitleInput.value = metaSubtitleEl.textContent.trim();
-                }
-                if (headerCommitteeTitle) {
-                    headerCommitteeTitle.textContent = metaTitleEl.textContent.trim();
                 }
             } catch (e) {
                 console.error('Error cargando metadata del comité:', e);
@@ -1737,11 +1733,6 @@ async function joinCurrentCommittee() {
                 <div class="committee-page-header__left z-10">
                     <img src="../../assets/images/logo-brisa-transparent.png" alt="Brisa Logo"
                         class="h-[5.25rem] w-auto" width="900" height="500" decoding="async">
-                    <div class="committee-header-context" aria-label="Identidad del comité">
-                        <img src="../../assets/images/committees/logos/committee-emergencias-logo.png" alt="Logo del Comité Ejecutivo de Emergencias"
-                            class="committee-header-logo" width="512" height="512" decoding="async">
-                        <span id="committee-header-title" class="committee-header-context__title">Comité Ejecutivo de Emergencias</span>
-                    </div>
                 </div>
 
                 <div class="absolute inset-0 flex items-center justify-center pointer-events-none committee-page-header__center">
@@ -1793,9 +1784,11 @@ async function joinCurrentCommittee() {
 
         <div class="text-center mb-12 animate-fade-in">
             <div class="flex items-center justify-center mb-2">
-                <div class="committee-title-wrapper">
-                    <h2 id="committee-title"
-                        class="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight">Comité Ejecutivo de Emergencias</h2>
+                <div class="committee-title-wrapper committee-hero-identity" aria-label="Identidad del comité">
+                    <img src="../../assets/images/committees/logos/committee-emergencias-logo.png" alt="Logo del Comité Ejecutivo de Emergencias" class="committee-hero-logo" width="512" height="512" decoding="async">
+                    <div class="committee-hero-copy">
+                        <h2 id="committee-title" class="committee-hero-title">Comité Ejecutivo de Emergencias</h2>
+                    </div>
                     <button id="meta-edit-btn" class="committee-edit-trigger" type="button" data-tooltip="Editar"
                         aria-label="Editar título y descripción">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"

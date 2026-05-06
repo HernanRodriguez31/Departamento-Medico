@@ -95,8 +95,8 @@ export function createCommitteeNotesController({
   const els = {};
 
   const getCommitteeContext = () => {
-    const titleEl = document.getElementById("committee-header-title") || document.getElementById("committee-title");
-    const logoEl = document.querySelector(".committee-header-logo");
+    const titleEl = document.getElementById("committee-title");
+    const logoEl = document.querySelector(".committee-hero-logo");
     const fallbackTitle = document.title?.split("|")?.[0]?.trim() || "Comité";
     return {
       name: titleEl?.textContent?.trim() || fallbackTitle,
@@ -145,6 +145,9 @@ export function createCommitteeNotesController({
     els.submitLabel = document.getElementById("committee-note-submit-label");
     els.boardLogo = document.getElementById("committee-board-logo");
     els.boardName = document.getElementById("committee-board-name");
+    els.scrollShell = document.querySelector(".committee-board-scroll-shell");
+    els.scrollPrev = document.querySelector("[data-committee-board-scroll='prev']");
+    els.scrollNext = document.querySelector("[data-committee-board-scroll='next']");
     els.toggleLabel = document.querySelector("#committee-board-toggle [data-committee-board-label]");
   };
 
@@ -160,28 +163,104 @@ export function createCommitteeNotesController({
     return backdrop;
   };
 
+  const ensureScrollShell = () => {
+    syncElements();
+    if (!els.columns) return;
+    let shell = els.columns.closest(".committee-board-scroll-shell");
+    if (!shell) {
+      shell = document.createElement("div");
+      shell.className = "committee-board-scroll-shell";
+      els.columns.parentNode.insertBefore(shell, els.columns);
+      shell.appendChild(els.columns);
+    }
+    if (!shell.querySelector("[data-committee-board-scroll='prev']")) {
+      shell.insertAdjacentHTML("afterbegin", `
+        <button type="button" class="committee-board-scroll committee-board-scroll--prev" data-committee-board-scroll="prev" aria-label="Desplazar pizarra hacia la izquierda">
+          <i data-lucide="chevron-left"></i>
+        </button>
+      `);
+    }
+    if (!shell.querySelector("[data-committee-board-scroll='next']")) {
+      shell.insertAdjacentHTML("beforeend", `
+        <button type="button" class="committee-board-scroll committee-board-scroll--next" data-committee-board-scroll="next" aria-label="Desplazar pizarra hacia la derecha">
+          <i data-lucide="chevron-right"></i>
+        </button>
+      `);
+    }
+    syncElements();
+  };
+
+  const getColumnScrollAmount = () => {
+    if (!els.columns) return 320;
+    const column = els.columns.querySelector(".committee-board-column");
+    if (!column) return Math.min(els.columns.clientWidth * 0.82, 380);
+    const styles = window.getComputedStyle(els.columns);
+    const gap = Number.parseFloat(styles.columnGap || styles.gap || "0") || 0;
+    return column.getBoundingClientRect().width + gap;
+  };
+
+  const updateScrollControls = () => {
+    syncElements();
+    if (!els.columns || !els.scrollPrev || !els.scrollNext) return;
+    const maxScroll = Math.max(0, els.columns.scrollWidth - els.columns.clientWidth);
+    const hasOverflow = maxScroll > 2;
+    const atStart = els.columns.scrollLeft <= 2;
+    const atEnd = els.columns.scrollLeft >= maxScroll - 2;
+    els.scrollPrev.hidden = !hasOverflow;
+    els.scrollNext.hidden = !hasOverflow;
+    els.scrollPrev.disabled = !hasOverflow || atStart;
+    els.scrollNext.disabled = !hasOverflow || atEnd;
+  };
+
+  const setupScrollControls = () => {
+    ensureScrollShell();
+    if (!els.scrollShell || !els.columns || !els.scrollPrev || !els.scrollNext) return;
+    if (els.scrollShell.dataset.scrollBound === "true") {
+      updateScrollControls();
+      return;
+    }
+    els.scrollShell.dataset.scrollBound = "true";
+    const scrollByDirection = (direction) => {
+      els.columns?.scrollBy({
+        left: getColumnScrollAmount() * direction,
+        behavior: "smooth"
+      });
+    };
+    els.scrollPrev.addEventListener("click", (event) => {
+      event.preventDefault();
+      scrollByDirection(-1);
+    });
+    els.scrollNext.addEventListener("click", (event) => {
+      event.preventDefault();
+      scrollByDirection(1);
+    });
+    els.columns.addEventListener("scroll", () => window.requestAnimationFrame(updateScrollControls), { passive: true });
+    window.addEventListener("resize", () => window.requestAnimationFrame(updateScrollControls));
+    updateScrollControls();
+  };
+
   const decorateBoardChrome = () => {
     syncElements();
     if (!els.panel) return;
     const header = els.panel.querySelector(".committee-board-panel__header");
-    if (header && header.dataset.decorated !== "true") {
-      header.dataset.decorated = "true";
+    if (header && header.dataset.decorated !== "identity-v2") {
+      header.dataset.decorated = "identity-v2";
       header.innerHTML = `
         <div class="committee-board-panel__identity">
           <img id="committee-board-logo" class="committee-board-panel__logo" alt="" hidden>
           <div class="committee-board-panel__identity-text">
-            <span class="committee-board-panel__identity-label">Comité</span>
             <strong id="committee-board-name">Comité</strong>
           </div>
         </div>
         <div class="committee-board-panel__heading">
-          <p class="committee-board-panel__department">Departamento Médico</p>
           <h3 class="committee-board-panel__title">Pizarra de comunicaciones</h3>
-          <p class="committee-board-panel__subtitle">Notas del comité y de cada proyecto.</p>
         </div>
-        <button type="button" class="committee-board-panel__close" data-committee-board-close aria-label="Cerrar pizarra de comunicaciones">
-          <i data-lucide="x"></i>
-        </button>
+        <div class="committee-board-panel__right">
+          <p class="committee-board-panel__department">Departamento Médico</p>
+          <button type="button" class="committee-board-panel__close" data-committee-board-close aria-label="Cerrar pizarra de comunicaciones">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
       `;
     }
     let footer = els.panel.querySelector(".committee-board-panel__footer");
@@ -207,6 +286,7 @@ export function createCommitteeNotesController({
       }
     }
     if (els.toggleLabel) els.toggleLabel.textContent = "Pizarra de comunicaciones";
+    setupScrollControls();
   };
 
   const ensureBoardPortal = () => {
@@ -234,6 +314,7 @@ export function createCommitteeNotesController({
       els.backdrop?.removeAttribute("hidden");
       els.toggle.setAttribute("aria-expanded", "true");
       document.body.classList.add("committee-board-is-open");
+      window.requestAnimationFrame(updateScrollControls);
     } else {
       els.panel.setAttribute("hidden", "");
       els.backdrop?.setAttribute("hidden", "");
@@ -330,17 +411,20 @@ export function createCommitteeNotesController({
     const likeCount = Object.keys(likedBy).length;
     const liked = userLikedNote(note);
     const likeNames = formatLikeNames(likedBy);
+    const authorLabel = note.authorName || "Usuario";
+    const dateLabel = formatNoteDate(note.createdAt || note.updatedAt);
     const editedLabel = note.updatedByName && toMillis(note.updatedAt) !== toMillis(note.createdAt)
-      ? `<span>Editado por ${escapeHTML(note.updatedByName)}</span>`
+      ? `<span class="committee-board-note__edited">Editado por ${escapeHTML(note.updatedByName)}</span>`
       : "";
     const safeNoteId = escapeAttribute(JSON.stringify(note.id));
-    const destinationLabel = column.kind === NOTE_SCOPE_PROJECT
-      ? `Proyecto de ${column.title}`
-      : "Nota de comité";
     return `
       <article class="committee-board-note" data-note-id="${escapeAttribute(note.id)}">
         <div class="committee-board-note__header">
-          <span class="committee-board-note__scope" title="${escapeAttribute(destinationLabel)}">${escapeHTML(destinationLabel)}</span>
+          <span class="committee-board-note__message-pill">
+            <span class="committee-board-note__message-label">Mensaje</span>
+            <span class="committee-board-note__message-author">${escapeHTML(authorLabel)}</span>
+            <span class="committee-board-note__message-date">${escapeHTML(dateLabel)}</span>
+          </span>
           ${canManageNote(note) ? `
             <span class="committee-board-note__actions">
               <button type="button" onclick="window.editCommitteeNote(${safeNoteId})" title="Editar nota">
@@ -353,11 +437,7 @@ export function createCommitteeNotesController({
           ` : ""}
         </div>
         <p class="committee-board-note__text">${escapeHTML(note.text)}</p>
-        <div class="committee-board-note__meta">
-          <span>${escapeHTML(note.authorName || "Usuario")}</span>
-          <span>${escapeHTML(formatNoteDate(note.createdAt || note.updatedAt))}</span>
-          ${editedLabel}
-        </div>
+        ${editedLabel ? `<div class="committee-board-note__meta">${editedLabel}</div>` : ""}
         <div class="committee-board-note__footer">
           <button
             type="button"
@@ -410,6 +490,7 @@ export function createCommitteeNotesController({
     if (els.count) els.count.textContent = String(notes.length);
     renderScopeOptions();
     renderColumns();
+    updateScrollControls();
     if (window.lucide) window.lucide.createIcons();
   };
 
