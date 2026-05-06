@@ -52,13 +52,13 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
     
     <link rel="stylesheet" href="../../assets/css/shared/department-calendar.css?v=20260506-committee-calendars-1">
-    <link rel="stylesheet" href="../../assets/css/pages/comite.css?v=20260506-committee-board-1">
+    <link rel="stylesheet" href="../../assets/css/pages/comite.css?v=20260506-committee-board-2">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/es.js"></script>
 <!-- Firebase SDKs -->
     <script type="module">
         import { getFirebase } from "/assets/js/common/firebaseClient.js";
-        import { EmailAuthProvider, onAuthStateChanged, reauthenticateWithCredential } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+        import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
         import {
             collection,
             addDoc,
@@ -85,12 +85,11 @@
             buildCommitteeMemberWritePayload,
             groupCommitteeMembers
         } from "../../assets/js/common/committee-member-roles.js";
-        import { hydrateAvatars, resolveUidForAuthor } from "../../assets/js/common/user-profiles.js?v=20260426-profile-avatars-1";
         import { escapeHTML, escapeAttribute } from "../../assets/js/utils/safe-dom.js";
         import { initSessionGuard } from "../../assets/js/shared/sessionGuard.js?v=20260305-session-1";
         import { initUserMenu } from "../../assets/js/common/user-menu.js?v=20260430-orgtree-avatars-1";
         import { initDepartmentCalendar } from "../../assets/js/common/department-calendar.js?v=20260506-committee-calendars-1";
-        import { createCommitteeNotesController } from "../../assets/js/common/committee-notes.js?v=20260506-committee-board-1";
+        import { createCommitteeNotesController } from "../../assets/js/common/committee-notes.js?v=20260506-committee-board-2";
 
         let db = null;
         let auth = null;
@@ -141,169 +140,6 @@
             if (!user) return false;
             return isAdmin ? true : await refreshAdminState(user);
         };
-
-        // Forum message actions
-        const getForumMessageById = (id) => state.messages.find((msg) => msg.id === id);
-
-        const requirePasswordReauth = async (user, confirmLabel = "Confirmar") => {
-            const providerIds = (user.providerData || []).map((p) => p.providerId);
-            if (!providerIds.includes("password")) {
-                Swal.fire({
-                    icon: "info",
-                    title: "No disponible",
-                    text: "Tu método de ingreso no usa contraseña. Reautenticá desde tu proveedor."
-                });
-                return false;
-            }
-            const result = await Swal.fire({
-                title: "Confirmá tu contraseña",
-                input: "password",
-                inputPlaceholder: "Contraseña",
-                showCancelButton: true,
-                confirmButtonText: confirmLabel,
-                cancelButtonText: "Cancelar"
-            });
-            if (!result.isConfirmed) return false;
-            const password = result.value;
-            if (!password) return false;
-            try {
-                const cred = EmailAuthProvider.credential(user.email, password);
-                await reauthenticateWithCredential(user, cred);
-                return true;
-            } catch (err) {
-                console.error("[Foro] Error al reautenticar", err);
-                Swal.fire({
-                    icon: "error",
-                    title: "Error",
-                    text: "No se pudo verificar la contraseña. Intentá nuevamente."
-                });
-                return false;
-            }
-        };
-
-        window.editForumMessage = async (id) => {
-            if (!db) {
-                console.warn("No hay conexión a Firestore para editar el mensaje.");
-                return;
-            }
-            const user = auth?.currentUser;
-            if (!user) {
-                Swal.fire({
-                    icon: "warning",
-                    title: "Acceso restringido",
-                    text: "Iniciá sesión para continuar."
-                });
-                return;
-            }
-            const msg = getForumMessageById(id);
-            if (!msg || !canManageForumMessage(msg, user)) {
-                Swal.fire({
-                    icon: "error",
-                    title: "Acceso restringido",
-                    text: "Solo podés editar tus propios mensajes o moderar como administrador."
-                });
-                return;
-            }
-            await claimForumMessageOwner(msg, user);
-            const result = await Swal.fire({
-                title: "Editar mensaje",
-                input: "textarea",
-                inputValue: msg.text || "",
-                inputPlaceholder: "Escribí tu mensaje",
-                showCancelButton: true,
-                confirmButtonText: "Guardar",
-                cancelButtonText: "Cancelar",
-                inputValidator: (value) => {
-                    if (!value || !value.trim()) return "Escribí un mensaje.";
-                    return null;
-                }
-            });
-            if (!result.isConfirmed) return;
-            const nextText = (result.value || "").trim();
-            if (!nextText || nextText === (msg.text || "").trim()) return;
-            const reauthed = await requirePasswordReauth(user, "Guardar");
-            if (!reauthed) return;
-            try {
-                await updateDoc(
-                    doc(db, "artifacts", appId, "public", "data", "committee_messages", id),
-                    { text: nextText }
-                );
-                Swal.fire({
-                    icon: "success",
-                    title: "Actualizado",
-                    text: "Tu mensaje fue editado.",
-                    timer: 1400,
-                    showConfirmButton: false
-                });
-            } catch (e) {
-                console.error("Error editando mensaje del foro:", e);
-                Swal.fire({
-                    icon: "error",
-                    title: "Error",
-                    text: "No se pudo editar el mensaje."
-                });
-            }
-        };
-
-        window.deleteForumMessage = async (id) => {
-            if (!db) {
-                console.warn("No hay conexión a Firestore para borrar el mensaje.");
-                return;
-            }
-            const user = auth?.currentUser;
-            if (!user) {
-                Swal.fire({
-                    icon: "warning",
-                    title: "Acceso restringido",
-                    text: "Iniciá sesión para continuar."
-                });
-                return;
-            }
-            const msg = getForumMessageById(id);
-            if (!msg || !canManageForumMessage(msg, user)) {
-                Swal.fire({
-                    icon: "error",
-                    title: "Acceso restringido",
-                    text: "Solo podés borrar tus propios mensajes o moderar como administrador."
-                });
-                return;
-            }
-            await claimForumMessageOwner(msg, user);
-            const confirm = await Swal.fire({
-                title: "Eliminar mensaje",
-                text: "Esta acción no se puede deshacer. ¿Continuar?",
-                icon: "warning",
-                showCancelButton: true,
-                confirmButtonColor: "#d33",
-                cancelButtonColor: "#3085d6",
-                confirmButtonText: "Borrar",
-                cancelButtonText: "Cancelar"
-            });
-            if (!confirm.isConfirmed) return;
-            const reauthed = await requirePasswordReauth(user, "Eliminar");
-            if (!reauthed) return;
-
-            try {
-                await deleteDoc(
-                    doc(db, "artifacts", appId, "public", "data", "committee_messages", id)
-                );
-                Swal.fire({
-                    icon: "success",
-                    title: "Eliminado",
-                    text: "El mensaje ha sido borrado correctamente.",
-                    timer: 1400,
-                    showConfirmButton: false
-                });
-            } catch (e) {
-                console.error("Error eliminando mensaje del foro:", e);
-                Swal.fire({
-                    icon: "error",
-                    title: "Error",
-                    text: "No se pudo eliminar el mensaje."
-                });
-            }
-        };
-
 
         // --- Constants ---
         const PROJECT_STAGES = [
@@ -515,7 +351,6 @@
 
             members: [],
             topics: [],
-            messages: [],
             membersReady: false,
             topicsReady: false,
             loading: true,
@@ -823,7 +658,6 @@
             renderProjects();
             renderFinished();
             renderMembers();
-            renderForum();
             updateStats();
             attachStageTooltips();
             attachDocActions();
@@ -1031,83 +865,6 @@
             profileCache.set(user.uid, displayName);
             return displayName;
         };
-
-        const normalizeAuthor = (value) => (value || "").trim().toLowerCase();
-
-        const isForumMessageOwner = (msg, user) => {
-            if (!msg || !user) return false;
-            if (msg.authorUid && msg.authorUid === user.uid) return true;
-            if (!msg.authorUid) {
-                const authorName = normalizeAuthor(msg.author || msg.authorName);
-                const aliases = [
-                    user.displayName,
-                    user.email,
-                    profileCache.get(user.uid)
-                ]
-                    .filter(Boolean)
-                    .map(normalizeAuthor);
-                return Boolean(authorName && aliases.includes(authorName));
-            }
-            return false;
-        };
-
-const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForumMessageOwner(msg, user));
-
-        const claimForumMessageOwner = async (msg, user) => {
-            if (!db || !msg || msg.authorUid || !user) return;
-            if (!isForumMessageOwner(msg, user)) return;
-            try {
-                const displayName = await getUserDisplayName(user);
-                await updateDoc(
-                    doc(db, "artifacts", appId, "public", "data", "committee_messages", msg.id),
-                    {
-                        authorUid: user.uid,
-                        authorName: displayName || msg.author || user.email || "Usuario"
-                    }
-                );
-            } catch (e) {
-                console.warn("No se pudo reclamar el mensaje del foro.", e);
-            }
-        };
-
-        let legacyForumCleanup = false;
-
-        const syncLegacyForumMessages = async () => {
-            if (legacyForumCleanup) return;
-            if (!db) return;
-            const user = auth?.currentUser;
-            if (!user) return;
-            const admin = await refreshAdminState(user);
-            if (!admin) return;
-
-            const pending = state.messages.filter((msg) => !msg.authorUid && !msg.isInitial);
-            if (!pending.length) return;
-            legacyForumCleanup = true;
-
-            for (const msg of pending) {
-                try {
-                    const resolvedUid = await resolveUidForAuthor({
-                        uid: msg.authorUid,
-                        authorName: msg.author || msg.authorName
-                    });
-                    if (resolvedUid) {
-                        await updateDoc(
-                            doc(db, "artifacts", appId, "public", "data", "committee_messages", msg.id),
-                            {
-                                authorUid: resolvedUid,
-                                authorName: msg.authorName || msg.author || ""
-                            }
-                        );
-                    } else {
-                        await deleteDoc(
-                            doc(db, "artifacts", appId, "public", "data", "committee_messages", msg.id)
-                        );
-                    }
-                } catch (e) {
-                    console.warn("No se pudo sincronizar mensaje legado.", e);
-                }
-            }
-        };
 function updateJoinButtonState() {
     const joinBtn = document.getElementById("btn-join-committee");
     const menu = document.getElementById("committee-options-menu");
@@ -1269,140 +1026,6 @@ async function joinCurrentCommittee() {
                 console.error("Error al salir del comité:", e);
                 alert("Ocurrió un error al salir del comité.");
             }
-        }
-
-        function renderForum() {
-            const container = document.getElementById('forum-messages');
-
-            if (state.messages.length === 0) {
-                container.innerHTML = `
-                    <div class="h-full flex flex-col items-center justify-center text-gray-400 opacity-60">
-                        <i data-lucide="message-square" class="w-12 h-12 mb-2"></i>
-                        <p>No hay mensajes aún. ¡Inicia la conversación!</p>
-                    </div>
-                `;
-            } else {
-                container.innerHTML = state.messages.map(msg => {
-
-                    const authorName = msg.author || msg.authorName || "Usuario";
-
-                    const initials = authorName
-
-                        .split(" ")
-
-                        .filter(Boolean)
-
-                        .map((n) => n[0])
-
-                        .join("")
-
-                        .substring(0, 2)
-
-                        .toUpperCase();
-
-                    const currentUser = auth?.currentUser;
-
-                    const canManage = currentUser && canManageForumMessage(msg, currentUser);
-
-                    const roleLabel = getMemberRoleDisplay(msg.businessUnit, msg.managementUnit, false);
-
-                    const messageActions = canManage ? `
-
-                        <div class="flex items-center gap-1">
-
-                            <button
-
-                                type="button"
-
-                                onclick="window.editForumMessage(${safeInlineJsString(msg.id)})"
-
-                                class="text-gray-300 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-all"
-
-                                title="Editar mensaje">
-
-                                <i data-lucide="pencil" class="w-4 h-4"></i>
-
-                            </button>
-
-                            <button
-
-                                type="button"
-
-                                onclick="window.deleteForumMessage(${safeInlineJsString(msg.id)})"
-
-                                class="text-gray-300 hover:text-red-500 p-1 rounded-full hover:bg-red-50 transition-all"
-
-                                title="Eliminar mensaje">
-
-                                <i data-lucide="trash-2" class="w-4 h-4"></i>
-
-                            </button>
-
-                        </div>
-
-                    ` : "";
-
-                    return `
-
-                <div class="flex flex-col bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-
-                    <div class="flex justify-between items-start gap-3 mb-2">
-
-                        <div class="flex items-center gap-3">
-
-                            <div class="w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs border bg-brisa/10 text-brisa border-brisa/20 dm-foro-avatar" data-author-uid="${escapeAttribute(msg.authorUid || '')}" data-author-name="${escapeAttribute(authorName)}">
-
-                                <img class="w-full h-full object-cover rounded-full" data-author-avatar src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="Avatar" hidden />
-
-                                <span class="text-xs font-semibold" data-avatar-fallback="initials">${escapeHTML(initials)}</span>
-
-                            </div>
-
-                            <div>
-
-                                <div class="flex items-baseline gap-2">
-
-                                    <span class="block text-sm font-bold text-gray-800 leading-none">${escapeHTML(authorName)}</span>
-
-                                    <span class="text-[10px] text-gray-500 font-medium truncate">${roleLabel}</span>
-
-                                </div>
-
-                            </div>
-
-                        </div>
-
-                        <div class="flex items-center gap-2">
-
-                            <div class="flex items-center gap-1 text-[10px] text-gray-400 bg-gray-50 px-2 py-1 rounded-full">
-
-                                <i data-lucide="clock" class="w-3 h-3"></i>
-
-                                ${formatDateTime(msg.createdAt)}
-
-                            </div>
-
-                            ${messageActions}
-
-                        </div>
-
-                    </div>
-
-                    <p class="text-sm text-gray-600 leading-relaxed pl-12">${escapeHTML(msg.text)}</p>
-
-                </div>
-
-                `;
-
-                }).join('');
-
-                hydrateAvatars(container);
-
-                // Scroll to bottom
-                container.scrollTop = container.scrollHeight;
-            }
-
-            if (window.lucide) window.lucide.createIcons();
         }
 
         // --- Actions (Exposed to Window) ---
@@ -1738,21 +1361,6 @@ async function joinCurrentCommittee() {
                 }, (error) => {
                     console.error('Error suscribiendo proyectos del comité:', error);
                 }));
-
-                const msgsRef = query(
-                    collection(db, 'artifacts', appId, 'public', 'data', 'committee_messages'),
-                    where('committeeId', '==', COMMITTEE_ID)
-                );
-
-                committeeSubscriptions.push(onSnapshot(msgsRef, (snap) => {
-                    state.messages = snap.docs
-                        .map(d => ({ id: d.id, ...d.data() }))
-                        .sort((a, b) => getCreatedAtMillis(a.createdAt) - getCreatedAtMillis(b.createdAt));
-                    render();
-                    syncLegacyForumMessages();
-                }, (error) => {
-                    console.error('Error suscribiendo mensajes del comité:', error);
-                }));
             };
 
             if (!db && !hasLocal) {
@@ -1780,7 +1388,6 @@ async function joinCurrentCommittee() {
                         await getUserDisplayName(user);
                         committeeNotesController?.subscribe();
                         subscribeCommitteeData();
-                        syncLegacyForumMessages();
                         updateJoinButtonState();
                     }
                 });
@@ -1894,76 +1501,6 @@ async function joinCurrentCommittee() {
                 document.getElementById('new-member-mu').value = '';
                 document.getElementById('new-member-role').value = 'vocal';
             });
-
-            document.getElementById('form-send-msg').addEventListener('submit', async (e) => {
-                e.preventDefault();
-
-                const text = document.getElementById('msg-text').value.trim();
-                if (!text) return;
-
-                const user = auth.currentUser;
-                if (!user) {
-                    alert("Debés iniciar sesión para enviar mensajes.");
-                    return;
-                }
-
-                const perfilRef = doc(db, "usuarios", user.uid);
-                const perfilSnap = await getDoc(perfilRef);
-                if (!perfilSnap.exists()) {
-                    alert("No encontramos tu perfil en la base de datos (colección 'usuarios').");
-                    return;
-                }
-
-                const perfil = perfilSnap.data() || {};
-                const author =
-                    resolveValue(perfil, ["displayName", "nombreCompleto", "apellidoNombre", "fullName", "name", "nombre"], "") ||
-                    `${resolveValue(perfil, ["apellido", "lastName"], "")} ${resolveValue(perfil, ["nombre"], "")}`.trim() ||
-                    user.displayName ||
-                    user.email ||
-                    "Médico";
-                const businessUnit = resolveValue(perfil, ["businessUnit", "unidadNegocio", "bu", "business_unit"], "");
-                const managementUnit = resolveValue(perfil, ["managementUnit", "unidadGestion", "mu", "management_unit"], "");
-
-                try {
-                    await addDoc(
-                        collection(db, 'artifacts', appId, 'public', 'data', 'committee_messages'),
-                        {
-                            text,
-                            author,
-                            businessUnit,
-                            managementUnit,
-                            committeeId: 'comite_docencia_investigacion',
-                            createdAt: serverTimestamp()
-                        }
-                    );
-                } catch (e) {
-                    console.error('Error escribiendo mensaje en Firestore:', e);
-                }
-                document.getElementById('msg-text').value = '';
-            });
-
-            // Dynamic Selects Logic
-            const newMemberBu = document.getElementById('new-member-bu');
-            if (newMemberBu) {
-                newMemberBu.addEventListener('change', (e) => {
-                    const targetEl = document.getElementById('new-member-mu');
-                    const val = e.target.value;
-                    if (!targetEl) return;
-
-                    targetEl.innerHTML = '<option value=\"\">Seleccionar Unidad de Gestión...</option>';
-                    if (val && ORGANIZATION_STRUCTURE[val]) {
-                        targetEl.disabled = false;
-                        ORGANIZATION_STRUCTURE[val].forEach(opt => {
-                            const option = document.createElement('option');
-                            option.value = opt;
-                            option.textContent = opt;
-                            targetEl.appendChild(option);
-                        });
-                    } else {
-                        targetEl.disabled = true;
-                    }
-                });
-            }
 
             // Evidence Engine Logic
             document.getElementById('form-pubmed').addEventListener('submit', (e) => {
@@ -2311,7 +1848,6 @@ async function joinCurrentCommittee() {
                 <a class="comite-tab is-active" href="#proyectos" aria-current="page">Proyectos</a>
                 <a class="comite-tab" href="#finalizados">Finalizados</a>
                 <a class="comite-tab" href="#integrantes">Integrantes</a>
-                <a class="comite-tab" href="#foro">Foro</a>
             </div>
         </nav>
 
@@ -2335,15 +1871,15 @@ async function joinCurrentCommittee() {
 
                 <button id="committee-board-toggle" class="committee-board-bubble" type="button" aria-expanded="false" aria-controls="committee-board-panel">
                     <i data-lucide="notebook-pen"></i>
-                    <span>Pizarrón</span>
+                    <span data-committee-board-label>Pizarra de comunicaciones</span>
                     <span id="committee-board-count" class="committee-board-bubble__count">0</span>
                 </button>
 
-                <aside id="committee-board-panel" class="committee-board-panel" aria-label="Pizarrón del comité" hidden>
+                <aside id="committee-board-panel" class="committee-board-panel" aria-label="Pizarra de comunicaciones del comité" hidden>
                     <div class="committee-board-panel__header">
                         <div>
                             <p class="committee-board-panel__eyebrow">Seguimiento</p>
-                            <h3 class="committee-board-panel__title">Pizarrón</h3>
+                            <h3 class="committee-board-panel__title">Pizarra de comunicaciones</h3>
                             <p class="committee-board-panel__subtitle">Notas del comité y de cada proyecto.</p>
                         </div>
                         <div class="committee-board-panel__actions">
@@ -2351,7 +1887,7 @@ async function joinCurrentCommittee() {
                                 <i data-lucide="plus"></i>
                                 Agregar nota
                             </button>
-                            <button type="button" class="committee-board-panel__close" data-committee-board-close aria-label="Cerrar pizarrón">
+                            <button type="button" class="committee-board-panel__close" data-committee-board-close aria-label="Cerrar pizarra de comunicaciones">
                                 <i data-lucide="x"></i>
                             </button>
                         </div>
@@ -2602,51 +2138,6 @@ async function joinCurrentCommittee() {
                 </div>
             </div>
         </div>
-
-        <!-- Internal Forum -->
-        <div id="foro" class="mt-16 mb-8 max-w-5xl mx-auto w-full comite-tab-section">
-            <div class="text-center mb-8">
-                <h2
-                    class="text-3xl font-extrabold text-gray-900 mb-2 tracking-tight flex items-center justify-center gap-3">
-                    <i data-lucide="message-square" class="w-8 h-8 text-brisa"></i>
-                    Foro de Comunicación Interna
-                </h2>
-                <p class="text-gray-500 font-medium">Espacio de colaboración y novedades para los integrantes del
-                    comité.</p>
-            </div>
-
-            <div class="section-card bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col h-auto">
-                <!-- Header -->
-                <div class="bg-gray-50 p-4 border-b border-gray-200 flex items-center justify-between">
-                    <span class="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                        <i data-lucide="message-circle" class="w-4 h-4 text-brisa"></i> Actividad Reciente
-                    </span>
-                    <span class="text-xs text-gray-400">Visible para todos los miembros</span>
-                </div>
-
-                <!-- Messages List -->
-                <div id="forum-messages" class="h-96 max-h-96 overflow-y-auto p-6 space-y-4 bg-gray-50/30">
-                    <!-- Messages rendered here -->
-                </div>
-
-                <!-- Input Area -->
-                <div class="px-4 py-3 bg-white border-t border-gray-200">
-                    <form id="form-send-msg" class="flex gap-3 items-end">
-                        <div class="flex-1">
-                            <textarea id="msg-text" placeholder="Escribe tu mensaje, novedad o consulta aquí..."
-                                class="w-full px-4 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brisa focus:border-transparent transition-all resize-none forum-textarea"
-                                rows="1"
-                                onkeydown="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); this.form.dispatchEvent(new Event('submit', {cancelable: true, bubbles: true})); }"></textarea>
-                        </div>
-                        <button type="submit"
-                            class="h-[42px] px-6 bg-brisa text-white rounded-lg hover:bg-brisa-dark disabled:opacity-50 transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-medium flex-shrink-0">
-                            <i data-lucide=\"send\" class=\"w-4 h-4\"></i> <span class=\"hidden sm:inline\">Enviar</span>
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
-
 
         <!-- Committee Calendar -->
         <div id="calendario-comite" class="committee-calendar-section mt-16 mb-8 max-w-5xl mx-auto w-full comite-tab-section">

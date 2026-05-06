@@ -94,6 +94,17 @@ export function createCommitteeNotesController({
   let editingNoteId = "";
   const els = {};
 
+  const getCommitteeContext = () => {
+    const titleEl = document.getElementById("committee-header-title") || document.getElementById("committee-title");
+    const logoEl = document.querySelector(".committee-header-logo");
+    const fallbackTitle = document.title?.split("|")?.[0]?.trim() || "Comité";
+    return {
+      name: titleEl?.textContent?.trim() || fallbackTitle,
+      logoSrc: logoEl?.getAttribute("src") || "",
+      logoAlt: logoEl?.getAttribute("alt") || "Logo del comité"
+    };
+  };
+
   const getTopicList = () => {
     const topics = typeof getTopics === "function" ? getTopics() : [];
     return Array.isArray(topics) ? topics.filter((topic) => topic && topic.id) : [];
@@ -119,6 +130,7 @@ export function createCommitteeNotesController({
   const syncElements = () => {
     els.toggle = document.getElementById("committee-board-toggle");
     els.panel = document.getElementById("committee-board-panel");
+    els.backdrop = document.getElementById("committee-board-backdrop");
     els.close = document.querySelector("[data-committee-board-close]");
     els.add = document.getElementById("committee-note-add");
     els.columns = document.getElementById("committee-board-columns");
@@ -131,16 +143,85 @@ export function createCommitteeNotesController({
     els.hint = document.getElementById("committee-note-context-hint");
     els.formTitle = document.getElementById("committee-note-modal-title");
     els.submitLabel = document.getElementById("committee-note-submit-label");
+    els.boardLogo = document.getElementById("committee-board-logo");
+    els.boardName = document.getElementById("committee-board-name");
+    els.toggleLabel = document.querySelector("#committee-board-toggle [data-committee-board-label]");
+  };
+
+  const ensureBackdrop = () => {
+    let backdrop = document.getElementById("committee-board-backdrop");
+    if (!backdrop) {
+      backdrop = document.createElement("div");
+      backdrop.id = "committee-board-backdrop";
+      backdrop.className = "committee-board-backdrop";
+      backdrop.setAttribute("hidden", "");
+      document.body.appendChild(backdrop);
+    }
+    return backdrop;
+  };
+
+  const decorateBoardChrome = () => {
+    syncElements();
+    if (!els.panel) return;
+    const header = els.panel.querySelector(".committee-board-panel__header");
+    if (header && header.dataset.decorated !== "true") {
+      header.dataset.decorated = "true";
+      header.innerHTML = `
+        <div class="committee-board-panel__identity">
+          <img id="committee-board-logo" class="committee-board-panel__logo" alt="" hidden>
+          <div class="committee-board-panel__identity-text">
+            <span class="committee-board-panel__identity-label">Comité</span>
+            <strong id="committee-board-name">Comité</strong>
+          </div>
+        </div>
+        <div class="committee-board-panel__heading">
+          <p class="committee-board-panel__department">Departamento Médico</p>
+          <h3 class="committee-board-panel__title">Pizarra de comunicaciones</h3>
+          <p class="committee-board-panel__subtitle">Notas del comité y de cada proyecto.</p>
+        </div>
+        <button type="button" class="committee-board-panel__close" data-committee-board-close aria-label="Cerrar pizarra de comunicaciones">
+          <i data-lucide="x"></i>
+        </button>
+      `;
+    }
+    let footer = els.panel.querySelector(".committee-board-panel__footer");
+    if (!footer) {
+      footer = document.createElement("div");
+      footer.className = "committee-board-panel__footer";
+      els.panel.appendChild(footer);
+    }
+    if (els.add && els.add.parentElement !== footer) {
+      els.add.innerHTML = '<i data-lucide="pencil"></i><span>Agregar nota</span>';
+      footer.appendChild(els.add);
+    }
+    syncElements();
+    const context = getCommitteeContext();
+    if (els.boardName) els.boardName.textContent = context.name;
+    if (els.boardLogo) {
+      if (context.logoSrc) {
+        els.boardLogo.src = context.logoSrc;
+        els.boardLogo.alt = context.logoAlt;
+        els.boardLogo.hidden = false;
+      } else {
+        els.boardLogo.hidden = true;
+      }
+    }
+    if (els.toggleLabel) els.toggleLabel.textContent = "Pizarra de comunicaciones";
   };
 
   const ensureBoardPortal = () => {
     syncElements();
+    ensureBackdrop();
     if (els.toggle && els.toggle.parentElement !== document.body) {
       document.body.appendChild(els.toggle);
     }
     if (els.panel && els.panel.parentElement !== document.body) {
       document.body.appendChild(els.panel);
     }
+    if (els.modal && els.modal.parentElement !== document.body) {
+      document.body.appendChild(els.modal);
+    }
+    decorateBoardChrome();
     syncElements();
   };
 
@@ -148,11 +229,16 @@ export function createCommitteeNotesController({
     syncElements();
     if (!els.panel || !els.toggle) return;
     if (open) {
+      decorateBoardChrome();
       els.panel.removeAttribute("hidden");
+      els.backdrop?.removeAttribute("hidden");
       els.toggle.setAttribute("aria-expanded", "true");
+      document.body.classList.add("committee-board-is-open");
     } else {
       els.panel.setAttribute("hidden", "");
+      els.backdrop?.setAttribute("hidden", "");
       els.toggle.setAttribute("aria-expanded", "false");
+      document.body.classList.remove("committee-board-is-open");
       closeComposer();
     }
   };
@@ -320,6 +406,7 @@ export function createCommitteeNotesController({
 
   const render = () => {
     syncElements();
+    decorateBoardChrome();
     if (els.count) els.count.textContent = String(notes.length);
     renderScopeOptions();
     renderColumns();
@@ -484,7 +571,11 @@ export function createCommitteeNotesController({
     }
   };
 
-  const openProjectNote = (projectId = "") => open(projectId, { openComposer: true });
+  const openProjectComposer = (projectId = "") => {
+    selectedProjectId = projectId || "";
+    render();
+    window.requestAnimationFrame(() => openComposer({ projectId: selectedProjectId }));
+  };
 
   const close = () => setOpenState(false);
 
@@ -519,6 +610,7 @@ export function createCommitteeNotesController({
     if (initialized) return;
     initialized = true;
     ensureBoardPortal();
+    decorateBoardChrome();
     els.add?.addEventListener("click", (event) => {
       event.preventDefault();
       setOpenState(true);
@@ -567,7 +659,7 @@ export function createCommitteeNotesController({
       }
       if (!els.panel || els.panel.hasAttribute("hidden")) return;
       const target = event.target;
-      if (els.panel.contains(target) || els.toggle?.contains(target)) return;
+      if (els.panel.contains(target) || els.toggle?.contains(target) || els.modal?.contains(target)) return;
       close();
     });
     document.addEventListener("keydown", (event) => {
@@ -576,7 +668,7 @@ export function createCommitteeNotesController({
       else close();
     });
     window.openCommitteeBoard = open;
-    window.openCommitteeProjectNote = openProjectNote;
+    window.openCommitteeProjectNote = openProjectComposer;
     window.editCommitteeNote = editNote;
     window.deleteCommitteeNote = deleteNote;
     window.toggleCommitteeNoteLike = toggleNoteLike;
