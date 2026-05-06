@@ -212,6 +212,36 @@ service cloud.firestore {
         && changedOnly(["avatarUrl", "avatarUpdatedAt", "updatedAt"]);
     }
 
+    function validCarouselType(data) {
+      return !hasKey(data, "type")
+        || data.type in ["image", "text", "art_gallery", "team_hobbies"];
+    }
+
+    function validImageCrop(data) {
+      return !hasKey(data, "imageCrop")
+        || (
+          data.imageCrop is map
+          && data.imageCrop.keys().hasOnly(["zoom", "offsetX", "offsetY", "frameAspect"])
+          && data.imageCrop.zoom is number
+          && data.imageCrop.zoom >= 1
+          && data.imageCrop.zoom <= 3
+          && data.imageCrop.offsetX is number
+          && data.imageCrop.offsetX >= -0.5
+          && data.imageCrop.offsetX <= 0.5
+          && data.imageCrop.offsetY is number
+          && data.imageCrop.offsetY >= -0.5
+          && data.imageCrop.offsetY <= 0.5
+          && data.imageCrop.frameAspect is number
+          && data.imageCrop.frameAspect >= 0
+          && data.imageCrop.frameAspect <= 10
+        );
+    }
+
+    function validImageColorPipeline(data) {
+      return !hasKey(data, "imageColorPipeline")
+        || data.imageColorPipeline in ["original", "canvas-fallback"];
+    }
+
     function validLegacyPostCreate() {
       return signedIn()
         && onlyKeys([
@@ -230,6 +260,9 @@ service cloud.firestore {
           "imageAspect",
           "imageWidth",
           "imageHeight",
+          "imageCrop",
+          "imageOriginalName",
+          "imageColorPipeline",
           "authorName",
           "authorUid",
           "businessUnit",
@@ -248,6 +281,10 @@ service cloud.firestore {
           "commentCount"
         ])
         && hasAnyOwnerField(request.resource.data)
+        && validCarouselType(request.resource.data)
+        && validImageCrop(request.resource.data)
+        && validImageColorPipeline(request.resource.data)
+        && validOptionalString(request.resource.data, "imageOriginalName", 160)
         && (!hasKey(request.resource.data, "authorUid") || request.resource.data.authorUid == request.auth.uid)
         && (!hasKey(request.resource.data, "createdByUid") || request.resource.data.createdByUid == request.auth.uid);
     }
@@ -255,7 +292,6 @@ service cloud.firestore {
     function validLegacyPostContentUpdate() {
       return isOwnedByCurrentUser(resource.data)
         && changedOnly([
-          "type",
           "title",
           "text",
           "imageUrl",
@@ -270,6 +306,9 @@ service cloud.firestore {
           "imageAspect",
           "imageWidth",
           "imageHeight",
+          "imageCrop",
+          "imageOriginalName",
+          "imageColorPipeline",
           "authorName",
           "businessUnit",
           "managementUnit",
@@ -278,7 +317,11 @@ service cloud.firestore {
           "unidadGestion",
           "createdByName",
           "updatedAt"
-        ]);
+        ])
+        && validImageCrop(request.resource.data)
+        && validImageColorPipeline(request.resource.data)
+        && validOptionalString(request.resource.data, "imageOriginalName", 160)
+        && (!hasKey(request.resource.data, "type") || request.resource.data.type == resource.data.type);
     }
 
     function validPostCreate() {
@@ -309,16 +352,143 @@ service cloud.firestore {
         );
     }
 
-    function validCommentCreate() {
+    function validCommentText(data) {
+      return hasKey(data, "text")
+        && data.text is string
+        && data.text.size() > 0
+        && data.text.size() <= 800;
+    }
+
+    function validOptionalString(data, key, maxLength) {
+      return !hasKey(data, key)
+        || data[key] == null
+        || (data[key] is string && data[key].size() <= maxLength);
+    }
+
+    function validCommentCreate(commentId) {
       return signedIn()
-        && onlyKeys(["text", "authorUid", "authorName", "createdAt", "likedBy"])
-        && request.resource.data.authorUid == request.auth.uid;
+        && onlyKeys([
+          "text",
+          "authorUid",
+          "authorName",
+          "createdAt",
+          "likedBy",
+          "parentCommentId",
+          "rootCommentId",
+          "replyDepth",
+          "replyToCommentId",
+          "deleted",
+          "deletedAt",
+          "deletedBy",
+          "replyToAuthorName"
+        ])
+        && validCommentText(request.resource.data)
+        && request.resource.data.authorUid == request.auth.uid
+        && request.resource.data.authorName is string
+        && request.resource.data.authorName.size() <= 120
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.likedBy is map
+        && (!hasKey(request.resource.data, "deleted") || request.resource.data.deleted == false)
+        && (!hasKey(request.resource.data, "deletedAt") || request.resource.data.deletedAt == null)
+        && (!hasKey(request.resource.data, "deletedBy") || request.resource.data.deletedBy == "")
+        && (!hasKey(request.resource.data, "replyDepth") || (
+          request.resource.data.replyDepth is int
+          && request.resource.data.replyDepth >= 0
+          && request.resource.data.replyDepth <= 2
+        ))
+        && validOptionalString(request.resource.data, "parentCommentId", 160)
+        && validOptionalString(request.resource.data, "rootCommentId", 160)
+        && validOptionalString(request.resource.data, "replyToCommentId", 160)
+        && validOptionalString(request.resource.data, "replyToAuthorName", 120)
+        && (
+          !hasKey(request.resource.data, "parentCommentId")
+          || request.resource.data.parentCommentId == null
+          || (hasKey(request.resource.data, "replyDepth") && request.resource.data.replyDepth > 0)
+        )
+        && (
+          !hasKey(request.resource.data, "replyDepth")
+          || request.resource.data.replyDepth == 0
+          || (
+            request.resource.data.parentCommentId is string
+            && request.resource.data.parentCommentId.size() > 0
+            && request.resource.data.rootCommentId is string
+            && request.resource.data.rootCommentId.size() > 0
+            && request.resource.data.replyToCommentId is string
+            && request.resource.data.replyToCommentId.size() > 0
+            && request.resource.data.replyToAuthorName is string
+            && request.resource.data.replyToAuthorName.size() > 0
+          )
+        )
+        && (
+          !hasKey(request.resource.data, "replyDepth")
+          || request.resource.data.replyDepth != 0
+          || (
+            (!hasKey(request.resource.data, "parentCommentId") || request.resource.data.parentCommentId == null)
+            && (!hasKey(request.resource.data, "replyToCommentId") || request.resource.data.replyToCommentId == null)
+            && (
+              !hasKey(request.resource.data, "rootCommentId")
+              || request.resource.data.rootCommentId == null
+              || request.resource.data.rootCommentId == commentId
+            )
+          )
+        );
+    }
+
+    function validCarouselCommentCreate(postId, commentId) {
+      return validCommentCreate(commentId)
+        && (
+          !hasKey(request.resource.data, "replyDepth")
+          || request.resource.data.replyDepth == 0
+          || (
+            exists(/databases/$(database)/documents/dm_carousel/$(postId)/comments/$(request.resource.data.parentCommentId))
+            && (
+              !hasKey(get(/databases/$(database)/documents/dm_carousel/$(postId)/comments/$(request.resource.data.parentCommentId)).data, "deleted")
+              || get(/databases/$(database)/documents/dm_carousel/$(postId)/comments/$(request.resource.data.parentCommentId)).data.deleted != true
+            )
+            && request.resource.data.replyToCommentId == request.resource.data.parentCommentId
+            && (
+              (
+                (
+                  !hasKey(get(/databases/$(database)/documents/dm_carousel/$(postId)/comments/$(request.resource.data.parentCommentId)).data, "replyDepth")
+                  || get(/databases/$(database)/documents/dm_carousel/$(postId)/comments/$(request.resource.data.parentCommentId)).data.replyDepth == 0
+                )
+                && request.resource.data.replyDepth == 1
+                && request.resource.data.rootCommentId == request.resource.data.parentCommentId
+              )
+              || (
+                hasKey(get(/databases/$(database)/documents/dm_carousel/$(postId)/comments/$(request.resource.data.parentCommentId)).data, "replyDepth")
+                &&
+                get(/databases/$(database)/documents/dm_carousel/$(postId)/comments/$(request.resource.data.parentCommentId)).data.replyDepth == 1
+                && request.resource.data.replyDepth == 2
+                && request.resource.data.rootCommentId == get(/databases/$(database)/documents/dm_carousel/$(postId)/comments/$(request.resource.data.parentCommentId)).data.rootCommentId
+              )
+            )
+          )
+        );
     }
 
     function validCommentLikeUpdate() {
       return signedIn()
         && changedOnly(["likedBy"])
         && request.resource.data.likedBy is map;
+    }
+
+    function validCommentContentUpdate() {
+      return isOwnedByCurrentUser(resource.data)
+        && changedOnly(["text", "updatedAt"])
+        && validCommentText(request.resource.data)
+        && request.resource.data.authorUid == resource.data.authorUid
+        && request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    function validCommentLogicalDelete() {
+      return isOwnedByCurrentUser(resource.data)
+        && changedOnly(["deleted", "deletedAt", "deletedBy", "updatedAt"])
+        && request.resource.data.deleted == true
+        && request.resource.data.deletedAt is timestamp
+        && request.resource.data.deletedBy == request.auth.uid
+        && request.resource.data.authorUid == resource.data.authorUid
+        && request.resource.data.createdAt == resource.data.createdAt;
     }
 
     function validCommitteeMessageCreate() {
@@ -1015,11 +1185,9 @@ service cloud.firestore {
 
       match /comments/{commentId} {
         allow read: if signedIn();
-        allow create: if validCommentCreate();
-        allow update: if (
-            isOwnedByCurrentUser(resource.data)
-            && changedOnly(["text", "updatedAt"])
-          )
+        allow create: if validCarouselCommentCreate(postId, commentId);
+        allow update: if validCommentContentUpdate()
+          || validCommentLogicalDelete()
           || isAdmin();
         allow delete: if isOwnedByCurrentUser(resource.data) || isAdmin();
       }
@@ -1070,12 +1238,10 @@ service cloud.firestore {
 
       match /comments/{commentId} {
         allow read: if signedIn();
-        allow create: if validCommentCreate();
+        allow create: if validCommentCreate(commentId);
         allow update: if validCommentLikeUpdate()
-          || (
-            isOwnedByCurrentUser(resource.data)
-            && changedOnly(["text", "updatedAt"])
-          )
+          || validCommentContentUpdate()
+          || validCommentLogicalDelete()
           || isAdmin();
         allow delete: if isOwnedByCurrentUser(resource.data) || isAdmin();
       }

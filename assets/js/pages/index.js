@@ -1022,6 +1022,11 @@ async function initCarouselModule() {
     };
   };
 
+  const isVisualResourcePost = (post = {}) => {
+    const type = post.type || "";
+    return !type || type === "image" || type === "text";
+  };
+
   const mergePosts = (incoming, { reset = false } = {}) => {
     if (reset) {
       feedPosts = incoming;
@@ -1068,7 +1073,7 @@ async function initCarouselModule() {
       const snap = await getDocs(q);
       const incoming = snap.docs
         .map(mapPostDoc)
-        .filter((s) => s.type !== "art_gallery")
+        .filter(isVisualResourcePost)
         .filter((s) => s.imageUrl || s.text || s.title);
       mergePosts(incoming, { reset });
       if (snap.docs.length > 0) {

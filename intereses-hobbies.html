@@ -35,7 +35,7 @@
     />
     <link rel="stylesheet" href="/assets/css/core-contrast.css?v=20260502-committee-border-align-1" />
     <link rel="stylesheet" href="/assets/css/pages/galeriadearte.css?v=20260503-art-gallery-like-tooltip-1" />
-    <link rel="stylesheet" href="/assets/css/pages/intereses-hobbies.css?v=20260505-team-hobbies-page-1" />
+    <link rel="stylesheet" href="/assets/css/pages/intereses-hobbies.css?v=20260505-team-hobbies-image-comments-2" />
   </head>
   <body class="art-gallery-page team-hobbies-page ui-clarity">
     <div id="app">
@@ -175,10 +175,6 @@
                 Un espacio para compartir fotos, actividades, momentos personales y conversaciones que fortalecen la comunidad del Departamento Médico.
               </p>
             </div>
-            <button class="team-hobbies-upload" id="team-hobbies-upload" type="button">
-              <i data-lucide="image-plus" aria-hidden="true"></i>
-              <span>Compartir foto</span>
-            </button>
           </section>
 
           <section class="team-hobbies-wall" aria-label="Publicaciones de intereses y hobbies">
@@ -238,8 +234,9 @@
         </svg>
       </a>
 
-      <button id="dmAssistantFab" type="button" aria-label="Asistente IA">
-        <img src="/asistente-ia/boti-brisa.jpg" alt="" aria-hidden="true" />
+      <button class="team-hobbies-upload team-hobbies-upload--fab" id="team-hobbies-upload" type="button" aria-label="Compartir foto">
+        <i data-lucide="image-plus" aria-hidden="true"></i>
+        <span>Compartir</span>
       </button>
     </div>
 
@@ -270,7 +267,7 @@
               <span>Foto</span>
               <input id="team-hobbies-file" type="file" accept="image/*" required />
             </label>
-            <div id="team-hobbies-preview" class="art-preview art-field--full">
+            <div id="team-hobbies-preview" class="art-preview team-hobbies-crop-preview art-field--full" aria-live="polite">
               <span>Vista previa de la foto</span>
             </div>
           </div>
@@ -310,6 +307,13 @@
               <span>Descripción</span>
               <textarea id="team-hobbies-edit-description" rows="5" maxlength="1200"></textarea>
             </label>
+            <label class="art-field art-field--full">
+              <span>Foto</span>
+              <input id="team-hobbies-edit-file" type="file" accept="image/*" />
+            </label>
+            <div id="team-hobbies-edit-preview" class="art-preview team-hobbies-crop-preview art-field--full" aria-live="polite">
+              <span>Preparando imagen actual...</span>
+            </div>
           </div>
           <div id="team-hobbies-edit-error" class="art-form__error" role="alert" hidden></div>
           <div class="art-form__actions">
@@ -389,6 +393,34 @@
       </div>
     </div>
 
+    <div id="team-hobbies-lightbox" class="team-hobbies-lightbox" aria-hidden="true" hidden>
+      <button id="team-hobbies-lightbox-close" class="team-hobbies-lightbox__close" type="button" aria-label="Cerrar imagen">
+        &times;
+      </button>
+      <figure class="team-hobbies-lightbox__figure" role="dialog" aria-modal="true" aria-labelledby="team-hobbies-lightbox-title">
+        <div class="team-hobbies-lightbox__image-wrap">
+          <img id="team-hobbies-lightbox-img" class="team-hobbies-lightbox__img" src="" alt="" />
+          <img class="team-hobbies-lightbox__brand" src="/assets/images/logo-brisa-heart.png" alt="Brisa Salud y Bienestar" />
+        </div>
+        <figcaption class="team-hobbies-lightbox__caption">
+          <span class="team-hobbies-lightbox__text">
+            <strong id="team-hobbies-lightbox-title"></strong>
+            <span id="team-hobbies-lightbox-description"></span>
+          </span>
+          <span class="team-hobbies-lightbox__metrics" aria-label="Métricas de la foto">
+            <span class="team-hobbies-lightbox__metric">
+              <span aria-hidden="true">♥</span>
+              <span id="team-hobbies-lightbox-likes">0</span>
+            </span>
+            <span class="team-hobbies-lightbox__metric">
+              <i data-lucide="message-circle" aria-hidden="true"></i>
+              <span id="team-hobbies-lightbox-comments">0</span>
+            </span>
+          </span>
+        </figcaption>
+      </figure>
+    </div>
+
     <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
     <script>
       if (window.lucide) window.lucide.createIcons();
@@ -398,7 +430,7 @@
       installFirebaseGlobals();
     </script>
     <script type="module" src="/assets/js/common/notifications.js"></script>
-    <script type="module" src="/assets/js/pages/intereses-hobbies.js?v=20260505-team-hobbies-page-1"></script>
+    <script type="module" src="/assets/js/pages/intereses-hobbies.js?v=20260505-team-hobbies-image-comments-2"></script>
     <script type="module">
       import("/js/chat.js?v=20260504-bitacora-dock-chat-polish-2").catch(() => {});
     </script>

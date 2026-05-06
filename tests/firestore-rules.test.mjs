@@ -14,6 +14,7 @@ import {
   getDocs,
   limit,
   query,
+  serverTimestamp,
   setDoc,
   Timestamp,
   updateDoc
@@ -1355,6 +1356,14 @@ test("dm_carousel allows authenticated art gallery posts with scoped metadata", 
       imageAspect: "landscape",
       imageWidth: 1200,
       imageHeight: 800,
+      imageCrop: {
+        zoom: 1.1,
+        offsetX: 0.05,
+        offsetY: -0.03,
+        frameAspect: 1.5
+      },
+      imageOriginalName: "obra.jpg",
+      imageColorPipeline: "original",
       authorUid: "user-a",
       authorName: "Dr. Usuario A",
       createdByUid: "user-a",
@@ -1410,6 +1419,14 @@ test("dm_carousel allows authenticated team hobbies posts with scoped metadata",
       imageAspect: "landscape",
       imageWidth: 1200,
       imageHeight: 800,
+      imageCrop: {
+        zoom: 1,
+        offsetX: 0,
+        offsetY: 0,
+        frameAspect: 1.5
+      },
+      imageOriginalName: "hobby.jpg",
+      imageColorPipeline: "original",
       authorUid: "user-a",
       authorName: "Dr. Usuario A",
       createdByUid: "user-a",
@@ -1444,20 +1461,156 @@ test("dm_carousel allows authenticated team hobbies posts with scoped metadata",
       hobbyCategory: "deporte"
     })
   );
+  await assertFails(
+    setDoc(doc(ownerDb, "dm_carousel", "hobby-post-invalid-type"), {
+      type: "team_hobbies_private",
+      title: "Tipo invalido",
+      imageUrl: "https://example.test/hobby.jpg",
+      authorUid: "user-a",
+      createdAt: Timestamp.now()
+    })
+  );
+  await assertFails(
+    updateDoc(doc(ownerDb, "dm_carousel", "hobby-post-a"), {
+      type: "image",
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertSucceeds(
+    updateDoc(doc(ownerDb, "dm_carousel", "hobby-post-a"), {
+      imageCrop: {
+        zoom: 1.4,
+        offsetX: 0.1,
+        offsetY: -0.1,
+        frameAspect: 1.5
+      },
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertFails(
+    updateDoc(doc(ownerDb, "dm_carousel", "hobby-post-a"), {
+      imageCrop: {
+        zoom: 5,
+        offsetX: 0,
+        offsetY: 0,
+        frameAspect: 1.5
+      },
+      updatedAt: Timestamp.now()
+    })
+  );
 });
 
 test("dm_carousel comments still allow legit comment create delete and block direct like-map updates", async () => {
   const ownerDb = authedDb("user-a");
   const otherDb = authedDb("user-b");
+  const commentPayload = (overrides = {}) => ({
+    text: "Nuevo comentario",
+    authorUid: "user-b",
+    authorName: "Dr. Usuario B",
+    createdAt: Timestamp.now(),
+    likedBy: {},
+    parentCommentId: null,
+    rootCommentId: "comment-b",
+    replyDepth: 0,
+    replyToCommentId: null,
+    replyToAuthorName: "",
+    deleted: false,
+    deletedAt: null,
+    deletedBy: "",
+    ...overrides
+  });
 
   await assertSucceeds(
-    setDoc(doc(otherDb, "dm_carousel", "post-a", "comments", "comment-b"), {
-      text: "Nuevo comentario",
-      authorUid: "user-b",
-      authorName: "Dr. Usuario B",
-      createdAt: Timestamp.now(),
-      likedBy: {}
-    })
+    setDoc(doc(otherDb, "dm_carousel", "post-a", "comments", "comment-b"), commentPayload())
+  );
+  await assertSucceeds(
+    setDoc(doc(otherDb, "dm_carousel", "post-a", "comments", "comment-server-timestamp"), commentPayload({
+      createdAt: serverTimestamp(),
+      rootCommentId: "comment-server-timestamp"
+    }))
+  );
+  await assertSucceeds(
+    setDoc(doc(otherDb, "dm_carousel", "post-a", "comments", "reply-b"), commentPayload({
+      text: "Respuesta en cascada",
+      parentCommentId: "comment-a",
+      rootCommentId: "comment-a",
+      replyDepth: 1,
+      replyToCommentId: "comment-a",
+      replyToAuthorName: "Dr. Usuario A"
+    }))
+  );
+  await assertSucceeds(
+    setDoc(doc(otherDb, "dm_carousel", "post-a", "comments", "reply-server-timestamp"), commentPayload({
+      text: "Respuesta con serverTimestamp",
+      createdAt: serverTimestamp(),
+      parentCommentId: "comment-a",
+      rootCommentId: "comment-a",
+      replyDepth: 1,
+      replyToCommentId: "comment-a",
+      replyToAuthorName: "Dr. Usuario A"
+    }))
+  );
+  await assertSucceeds(
+    setDoc(doc(otherDb, "dm_carousel", "post-a", "comments", "reply-level-two"), commentPayload({
+      text: "Respuesta nivel dos",
+      parentCommentId: "reply-b",
+      rootCommentId: "comment-a",
+      replyDepth: 2,
+      replyToCommentId: "reply-b",
+      replyToAuthorName: "Dr. Usuario B"
+    }))
+  );
+  await assertFails(
+    setDoc(doc(otherDb, "dm_carousel", "post-a", "comments", "reply-too-deep"), commentPayload({
+      text: "Respuesta demasiado profunda",
+      parentCommentId: "reply-b",
+      rootCommentId: "comment-a",
+      replyDepth: 3,
+      replyToCommentId: "reply-b",
+      replyToAuthorName: "Dr. Usuario B"
+    }))
+  );
+  await assertFails(
+    setDoc(doc(otherDb, "dm_carousel", "post-a", "comments", "reply-missing-parent"), commentPayload({
+      text: "Respuesta incompleta",
+      parentCommentId: "comment-a",
+      rootCommentId: "comment-a",
+      replyDepth: 1,
+      replyToCommentId: null,
+      replyToAuthorName: "Dr. Usuario A"
+    }))
+  );
+  await assertFails(
+    setDoc(doc(otherDb, "dm_carousel", "post-a", "comments", "reply-parent-not-found"), commentPayload({
+      text: "Respuesta con padre inexistente",
+      parentCommentId: "missing-comment",
+      rootCommentId: "missing-comment",
+      replyDepth: 1,
+      replyToCommentId: "missing-comment",
+      replyToAuthorName: "Dr. Usuario A"
+    }))
+  );
+  await assertFails(
+    setDoc(doc(otherDb, "dm_carousel", "post-a", "comments", "reply-depth-inconsistent"), commentPayload({
+      text: "Respuesta con profundidad inconsistente",
+      parentCommentId: "comment-a",
+      rootCommentId: "comment-a",
+      replyDepth: 2,
+      replyToCommentId: "comment-a",
+      replyToAuthorName: "Dr. Usuario A"
+    }))
+  );
+  await assertFails(
+    setDoc(doc(otherDb, "dm_carousel", "post-a", "comments", "forged-author"), commentPayload({
+      authorUid: "user-a",
+      rootCommentId: "forged-author"
+    }))
+  );
+  await assertFails(
+    setDoc(doc(otherDb, "dm_carousel", "post-a", "comments", "empty-comment"), commentPayload({
+      text: "",
+      rootCommentId: "empty-comment"
+    }))
   );
   await assertFails(
     updateDoc(doc(otherDb, "dm_carousel", "post-a", "comments", "comment-a"), {
@@ -1476,6 +1629,28 @@ test("dm_carousel comments still allow legit comment create delete and block dir
   await assertFails(
     updateDoc(doc(otherDb, "dm_carousel", "post-a", "comments", "comment-a"), {
       text: "Edición ajena",
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertFails(
+    updateDoc(doc(authedDb("user-a"), "dm_carousel", "post-a", "comments", "comment-a"), {
+      authorUid: "user-b",
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertSucceeds(
+    updateDoc(doc(authedDb("user-a"), "dm_carousel", "post-a", "comments", "comment-a"), {
+      deleted: true,
+      deletedAt: Timestamp.now(),
+      deletedBy: "user-a",
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertFails(
+    updateDoc(doc(otherDb, "dm_carousel", "post-a", "comments", "comment-a"), {
+      deleted: true,
+      deletedAt: Timestamp.now(),
+      deletedBy: "user-b",
       updatedAt: Timestamp.now()
     })
   );

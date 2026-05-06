@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "brisa-root-";
-const CACHE_VERSION = "v142";
+const CACHE_VERSION = "v147";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const OFFLINE_URL = "/offline.html";
 const PRECACHE_URLS = [
@@ -16,13 +16,13 @@ const PRECACHE_URLS = [
   "/assets/css/pages/index.css?v=20260505-team-hobbies-page-1",
   "/assets/css/shared/brisa-chat.css?v=20260504-bitacora-dock-chat-polish-2",
   "/assets/css/pages/galeriadearte.css?v=20260503-art-gallery-like-tooltip-1",
-  "/assets/css/pages/intereses-hobbies.css?v=20260505-team-hobbies-page-1",
+  "/assets/css/pages/intereses-hobbies.css?v=20260505-team-hobbies-image-comments-2",
   "/assets/css/pages/bitacora-cientifica.css?v=20260505-bitacora-pdf-load-save-reliability-2",
   "/css/structure.css?v=20260502-specialists-lorena-popup-card-1",
   "/assets/css/core-contrast.css?v=20260502-committee-border-align-1",
-  "/assets/js/pages/index.js?v=20260505-team-hobbies-page-1",
+  "/assets/js/pages/index.js?v=20260505-team-hobbies-isolation-color-1",
   "/assets/js/pages/galeriadearte.js?v=20260503-art-gallery-like-tooltip-1",
-  "/assets/js/pages/intereses-hobbies.js?v=20260505-team-hobbies-page-1",
+  "/assets/js/pages/intereses-hobbies.js?v=20260505-team-hobbies-image-comments-2",
   "/assets/js/pages/bitacora-cientifica.js?v=20260505-bitacora-pdf-load-save-reliability-2",
   "/assets/js/data/bitacora-posts.js",
   "/assets/js/data/scientific-sources.js?v=20260504-ramr-logo-center-2",

@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import assert from "node:assert/strict";
 import { after, before, beforeEach, test } from "node:test";
 
 import {
@@ -50,6 +51,7 @@ const unauthedStorage = () => testEnv.unauthenticatedContext().storage(BUCKET_UR
 
 const pdfBytes = () => new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34]);
 const imageBytes = () => new Uint8Array([0xff, 0xd8, 0xff, 0xdb, 0x00, 0x43, 0x00, 0xff, 0xd9]);
+const pngBytes = () => new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
 
 test("bitacora PDF storage allows authenticated reads and only owner PDF uploads", async () => {
   const owner = storageFor("user-a");
@@ -117,4 +119,26 @@ test("dm_carousel storage allows authenticated reads and owner-only image writes
   );
   await assertFails(other.ref("dm_carousel/user-a/hobby.jpg").delete());
   await assertSucceeds(photoRef.delete());
+});
+
+test("dm_carousel storage accepts original PNG team-hobbies uploads with metadata", async () => {
+  const owner = storageFor("user-a");
+  const photoRef = owner.ref("dm_carousel/user-a/IMG_0678.png");
+
+  await assertSucceeds(
+    photoRef.put(pngBytes(), {
+      contentType: "image/png",
+      customMetadata: {
+        type: "team_hobbies",
+        source: "team_hobbies_original",
+        imageColorPipeline: "original",
+        imageOriginalName: "IMG_0678.png"
+      }
+    })
+  );
+
+  const metadata = await assertSucceeds(photoRef.getMetadata());
+  assert.equal(metadata.contentType, "image/png");
+  assert.equal(metadata.customMetadata?.type, "team_hobbies");
+  assert.equal(metadata.customMetadata?.imageColorPipeline, "original");
 });

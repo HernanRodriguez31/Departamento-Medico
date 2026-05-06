@@ -1096,6 +1096,11 @@ async function initCarouselModule() {
     };
   };
 
+  const isVisualResourcePost = (post = {}) => {
+    const type = post.type || "";
+    return !type || type === "image" || type === "text";
+  };
+
   const mergePosts = (incoming, { reset = false } = {}) => {
     if (reset) {
       feedPosts = incoming;
@@ -1478,7 +1483,7 @@ async function initCarouselModule() {
         const removedIds = [];
         snap.docChanges().forEach((change) => {
           const post = mapPostDoc(change.doc);
-          if (post.type === "art_gallery") return;
+          if (!isVisualResourcePost(post)) return;
           if (change.type === "added") {
             if (postsById.has(post.id) || renderedPostIds.has(post.id)) {
               updatedPosts.push(post);
@@ -1583,7 +1588,7 @@ async function initCarouselModule() {
       const snap = await getDocs(q);
       const incoming = snap.docs
         .map(mapPostDoc)
-        .filter((s) => s.type !== "art_gallery")
+        .filter(isVisualResourcePost)
         .filter((s) => s.imageUrl || s.text || s.title);
       const incomingIds = new Set(incoming.map((post) => post.id));
       const preservedOptimistic =
