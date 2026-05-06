@@ -57,7 +57,7 @@ const normalizeLikedBy = (likedBy) => {
 
 const formatLikeNames = (likedBy = {}) => {
   const names = Object.values(normalizeLikedBy(likedBy)).filter(Boolean);
-  if (!names.length) return "Sin likes";
+  if (!names.length) return "";
   if (names.length <= 3) return names.join(", ");
   return `${names.slice(0, 3).join(", ")} y ${names.length - 3} mas`;
 };
@@ -243,8 +243,8 @@ export function createCommitteeNotesController({
     syncElements();
     if (!els.panel) return;
     const header = els.panel.querySelector(".committee-board-panel__header");
-    if (header && header.dataset.decorated !== "identity-v3") {
-      header.dataset.decorated = "identity-v3";
+    if (header && header.dataset.decorated !== "identity-v4") {
+      header.dataset.decorated = "identity-v4";
       header.innerHTML = `
         <div class="committee-board-panel__identity">
           <img id="committee-board-logo" class="committee-board-panel__logo" alt="" hidden>
@@ -289,6 +289,7 @@ export function createCommitteeNotesController({
       }
     }
     if (els.toggleLabel) els.toggleLabel.textContent = "Pizarra de comunicaciones";
+    if (els.toggle) els.toggle.setAttribute("aria-label", "Abrir pizarra de comunicaciones");
     setupScrollControls();
   };
 
@@ -316,12 +317,14 @@ export function createCommitteeNotesController({
       els.panel.removeAttribute("hidden");
       els.backdrop?.removeAttribute("hidden");
       els.toggle.setAttribute("aria-expanded", "true");
+      els.toggle.setAttribute("aria-label", "Cerrar pizarra de comunicaciones");
       document.body.classList.add("committee-board-is-open");
       window.requestAnimationFrame(updateScrollControls);
     } else {
       els.panel.setAttribute("hidden", "");
       els.backdrop?.setAttribute("hidden", "");
       els.toggle.setAttribute("aria-expanded", "false");
+      els.toggle.setAttribute("aria-label", "Abrir pizarra de comunicaciones");
       document.body.classList.remove("committee-board-is-open");
       closeComposer();
     }
@@ -384,8 +387,8 @@ export function createCommitteeNotesController({
       {
         id: NOTE_SCOPE_COMMITTEE,
         kind: NOTE_SCOPE_COMMITTEE,
-        title: "Nota de comité",
-        subtitle: "Comentarios generales",
+        title: "Notas",
+        subtitle: "Comentarios del comité",
         icon: "clipboard-list"
       },
       ...topics.map((topic) => ({
@@ -414,6 +417,7 @@ export function createCommitteeNotesController({
     const likeCount = Object.keys(likedBy).length;
     const liked = userLikedNote(note);
     const likeNames = formatLikeNames(likedBy);
+    const likeTitle = likeNames || "Indicar like";
     const authorLabel = note.authorName || "Usuario";
     const dateLabel = formatNoteDate(note.createdAt || note.updatedAt);
     const editedLabel = note.updatedByName && toMillis(note.updatedAt) !== toMillis(note.createdAt)
@@ -424,7 +428,7 @@ export function createCommitteeNotesController({
       <article class="committee-board-note" data-note-id="${escapeAttribute(note.id)}">
         <div class="committee-board-note__header">
           <span class="committee-board-note__message-pill">
-            <span class="committee-board-note__message-label">Mensaje</span>
+            <span class="committee-board-note__message-label">Nota:</span>
             <span class="committee-board-note__message-author">${escapeHTML(authorLabel)}</span>
             <span class="committee-board-note__message-date">${escapeHTML(dateLabel)}</span>
           </span>
@@ -439,20 +443,20 @@ export function createCommitteeNotesController({
             </span>
           ` : ""}
         </div>
-        <p class="committee-board-note__text">${escapeHTML(note.text)}</p>
-        ${editedLabel ? `<div class="committee-board-note__meta">${editedLabel}</div>` : ""}
-        <div class="committee-board-note__footer">
+        <div class="committee-board-note__body">
+          <p class="committee-board-note__text">${escapeHTML(note.text)}</p>
           <button
             type="button"
             class="committee-board-note__like${liked ? " is-active" : ""}"
             onclick="window.toggleCommitteeNoteLike(${safeNoteId})"
             aria-pressed="${liked ? "true" : "false"}"
-            title="${escapeAttribute(likeNames)}">
+            aria-label="${liked ? "Quitar like" : "Indicar like"}"
+            title="${escapeAttribute(likeTitle)}">
             <i data-lucide="thumbs-up"></i>
             <span>${likeCount}</span>
           </button>
-          <span class="committee-board-note__like-names" title="${escapeAttribute(likeNames)}">${escapeHTML(likeNames)}</span>
         </div>
+        ${editedLabel ? `<div class="committee-board-note__meta">${editedLabel}</div>` : ""}
       </article>
     `;
   };

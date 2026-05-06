@@ -4446,3 +4446,355 @@ body.comite-detail-premium-v2 .committee-member-card--placeholder .committee-mem
         white-space: nowrap;
     }
 }
+
+body.committee-board-is-open #brisa-chat-root,
+body.committee-board-is-open .brisa-chat-bubble,
+body.committee-board-is-open .brisa-chat-fab {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+.committee-board-bubble {
+    position: fixed;
+    left: max(1.05rem, env(safe-area-inset-left));
+    top: 50dvh;
+    z-index: 76;
+    display: inline-grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.54rem;
+    max-width: 12.15rem;
+    min-height: 3.18rem;
+    padding: 0.48rem 0.72rem 0.48rem 0.62rem;
+    border-color: rgba(122, 184, 0, 0.68);
+    border-radius: 0.96rem;
+    color: #527b17;
+    overflow: visible;
+}
+
+.committee-board-bubble [data-committee-board-label] {
+    width: 5.45rem;
+    color: #527b17;
+    font-size: 0.76rem;
+    line-height: 1.02;
+}
+
+.committee-board-bubble > svg {
+    width: 1.78rem;
+    height: 1.78rem;
+    color: #5f8f16;
+}
+
+.committee-board-bubble__count {
+    position: absolute;
+    left: 2.05rem;
+    top: 1.92rem;
+    min-width: 1.08rem;
+    height: 1.08rem;
+    padding: 0 0.22rem;
+    border: 2px solid rgba(255, 255, 255, 0.96);
+    background: rgba(122, 184, 0, 0.16);
+    color: #527b17;
+    font-size: 0.56rem;
+    box-shadow: 0 4px 10px rgba(82, 123, 23, 0.12);
+}
+
+.committee-board-bubble[aria-expanded="true"] {
+    width: 2.18rem;
+    min-width: 2.18rem;
+    max-width: 2.18rem;
+    height: 2.18rem;
+    min-height: 2.18rem;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.96);
+    transform: translateY(-50%);
+}
+
+.committee-board-bubble[aria-expanded="true"]:hover {
+    transform: translateY(calc(-50% - 1px));
+}
+
+.committee-board-bubble[aria-expanded="true"] > svg,
+.committee-board-bubble[aria-expanded="true"] [data-committee-board-label],
+.committee-board-bubble[aria-expanded="true"] .committee-board-bubble__count {
+    opacity: 0;
+    visibility: hidden;
+}
+
+.committee-board-bubble[aria-expanded="true"]::before,
+.committee-board-bubble[aria-expanded="true"]::after {
+    content: "";
+    position: absolute;
+    width: 0.95rem;
+    height: 2px;
+    border-radius: 999px;
+    background: #6f9f21;
+}
+
+.committee-board-bubble[aria-expanded="true"]::before {
+    transform: rotate(45deg);
+}
+
+.committee-board-bubble[aria-expanded="true"]::after {
+    transform: rotate(-45deg);
+}
+
+.committee-board-backdrop {
+    background: rgba(15, 23, 42, 0.68);
+    backdrop-filter: blur(18px);
+}
+
+.committee-board-panel {
+    left: 50%;
+    right: auto;
+    top: calc(50dvh - 1rem);
+    bottom: auto;
+    width: min(94rem, calc(100vw - 7rem));
+    height: min(82dvh, calc(100dvh - 5.4rem));
+    transform: translate(-50%, -50%);
+    padding: 1.08rem;
+    border-color: rgba(214, 223, 233, 0.98);
+    border-radius: 1.15rem;
+    overflow: hidden;
+}
+
+.committee-board-panel::before {
+    content: "";
+    position: absolute;
+    left: 0.94rem;
+    right: 0.94rem;
+    top: 0;
+    height: 3px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(122, 184, 0, 0), rgba(122, 184, 0, 0.85) 10%, rgba(122, 184, 0, 0.85) 90%, rgba(122, 184, 0, 0));
+    pointer-events: none;
+}
+
+.committee-board-panel__header {
+    grid-template-columns: minmax(15rem, 1fr) minmax(20rem, 1fr) minmax(15rem, 1fr);
+    padding: 0.42rem 0.08rem 0.9rem;
+    gap: 1.1rem;
+}
+
+.committee-board-panel__identity-text strong,
+.committee-board-panel__title,
+.committee-board-panel__department {
+    font-size: 1.42rem;
+    font-weight: 880;
+    line-height: 1.08;
+}
+
+.committee-board-panel__title svg {
+    width: 1.36rem;
+    height: 1.36rem;
+    color: #6f9f21;
+}
+
+.committee-board-panel__close,
+.committee-note-modal__close {
+    width: 1.78rem;
+    height: 1.78rem;
+    border-radius: 0.62rem;
+    color: #8a96a6;
+}
+
+.committee-board-panel__close svg,
+.committee-note-modal__close svg {
+    width: 1.02rem;
+    height: 1.02rem;
+}
+
+.committee-board-columns {
+    grid-auto-columns: minmax(19.25rem, 22rem);
+    gap: 1.08rem;
+    padding: 0.86rem;
+    border-color: rgba(219, 228, 238, 0.96);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(247, 250, 253, 0.72));
+}
+
+.committee-board-column {
+    gap: 0.86rem;
+    padding: 0.82rem;
+    border-color: rgba(219, 228, 238, 0.92);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(250, 252, 254, 0.88));
+}
+
+.committee-board-column__header {
+    min-height: 3.3rem;
+    padding: 0.58rem 0.62rem;
+    border: 1px solid rgba(190, 213, 155, 0.34);
+    border-radius: 0.76rem;
+    background: linear-gradient(135deg, rgba(122, 184, 0, 0.13), rgba(247, 251, 242, 0.94) 54%, rgba(255, 255, 255, 0.96));
+}
+
+.committee-board-column__eyebrow {
+    color: #6f9f21;
+    font-size: 0.57rem;
+}
+
+.committee-board-column__title {
+    color: #172033;
+    font-size: 0.94rem;
+}
+
+.committee-board-column__icon,
+.committee-board-column__count {
+    background: rgba(255, 255, 255, 0.9);
+    color: #5f8f16;
+}
+
+.committee-board-note {
+    gap: 0.5rem;
+    padding: 0.68rem;
+    border-color: rgba(190, 213, 155, 0.36);
+    background: linear-gradient(180deg, rgba(247, 251, 242, 0.98), rgba(255, 255, 255, 0.94));
+    box-shadow: 0 8px 18px rgba(82, 123, 23, 0.07);
+}
+
+.committee-board-note__message-pill {
+    padding: 0.2rem 0.46rem;
+    border-color: rgba(215, 224, 233, 0.9);
+    border-radius: 0.58rem;
+    background: rgba(248, 250, 252, 0.96);
+}
+
+.committee-board-note__message-label {
+    color: #667085;
+    font-size: 0.57rem;
+}
+
+.committee-board-note__message-author {
+    color: #566171;
+    font-size: 0.62rem;
+    font-weight: 780;
+}
+
+.committee-board-note__message-date {
+    color: #8c98a8;
+    font-size: 0.6rem;
+    font-weight: 560;
+}
+
+.committee-board-note__actions button {
+    width: 1.34rem;
+    height: 1.34rem;
+    border-radius: 0.46rem;
+    background: rgba(255, 255, 255, 0.88);
+}
+
+.committee-board-note__body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 0.48rem;
+    min-width: 0;
+}
+
+.committee-board-note__text {
+    margin: 0;
+    padding: 0.06rem 0;
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.committee-board-note__footer,
+.committee-board-note__like-names {
+    display: none;
+}
+
+.committee-board-note__like {
+    min-width: 2.18rem;
+    min-height: 1.34rem;
+    gap: 0.18rem;
+    padding: 0 0.34rem;
+    border-color: rgba(190, 213, 155, 0.42);
+    background: rgba(255, 255, 255, 0.92);
+    color: #7f8b9d;
+    font-size: 0.6rem;
+    line-height: 1;
+    box-shadow: 0 3px 8px rgba(15, 23, 42, 0.04);
+}
+
+.committee-board-note__like.is-active {
+    border-color: rgba(122, 184, 0, 0.58);
+    background: rgba(122, 184, 0, 0.1);
+    color: #527b17;
+}
+
+.committee-board-note__like svg {
+    width: 0.68rem;
+    height: 0.68rem;
+}
+
+@media (max-width: 768px) {
+    .committee-board-bubble {
+        left: max(0.68rem, env(safe-area-inset-left));
+        max-width: 11.5rem;
+    }
+
+    .committee-board-bubble[aria-expanded="true"] {
+        width: 2rem;
+        min-width: 2rem;
+        max-width: 2rem;
+        height: 2rem;
+        min-height: 2rem;
+    }
+
+    .committee-board-panel {
+        left: 0.58rem;
+        right: 0.58rem;
+        top: 0.62rem;
+        bottom: 0.62rem;
+        width: auto;
+        height: auto;
+        transform: none;
+        padding: 0.72rem;
+        border-radius: 1rem;
+    }
+
+    .committee-board-panel__header {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "identity right"
+            "heading heading";
+        gap: 0.72rem;
+    }
+
+    .committee-board-panel__identity-text strong,
+    .committee-board-panel__title,
+    .committee-board-panel__department {
+        font-size: 1.08rem;
+    }
+
+    .committee-board-panel__heading {
+        text-align: left;
+    }
+
+    .committee-board-panel__department {
+        display: none;
+    }
+
+    .committee-board-columns {
+        grid-auto-flow: row;
+        grid-auto-columns: auto;
+        overflow-x: hidden;
+        overflow-y: auto;
+    }
+
+    .committee-board-column {
+        min-height: 13.5rem;
+    }
+
+    .committee-board-note__body {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .committee-board-note__like {
+        justify-self: start;
+    }
+}
