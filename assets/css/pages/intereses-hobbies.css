@@ -395,6 +395,18 @@ body.team-hobbies-lightbox-open {
   touch-action: none;
 }
 
+.team-hobbies-cropper--portrait .team-hobbies-cropper__viewport {
+  width: min(100%, 24rem);
+  max-height: none;
+  aspect-ratio: var(--crop-ratio, 3 / 4);
+}
+
+.team-hobbies-cropper--square .team-hobbies-cropper__viewport {
+  width: min(100%, 30rem);
+  max-height: none;
+  aspect-ratio: 1 / 1;
+}
+
 .team-hobbies-cropper__viewport.is-dragging {
   cursor: grabbing;
 }
@@ -1305,6 +1317,16 @@ body.team-hobbies-lightbox-open {
 
   .team-hobbies-cropper__viewport {
     max-height: min(42vh, 22rem);
+  }
+
+  .team-hobbies-cropper--portrait .team-hobbies-cropper__viewport {
+    width: min(100%, 18rem);
+    max-height: none;
+  }
+
+  .team-hobbies-cropper--square .team-hobbies-cropper__viewport {
+    width: min(100%, 20rem);
+    max-height: none;
   }
 
   .team-hobbies-cropper__button {

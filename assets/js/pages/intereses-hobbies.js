@@ -200,6 +200,19 @@ const getCropStyle = (cropValue = {}) => {
   ].join("; ");
 };
 
+const getCropperFrameRatio = ({ width = 0, height = 0, imageAspect = "" } = {}) => {
+  const naturalRatio = Number(width) > 0 && Number(height) > 0 ? Number(width) / Number(height) : 1;
+  if (imageAspect === "portrait") return clamp(naturalRatio, 0.58, 0.82);
+  if (imageAspect === "square") return 1;
+  return clamp(naturalRatio, 1.18, 1.9);
+};
+
+const getCropperOrientationClass = (imageAspect = "") => {
+  if (imageAspect === "portrait") return "team-hobbies-cropper--portrait";
+  if (imageAspect === "square") return "team-hobbies-cropper--square";
+  return "team-hobbies-cropper--landscape";
+};
+
 const getCropFromState = (state) => {
   if (!state) return { ...DEFAULT_IMAGE_CROP };
   const crop = {
@@ -479,7 +492,7 @@ const renderComment = (comment, nestedHtml = "", level = 0) => {
   const replyTo = safeLevel > 0 && comment.replyToAuthorName
     ? `<span class="team-hobby-comment__reply-to">Responder a ${escapeHtml(comment.replyToAuthorName)}</span>`
     : "";
-  const text = isDeleted ? "Comentario eliminado" : comment.text || "";
+  const text = comment.text || "";
   return `
     <article class="team-hobby-comment${safeLevel > 0 ? " team-hobby-comment--reply" : ""}${isDeleted ? " is-deleted" : ""}" data-comment-id="${escapeHtml(comment.id)}" data-reply-depth="${safeLevel}" style="--reply-level: ${safeLevel};">
       <div class="team-hobby-comment__meta">
@@ -540,7 +553,9 @@ const renderCommentsTree = (comments = []) => {
 
   const renderBranch = (comment, level = 0) => {
     const effectiveLevel = Math.min(Math.max(Number(level) || Number(comment.replyDepth) || 0, Number(comment.replyDepth) || 0), 2);
-    const children = (byParent.get(comment.id) || []).map((child) => renderBranch(child, effectiveLevel + 1)).join("");
+    const childLevel = comment.deleted ? effectiveLevel : effectiveLevel + 1;
+    const children = (byParent.get(comment.id) || []).map((child) => renderBranch(child, childLevel)).join("");
+    if (comment.deleted) return children;
     return renderComment(comment, children, effectiveLevel);
   };
 
@@ -1344,11 +1359,13 @@ const renderCropper = ({
   else resetUploadCropState({ clearPreview: false });
   const fileLabel = escapeHtml(file?.name || "foto seleccionada");
   const displayLabel = escapeHtml(label || file?.name || "Foto actual");
+  const frameRatio = getCropperFrameRatio({ width, height, imageAspect });
+  const orientationClass = getCropperOrientationClass(imageAspect);
   container.classList.add("has-cropper");
   container.classList.remove("has-error", "is-loading");
   container.innerHTML = `
-    <div class="team-hobbies-cropper" data-orientation="${escapeHtml(imageAspect)}">
-      <div class="team-hobbies-cropper__viewport" data-crop-viewport tabindex="0" aria-label="Previsualización ajustable de la foto" style="--crop-ratio: ${width} / ${height};">
+    <div class="team-hobbies-cropper ${orientationClass}" data-orientation="${escapeHtml(imageAspect)}">
+      <div class="team-hobbies-cropper__viewport" data-crop-viewport tabindex="0" aria-label="Previsualización ajustable de la foto" style="--crop-ratio: ${frameRatio};">
         <img class="team-hobbies-cropper__image" src="${escapeHtml(objectUrl)}" alt="Vista previa de ${fileLabel}" draggable="false" />
       </div>
       <div class="team-hobbies-cropper__meta">
