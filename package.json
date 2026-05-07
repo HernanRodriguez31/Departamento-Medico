@@ -4,8 +4,10 @@
   "type": "module",
   "scripts": {
     "test:safe-dom": "node --test tests/safe-dom.test.mjs",
-    "test:rules": "firebase emulators:exec --only firestore --project departamento-medico-brisa \"node --test tests/firestore-rules.test.mjs\"",
-    "test": "npm run test:safe-dom && npm run test:rules"
+    "test:functions": "npm --prefix functions test",
+    "test:rules": "FIREBASE_CLI_UPDATE_NOTIFIER=false firebase emulators:exec --only firestore --project departamento-medico-brisa \"node --test tests/firestore-rules.test.mjs\"",
+    "test": "npm run test:safe-dom && npm run test:functions && npm run test:rules",
+    "qa": "npm test"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "5.0.0",

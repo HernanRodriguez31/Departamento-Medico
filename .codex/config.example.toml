@@ -1,0 +1,16 @@
+model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
+plan_mode_reasoning_effort = "xhigh"
+model_reasoning_summary = "concise"
+model_verbosity = "medium"
+sandbox_mode = "workspace-write"
+approval_policy = "on-request"
+web_search = "cached"
+file_opener = "vscode"
+service_tier = "fast"
+
+[features]
+codex_hooks = true
+
+[sandbox_workspace_write]
+network_access = false
