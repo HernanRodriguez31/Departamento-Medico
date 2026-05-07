@@ -5007,6 +5007,8 @@ body.comite-detail-premium-v2 {
     --committee-rail-board-top: calc(50dvh - var(--committee-rail-gap));
     --committee-rail-bot-top: 50dvh;
     --committee-rail-chat-top: calc(50dvh + var(--committee-rail-gap));
+    --committee-board-panel-width: min(96rem, calc(100vw - 7rem));
+    --committee-board-panel-gutter-left: calc((100vw - var(--committee-board-panel-width)) / 2);
 }
 
 body.comite-detail-premium-v2 .committee-board-bubble {
@@ -5041,14 +5043,14 @@ body.comite-detail-premium-v2 .committee-board-bubble__count {
 }
 
 body.comite-detail-premium-v2 .committee-board-bubble[aria-expanded="true"] {
-    left: clamp(2.3rem, 2.85vw, 3.55rem);
+    left: calc(var(--committee-board-panel-gutter-left) / 2);
     top: 50dvh;
     width: 2.06rem;
     min-width: 2.06rem;
     max-width: 2.06rem;
     height: 2.06rem;
     min-height: 2.06rem;
-    transform: translateY(-50%);
+    transform: translate(-50%, -50%);
     border-color: rgba(127, 186, 47, 0.68);
     background: rgba(255, 255, 255, 0.96);
     box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
@@ -5146,14 +5148,20 @@ body.comite-detail-premium-v2 #brisa-chat-root[data-chat-context="committee"] .c
 
 body.comite-detail-premium-v2 #brisa-chat-root[data-chat-context="committee"] .brisa-chat-fab {
     left: var(--committee-rail-left);
-    top: var(--committee-rail-chat-top);
+    top: calc(var(--committee-rail-chat-top) - (var(--dm-chat-fab-size, 58px) / 2));
     bottom: auto;
-    transform: translateY(-50%);
+    transform: none;
 }
 
 body.comite-detail-premium-v2 #brisa-chat-root[data-chat-context="committee"] .brisa-chat-fab[data-side="left"] .brisa-chat-panel {
-    left: calc(100% + 0.82rem);
+    position: fixed;
+    left: calc(var(--committee-rail-left) + var(--dm-chat-fab-size, 58px) + 0.82rem);
     right: auto;
+    top: calc(var(--committee-rail-chat-top) - (var(--dm-chat-fab-size, 58px) / 2));
+    bottom: 0;
+    height: auto;
+    max-height: none;
+    transform-origin: 0 0;
 }
 
 body.comite-detail-premium-v2 #brisa-chat-root[data-chat-context="committee"] .brisa-chat-window {
@@ -5170,7 +5178,7 @@ body.committee-board-is-open #brisa-chat-root .committee-assistant-bubble {
 
 body.comite-detail-premium-v2 .committee-board-panel {
     top: calc(50dvh - 1.3rem);
-    width: min(96rem, calc(100vw - 7rem));
+    width: var(--committee-board-panel-width);
     height: min(84dvh, calc(100dvh - 4.4rem));
 }
 
@@ -5247,6 +5255,7 @@ body.comite-detail-premium-v2 .committee-board-note__like {
     body.comite-detail-premium-v2 .committee-board-bubble[aria-expanded="true"] {
         left: 1rem;
         top: 50dvh;
+        transform: translateY(-50%);
     }
 
     body.comite-detail-premium-v2 #brisa-chat-root[data-chat-context="committee"] .committee-assistant-bubble {
