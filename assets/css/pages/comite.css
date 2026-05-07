@@ -4530,18 +4530,21 @@ body.committee-board-is-open .brisa-chat-fab {
 .committee-board-bubble[aria-expanded="true"]::after {
     content: "";
     position: absolute;
+    top: 50%;
+    left: 50%;
     width: 0.95rem;
     height: 2px;
     border-radius: 999px;
     background: #6f9f21;
+    transform-origin: center;
 }
 
 .committee-board-bubble[aria-expanded="true"]::before {
-    transform: rotate(45deg);
+    transform: translate(-50%, -50%) rotate(45deg);
 }
 
 .committee-board-bubble[aria-expanded="true"]::after {
-    transform: rotate(-45deg);
+    transform: translate(-50%, -50%) rotate(-45deg);
 }
 
 .committee-board-backdrop {
