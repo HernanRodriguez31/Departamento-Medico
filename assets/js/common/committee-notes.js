@@ -15,7 +15,6 @@ import { escapeAttribute, escapeHTML } from "../utils/safe-dom.js";
 const LOCAL_NOTE_PREFIX = "local_note_";
 const NOTE_SCOPE_COMMITTEE = "committee";
 const NOTE_SCOPE_PROJECT = "project";
-const ORPHAN_PROJECT_COLUMN = "__orphan_project_notes__";
 
 const toMillis = (value) => {
   if (value && typeof value.toMillis === "function") return value.toMillis();
@@ -107,10 +106,20 @@ export function createCommitteeNotesController({
 
   const getTopicList = () => {
     const topics = typeof getTopics === "function" ? getTopics() : [];
-    return Array.isArray(topics) ? topics.filter((topic) => topic && topic.id) : [];
+    return Array.isArray(topics)
+      ? topics.filter((topic) => topic && topic.id && Number(topic.stage || 1) < 5)
+      : [];
   };
 
   const getTopicById = (projectId) => getTopicList().find((topic) => topic.id === projectId) || null;
+
+  const getVisibleNotes = () => {
+    const topicIds = new Set(getTopicList().map((topic) => topic.id));
+    return notes.filter((note) => {
+      if (note.scope !== NOTE_SCOPE_PROJECT || !note.projectId) return true;
+      return topicIds.has(note.projectId);
+    });
+  };
 
   const sortNotes = () => {
     notes.sort((a, b) => toMillis(b.updatedAt || b.createdAt) - toMillis(a.updatedAt || a.createdAt));
@@ -375,9 +384,6 @@ export function createCommitteeNotesController({
     if (column.kind === NOTE_SCOPE_COMMITTEE) {
       return notes.filter((note) => note.scope !== NOTE_SCOPE_PROJECT || !note.projectId);
     }
-    if (column.id === ORPHAN_PROJECT_COLUMN) {
-      return notes.filter((note) => note.scope === NOTE_SCOPE_PROJECT && note.projectId && !getTopicById(note.projectId));
-    }
     return notes.filter((note) => note.scope === NOTE_SCOPE_PROJECT && note.projectId === column.id);
   };
 
@@ -399,16 +405,6 @@ export function createCommitteeNotesController({
         icon: "folder-kanban"
       }))
     ];
-    const hasOrphans = notes.some((note) => note.scope === NOTE_SCOPE_PROJECT && note.projectId && !getTopicById(note.projectId));
-    if (hasOrphans) {
-      columns.push({
-        id: ORPHAN_PROJECT_COLUMN,
-        kind: NOTE_SCOPE_PROJECT,
-        title: "Proyecto no disponible",
-        subtitle: "Notas sin proyecto activo",
-        icon: "folder-x"
-      });
-    }
     return columns;
   };
 
@@ -466,8 +462,11 @@ export function createCommitteeNotesController({
     const columns = buildColumns();
     els.columns.innerHTML = columns.map((column) => {
       const columnNotes = getNotesForColumn(column);
+      const columnClass = column.kind === NOTE_SCOPE_COMMITTEE
+        ? "committee-board-column committee-board-column--committee"
+        : "committee-board-column committee-board-column--project";
       return `
-        <section class="committee-board-column" data-board-column="${escapeAttribute(column.id)}">
+        <section class="${columnClass}" data-board-column="${escapeAttribute(column.id)}" data-board-column-kind="${escapeAttribute(column.kind)}">
           <header class="committee-board-column__header">
             <span class="committee-board-column__icon"><i data-lucide="${escapeAttribute(column.icon)}"></i></span>
             <div>
@@ -494,7 +493,7 @@ export function createCommitteeNotesController({
   const render = () => {
     syncElements();
     decorateBoardChrome();
-    if (els.count) els.count.textContent = String(notes.length);
+    if (els.count) els.count.textContent = String(getVisibleNotes().length);
     renderScopeOptions();
     renderColumns();
     updateScrollControls();
