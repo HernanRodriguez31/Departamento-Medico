@@ -4997,3 +4997,284 @@ body.committee-board-is-open .brisa-chat-fab {
         grid-template-columns: minmax(0, 1fr) auto;
     }
 }
+
+/* Committee left rail + Bot Brisa assistant */
+body.comite-detail-premium-v2 {
+    --committee-brisa-green: #7fba2f;
+    --committee-brisa-green-strong: #6ea326;
+    --committee-rail-left: max(1.06rem, env(safe-area-inset-left));
+    --committee-rail-gap: 5.9rem;
+    --committee-rail-board-top: calc(50dvh - var(--committee-rail-gap));
+    --committee-rail-bot-top: 50dvh;
+    --committee-rail-chat-top: calc(50dvh + var(--committee-rail-gap));
+}
+
+body.comite-detail-premium-v2 .committee-board-bubble {
+    left: var(--committee-rail-left);
+    top: var(--committee-rail-board-top);
+    transform: translateY(-50%);
+    max-width: 13.25rem;
+    min-height: 3.32rem;
+    padding: 0.5rem 1.16rem 0.5rem 0.72rem;
+    border-color: rgba(127, 186, 47, 0.82);
+    color: var(--committee-brisa-green-strong);
+}
+
+body.comite-detail-premium-v2 .committee-board-bubble [data-committee-board-label] {
+    width: 6.35rem;
+    color: var(--committee-brisa-green-strong);
+    font-size: 0.68rem;
+    line-height: 1.02;
+}
+
+body.comite-detail-premium-v2 .committee-board-bubble > svg {
+    width: 2rem;
+    height: 2rem;
+    color: var(--committee-brisa-green);
+}
+
+body.comite-detail-premium-v2 .committee-board-bubble__count {
+    left: 1.74rem;
+    top: 2.08rem;
+    border-color: rgba(127, 186, 47, 0.9);
+    color: var(--committee-brisa-green-strong);
+}
+
+body.comite-detail-premium-v2 .committee-board-bubble[aria-expanded="true"] {
+    left: clamp(2.3rem, 2.85vw, 3.55rem);
+    top: 50dvh;
+    width: 2.06rem;
+    min-width: 2.06rem;
+    max-width: 2.06rem;
+    height: 2.06rem;
+    min-height: 2.06rem;
+    transform: translateY(-50%);
+    border-color: rgba(127, 186, 47, 0.68);
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+}
+
+body.comite-detail-premium-v2 #brisa-chat-root[data-chat-context="committee"] .committee-assistant-bubble {
+    position: fixed;
+    left: var(--committee-rail-left);
+    top: var(--committee-rail-bot-top);
+    z-index: 21502;
+    display: flex;
+    align-items: center;
+    gap: 0.54rem;
+    min-width: 9.6rem;
+    min-height: 3.54rem;
+    padding: 0.46rem 0.84rem 0.46rem 0.52rem;
+    border: 1px solid rgba(127, 186, 47, 0.5);
+    border-radius: 999px;
+    background:
+        radial-gradient(circle at 26% 12%, rgba(255, 255, 255, 0.98), rgba(246, 252, 239, 0.94) 46%, rgba(232, 246, 215, 0.86)),
+        rgba(255, 255, 255, 0.92);
+    color: var(--committee-brisa-green-strong);
+    box-shadow:
+        0 18px 38px rgba(73, 112, 20, 0.16),
+        inset 0 1px 0 rgba(255, 255, 255, 0.82);
+    transform: translateY(-50%);
+    pointer-events: auto;
+    cursor: pointer;
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+}
+
+body.comite-detail-premium-v2 #brisa-chat-root[data-chat-context="committee"] .committee-assistant-bubble:hover {
+    transform: translateY(calc(-50% - 1px));
+    border-color: rgba(127, 186, 47, 0.78);
+    box-shadow:
+        0 20px 44px rgba(73, 112, 20, 0.2),
+        0 0 0 4px rgba(127, 186, 47, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+body.comite-detail-premium-v2 #brisa-chat-root[data-chat-context="committee"] .committee-assistant-bubble:focus-visible {
+    outline: 3px solid rgba(127, 186, 47, 0.3);
+    outline-offset: 3px;
+}
+
+body.comite-detail-premium-v2 #brisa-chat-root[data-chat-context="committee"] .committee-assistant-bubble__avatar {
+    position: relative;
+    width: 2.46rem;
+    height: 2.46rem;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: linear-gradient(145deg, #ffffff, #eef8e2);
+    box-shadow:
+        0 8px 18px rgba(73, 112, 20, 0.18),
+        inset 0 0 0 1px rgba(127, 186, 47, 0.2);
+    overflow: hidden;
+}
+
+body.comite-detail-premium-v2 #brisa-chat-root[data-chat-context="committee"] .committee-assistant-bubble__avatar::after {
+    content: "";
+    position: absolute;
+    inset: -32%;
+    background: conic-gradient(from 160deg, rgba(127, 186, 47, 0), rgba(127, 186, 47, 0.38), rgba(127, 186, 47, 0));
+    animation: committeeBotAura 3.6s linear infinite;
+    opacity: 0.54;
+}
+
+body.comite-detail-premium-v2 #brisa-chat-root[data-chat-context="committee"] .committee-assistant-bubble__avatar img {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center top;
+    border-radius: inherit;
+    transform: scale(1.08);
+}
+
+body.comite-detail-premium-v2 #brisa-chat-root[data-chat-context="committee"] .committee-assistant-bubble__copy {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    min-width: 0;
+    color: var(--committee-brisa-green-strong);
+    font-size: 0.76rem;
+    font-weight: 860;
+    letter-spacing: 0;
+    line-height: 1.04;
+}
+
+@keyframes committeeBotAura {
+    to { transform: rotate(1turn); }
+}
+
+body.comite-detail-premium-v2 #brisa-chat-root[data-chat-context="committee"] .brisa-chat-fab {
+    left: var(--committee-rail-left);
+    top: var(--committee-rail-chat-top);
+    bottom: auto;
+    transform: translateY(-50%);
+}
+
+body.comite-detail-premium-v2 #brisa-chat-root[data-chat-context="committee"] .brisa-chat-fab[data-side="left"] .brisa-chat-panel {
+    left: calc(100% + 0.82rem);
+    right: auto;
+}
+
+body.comite-detail-premium-v2 #brisa-chat-root[data-chat-context="committee"] .brisa-chat-window {
+    left: calc(var(--committee-rail-left) + 21.9rem);
+    top: calc(var(--committee-rail-chat-top) - 13rem);
+    bottom: auto;
+}
+
+body.committee-board-is-open #brisa-chat-root .committee-assistant-bubble {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+body.comite-detail-premium-v2 .committee-board-panel {
+    top: calc(50dvh - 1.3rem);
+    width: min(96rem, calc(100vw - 7rem));
+    height: min(84dvh, calc(100dvh - 4.4rem));
+}
+
+body.comite-detail-premium-v2 .committee-board-panel::before {
+    height: 2px;
+    background: linear-gradient(90deg, transparent 0, rgba(127, 186, 47, 0.54) 7%, rgba(127, 186, 47, 0.82) 50%, rgba(127, 186, 47, 0.54) 93%, transparent 100%);
+}
+
+body.comite-detail-premium-v2 .committee-board-panel__identity-text strong,
+body.comite-detail-premium-v2 .committee-board-panel__title,
+body.comite-detail-premium-v2 .committee-board-panel__department {
+    font-size: 1.18rem;
+    letter-spacing: 0;
+}
+
+body.comite-detail-premium-v2 .committee-board-panel__title svg {
+    width: 1.1rem;
+    height: 1.1rem;
+    color: var(--committee-brisa-green-strong);
+}
+
+body.comite-detail-premium-v2 .committee-board-panel__close {
+    width: 2.06rem;
+    height: 2.06rem;
+    min-width: 2.06rem;
+}
+
+body.comite-detail-premium-v2 .committee-board-column__header {
+    min-height: 4.48rem;
+    height: 4.48rem;
+}
+
+body.comite-detail-premium-v2 .committee-board-column__title {
+    font-weight: 850;
+}
+
+body.comite-detail-premium-v2 .committee-board-column--committee .committee-board-column__eyebrow {
+    font-size: 0.72rem;
+    font-weight: 900;
+    line-height: 1.05;
+}
+
+body.comite-detail-premium-v2 .committee-board-column--committee .committee-board-column__title {
+    font-size: 0.62rem;
+    font-weight: 820;
+}
+
+body.comite-detail-premium-v2 .committee-board-note__text {
+    color: #1f2937;
+    font-size: 0.86rem;
+    font-weight: 520;
+    line-height: 1.42;
+}
+
+body.comite-detail-premium-v2 .committee-board-note__message-author {
+    font-weight: 680;
+}
+
+body.comite-detail-premium-v2 .committee-board-note__like {
+    min-width: 1.7rem;
+    min-height: 1.1rem;
+}
+
+@media (max-width: 768px) {
+    body.comite-detail-premium-v2 {
+        --committee-rail-left: max(0.78rem, env(safe-area-inset-left));
+        --committee-rail-gap: 4.7rem;
+    }
+
+    body.comite-detail-premium-v2 .committee-board-bubble {
+        max-width: 12.55rem;
+    }
+
+    body.comite-detail-premium-v2 .committee-board-bubble[aria-expanded="true"] {
+        left: 1rem;
+        top: 50dvh;
+    }
+
+    body.comite-detail-premium-v2 #brisa-chat-root[data-chat-context="committee"] .committee-assistant-bubble {
+        min-width: 3.65rem;
+        width: 3.65rem;
+        height: 3.65rem;
+        padding: 0.42rem;
+    }
+
+    body.comite-detail-premium-v2 #brisa-chat-root[data-chat-context="committee"] .committee-assistant-bubble__copy {
+        display: none;
+    }
+
+    body.comite-detail-premium-v2 #brisa-chat-root[data-chat-context="committee"] .brisa-chat-fab {
+        top: auto;
+        bottom: calc(1rem + env(safe-area-inset-bottom));
+        transform: none;
+    }
+
+    body.comite-detail-premium-v2 .committee-board-panel {
+        top: 0.58rem;
+        width: auto;
+        height: auto;
+    }
+
+    body.comite-detail-premium-v2 .committee-board-panel__identity-text strong,
+    body.comite-detail-premium-v2 .committee-board-panel__title,
+    body.comite-detail-premium-v2 .committee-board-panel__department {
+        font-size: 1.05rem;
+    }
+}

@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Asistente Médico IA - Boti Brisa</title>
+    <script>
+        try {
+            ['dm_ai_state_v1', 'dm_ai_reset_once_v1'].forEach((key) => localStorage.removeItem(key));
+        } catch (error) {}
+    </script>
     
     <!-- 1. Tailwind CSS (Estilos) -->
     <script src="https://cdn.tailwindcss.com/3.4.17"></script>
@@ -151,42 +156,152 @@
                 .replace(/\s+/g, ' ')            // Quitar espacios extra
                 .trim();
         };
-        // Variable global para guardar la charla fuera de la funcion
-        // El 'role: user' eres tu, 'role: model' es Boti.
+        const AI_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+        const AI_SESSION_PREFIX = 'dm_ai_session_v2';
+        const AI_ANON_SESSION_KEY = 'dm_ai_anon_session_v1';
+        const LEGACY_AI_STATE_KEYS = ['dm_ai_state_v1', 'dm_ai_reset_once_v1'];
+        let anonSessionFallback = '';
+
+        const safeStorage = (storageName) => {
+            try {
+                const storage = window[storageName];
+                const testKey = `dm_ai_storage_test_${Date.now()}`;
+                storage.setItem(testKey, '1');
+                storage.removeItem(testKey);
+                return storage;
+            } catch (error) {
+                return null;
+            }
+        };
+
+        const getAnonymousSessionId = () => {
+            const storage = safeStorage('sessionStorage');
+            if (storage) {
+                const existing = storage.getItem(AI_ANON_SESSION_KEY);
+                if (existing) return existing;
+                const next = (window.crypto?.randomUUID?.() || `anon-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+                storage.setItem(AI_ANON_SESSION_KEY, next);
+                return next;
+            }
+            if (!anonSessionFallback) {
+                anonSessionFallback = `anon-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+            }
+            return anonSessionFallback;
+        };
+
+        const normalizeAiUserContext = (user = {}, fallbackName = 'Doctor/a') => {
+            const uid = String(user?.uid || '').trim();
+            if (uid) {
+                return {
+                    uid,
+                    displayName: String(user?.displayName || user?.email || fallbackName || 'Usuario').trim() || 'Usuario',
+                    email: String(user?.email || '').trim(),
+                    isAuthenticated: user?.isAuthenticated !== false
+                };
+            }
+            return {
+                uid: `anon:${getAnonymousSessionId()}`,
+                displayName: String(user?.displayName || fallbackName || 'Usuario').trim() || 'Usuario',
+                email: '',
+                isAuthenticated: false
+            };
+        };
+
+        const normalizeModelKey = (model) => (model === 'gpt' ? 'gpt' : 'gemini');
+        const getSessionKey = (uid, model) => `${AI_SESSION_PREFIX}:${uid}:${normalizeModelKey(model)}`;
+        const sanitizeMessagesForStorage = (list = []) => (
+            Array.isArray(list)
+                ? list
+                    .filter((message) => message && typeof message === 'object')
+                    .map(({ image, ...rest }) => rest)
+                : []
+        );
+
+        const readStoredMessagesForModel = (userContext, model) => {
+            const storage = safeStorage('sessionStorage');
+            if (!storage || !userContext?.uid) return [];
+            const key = getSessionKey(userContext.uid, model);
+            try {
+                const raw = storage.getItem(key);
+                if (!raw) return [];
+                const parsed = JSON.parse(raw);
+                const expiresAt = Number(parsed?.expiresAt || 0);
+                if (!expiresAt || expiresAt <= Date.now()) {
+                    storage.removeItem(key);
+                    return [];
+                }
+                return sanitizeMessagesForStorage(parsed.messages || []);
+            } catch (error) {
+                storage.removeItem(key);
+                return [];
+            }
+        };
+
+        const readStoredMessagesByModel = (userContext) => ({
+            gemini: readStoredMessagesForModel(userContext, 'gemini'),
+            gpt: readStoredMessagesForModel(userContext, 'gpt')
+        });
+
+        const persistMessagesByModel = (userContext, messagesByModel = {}) => {
+            const storage = safeStorage('sessionStorage');
+            if (!storage || !userContext?.uid) return;
+            const now = Date.now();
+            ['gemini', 'gpt'].forEach((model) => {
+                const messages = sanitizeMessagesForStorage(messagesByModel[model] || []);
+                storage.setItem(
+                    getSessionKey(userContext.uid, model),
+                    JSON.stringify({
+                        uid: userContext.uid,
+                        model,
+                        updatedAt: now,
+                        expiresAt: now + AI_SESSION_TTL_MS,
+                        messages
+                    })
+                );
+            });
+        };
+
+        const clearStoredMessagesForUser = (userContext) => {
+            const storage = safeStorage('sessionStorage');
+            if (!storage || !userContext?.uid) return;
+            ['gemini', 'gpt'].forEach((model) => storage.removeItem(getSessionKey(userContext.uid, model)));
+        };
+
+        const clearLegacyAiState = () => {
+            try {
+                LEGACY_AI_STATE_KEYS.forEach((key) => localStorage.removeItem(key));
+            } catch (error) {
+                // no-op
+            }
+        };
+        clearLegacyAiState();
+
+        // Variable en memoria solamente. Nunca se comparte entre usuarios ni se persiste.
         let historialClinico = [];
 
         // AHORA EL WIDGET ACEPTA EL NOMBRE DEL USUARIO DESDE "AFUERA"
         const MedicalChatWidget = ({ nombreUsuario = "Doctor/a" }) => {
             const isEmbedMode = new URLSearchParams(window.location.search).get('embed') === '1';
-            const AI_STATE_KEY = 'dm_ai_state_v1';
-            const RESET_ONCE_KEY = 'dm_ai_reset_once_v1';
-            const shouldResetOnce = (() => {
-                try {
-                    return localStorage.getItem(RESET_ONCE_KEY) !== 'done';
-                } catch (error) {
-                    return false;
-                }
-            })();
-            const storedState = (() => {
-                if (shouldResetOnce) return {};
-                try {
-                    const raw = localStorage.getItem(AI_STATE_KEY);
-                    return raw ? JSON.parse(raw) : {};
-                } catch (error) {
-                    return {};
-                }
-            })();
+            const initialUserContext = normalizeAiUserContext(null, nombreUsuario);
             const urlModel = new URLSearchParams(window.location.search).get('model');
             const initialModel = (urlModel === 'gpt' || urlModel === 'gemini')
                 ? urlModel
-                : (storedState.selectedModel || 'gemini');
+                : (() => {
+                    try {
+                        const storedModel = localStorage.getItem('dm_ai_model');
+                        return storedModel === 'gpt' || storedModel === 'gemini' ? storedModel : 'gemini';
+                    } catch (error) {
+                        return 'gemini';
+                    }
+                })();
             const [isChatOpen, setIsChatOpen] = useState(isEmbedMode);
             const [isExpanded, setIsExpanded] = useState(isEmbedMode);
             const [isModelPickerOpen, setIsModelPickerOpen] = useState(false);
             const [selectedModel, setSelectedModel] = useState(initialModel);
-            const [messagesByModel, setMessagesByModel] = useState(storedState.messagesByModel || {});
-            const [resetOncePending, setResetOncePending] = useState(shouldResetOnce);
+            const [aiUserContext, setAiUserContext] = useState(initialUserContext);
+            const [messagesByModel, setMessagesByModel] = useState(() => readStoredMessagesByModel(initialUserContext));
             const messages = messagesByModel[selectedModel] || [];
+            const currentAiUserRef = useRef(initialUserContext.uid);
 
             const updateMessagesForModel = (modelKey, updater) => {
                 setMessagesByModel((prev) => {
@@ -329,8 +444,10 @@
             useEffect(() => {
                 const loader = document.getElementById('app-loader');
                 if (loader) loader.remove();
+                clearLegacyAiState();
                 try {
                     window.parent?.postMessage({ type: 'dm-ai-ready' }, window.location.origin);
+                    window.parent?.postMessage({ type: 'dm-ai-request-user-context' }, window.location.origin);
                 } catch (error) {
                     // no-op
                 }
@@ -338,23 +455,15 @@
 
             useEffect(() => {
                 try {
-                    const sanitized = Object.fromEntries(
-                        Object.entries(messagesByModel || {}).map(([key, list]) => [
-                            key,
-                            (list || []).map(({ image, ...rest }) => rest)
-                        ])
-                    );
-                    localStorage.setItem('dm_ai_state_v1', JSON.stringify({
-                        selectedModel,
-                        messagesByModel: sanitized
-                    }));
+                    if (!aiUserContext?.uid || currentAiUserRef.current !== aiUserContext.uid) return;
+                    persistMessagesByModel(aiUserContext, messagesByModel);
                     if (!isEmbedMode) {
                         localStorage.setItem('dm_ai_model', selectedModel);
                     }
                 } catch (error) {
                     // no-op
                 }
-            }, [selectedModel, messagesByModel]);
+            }, [selectedModel, messagesByModel, aiUserContext.uid, isEmbedMode]);
 
             const getAllParams = () => {
                 const params = new URLSearchParams(window.location.search || "");
@@ -458,7 +567,7 @@
 
                 try {
                     // SAFETY CHECK: Definimos nombre por defecto si falla
-                    const nombreFinal = (typeof nombreUsuario !== 'undefined') ? nombreUsuario : "Doctor/a";
+                    const nombreFinal = aiUserContext?.displayName || nombreUsuario || "Doctor/a";
                     const fechaHoy = new Date().toLocaleString();
 
                     // GESTI�N DE PROTOCOLOS (Si existe la funci�n)
@@ -469,25 +578,6 @@
                             console.log("?? Protocolo activado");
                             contextoAdicional = `ATENCI�N: USA ESTE PROTOCOLO INTERNO:\n${protocolosEncontrados.map(p => `--- ${p.titulo} ---\n${p.contenido}`).join('\n')}`;
                         }
-                    }
-
-                    // INICIALIZACI�N SEGURA DEL HISTORIAL
-                    // Si por alguna raz�n historialClinico no existe, lo creamos al vuelo para no romper nada
-                    let historialParaEnvio = [];
-                    if (typeof historialClinico !== 'undefined') {
-                        historialParaEnvio = historialClinico;
-                    } else {
-                        historialParaEnvio = []; 
-                    }
-
-                    if (historialParaEnvio.length === 0) {
-                        const promptSistema = `
-                        ACT�A COMO: "Boti Brisa", Asesor M�dico Corporativo.
-                        CONTEXTO: Hoy es ${fechaHoy}. Usuario: ${nombreFinal}.
-                        DIRECTRICES: Prioriza protocolos internos. Tono ejecutivo.
-                        `;
-                        historialParaEnvio.push({ role: "user", parts: [{ text: promptSistema }] });
-                        historialParaEnvio.push({ role: "model", parts: [{ text: "Entendido. Iniciando sistema m�dico." }] });
                     }
 
                     // PREPARAR MENSAJE
@@ -501,9 +591,6 @@
                     if (!token) {
                         return "Necesitas iniciar sesi\u00f3n para usar el asistente.";
                     }
-
-                    // Agregamos al historial
-                    historialParaEnvio.push({ role: "user", parts: partesUsuario });
 
                     const historyContents = (Array.isArray(history) ? history : [])
                         .map((message) => {
@@ -520,6 +607,18 @@
                             return { role: mappedRole, parts: [{ text }] };
                         })
                         .filter(Boolean);
+
+                    const promptSistema = `
+                    ACTUA COMO: "Boti Brisa", Asesor Medico Corporativo.
+                    CONTEXTO: Hoy es ${fechaHoy}. Usuario: ${nombreFinal}.
+                    DIRECTRICES: Prioriza protocolos internos. Tono ejecutivo.
+                    `;
+                    const historialParaEnvio = [
+                        { role: "user", parts: [{ text: promptSistema }] },
+                        { role: "model", parts: [{ text: "Entendido. Iniciando sistema medico." }] },
+                        ...historyContents,
+                        { role: "user", parts: partesUsuario }
+                    ];
 
                     const requestOptions = {
                         method: "POST",
@@ -541,7 +640,6 @@
                     const { response, data, endpoint } = await postAiRequest(requestOptions);
 
                     if (!response.ok || !data?.ok) {
-                        historialParaEnvio.pop();
                         return handleAiFailure(
                             "gemini",
                             response.status,
@@ -554,12 +652,6 @@
                         data?.text ||
                         data?.candidates?.[0]?.content?.parts?.[0]?.text ||
                         "Sin respuesta clinica.";
-
-                    // Guardamos la respuesta
-                    historialParaEnvio.push({ role: "model", parts: [{ text: respuestaBot }] });
-                    
-                    // Actualizamos la variable global si existe
-                    if (typeof historialClinico !== 'undefined') historialClinico = historialParaEnvio;
 
                     return respuestaBot;
 
@@ -746,6 +838,17 @@
                 const handleExternalModel = (event) => {
                     if (event.origin !== window.location.origin) return;
                     const payload = event.data || {};
+                    if (payload.type === 'dm-ai-user-context') {
+                        const nextUserContext = normalizeAiUserContext(payload.user, nombreUsuario);
+                        setAiUserContext((prev) => (
+                            prev.uid === nextUserContext.uid
+                                && prev.displayName === nextUserContext.displayName
+                                && prev.email === nextUserContext.email
+                                ? prev
+                                : nextUserContext
+                        ));
+                        return;
+                    }
                     if (payload.type !== 'dm-ai-select-model') return;
                     const nextModel = payload.model;
                     if (!models[nextModel]) return;
@@ -755,7 +858,18 @@
                 };
                 window.addEventListener('message', handleExternalModel);
                 return () => window.removeEventListener('message', handleExternalModel);
-            }, [isChatOpen]);
+            }, [nombreUsuario]);
+
+            useEffect(() => {
+                if (!aiUserContext?.uid || currentAiUserRef.current === aiUserContext.uid) return;
+                currentAiUserRef.current = aiUserContext.uid;
+                historialClinico = [];
+                setMessagesByModel(readStoredMessagesByModel(aiUserContext));
+                setInputText('');
+                setSelectedFile(null);
+                setIsTyping(false);
+                setIsModelPickerOpen(false);
+            }, [aiUserContext.uid]);
 
             useEffect(() => {
                 if (!isEmbedMode) return undefined;
@@ -874,21 +988,6 @@
             }, [inputText]);
 
             useEffect(() => {
-                if (!resetOncePending || !isChatOpen) return;
-                setMessagesByModel({});
-                if (typeof historialClinico !== 'undefined') {
-                    historialClinico = [];
-                }
-                try {
-                    localStorage.removeItem(AI_STATE_KEY);
-                    localStorage.setItem(RESET_ONCE_KEY, 'done');
-                } catch (error) {
-                    // no-op
-                }
-                setResetOncePending(false);
-            }, [resetOncePending, isChatOpen]);
-
-            useEffect(() => {
                 if (!isChatOpen) return;
                 updateMessages((prev) => {
                     const greetingText = getGreetingText(selectedModel);
@@ -933,14 +1032,8 @@
 
             const clearChat = () => {
                 setMessagesByModel({});
-                if (typeof historialClinico !== 'undefined') {
-                    historialClinico = [];
-                }
-                try {
-                    localStorage.removeItem('dm_ai_state_v1');
-                } catch (error) {
-                    // no-op
-                }
+                historialClinico = [];
+                clearStoredMessagesForUser(aiUserContext);
             };
 
             // --- TU NUEVA FUNCI�N 'HANDLE SEND' MEJORADA ---

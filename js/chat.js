@@ -42,7 +42,8 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   const USER_DIRECTORY_TTL_MS = 5 * 60 * 1000;
   const ASSISTANT_MODEL_STORAGE_KEY = 'dm_ai_model';
   const ASSISTANT_DEFAULT_MODEL = 'gemini';
-  const ASSISTANT_SHELL_MODULE_URL = '/assets/js/shared/assistant-shell.js?v=20260306-chat-desktop-layout-1';
+  const ASSISTANT_SHELL_MODULE_URL = '/assets/js/shared/assistant-shell.js?v=20260506-committee-bot-brisa-1';
+  const ASSISTANT_ICON_SRC = '/asistente-ia/boti-brisa.jpg';
   const CHAT_STYLESHEET_URL = '/assets/css/shared/brisa-chat.css?v=20260504-bitacora-dock-chat-polish-2';
   const VIRTUAL_REPLIES = [
     'Estoy en línea, contame tu caso.',
@@ -2008,7 +2009,20 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       root.id = 'brisa-chat-root';
       document.body.appendChild(root);
     }
-    root.dataset.chatContext = detectChatDesktopContext();
+    const chatContext = detectChatDesktopContext();
+    root.dataset.chatContext = chatContext;
+    const committeeAssistantButton = chatContext === 'committee'
+      ? `
+      <button class="committee-assistant-bubble" id="committee-assistant-bubble" type="button" aria-label="Abrir Bot Brisa" title="Abrir Bot Brisa">
+        <span class="committee-assistant-bubble__avatar" aria-hidden="true">
+          <img src="${ASSISTANT_ICON_SRC}" alt="" loading="lazy" draggable="false" />
+        </span>
+        <span class="committee-assistant-bubble__copy">
+          <span>Bot</span>
+          <span>Brisa</span>
+        </span>
+      </button>`
+      : "";
 
     root.innerHTML = `
       <div class="brisa-chat-mobile-overlay hidden fixed inset-0 z-[9999] bg-black/60 flex items-center justify-center p-4 transition-opacity duration-300" id="brisa-chat-mobile-overlay" aria-hidden="true">
@@ -2016,6 +2030,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
           <div class="brisa-chat-mobile-stack relative w-full max-w-md max-h-[85dvh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden" id="brisa-chat-mobile-stack" role="dialog" aria-modal="true" aria-label="Chat médico"></div>
         </div>
       </div>
+      ${committeeAssistantButton}
       <div class="brisa-chat-fab" id="brisa-chat-fab" data-side="${BUBBLE_DEFAULT_SIDE}">
         <div class="brisa-chat-panel" id="brisa-chat-panel">
           <div class="brisa-chat-panel-header">
@@ -2783,12 +2798,19 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   function updateAssistantQuickRow() {
     const row = document.getElementById('brisa-chat-quick-ai');
     const badge = document.getElementById('brisa-chat-quick-ai-model');
-    if (!row || !badge) return;
     const model = resolveAssistantModel();
     const label = getAssistantModelLabel(model);
-    row.dataset.model = model;
-    row.setAttribute('aria-label', `Abrir Asistente IA en ${label}`);
-    badge.textContent = label;
+    if (row && badge) {
+      row.dataset.model = model;
+      row.setAttribute('aria-label', `Abrir Asistente IA en ${label}`);
+      badge.textContent = label;
+    }
+    const assistantBubble = document.getElementById('committee-assistant-bubble');
+    if (assistantBubble) {
+      assistantBubble.dataset.model = model;
+      assistantBubble.setAttribute('aria-label', `Abrir Bot Brisa en ${label}`);
+      assistantBubble.setAttribute('title', `Abrir Bot Brisa en ${label}`);
+    }
   }
 
   async function ensureAssistantShellReady() {
@@ -4368,6 +4390,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     const quickGroup = document.getElementById('brisa-chat-quick-group');
     const quickForo = document.getElementById('brisa-chat-quick-foro');
     const quickAi = document.getElementById('brisa-chat-quick-ai');
+    const assistantBubble = document.getElementById('committee-assistant-bubble');
     const deleteModal = document.getElementById('brisa-chat-delete-modal');
     const deletePass = document.getElementById('brisa-chat-delete-pass');
     const deleteCancel = document.getElementById('brisa-chat-delete-cancel');
@@ -5017,41 +5040,63 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         openSpecialConversation('dm_foro_general', 'Foro general', 'Mensajes vinculados al foro', { origin: 'panel' });
       });
     }
+    const openAssistantFromAnchor = async (anchorEl = null) => {
+      try {
+        const context = getChatContext();
+        if (isCompactMobileChat() && !isEmbeddedMode()) {
+          closeMobileHub();
+        } else {
+          closeUsersPanel({ origin: 'bubble' });
+        }
+        setChatState({
+          isChatOpen: false,
+          isMinimized: true,
+          activeConversationId: null,
+          activePeerUid: null
+        });
+        const shell = await ensureAssistantShellReady();
+        const model = resolveAssistantModel();
+        await shell.openChat?.(model, { anchorEl, context });
+        updateAssistantQuickRow();
+      } catch (error) {
+        console.warn('No se pudo abrir el Asistente IA desde el chat:', error);
+      }
+    };
+
+    if (assistantBubble) {
+      assistantBubble.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const anchorEl = isElementVisible(assistantBubble) ? assistantBubble : null;
+        openAssistantFromAnchor(anchorEl);
+      });
+      assistantBubble.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          const anchorEl = isElementVisible(assistantBubble) ? assistantBubble : null;
+          openAssistantFromAnchor(anchorEl);
+        }
+      });
+    }
+
     if (quickAi) {
-      const openAssistant = async () => {
-        try {
+      quickAi.addEventListener('click', () => {
+        const anchorEl = resolveAssistantAnchorForChat({
+          panel,
+          windowEl: win,
+          bubble
+        });
+        openAssistantFromAnchor(anchorEl);
+      });
+      quickAi.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
           const anchorEl = resolveAssistantAnchorForChat({
             panel,
             windowEl: win,
             bubble
           });
-          const context = getChatContext();
-          if (isCompactMobileChat() && !isEmbeddedMode()) {
-            closeMobileHub();
-          } else {
-            closeUsersPanel({ origin: 'bubble' });
-          }
-          setChatState({
-            isChatOpen: false,
-            isMinimized: true,
-            activeConversationId: null,
-            activePeerUid: null
-          });
-          const shell = await ensureAssistantShellReady();
-          const model = resolveAssistantModel();
-          await shell.openChat?.(model, { anchorEl, context });
-          updateAssistantQuickRow();
-        } catch (error) {
-          console.warn('No se pudo abrir el Asistente IA desde el chat:', error);
-        }
-      };
-      quickAi.addEventListener('click', () => {
-        openAssistant();
-      });
-      quickAi.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          openAssistant();
+          openAssistantFromAnchor(anchorEl);
         }
       });
     }
