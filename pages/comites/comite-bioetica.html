@@ -51,13 +51,14 @@
     <!-- Flatpickr (Custom Date Picker) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
     
-    <link rel="stylesheet" href="../../assets/css/pages/comite.css?v=20260307-chat-aladdin-1">
+    <link rel="stylesheet" href="../../assets/css/shared/department-calendar.css?v=20260506-committee-calendars-1">
+    <link rel="stylesheet" href="../../assets/css/pages/comite.css?v=20260507-board-x-center-1">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/es.js"></script>
 <!-- Firebase SDKs -->
     <script type="module">
         import { getFirebase } from "/assets/js/common/firebaseClient.js";
-        import { EmailAuthProvider, onAuthStateChanged, reauthenticateWithCredential } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+        import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
         import {
             collection,
             addDoc,
@@ -84,9 +85,11 @@
             buildCommitteeMemberWritePayload,
             groupCommitteeMembers
         } from "../../assets/js/common/committee-member-roles.js";
-        import { hydrateAvatars, resolveUidForAuthor } from "../../assets/js/common/user-profiles.js";
         import { escapeHTML, escapeAttribute } from "../../assets/js/utils/safe-dom.js";
         import { initSessionGuard } from "../../assets/js/shared/sessionGuard.js?v=20260305-session-1";
+        import { initUserMenu } from "../../assets/js/common/user-menu.js?v=20260430-orgtree-avatars-1";
+        import { initDepartmentCalendar } from "../../assets/js/common/department-calendar.js?v=20260506-committee-calendars-1";
+        import { createCommitteeNotesController } from "../../assets/js/common/committee-notes.js?v=20260507-board-x-center-1";
 
         const appId = "departamento-medico-brisa";
         const COMMITTEE_ID = "comite_bioetica";
@@ -105,7 +108,9 @@
         if (auth) {
             initSessionGuard({ auth, db, loginPath: "../../login.html" });
         }
+        initUserMenu({ variant: "desktop" });
         let isAdmin = false;
+        let committeeNotesController = null;
 
         const resolveAdminStatus = async (user) => {
             if (!user) return false;
@@ -136,174 +141,10 @@
             return isAdmin ? true : await refreshAdminState(user);
         };
 
-        // Forum message actions
-        const getForumMessageById = (id) => state.messages.find((msg) => msg.id === id);
-
-        const requirePasswordReauth = async (user, confirmLabel = "Confirmar") => {
-            const providerIds = (user.providerData || []).map((p) => p.providerId);
-            if (!providerIds.includes("password")) {
-                Swal.fire({
-                    icon: "info",
-                    title: "No disponible",
-                    text: "Tu método de ingreso no usa contraseña. Reautenticá desde tu proveedor."
-                });
-                return false;
-            }
-            const result = await Swal.fire({
-                title: "Confirmá tu contraseña",
-                input: "password",
-                inputPlaceholder: "Contraseña",
-                showCancelButton: true,
-                confirmButtonText: confirmLabel,
-                cancelButtonText: "Cancelar"
-            });
-            if (!result.isConfirmed) return false;
-            const password = result.value;
-            if (!password) return false;
-            try {
-                const cred = EmailAuthProvider.credential(user.email, password);
-                await reauthenticateWithCredential(user, cred);
-                return true;
-            } catch (err) {
-                console.error("[Foro] Error al reautenticar", err);
-                Swal.fire({
-                    icon: "error",
-                    title: "Error",
-                    text: "No se pudo verificar la contraseña. Intentá nuevamente."
-                });
-                return false;
-            }
-        };
-
-        window.editForumMessage = async (id) => {
-            if (!db) {
-                console.warn("No hay conexión a Firestore para editar el mensaje.");
-                return;
-            }
-            const user = auth?.currentUser;
-            if (!user) {
-                Swal.fire({
-                    icon: "warning",
-                    title: "Acceso restringido",
-                    text: "Iniciá sesión para continuar."
-                });
-                return;
-            }
-            const msg = getForumMessageById(id);
-            if (!msg || !canManageForumMessage(msg, user)) {
-                Swal.fire({
-                    icon: "error",
-                    title: "Acceso restringido",
-                    text: "Solo podés editar tus propios mensajes o moderar como administrador."
-                });
-                return;
-            }
-            await claimForumMessageOwner(msg, user);
-            const result = await Swal.fire({
-                title: "Editar mensaje",
-                input: "textarea",
-                inputValue: msg.text || "",
-                inputPlaceholder: "Escribí tu mensaje",
-                showCancelButton: true,
-                confirmButtonText: "Guardar",
-                cancelButtonText: "Cancelar",
-                inputValidator: (value) => {
-                    if (!value || !value.trim()) return "Escribí un mensaje.";
-                    return null;
-                }
-            });
-            if (!result.isConfirmed) return;
-            const nextText = (result.value || "").trim();
-            if (!nextText || nextText === (msg.text || "").trim()) return;
-            const reauthed = await requirePasswordReauth(user, "Guardar");
-            if (!reauthed) return;
-            try {
-                await updateDoc(
-                    doc(db, "artifacts", appId, "public", "data", "committee_messages", id),
-                    { text: nextText }
-                );
-                Swal.fire({
-                    icon: "success",
-                    title: "Actualizado",
-                    text: "Tu mensaje fue editado.",
-                    timer: 1400,
-                    showConfirmButton: false
-                });
-            } catch (e) {
-                console.error("Error editando mensaje del foro:", e);
-                Swal.fire({
-                    icon: "error",
-                    title: "Error",
-                    text: "No se pudo editar el mensaje."
-                });
-            }
-        };
-
-        window.deleteForumMessage = async (id) => {
-            if (!db) {
-                console.warn("No hay conexión a Firestore para borrar el mensaje.");
-                return;
-            }
-            const user = auth?.currentUser;
-            if (!user) {
-                Swal.fire({
-                    icon: "warning",
-                    title: "Acceso restringido",
-                    text: "Iniciá sesión para continuar."
-                });
-                return;
-            }
-            const msg = getForumMessageById(id);
-            if (!msg || !canManageForumMessage(msg, user)) {
-                Swal.fire({
-                    icon: "error",
-                    title: "Acceso restringido",
-                    text: "Solo podés borrar tus propios mensajes o moderar como administrador."
-                });
-                return;
-            }
-            await claimForumMessageOwner(msg, user);
-            const confirm = await Swal.fire({
-                title: "Eliminar mensaje",
-                text: "Esta acción no se puede deshacer. ¿Continuar?",
-                icon: "warning",
-                showCancelButton: true,
-                confirmButtonColor: "#d33",
-                cancelButtonColor: "#3085d6",
-                confirmButtonText: "Borrar",
-                cancelButtonText: "Cancelar"
-            });
-            if (!confirm.isConfirmed) return;
-            const reauthed = await requirePasswordReauth(user, "Eliminar");
-            if (!reauthed) return;
-
-            try {
-                await deleteDoc(
-                    doc(db, "artifacts", appId, "public", "data", "committee_messages", id)
-                );
-                Swal.fire({
-                    icon: "success",
-                    title: "Eliminado",
-                    text: "El mensaje ha sido borrado correctamente.",
-                    timer: 1400,
-                    showConfirmButton: false
-                });
-            } catch (e) {
-                console.error("Error eliminando mensaje del foro:", e);
-                Swal.fire({
-                    icon: "error",
-                    title: "Error",
-                    text: "No se pudo eliminar el mensaje."
-                });
-            }
-        };
-
-
         // --- State Management ---
         const state = {
             members: [],
             topics: [],
-            messages: [],
             membersReady: false,
             topicsReady: false
         };
@@ -323,6 +164,53 @@
                     }
                 };
             });
+        }
+
+
+        function getManualDocLinks(topic) {
+            const links = topic?.docLinks && typeof topic.docLinks === 'object' ? topic.docLinks : {};
+            return {
+                folder: String(links.folder || '').trim(),
+                doc: String(links.doc || links.word || '').trim(),
+                ppt: String(links.ppt || '').trim()
+            };
+        }
+
+        function buildDocLinksFromValues(folder, doc, ppt) {
+            return {
+                folder: String(folder || '').trim(),
+                doc: String(doc || '').trim(),
+                ppt: String(ppt || '').trim()
+            };
+        }
+
+        function renderProjectDocumentActions(topic, variant = 'project') {
+            const links = getDocLinksForTopic(COMMITTEE_ID, topic);
+            const hasFolder = !!links.folder;
+            const hasDoc = !!links.doc;
+            const hasPpt = !!links.ppt;
+            const modifier = variant === 'finished' ? ' committee-project-card__doc-actions--finished' : '';
+            const label = variant === 'finished' ? 'Trabajo' : 'Documentos';
+            const noteButton = variant === 'finished' ? '' : `
+                        <button type="button" class="doc-icon doc-icon-note" onclick="event.stopPropagation(); window.openCommitteeProjectNote?.(${safeInlineJsString(topic.id)})" title="Nota del proyecto">
+                            <i data-lucide="notebook-pen"></i>
+                        </button>`;
+            return `
+                <div class="committee-project-card__doc-actions${modifier}">
+                    <span class="committee-project-card__doc-label">${label}</span>
+                    <div class="doc-actions committee-project-card__doc-icons" aria-label="Accesos de trabajo de ${escapeAttribute(topic.title || 'proyecto')}">
+                        <button type="button" class="doc-icon doc-icon-folder" data-topic-id="${escapeAttribute(topic.id)}" data-doc-type="folder" title="Carpeta del proyecto" ${hasFolder ? '' : 'disabled'}>
+                            <i data-lucide="folder"></i>
+                        </button>
+                        <button type="button" class="doc-icon doc-icon-doc" data-topic-id="${escapeAttribute(topic.id)}" data-doc-type="word" title="Documento colaborativo" ${hasDoc ? '' : 'disabled'}>
+                            <i data-lucide="file-text"></i>
+                        </button>
+                        <button type="button" class="doc-icon doc-icon-ppt" data-topic-id="${escapeAttribute(topic.id)}" data-doc-type="ppt" title="Presentación colaborativa" ${hasPpt ? '' : 'disabled'}>
+                            <i data-lucide="presentation"></i>
+                        </button>${noteButton}
+                    </div>
+                </div>
+            `;
         }
 
         const STAGE_DEFINITIONS = {
@@ -348,6 +236,7 @@
             }
         };
         const STAGE_LABELS = ['Planificación', 'Programación', 'Desarrollo', 'Ejecución', 'Finalizado'];
+        const STEP_SHORT_LABELS = ['Plan.', 'Prog.', 'Des.', 'Ejec.', 'Fin.'];
         const COMMITTEE_MEMBER_GROUP_EMPTY_LABELS = {
             referentes: 'Sin referentes',
             secretaria: 'Sin secretaría',
@@ -406,7 +295,6 @@
         const metaSubtitleInput = document.getElementById('meta-subtitle-input');
         const metaSaveBtn = document.getElementById('meta-save-btn');
         const metaCancelBtn = document.getElementById('meta-cancel-btn');
-        const headerCommitteeTitle = document.getElementById('committee-header-title');
 
         function setMetaEditing(state) {
             if (!metaFields || !metaEditBtn) return;
@@ -434,9 +322,6 @@
                 if (metaTitleInput && metaSubtitleInput) {
                     metaTitleInput.value = metaTitleEl.textContent.trim();
                     metaSubtitleInput.value = metaSubtitleEl.textContent.trim();
-                }
-                if (headerCommitteeTitle) {
-                    headerCommitteeTitle.textContent = metaTitleEl.textContent.trim();
                 }
             } catch (e) {
                 console.error("Error cargando metadata de Bioética:", e);
@@ -512,7 +397,7 @@
             const safeBu = escapeHTML(bu || '');
             const safeMu = escapeHTML(mu || '');
             let text = `${safeBu} ${safeMu ? '· ' + safeMu : ''}`;
-            if (isLeader) text = `<span class="text-blue-600 font-bold">Líder</span> · ` + text;
+            if (isLeader) text = `<span class="text-brisa font-bold">Líder</span> · ` + text;
             return text;
         }
 
@@ -545,54 +430,74 @@
         }
 
         function renderProjectMeetingChip(topic) {
+            const meetingValue = topic.nextMeeting ? formatDate(topic.nextMeeting) : 'Sin fecha';
             if (isAdmin) {
                 return `
-                    <label class="committee-project-card__meta-item committee-project-card__meta-item--date">
+                    <label class="committee-project-card__meta-item committee-project-card__meta-item--meeting">
                         <span class="committee-project-card__meta-label">Próxima reunión</span>
                         <input
                             type="date"
                             onchange="window.updateTopicDate(${safeInlineJsString(topic.id)}, this.value)"
                             class="committee-project-card__date-input"
                             value="${escapeAttribute(topic.nextMeeting || '')}"
-                            title="Definir fecha">
+                            aria-label="Próxima reunión del proyecto ${escapeAttribute(topic.title || 'sin título')}"
+                            title="Definir próxima reunión">
                     </label>
                 `;
             }
 
-            if (topic.nextMeeting) {
-                return `
-                    <span class="committee-project-card__meta-item">
-                        <span class="committee-project-card__meta-label">Próxima reunión</span>
-                        <span class="committee-project-card__meta-value">${escapeHTML(formatDate(topic.nextMeeting))}</span>
-                    </span>
-                `;
-            }
-
             return `
-                <span class="committee-project-card__meta-item committee-project-card__meta-item--muted">
+                <span class="committee-project-card__meta-item committee-project-card__meta-item--meeting${topic.nextMeeting ? '' : ' committee-project-card__meta-item--muted'}">
                     <span class="committee-project-card__meta-label">Próxima reunión</span>
-                    <span class="committee-project-card__meta-value">Sin fecha</span>
+                    <span class="committee-project-card__meta-value">${escapeHTML(meetingValue)}</span>
                 </span>
             `;
         }
 
         function renderProjectSegments(topic, stageMeta) {
             return `
-                <div class="committee-project-card__segments" role="group" aria-label="Progreso del proyecto ${escapeAttribute(topic.title || 'sin título')}">
-                    ${stageMeta.segments.map((segment) => {
-                const segmentClass = `committee-project-card__segment${segment.active ? ' is-active' : ''}${segment.current ? ' is-current' : ''}`;
+                <div class="committee-project-card__progress-panel">
+                    <div class="committee-project-card__progress-head">
+                        <span class="committee-project-card__progress-summary">
+                            <span class="committee-project-card__progress-label">Proceso de avance:</span>
+                            <strong class="committee-project-card__progress-stage">${escapeHTML(stageMeta.label)}</strong>
+                        </span>
+                        <span class="committee-project-card__progress-percent">${stageMeta.percent}%</span>
+                    </div>
+                    <div class="committee-project-card__stepper-shell" data-current-stage="${stageMeta.stage}">
+                        <span class="committee-project-card__stepper-title">Proceso de avance</span>
+                        <div class="committee-project-card__stepper" role="group" aria-label="Proceso de avance del proyecto ${escapeAttribute(topic.title || 'sin título')}">
+                        ${stageMeta.segments.map((segment) => {
+                const label = STAGE_LABELS[segment.step - 1];
+                const shortLabel = STEP_SHORT_LABELS[segment.step - 1] || label;
+                const stageInfo = STAGE_DEFINITIONS[segment.step];
+                const tooltip = stageInfo ? stageInfo.title + ': ' + stageInfo.description : label;
+                const segmentClass = `committee-project-card__step${segment.active ? ' is-active' : ''}${segment.current ? ' is-current' : ''}${segment.step < stageMeta.stage ? ' is-complete' : ''}`;
+                const stepContent = `
+                                    <span class="committee-project-card__step-dot" aria-hidden="true">${segment.step}</span>
+                                    <span class="committee-project-card__step-label">${escapeHTML(shortLabel)}</span>
+                                `;
                 if (!isAdmin) {
-                    return `<span class="${segmentClass}" aria-hidden="true"></span>`;
+                    return `
+                                <span class="${segmentClass}" aria-label="${segment.step}. ${escapeAttribute(label)}${segment.current ? ', etapa actual' : ''}" data-stage-tooltip="${escapeAttribute(tooltip)}">
+                                    ${stepContent}
+                                </span>
+                            `;
                 }
                 return `
-                            <button
-                                type="button"
-                                onclick="event.stopPropagation(); window.updateTopicStage(${safeInlineJsString(topic.id)}, ${segment.step})"
-                                class="${segmentClass}"
-                                title="Mover a ${STAGE_LABELS[segment.step - 1]}">
-                            </button>
-                        `;
+                                <button
+                                    type="button"
+                                    onclick="event.stopPropagation(); window.updateTopicStage(${safeInlineJsString(topic.id)}, ${segment.step})"
+                                    class="${segmentClass}"
+                                    aria-label="Mover a ${segment.step}. ${escapeAttribute(label)}"
+                                    title="Mover a ${escapeAttribute(label)}"
+                                    data-stage-tooltip="${escapeAttribute(tooltip)}">
+                                    ${stepContent}
+                                </button>
+                            `;
             }).join('')}
+                        </div>
+                    </div>
                 </div>
             `;
         }
@@ -685,7 +590,7 @@
             const resolvedRole = member.committeeRole || 'vocal';
             const iconName = resolvedRole === 'referente' ? 'shield' : 'user';
             return `
-                <article class="committee-member-card committee-member-card--lane group/member">
+                <article class="committee-member-card committee-member-card--lane committee-member-card--role-${escapeAttribute(resolvedRole)} group/member">
                     <div class="committee-member-card__main">
                         <div class="committee-member-card__identity">
                             <div class="committee-member-card__avatar" data-committee-role="${escapeAttribute(resolvedRole)}">
@@ -726,11 +631,10 @@
             renderProjects();
             renderFinished();
             renderMembers();
-            renderDocuments();
-            renderForum();
             updateStats();
             attachStageTooltips();
             attachDocActions();
+            committeeNotesController?.render();
         }
 
         function updateStats() {
@@ -767,7 +671,6 @@
                                 <div class="committee-project-card__header">
                                     <div class="committee-project-card__title-block">
                                         <h4 class="committee-project-card__title" title="${escapeAttribute(topic.title || '')}">${escapeHTML(topic.title || 'Sin título')}</h4>
-                                        <span class="committee-project-card__stage-badge" data-stage="${stageMeta.stage}">${stageMeta.label}</span>
                                     </div>
                                     ${renderProjectActionCluster(topic)}
                                 </div>
@@ -780,19 +683,16 @@
                                     </div>
                                     <div class="committee-project-card__meta-row committee-project-card__meta-row--dates">
                                         <span class="committee-project-card__meta-item committee-project-card__meta-item--start">
-                                            <span class="committee-project-card__meta-label">Inicio</span>
+                                            <span class="committee-project-card__meta-label">Inicio del proyecto</span>
                                             <span class="committee-project-card__meta-value">${escapeHTML(formatDate(topic.startDate) || '—')}</span>
                                         </span>
                                         ${renderProjectMeetingChip(topic)}
                                     </div>
                                 </div>
                                 <div class="committee-project-card__progress">
-                                    <div class="committee-project-card__progress-head">
-                                        <span class="committee-project-card__progress-label">Avance</span>
-                                        <span class="committee-project-card__progress-percent">${stageMeta.percent}%</span>
-                                    </div>
                                     ${renderProjectSegments(topic, stageMeta)}
                                 </div>
+                                ${renderProjectDocumentActions(topic)}
                             </article>
                         `;
             }).join('')}
@@ -820,6 +720,7 @@
                         <span class="text-sm font-semibold text-gray-700 whitespace-normal break-words leading-tight" title="${escapeAttribute(topic.title)}">${escapeHTML(topic.title)}</span>
                     </div>
                     <div class="flex items-center justify-end gap-1 flex-shrink-0">
+                        ${renderProjectDocumentActions(topic, 'finished')}
                         <button onclick="window.updateTopicStage(${safeInlineJsString(topic.id)}, 4)" class="text-gray-400 hover:text-teal-600 p-1 mr-1 bg-white rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110" title="Reabrir">
                             <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
                         </button>
@@ -852,55 +753,90 @@
 
             const groupedMembers = groupCommitteeMembers(state.members);
             const groupsByKey = Object.fromEntries(groupedMembers.map((group) => [group.key, group]));
-            const hierarchyLevels = [
-                {
-                    key: 'referentes',
-                    title: groupsByKey.referentes?.title || 'Referentes',
-                    placeholder: COMMITTEE_MEMBER_GROUP_EMPTY_LABELS.referentes,
-                    layout: 'nodes'
-                },
-                {
-                    key: 'secretaria',
-                    title: groupsByKey.secretaria?.title || 'Secretaría',
-                    placeholder: COMMITTEE_MEMBER_GROUP_EMPTY_LABELS.secretaria,
-                    layout: 'nodes'
-                },
-                {
-                    key: 'vocales',
-                    title: groupsByKey.vocales?.title || 'Vocales',
-                    placeholder: COMMITTEE_MEMBER_GROUP_EMPTY_LABELS.vocales,
-                    layout: 'grid'
-                }
-            ];
+            const referentes = groupsByKey.referentes?.members || [];
+            const secretaria = groupsByKey.secretaria?.members || [];
+            const vocales = groupsByKey.vocales?.members || [];
+            const selectionLabel = 'En proceso de selección';
 
-            const renderHierarchyLevel = ({ key, title, placeholder, layout }) => {
-                const group = groupsByKey[key] || { members: [] };
-                const membersMarkup = group.members.length
-                    ? `<div class="${layout === 'grid' ? 'committee-members-level-row__grid' : 'committee-members-level-row__nodes'}">${group.members.map((member) => renderCommitteeMemberCard(member)).join('')}</div>`
-                    : `<div class="committee-members-level-row__placeholder">${placeholder}</div>`;
+            const renderTreeNode = (content) => `
+                <div class="committee-members-tree__node">
+                    ${content}
+                </div>
+            `;
 
-                return `
-                    <section class="committee-members-level-row committee-members-level-row--${key}" data-member-group="${key}">
-                        <div class="committee-members-level-row__label">
-                            <span class="committee-members-level-row__marker" aria-hidden="true"></span>
-                            <div class="committee-members-level-row__heading">
-                                <h4 class="committee-members-level-row__title">${title}</h4>
-                                <span class="committee-members-level-row__count">${group.members.length}</span>
+            const renderMemberPlaceholder = (role, label) => `
+                <article class="committee-member-card committee-member-card--lane committee-member-card--placeholder committee-member-card--role-${escapeAttribute(role)}" aria-label="${escapeAttribute(label)} en proceso de selección">
+                    <div class="committee-member-card__main">
+                        <div class="committee-member-card__identity">
+                            <div class="committee-member-card__avatar" data-committee-role="${escapeAttribute(role)}">
+                                <i data-lucide="user" class="w-5 h-5"></i>
+                            </div>
+                            <div class="committee-member-card__details committee-member-card__copy">
+                                <h4 class="committee-member-card__name">${selectionLabel}</h4>
+                                <div class="committee-member-card__badges">
+                                    <span class="pill committee-member-pill committee-member-pill--primary" data-committee-role="${escapeAttribute(role)}">${escapeHTML(label)}</span>
+                                </div>
                             </div>
                         </div>
-                        <div class="committee-members-level-row__content">
-                            ${membersMarkup}
+                    </div>
+                </article>
+            `;
+
+            const renderRoleLevel = (key, title, role, members) => {
+                const nodes = members.length
+                    ? members.map((member) => renderTreeNode(renderCommitteeMemberCard(member))).join('')
+                    : renderTreeNode(renderMemberPlaceholder(role, title));
+
+                return `
+                    <section class="committee-members-tree__level committee-members-tree__level--${escapeAttribute(key)}" data-member-group="${escapeAttribute(key)}">
+                        <div class="committee-members-tree__label">
+                            <span>${escapeHTML(title)}</span>
+                            <span class="committee-members-tree__count">${members.length}</span>
+                        </div>
+                        <div class="committee-members-tree__nodes">
+                            ${nodes}
                         </div>
                     </section>
                 `;
             };
 
+            const buildVocalRows = () => {
+                const slotPattern = vocales.length > 8 ? [3, 5, 7] : [3, 5];
+                const extraCount = Math.max(0, vocales.length - slotPattern.reduce((sum, count) => sum + count, 0));
+                const extraRows = extraCount ? Array.from({ length: Math.ceil(extraCount / 7) }, () => 7) : [];
+                const rowSizes = [...slotPattern, ...extraRows];
+                let cursor = 0;
+
+                return rowSizes.map((size, rowIndex) => {
+                    const cells = Array.from({ length: size }, () => {
+                        const member = vocales[cursor];
+                        cursor += 1;
+                        return renderTreeNode(member ? renderCommitteeMemberCard(member) : renderMemberPlaceholder('vocal', 'Vocal'));
+                    }).join('');
+
+                    return `
+                        <div class="committee-members-tree__vocal-row committee-members-tree__vocal-row--${rowIndex + 1}" style="--tree-columns: ${size}">
+                            ${cells}
+                        </div>
+                    `;
+                }).join('');
+            };
+
             container.innerHTML = `
-                <div class="committee-members-hierarchy">
-                    <div class="committee-members-hierarchy__rail" aria-hidden="true"></div>
-                    <div class="committee-members-hierarchy__rows">
-                        ${hierarchyLevels.map((level) => renderHierarchyLevel(level)).join('')}
-                    </div>
+                <div class="committee-members-tree" aria-label="Árbol de integrantes del comité">
+                    ${renderRoleLevel('referentes', 'Referente', 'referente', referentes)}
+                    <span class="committee-members-tree__connector" aria-hidden="true"></span>
+                    ${renderRoleLevel('secretaria', 'Secretaría', 'secretario', secretaria)}
+                    <span class="committee-members-tree__connector" aria-hidden="true"></span>
+                    <section class="committee-members-tree__level committee-members-tree__level--vocales" data-member-group="vocales">
+                        <div class="committee-members-tree__label">
+                            <span>Vocales</span>
+                            <span class="committee-members-tree__count">${vocales.length}</span>
+                        </div>
+                        <div class="committee-members-tree__vocal-rows">
+                            ${buildVocalRows()}
+                        </div>
+                    </section>
                 </div>
             `;
 
@@ -936,83 +872,6 @@
             }
             profileCache.set(user.uid, displayName);
             return displayName;
-        };
-
-        const normalizeAuthor = (value) => (value || "").trim().toLowerCase();
-
-        const isForumMessageOwner = (msg, user) => {
-            if (!msg || !user) return false;
-            if (msg.authorUid && msg.authorUid === user.uid) return true;
-            if (!msg.authorUid) {
-                const authorName = normalizeAuthor(msg.author || msg.authorName);
-                const aliases = [
-                    user.displayName,
-                    user.email,
-                    profileCache.get(user.uid)
-                ]
-                    .filter(Boolean)
-                    .map(normalizeAuthor);
-                return Boolean(authorName && aliases.includes(authorName));
-            }
-            return false;
-        };
-
-const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForumMessageOwner(msg, user));
-
-        const claimForumMessageOwner = async (msg, user) => {
-            if (!db || !msg || msg.authorUid || !user) return;
-            if (!isForumMessageOwner(msg, user)) return;
-            try {
-                const displayName = await getUserDisplayName(user);
-                await updateDoc(
-                    doc(db, "artifacts", appId, "public", "data", "committee_messages", msg.id),
-                    {
-                        authorUid: user.uid,
-                        authorName: displayName || msg.author || user.email || "Usuario"
-                    }
-                );
-            } catch (e) {
-                console.warn("No se pudo reclamar el mensaje del foro.", e);
-            }
-        };
-
-        let legacyForumCleanup = false;
-
-        const syncLegacyForumMessages = async () => {
-            if (legacyForumCleanup) return;
-            if (!db) return;
-            const user = auth?.currentUser;
-            if (!user) return;
-            const admin = await refreshAdminState(user);
-            if (!admin) return;
-
-            const pending = state.messages.filter((msg) => !msg.authorUid && !msg.isInitial);
-            if (!pending.length) return;
-            legacyForumCleanup = true;
-
-            for (const msg of pending) {
-                try {
-                    const resolvedUid = await resolveUidForAuthor({
-                        uid: msg.authorUid,
-                        authorName: msg.author || msg.authorName
-                    });
-                    if (resolvedUid) {
-                        await updateDoc(
-                            doc(db, "artifacts", appId, "public", "data", "committee_messages", msg.id),
-                            {
-                                authorUid: resolvedUid,
-                                authorName: msg.authorName || msg.author || ""
-                            }
-                        );
-                    } else {
-                        await deleteDoc(
-                            doc(db, "artifacts", appId, "public", "data", "committee_messages", msg.id)
-                        );
-                    }
-                } catch (e) {
-                    console.warn("No se pudo sincronizar mensaje legado.", e);
-                }
-            }
         };
 function updateJoinButtonState() {
     const joinBtn = document.getElementById("btn-join-committee");
@@ -1177,234 +1036,64 @@ async function joinCurrentCommittee() {
             }
         }
 
-        function renderDocuments() {
-            const container = document.getElementById('documents-grid');
-            const section = document.getElementById('documents-section');
-            if (!section || !container) return;
-
-            if (state.topics.length === 0) {
-                section.classList.add('hidden');
-                return;
-            }
-            section.classList.remove('hidden');
-
-            container.innerHTML = state.topics.map(topic => {
-                const links = getDocLinksForTopic(COMMITTEE_ID, topic);
-                const hasFolder = !!links.folder;
-                const hasDoc = !!links.doc;
-                const hasPpt = !!links.ppt;
-                const stageMeta = getStageMeta(topic.stage, { fallback: null });
-                const progressMeta = stageMeta
-                    ? `
-                        <div class="committee-doc-card__progress-meta">
-                            <span class="committee-doc-card__progress-label">${escapeHTML(stageMeta.label)}</span>
-                            <span class="committee-doc-card__progress-percent">${stageMeta.percent}%</span>
-                        </div>
-                    `
-                    : '';
-                const progressTrackClass = `committee-doc-card__progress-track${stageMeta ? '' : ' is-neutral'}`;
-                const progressBarClass = `committee-doc-card__progress-bar${stageMeta?.isFinished ? ' is-finished' : ''}`;
-
-                return `
-                    <div class="group committee-doc-card bg-white border border-gray-100 rounded-xl p-6 shadow-sm hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 cursor-pointer flex flex-col justify-between h-full relative overflow-hidden">
-                        <div class="absolute top-0 left-0 w-1 h-full bg-brisa opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                        <div>
-                            <div class="flex items-center justify-between mb-4">
-                                <div class="p-3 rounded-lg transition-colors duration-300 ${topic.stage === 5 ? 'bg-teal-50' : 'bg-brisa/10 group-hover:bg-brisa'}">
-                                    <i data-lucide="layers" class="w-6 h-6 ${topic.stage === 5 ? 'text-teal-600' : 'text-brisa group-hover:text-white'}"></i>
-                                </div>
-                                <i data-lucide="external-link" class="w-4 h-4 text-gray-300 group-hover:text-brisa transition-colors"></i>
-                            </div>
-                            <h3 class="text-lg font-bold text-gray-800 mb-2 line-clamp-2 leading-tight">${escapeHTML(topic.title)}</h3>
-                            <p class="text-xs text-gray-500 mb-4 font-medium">
-                                ${topic.stage === 5 ? `Finalizado el: ${formatDate(topic.finishedDate)}` : "Documento de trabajo colaborativo en Teams."}
-                            </p>
-                            ${progressMeta}
-                            <div class="${progressTrackClass}">
-                                <div class="${progressBarClass}" style="width: ${stageMeta ? `${stageMeta.percent}%` : '0%'}"></div>
-                            </div>
-                        </div>
-                        <div class="mt-auto">
-                            <div class="doc-actions">
-                                <button type="button" class="doc-icon doc-icon-folder" data-topic-id="${escapeAttribute(topic.id)}" data-doc-type="folder" title="Carpeta" ${hasFolder ? '' : 'disabled'}>
-                                    <i data-lucide="folder"></i>
-                                </button>
-                                <button type="button" class="doc-icon doc-icon-doc" data-topic-id="${escapeAttribute(topic.id)}" data-doc-type="word" title="Documento" ${hasDoc ? '' : 'disabled'}>
-                                    <i data-lucide="file-text"></i>
-                                </button>
-                                <button type="button" class="doc-icon doc-icon-ppt" data-topic-id="${escapeAttribute(topic.id)}" data-doc-type="ppt" title="Presentación" ${hasPpt ? '' : 'disabled'}>
-                                    <i data-lucide="presentation"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-
-            if (window.lucide) window.lucide.createIcons();
-        }
-
-        function renderForum() {
-            const container = document.getElementById('forum-messages');
-            if (!container) return;
-
-            if (state.messages.length === 0) {
-                container.innerHTML = `
-                    <div class="h-full flex flex-col items-center justify-center text-gray-400 opacity-60">
-                        <i data-lucide="message-square" class="w-12 h-12 mb-2"></i>
-                        <p>No hay mensajes aún. ¡Inicia la conversación!</p>
-                    </div>
-                `;
-            } else {
-                container.innerHTML = state.messages.map(msg => {
-
-                    const authorName = msg.author || msg.authorName || "Usuario";
-
-                    const initials = authorName
-
-                        .split(" ")
-
-                        .filter(Boolean)
-
-                        .map((n) => n[0])
-
-                        .join("")
-
-                        .substring(0, 2)
-
-                        .toUpperCase();
-
-                    const currentUser = auth?.currentUser;
-
-                    const canManage = currentUser && canManageForumMessage(msg, currentUser);
-
-                    const roleLabel = getMemberRoleDisplay(msg.businessUnit, msg.managementUnit, false);
-
-                    const messageActions = canManage ? `
-
-                        <div class="flex items-center gap-1">
-
-                            <button
-
-                                type="button"
-
-                                onclick="window.editForumMessage(${safeInlineJsString(msg.id)})"
-
-                                class="text-gray-300 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-all"
-
-                                title="Editar mensaje">
-
-                                <i data-lucide="pencil" class="w-4 h-4"></i>
-
-                            </button>
-
-                            <button
-
-                                type="button"
-
-                                onclick="window.deleteForumMessage(${safeInlineJsString(msg.id)})"
-
-                                class="text-gray-300 hover:text-red-500 p-1 rounded-full hover:bg-red-50 transition-all"
-
-                                title="Eliminar mensaje">
-
-                                <i data-lucide="trash-2" class="w-4 h-4"></i>
-
-                            </button>
-
-                        </div>
-
-                    ` : "";
-
-                    return `
-
-                <div class="flex flex-col bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-
-                    <div class="flex justify-between items-start gap-3 mb-2">
-
-                        <div class="flex items-center gap-3">
-
-                            <div class="w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs border bg-brisa/10 text-brisa border-brisa/20 dm-foro-avatar" data-author-uid="${escapeAttribute(msg.authorUid || '')}" data-author-name="${escapeAttribute(authorName)}">
-
-                                <img class="w-full h-full object-cover rounded-full" data-author-avatar src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="Avatar" hidden />
-
-                                <span class="text-xs font-semibold" data-avatar-fallback="initials">${escapeHTML(initials)}</span>
-
-                            </div>
-
-                            <div>
-
-                                <div class="flex items-baseline gap-2">
-
-                                    <span class="block text-sm font-bold text-gray-800 leading-none">${escapeHTML(authorName)}</span>
-
-                                    <span class="text-[10px] text-gray-500 font-medium truncate">${roleLabel}</span>
-
-                                </div>
-
-                            </div>
-
-                        </div>
-
-                        <div class="flex items-center gap-2">
-
-                            <div class="flex items-center gap-1 text-[10px] text-gray-400 bg-gray-50 px-2 py-1 rounded-full">
-
-                                <i data-lucide="clock" class="w-3 h-3"></i>
-
-                                ${formatDateTime(msg.createdAt)}
-
-                            </div>
-
-                            ${messageActions}
-
-                        </div>
-
-                    </div>
-
-                    <p class="text-sm text-gray-600 leading-relaxed pl-12">${escapeHTML(msg.text)}</p>
-
-                </div>
-
-                `;
-
-                }).join('');
-
-                hydrateAvatars(container);
-
-                container.scrollTop = container.scrollHeight;
-            }
-
-            if (window.lucide) window.lucide.createIcons();
-        }
-
         // --- Actions (Exposed to Window) ---
         window.editProject = async (id) => {
             if (!db) return;
             const current = state.topics.find(t => t.id === id);
             if (!current) return;
 
-            const currentTitle = current.title || '';
-            const currentStart = current.startDate || '';
-            const currentProposedBy = current.proposedBy || '';
+            const manualLinks = getManualDocLinks(current);
+            const result = await Swal.fire({
+                title: 'Editar proyecto',
+                html: `
+                    <div class="committee-project-edit-modal">
+                        <label class="committee-project-edit-modal__field">
+                            <span>Proyecto</span>
+                            <input data-edit-field="title" type="text" value="${escapeAttribute(current.title || '')}" placeholder="Nombre del proyecto">
+                        </label>
+                        <label class="committee-project-edit-modal__field">
+                            <span>Propuesto por</span>
+                            <input data-edit-field="proposedBy" type="text" value="${escapeAttribute(current.proposedBy || '')}" placeholder="Médico/s o equipo médico">
+                        </label>
+                        <label class="committee-project-edit-modal__field">
+                            <span>Fecha de inicio</span>
+                            <input data-edit-field="startDate" type="date" value="${escapeAttribute(current.startDate || '')}">
+                        </label>
+                        <div class="committee-project-edit-modal__links">
+                            <p>Accesos Teams del proyecto</p>
+                            <input data-edit-field="folder" type="url" value="${escapeAttribute(manualLinks.folder)}" placeholder="Link de carpeta">
+                            <input data-edit-field="doc" type="url" value="${escapeAttribute(manualLinks.doc)}" placeholder="Link de documento Word">
+                            <input data-edit-field="ppt" type="url" value="${escapeAttribute(manualLinks.ppt)}" placeholder="Link de PowerPoint">
+                        </div>
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'Guardar cambios',
+                cancelButtonText: 'Cancelar',
+                focusConfirm: false,
+                preConfirm: () => {
+                    const popup = Swal.getPopup();
+                    const read = (name) => popup?.querySelector(`[data-edit-field="${name}"]`)?.value.trim() || '';
+                    const title = read('title');
+                    if (!title) {
+                        Swal.showValidationMessage('Indicá el nombre del proyecto.');
+                        return false;
+                    }
+                    return {
+                        title,
+                        proposedBy: read('proposedBy'),
+                        startDate: read('startDate'),
+                        docLinks: buildDocLinksFromValues(read('folder'), read('doc'), read('ppt'))
+                    };
+                }
+            });
 
-            const newTitle = prompt('Editar título del proyecto:', currentTitle);
-            if (newTitle === null) return;
-
-            const newStart = prompt('Editar fecha de inicio (YYYY-MM-DD):', currentStart);
-            if (newStart === null) return;
-
-            const newProposedBy = prompt('Indicar quién propuso este proyecto (uno o varios médicos, o equipo médico del comité):', currentProposedBy);
-            if (newProposedBy === null) return;
+            if (!result.isConfirmed) return;
 
             try {
                 await updateDoc(
                     doc(db, 'artifacts', appId, 'public', 'data', 'committee_topics', id),
-                    {
-                        title: newTitle.trim(),
-                        startDate: newStart.trim(),
-                        proposedBy: newProposedBy.trim()
-                    }
+                    result.value
                 );
             } catch (e) {
                 console.error('Error actualizando proyecto:', e);
@@ -1604,6 +1293,17 @@ async function joinCurrentCommittee() {
                 state.topicsReady = false;
                 updateStats();
             };
+            committeeNotesController = createCommitteeNotesController({
+                db,
+                auth,
+                appId,
+                committeeId: COMMITTEE_ID,
+                getTopics: () => state.topics.filter((topic) => Number(topic.stage || 1) < 5),
+                getIsAdmin: () => isAdmin,
+                onChange: () => updateStats()
+            });
+            committeeNotesController.init();
+
             const subscribeCommitteeData = () => {
                 if (!db) return;
                 clearCommitteeSubscriptions();
@@ -1648,27 +1348,12 @@ async function joinCurrentCommittee() {
                 }, (error) => {
                     console.error('Error suscribiendo proyectos del comité:', error);
                 }));
-
-                const msgsRef = query(
-                    collection(db, 'artifacts', appId, 'public', 'data', 'committee_messages'),
-                    where('committeeId', '==', COMMITTEE_ID)
-                );
-                committeeSubscriptions.push(onSnapshot(msgsRef, (snap) => {
-                    state.messages = snap.docs
-                        .map(d => ({ id: d.id, ...d.data() }))
-                        .sort((a, b) => getCreatedAtMillis(a.createdAt) - getCreatedAtMillis(b.createdAt));
-                    render();
-                    syncLegacyForumMessages();
-                }, (error) => {
-                    console.error('Error suscribiendo mensajes del comité:', error);
-                }));
             };
 
             if (!db) {
                 // Fallback Mock Data
                 state.members = [];
                 state.topics = [];
-                state.messages = [];
                 state.membersReady = true;
                 state.topicsReady = true;
                 render();
@@ -1676,13 +1361,14 @@ async function joinCurrentCommittee() {
             if (auth) {
                 onAuthStateChanged(auth, async (user) => {
                     clearCommitteeSubscriptions();
+                    committeeNotesController?.unsubscribe();
                     if (!user) {
                         window.location.href = "../../login.html";
                     } else {
                         await refreshAdminState(user);
                         await getUserDisplayName(user);
+                        committeeNotesController?.subscribe();
                         subscribeCommitteeData();
-                        syncLegacyForumMessages();
                         updateJoinButtonState();
                     }
                 });
@@ -1701,6 +1387,11 @@ async function joinCurrentCommittee() {
                 const title = document.getElementById('new-topic-title').value;
                 const date = document.getElementById('new-topic-date').value;
                 const proposedBy = document.getElementById('new-topic-proposedBy').value.trim();
+                const docLinks = buildDocLinksFromValues(
+                    document.getElementById('new-topic-folder')?.value,
+                    document.getElementById('new-topic-doc')?.value,
+                    document.getElementById('new-topic-ppt')?.value
+                );
 
                 if (!title || !date) return;
 
@@ -1713,6 +1404,7 @@ async function joinCurrentCommittee() {
                             proposedBy,
                             committeeId: COMMITTEE_ID,
                             projectNumber,
+                            docLinks,
                             stage: 1,
                             createdAt: serverTimestamp()
                         });
@@ -1721,6 +1413,9 @@ async function joinCurrentCommittee() {
                 document.getElementById('new-topic-title').value = '';
                 document.getElementById('new-topic-date').value = '';
                 document.getElementById('new-topic-proposedBy').value = '';
+                document.getElementById('new-topic-folder').value = '';
+                document.getElementById('new-topic-doc').value = '';
+                document.getElementById('new-topic-ppt').value = '';
             });
 
             document.getElementById('form-add-member').addEventListener('submit', async (e) => {
@@ -1757,53 +1452,6 @@ async function joinCurrentCommittee() {
                 document.getElementById('new-member-bu').value = '';
                 document.getElementById('new-member-mu').value = '';
                 document.getElementById('new-member-role').value = 'vocal';
-            });
-
-            document.getElementById('form-send-msg').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const text = document.getElementById('msg-text').value.trim();
-
-                if (!text) return;
-
-                const user = auth.currentUser;
-                if (!user) {
-                    alert("Debés iniciar sesión para enviar mensajes.");
-                    return;
-                }
-
-                const perfilRef = doc(db, "usuarios", user.uid);
-                const perfilSnap = await getDoc(perfilRef);
-
-                if (!perfilSnap.exists()) {
-                    alert("No encontramos tu perfil en la base de datos (colección 'usuarios').");
-                    return;
-                }
-
-                const perfil = perfilSnap.data();
-                const author =
-                    resolveValue(perfil, ["displayName", "nombreCompleto", "apellidoNombre", "fullName", "name", "nombre"], "") ||
-                    `${resolveValue(perfil, ["apellido", "lastName"], "")} ${resolveValue(perfil, ["nombre"], "")}`.trim() ||
-                    user.displayName ||
-                    user.email ||
-                    "Médico";
-                const businessUnit = resolveValue(perfil, ["businessUnit", "unidadNegocio", "bu", "business_unit"], "");
-                const managementUnit = resolveValue(perfil, ["managementUnit", "unidadGestion", "mu", "management_unit"], "");
-
-                if (db) {
-                    try {
-                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'committee_messages'), {
-                            text,
-                            author,
-                            businessUnit,
-                            managementUnit,
-                            committeeId: COMMITTEE_ID,
-                            authorUid: user.uid,
-                            authorName: author,
-                            createdAt: serverTimestamp()
-                        });
-                    } catch (e) { console.error('Error escribiendo mensaje en Firestore:', e); }
-                }
-                document.getElementById('msg-text').value = '';
             });
 
             // Evidence Engine Logic
@@ -2010,34 +1658,76 @@ async function joinCurrentCommittee() {
 
             window.addEventListener('resize', closeMemberRoleMenus);
             window.addEventListener('scroll', closeMemberRoleMenus, true);
+
+            const committeeCalendarName = document.getElementById('committee-title')?.textContent.trim() || "Comité de Bioética";
+            initDepartmentCalendar({
+                auth,
+                db,
+                appId,
+                rootSelector: "#committee-calendar-root",
+                pageVariant: "committee",
+                calendarContext: {
+                    scope: "committee",
+                    committeeId: COMMITTEE_ID,
+                    committeeName: committeeCalendarName
+                }
+            });
         });
     </script>
 </head>
 
-<body class="bg-gray-50/50 font-sans text-gray-800 flex flex-col min-h-screen comite-bioetica--compact-v2 comite-detail-premium-v2">
+<body class="bg-gray-50/50 font-sans text-gray-800 flex flex-col min-h-screen comite-detail-premium-v2">
 
     <!-- Header -->
     <header
         class="bg-white shadow-sm sticky top-0 z-50 backdrop-blur-md bg-white/95 border-b border-gray-100 transition-all duration-300">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="relative flex justify-between items-center h-24">
-                <!-- Left: Logo -->
-                <div class="flex-shrink-0 flex items-center gap-3 z-10">
+            <div class="relative flex justify-between items-center h-24 committee-page-header__bar">
+                <div class="committee-page-header__left z-10">
                     <img src="../../assets/images/logo-brisa-transparent.png" alt="Brisa Logo"
                         class="h-[5.25rem] w-auto" width="900" height="500" decoding="async">
                 </div>
 
-                <!-- Center: Title (Absolute Centered) -->
-                <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div class="absolute inset-0 flex items-center justify-center pointer-events-none committee-page-header__center">
                     <h1 class="text-3xl md:text-4xl font-bold text-gray-900 tracking-tight whitespace-nowrap">
                         Departamento Médico</h1>
                 </div>
 
-                <!-- Right: Comités Icon -->
-                <div class="flex-shrink-0 flex items-center gap-4 text-sm text-gray-500 font-medium z-10">
-                    <span id="committee-header-title" class="hidden sm:inline">Comités de Trabajo</span>
-                    <img src="../../assets/images/logo-brisa-heart.png" alt="Comités Icon"
-                        class="h-16 w-auto object-contain" width="873" height="1024" decoding="async">
+                <div class="committee-page-header__right">
+                    <div class="user-panel" data-dm-user-menu data-variant="desktop">
+                        <button id="user-panel-trigger" class="user-panel-trigger" data-dm-user-trigger type="button" aria-haspopup="menu" aria-expanded="false">
+                            <span class="user-panel-icon" data-dm-user-avatar>
+                                <img class="user-avatar-img" data-dm-user-avatar-img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="Avatar" loading="lazy" decoding="async" hidden>
+                                <span class="user-avatar-initials" data-dm-user-avatar-initials>DM</span>
+                            </span>
+                            <span id="user-display-name" class="user-name" data-dm-user-trigger-name>Dr. …</span>
+                            <span id="user-info-trigger" class="ui-info" aria-label="Información usuario">i</span>
+                        </button>
+                        <div id="user-panel-dropdown" class="user-panel-dropdown" data-dm-user-dropdown role="menu" hidden>
+                            <div class="user-menu__row user-menu__row--primary">
+                                <span class="user-menu__avatar" data-dm-user-avatar>
+                                    <img class="user-avatar-img" data-dm-user-avatar-img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="Avatar" loading="lazy" decoding="async" hidden>
+                                    <span class="user-avatar-initials" data-dm-user-avatar-initials>DM</span>
+                                </span>
+                                <span id="user-panel-info" class="user-menu__user" data-dm-user-fullname>Usuario</span>
+                            </div>
+                            <div class="user-menu__row user-menu__row--subtle" data-dm-user-notif-toggle-row>
+                                <span class="user-menu__label">Notificaciones</span>
+                                <label class="push-switch">
+                                    <input id="push-toggle-menu" type="checkbox" aria-label="Notificaciones" data-dm-user-notif-toggle data-dm-user-notif-external="1">
+                                    <span class="push-slider"></span>
+                                </label>
+                                <span id="push-info-trigger" class="ui-info" aria-label="Información de notificaciones">i</span>
+                            </div>
+                            <div class="user-menu__row user-menu__row--subtle user-menu__row--photo" data-dm-user-avatar-upload-row>
+                                <span class="user-menu__label">Cambiar imagen de perfil</span>
+                                <label class="user-menu__action" for="profile-photo-input">Agregar</label>
+                                <input id="profile-photo-input" type="file" accept="image/*" data-dm-user-avatar-input hidden>
+                            </div>
+                            <div id="push-toggle-hint" class="push-toggle-hint"></div>
+                            <button id="user-panel-logout" class="user-menu__logout" type="button" data-dm-user-logout>Cerrar sesión</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -2047,9 +1737,11 @@ async function joinCurrentCommittee() {
 
         <div class="text-center mb-12 animate-fade-in">
             <div class="flex items-center justify-center mb-2">
-                <div class="committee-title-wrapper">
-                    <h2 id="committee-title"
-                        class="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight">Comité de Bioética</h2>
+                <div class="committee-title-wrapper committee-hero-identity" aria-label="Identidad del comité">
+                    <img src="../../assets/images/committees/logos/committee-bioetica-logo.png" alt="Logo del Comité de Bioética" class="committee-hero-logo" width="512" height="512" decoding="async">
+                    <div class="committee-hero-copy">
+                        <h2 id="committee-title" class="committee-hero-title">Comité de Bioética</h2>
+                    </div>
                     <button id="meta-edit-btn" class="committee-edit-trigger" type="button" data-tooltip="Editar"
                         aria-label="Editar título y descripción">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -2080,13 +1772,13 @@ async function joinCurrentCommittee() {
         <!-- Dashboard Stats -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
             <!-- Integrantes -->
-            <div class="stat-card flex items-center justify-between p-6 h-full" style="--accent:#2563eb">
+            <div class="stat-card flex items-center justify-between p-6 h-full" style="--accent:#7ab800">
                 <div>
                     <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Integrantes</p>
                     <p class="text-4xl font-extrabold text-gray-800" id="stat-members">—</p>
                 </div>
                 <div class="stat-icon p-4 rounded-full transition-all duration-300">
-                    <i data-lucide="users" class="w-8 h-8 text-blue-600"></i>
+                    <i data-lucide="users" class="w-8 h-8 text-brisa"></i>
                 </div>
             </div>
             <!-- Proyectos -->
@@ -2116,8 +1808,6 @@ async function joinCurrentCommittee() {
                 <a class="comite-tab is-active" href="#proyectos" aria-current="page">Proyectos</a>
                 <a class="comite-tab" href="#finalizados">Finalizados</a>
                 <a class="comite-tab" href="#integrantes">Integrantes</a>
-                <a class="comite-tab" href="#documents-section">Documentos</a>
-                <a class="comite-tab" href="#foro">Foro</a>
             </div>
         </nav>
 
@@ -2137,6 +1827,59 @@ async function joinCurrentCommittee() {
                         <p class="text-xs text-gray-400">Proyectos activos y seguimiento</p>
                     </div>
                 </div>
+
+
+                <button id="committee-board-toggle" class="committee-board-bubble" type="button" aria-expanded="false" aria-controls="committee-board-panel">
+                    <i data-lucide="notebook-pen"></i>
+                    <span data-committee-board-label>Pizarra de comunicaciones</span>
+                    <span id="committee-board-count" class="committee-board-bubble__count">0</span>
+                </button>
+
+                <aside id="committee-board-panel" class="committee-board-panel" aria-label="Pizarra de comunicaciones del comité" hidden>
+                    <div class="committee-board-panel__header">
+                        <div>
+                            <p class="committee-board-panel__eyebrow">Seguimiento</p>
+                            <h3 class="committee-board-panel__title">Pizarra de comunicaciones</h3>
+                            <p class="committee-board-panel__subtitle">Notas del comité y de cada proyecto.</p>
+                        </div>
+                        <div class="committee-board-panel__actions">
+                            <button id="committee-note-add" type="button" class="committee-board-panel__add">
+                                <i data-lucide="plus"></i>
+                                Agregar nota
+                            </button>
+                            <button type="button" class="committee-board-panel__close" data-committee-board-close aria-label="Cerrar pizarra de comunicaciones">
+                                <i data-lucide="x"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="committee-board-columns" class="committee-board-columns" aria-live="polite"></div>
+                    <div id="committee-note-modal" class="committee-note-modal" hidden>
+                        <form id="committee-note-form" class="committee-board-form committee-note-modal__card">
+                            <div class="committee-note-modal__header">
+                                <div>
+                                    <p class="committee-board-panel__eyebrow">Nota</p>
+                                    <h4 id="committee-note-modal-title" class="committee-note-modal__title">Agregar nota</h4>
+                                </div>
+                                <button type="button" class="committee-note-modal__close" data-committee-note-modal-close aria-label="Cerrar formulario">
+                                    <i data-lucide="x"></i>
+                                </button>
+                            </div>
+                            <div class="committee-board-form__row">
+                                <label for="committee-note-scope">Destino de la nota</label>
+                                <select id="committee-note-scope"></select>
+                                <p id="committee-note-context-hint" class="committee-board-form__hint">La nota quedará ubicada en la columna Nota de comité.</p>
+                            </div>
+                            <div class="committee-board-form__row">
+                                <label for="committee-note-text">Nota</label>
+                                <textarea id="committee-note-text" placeholder="Escribir una nota breve..."></textarea>
+                            </div>
+                            <button type="submit" class="committee-board-form__submit">
+                                <i data-lucide="plus"></i>
+                                <span id="committee-note-submit-label">Agregar nota</span>
+                            </button>
+                        </form>
+                    </div>
+                </aside>
 
                 <div id="projects-list" class="flex-col space-y-4">
                     <!-- Projects rendered here -->
@@ -2158,7 +1901,7 @@ async function joinCurrentCommittee() {
 
                 <div class="dm-accordion committee-projects-section__composer">
                     <button class="dm-accordion-toggle" type="button">
-                        <span>Agregar nuevo proyecto</span>
+                        <span class="committee-projects-section__add-label"><i data-lucide="pencil" class="w-4 h-4"></i><span>Agregar nuevo proyecto</span></span>
                         <span class="dm-accordion-chevron">⌄</span>
                     </button>
                     <div class="dm-accordion-panel" data-accordion="projects">
@@ -2170,6 +1913,14 @@ async function joinCurrentCommittee() {
                                 <input type="text" id="new-topic-proposedBy"
                                     placeholder="Propuesto por (médico/s o equipo médico del comité)..."
                                     class="w-full px-4 py-3 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brisa focus:bg-white transition-all">
+                                <div class="committee-project-doclink-fields">
+                                    <input type="url" id="new-topic-folder" placeholder="Link de carpeta en Teams (opcional)"
+                                        class="w-full px-4 py-3 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brisa focus:bg-white transition-all">
+                                    <input type="url" id="new-topic-doc" placeholder="Link de documento colaborativo (opcional)"
+                                        class="w-full px-4 py-3 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brisa focus:bg-white transition-all">
+                                    <input type="url" id="new-topic-ppt" placeholder="Link de PowerPoint colaborativo (opcional)"
+                                        class="w-full px-4 py-3 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brisa focus:bg-white transition-all">
+                                </div>
                                 <div class="flex gap-2">
                                     <div class="relative w-1/3">
                                         <div
@@ -2215,17 +1966,17 @@ async function joinCurrentCommittee() {
             <!-- Section 3: Integrantes -->
             <div
                 id="integrantes"
-                class="section-card card-accent blue bg-white rounded-2xl p-8 flex flex-col relative overflow-hidden w-full comite-tab-section">
+                class="section-card card-accent bg-white rounded-2xl p-8 flex flex-col relative overflow-hidden w-full comite-tab-section">
                                 <div class="comite__members-header mb-6 pb-4 border-b border-gray-50">
                     <div class="comite__members-title flex items-center gap-3">
-                        <div class="p-2.5 bg-blue-50 rounded-lg">
-                            <i data-lucide="users" class="w-6 h-6 text-blue-600"></i>
+                        <div class="p-2.5 bg-brisa/10 rounded-lg">
+                            <i data-lucide="users" class="w-6 h-6 text-brisa"></i>
                         </div>
                         <div class="comite__members-heading">
                             <div class="comite__members-title-line">
                                 <h3 class="text-xl font-bold text-gray-800">Integrantes</h3>
                                 <span id="members-count"
-                                    class="comite__members-count bg-blue-100 text-blue-700 text-xs px-2.5 py-1 rounded-full font-bold shadow-sm">0</span>
+                                    class="comite__members-count bg-brisa/10 text-brisa text-xs px-2.5 py-1 rounded-full font-bold shadow-sm">0</span>
                             </div>
                             <p class="text-xs text-gray-400">Equipo médico</p>
                         </div>
@@ -2282,33 +2033,13 @@ async function joinCurrentCommittee() {
                                 </select>
 
                                 <button type="submit"
-                                    class="w-full bg-white text-blue-600 border-2 border-blue-600 py-2.5 rounded-lg hover:bg-blue-600 hover:text-white text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-all duration-300 hover:scale-[1.02]">
+                                    class="w-full bg-white text-brisa border-2 border-brisa py-2.5 rounded-lg hover:bg-brisa hover:text-white text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-all duration-300 hover:scale-[1.02]">
                                     <i data-lucide="plus" class="w-4 h-4"></i> Agregar Integrante
                                 </button>
                             </div>
                         </form>
                     </div>
                 </div>
-            </div>
-        </div>
-
-        <!-- Documents Section -->
-        <div id="documents-section" class="section-card bg-white rounded-2xl p-8 mb-12 hidden comite-tab-section">
-            <div class="flex items-center justify-between mb-6">
-                        <div class="flex items-center gap-3">
-                    <div class="p-2 bg-teal-50 rounded-lg">
-                        <i data-lucide="layers" class="w-6 h-6 text-teal-600"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-2xl font-bold text-gray-800">Documentos de Trabajo</h3>
-                        <p class="text-xs text-gray-400 mt-1">Gestión de conocimiento centralizado</p>
-                    </div>
-                </div>
-                <span class="pill">Repositorios</span>
-            </div>
-            <div class="divider-soft mb-6"></div>
-            <div id="documents-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- Documents rendered here -->
             </div>
         </div>
 
@@ -2334,7 +2065,7 @@ async function joinCurrentCommittee() {
                         Datos NLM</p>
                     <form id="form-pubmed" class="w-full relative group">
                         <input type="text" id="pubmed-query" placeholder="Buscar papers, autores, PMID..."
-                            class="w-full pl-5 pr-12 py-4 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-50 transition-all outline-none text-gray-700 font-medium placeholder-gray-400">
+                            class="w-full pl-5 pr-12 py-4 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-brisa focus:ring-4 focus:ring-blue-50 transition-all outline-none text-gray-700 font-medium placeholder-gray-400">
                         <button type="submit"
                             class="absolute right-2 top-2 bottom-2 bg-[#2b6cb0] text-white p-2.5 rounded-lg hover:bg-blue-800 transition-all shadow-sm transform active:scale-95">
                             <i data-lucide="search" class="w-5 h-5"></i>
@@ -2368,47 +2099,17 @@ async function joinCurrentCommittee() {
             </div>
         </div>
 
-        <!-- Internal Forum -->
-        <div id="foro" class="mt-16 mb-8 max-w-5xl mx-auto w-full comite-tab-section">
-            <div class="text-center mb-8">
-                <h2
-                    class="text-3xl font-extrabold text-gray-900 mb-2 tracking-tight flex items-center justify-center gap-3">
-                    <i data-lucide="message-square" class="w-8 h-8 text-brisa"></i>
-                    Foro de Comunicación Interna
+        <!-- Committee Calendar -->
+        <div id="calendario-comite" class="committee-calendar-section mt-16 mb-8 max-w-5xl mx-auto w-full comite-tab-section">
+            <div class="calendar-header">
+                <h2 class="text-3xl font-extrabold text-gray-900 mb-2 tracking-tight flex items-center justify-center gap-3">
+                    <i data-lucide="calendar" class="w-8 h-8 text-brisa"></i>
+                    Calendario del Comité
                 </h2>
-                <p class="text-gray-500 font-medium">Espacio de colaboración y novedades para los integrantes del
-                    comité.</p>
+                <p class="calendar-header__subtitle">Reuniones, hitos y actividades propias del comité.</p>
             </div>
-
-            <div class="section-card bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col h-auto">
-                <!-- Header -->
-                <div class="bg-gray-50 p-4 border-b border-gray-200 flex items-center justify-between">
-                    <span class="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                        <i data-lucide="message-circle" class="w-4 h-4 text-brisa"></i> Actividad Reciente
-                    </span>
-                    <span class="text-xs text-gray-400">Visible para todos los miembros</span>
-                </div>
-
-                <!-- Messages List -->
-                <div id="forum-messages" class="h-96 max-h-96 overflow-y-auto p-6 space-y-4 bg-gray-50/30">
-                    <!-- Messages rendered here -->
-                </div>
-
-                <!-- Input Area -->
-                <div class="px-4 py-3 bg-white border-t border-gray-200 space-y-3">
-                    <form id="form-send-msg" class="flex gap-3 items-end">
-                        <div class="flex-1">
-                            <textarea id="msg-text" placeholder="Escribe tu mensaje, novedad o consulta aquí..."
-                                class="w-full px-4 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brisa focus:border-transparent transition-all resize-none forum-textarea"
-                                rows="1"
-                                onkeydown="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); this.form.dispatchEvent(new Event('submit', {cancelable: true, bubbles: true})); }"></textarea>
-                        </div>
-                        <button type="submit"
-                            class="h-[42px] px-6 bg-brisa text-white rounded-lg hover:bg-brisa-dark disabled:opacity-50 transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-medium flex-shrink-0">
-                            <i data-lucide="send" class="w-4 h-4"></i> <span class="hidden sm:inline">Enviar</span>
-                        </button>
-                    </form>
-                </div>
+            <div class="calendar-container">
+                <div id="committee-calendar-root" data-department-calendar></div>
             </div>
         </div>
 
@@ -2435,7 +2136,7 @@ async function joinCurrentCommittee() {
         </div>
     </footer>
 
-    <script type="module" src="../../js/chat.js?v=20260307-chat-aladdin-1"></script>
+    <script type="module" src="../../js/chat.js?v=20260508-boti-header-2"></script>
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.26.24"></script>
     <script>

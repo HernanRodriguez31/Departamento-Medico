@@ -139,19 +139,28 @@
 
     <!-- Styles -->
     <link rel="stylesheet" href="css/variables.css?v=20260306-network-bg-1" />
-    <link rel="stylesheet" href="css/style.css?v=20260305-orgtree-header-1" />
-    <link rel="stylesheet" href="css/structure.css" />
+    <link rel="stylesheet" href="css/style.css?v=20260428-desktop-orgtree-eyebrow-plus-1" />
+    <link rel="stylesheet" href="css/structure.css?v=20260502-specialists-lorena-popup-card-1" />
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
     />
     <link
       rel="stylesheet"
-      href="assets/css/pages/index.css?v=20260307-sidebar-cubes-1"
+      href="assets/css/pages/index.css?v=20260508-visual-resources-1"
     />
     <link
       rel="stylesheet"
-      href="assets/css/core-contrast.css?v=20260305-orgtree-header-1"
+      href="assets/css/shared/department-calendar.css?v=20260506-committee-calendars-1"
+    />
+    <link
+      rel="stylesheet"
+      href="assets/css/core-contrast.css?v=20260508-committee-flip-1"
+    />
+    <link
+      rel="stylesheet"
+      href="assets/css/shared/brisa-chat.css?v=20260504-bitacora-dock-chat-polish-2"
+      data-brisa-chat-css
     />
 
     <style>
@@ -182,6 +191,138 @@
       .section-card:hover {
         transform: translateY(-2px);
         box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+      }
+
+      #documentacion .dm-doc-card {
+        --dm-doc-accent: #2563eb;
+        --dm-doc-accent-soft: #eff6ff;
+        --dm-doc-border-hover: #bfdbfe;
+        --dm-doc-shadow-hover: rgba(37, 99, 235, 0.2);
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 1.1rem;
+        min-height: 7.75rem;
+        height: 100%;
+        padding: 1.35rem 1.45rem;
+        text-align: left;
+        text-decoration: none;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.75rem;
+        box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.1);
+        transition:
+          transform 0.3s ease,
+          border-color 0.3s ease,
+          box-shadow 0.3s ease;
+      }
+
+      #documentacion .dm-doc-card--green {
+        --dm-doc-accent: #7ab800;
+        --dm-doc-accent-soft: #f7fee7;
+        --dm-doc-border-hover: #7ab800;
+        --dm-doc-shadow-hover: rgba(122, 184, 0, 0.25);
+      }
+
+      #documentacion .dm-doc-card:hover {
+        transform: translateY(-0.25rem);
+        border-color: var(--dm-doc-border-hover);
+        box-shadow: 0 8px 30px -4px var(--dm-doc-shadow-hover);
+      }
+
+      #documentacion .dm-doc-card__title {
+        display: block;
+        min-height: 1.45rem;
+        color: #1f2937;
+        font-size: 1.05rem;
+        font-weight: 700;
+        line-height: 1.25;
+        white-space: nowrap;
+        transition: color 0.3s ease;
+      }
+
+      #documentacion .dm-doc-card:hover .dm-doc-card__title {
+        color: var(--dm-doc-accent);
+      }
+
+      #documentacion .dm-doc-card__body {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        min-height: 2.75rem;
+      }
+
+      #documentacion .dm-doc-card__icon {
+        width: 2.75rem;
+        height: 2.75rem;
+        flex: 0 0 2.75rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--dm-doc-accent);
+        background: var(--dm-doc-accent-soft);
+        border-radius: 0.55rem;
+        transition:
+          color 0.3s ease,
+          background-color 0.3s ease;
+      }
+
+      #documentacion .dm-doc-card:hover .dm-doc-card__icon {
+        color: #ffffff;
+        background: var(--dm-doc-accent);
+      }
+
+      #documentacion .dm-doc-card__icon svg,
+      #documentacion .dm-doc-card__icon i {
+        width: 1.5rem;
+        height: 1.5rem;
+      }
+
+      #documentacion .dm-doc-card__desc {
+        min-height: 2.3rem;
+        display: flex;
+        align-items: center;
+        color: #9ca3af;
+        font-size: 0.78rem;
+        font-weight: 500;
+        line-height: 1.35;
+        transition: color 0.3s ease;
+      }
+
+      #documentacion .dm-doc-card:hover .dm-doc-card__desc {
+        color: var(--dm-doc-accent);
+      }
+
+      @media (max-width: 640px) {
+        #documentacion .dm-doc-card {
+          min-height: 7.4rem;
+          padding: 1.2rem 1.25rem;
+        }
+
+        #documentacion .dm-doc-card__title {
+          font-size: 0.98rem;
+        }
+      }
+
+      .orgtree .structure__toggle-container,
+      .orgtree .dashboard-container,
+      .orgtree .structure__main-btn {
+        overflow: visible;
+      }
+
+      .orgtree .structure__toggle-container:hover,
+      .orgtree .structure__toggle-container:focus-within {
+        z-index: 60;
+      }
+
+      .orgtree .structure__toggle-container::before {
+        border-top-left-radius: inherit;
+        border-top-right-radius: inherit;
+      }
+
+      .orgtree .header-tooltip-content {
+        z-index: 1000;
       }
 
       /* Textarea del foro */
@@ -388,7 +529,9 @@
         transform: none;
       }
 
-      .referente-hero-card--static-photo:hover .referente-hero-photo--asset-framed img {
+      .referente-hero-card--static-photo:hover
+        .referente-hero-photo--asset-framed
+        img {
         transform: none;
         filter: none;
       }
@@ -576,7 +719,8 @@
       }
 
       .leader-card__role-primary,
-      .leader-card__role-slot {
+      .leader-card__role-slot,
+      .leader-card__role-highlight {
         min-height: 2.85rem;
         display: flex;
         align-items: center;
@@ -597,6 +741,15 @@
         letter-spacing: 0.07em;
         color: #475467;
         font-weight: 600;
+      }
+
+      .leader-card__role-highlight {
+        margin: 0;
+        color: var(--ref-green);
+        font-size: 0.94rem;
+        font-weight: 700;
+        line-height: 1.32;
+        letter-spacing: 0.055em;
       }
 
       .leader-card .referente__desc {
@@ -630,7 +783,8 @@
         }
 
         .leader-card__role-primary,
-        .leader-card__role-slot {
+        .leader-card__role-slot,
+        .leader-card__role-highlight {
           min-height: 2.65rem;
         }
       }
@@ -727,945 +881,6 @@
       }
     </style>
     <style>
-      /* CONTENEDOR RAÍZ */
-      #brisa-chat-root {
-        position: fixed;
-        inset: 0;
-        pointer-events: none;
-        z-index: 21500;
-        font-family:
-          system-ui,
-          -apple-system,
-          BlinkMacSystemFont,
-          "SF Pro Text",
-          sans-serif;
-      }
-
-      .brisa-chat-fab {
-        position: fixed;
-        bottom: var(--dm-fab-bottom);
-        left: 18px;
-        width: var(--dm-chat-fab-size, 58px);
-        height: var(--dm-chat-fab-size, 58px);
-        z-index: 50;
-      }
-
-      /* BURBUJA PRINCIPAL (Médicos conectados) */
-      .brisa-chat-bubble {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        border-radius: 999px;
-        z-index: 50;
-        background: radial-gradient(circle at 20% 0%, #8fcd1f, #5a8a00);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.24);
-        cursor: pointer;
-        pointer-events: auto;
-        touch-action: none;
-        -webkit-user-select: none;
-        user-select: none;
-      }
-
-      .brisa-chat-bubble-icon {
-        width: 26px;
-        height: 26px;
-        color: #ffffff;
-        pointer-events: none;
-        -webkit-user-select: none;
-        user-select: none;
-      }
-
-      .brisa-chat-badge {
-        position: absolute;
-        top: -4px;
-        right: -4px;
-        min-width: 18px;
-        height: 18px;
-        padding: 0 4px;
-        border-radius: 999px;
-        background: #e53935;
-        color: #fff;
-        font-size: 10px;
-        font-weight: 600;
-        display: none;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 4px 12px rgba(229, 57, 53, 0.35);
-      }
-
-      /* PANEL LISTA DE MÉDICOS CONECTADOS */
-      .brisa-chat-panel {
-        position: absolute;
-        bottom: calc(120% + var(--brisa-panel-offset, 0px));
-        right: 0;
-        left: auto;
-        width: 18rem;
-        max-height: 420px;
-        background: rgba(255, 255, 255, 0.94);
-        -webkit-backdrop-filter: blur(18px);
-        backdrop-filter: blur(18px);
-        z-index: 40;
-        border-radius: 18px;
-        border: 1px solid rgba(255, 255, 255, 0.65);
-        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
-        overflow: hidden;
-        display: none;
-        pointer-events: auto;
-      }
-
-      .brisa-chat-panel-header {
-        padding: 10px 14px;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-      }
-
-      .brisa-chat-panel-title {
-        font-size: 13px;
-        font-weight: 600;
-        color: #243220;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-      }
-
-      .brisa-chat-online-count {
-        font-size: 12px;
-        font-weight: 800;
-        color: #7ab800;
-      }
-
-      .brisa-chat-panel-subtitle {
-        font-size: 11px;
-        color: #6b7280;
-      }
-
-      .brisa-chat-panel-body {
-        max-height: 360px;
-        overflow-y: auto;
-      }
-
-      .brisa-chat-section-label {
-        padding: 6px 14px 4px;
-        font-size: 10px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: #9ca3af;
-      }
-
-      .brisa-chat-row {
-        padding: 8px 12px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        cursor: pointer;
-        transition: background 0.15s ease;
-        position: relative;
-      }
-
-      .brisa-chat-row:hover {
-        background: rgba(122, 184, 0, 0.06);
-      }
-
-      .brisa-chat-row-main {
-        display: flex;
-        flex-direction: column;
-        flex: 1;
-      }
-
-      .brisa-chat-name {
-        font-size: 13px;
-        font-weight: 500;
-        color: #111827;
-      }
-
-      .brisa-chat-meta {
-        font-size: 11px;
-        color: #6b7280;
-      }
-
-      .brisa-chat-status-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 999px;
-        background: #9ca3af;
-        box-shadow: 0 0 0 0 rgba(122, 184, 0, 0.55);
-      }
-
-      .brisa-chat-status-dot--online {
-        background: #7ab800;
-        box-shadow: 0 0 8px 0 rgba(122, 184, 0, 0.9);
-      }
-
-      .brisa-chat-icon-btn {
-        width: 24px;
-        height: 24px;
-        border-radius: 999px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border: none;
-        background: rgba(122, 184, 0, 0.08);
-        cursor: pointer;
-      }
-
-      .brisa-chat-icon-btn svg {
-        width: 16px;
-        height: 16px;
-        color: #5a8a00;
-      }
-
-      .brisa-chat-row--disabled {
-        cursor: default;
-      }
-
-      .brisa-chat-row--disabled:hover {
-        background: transparent;
-      }
-
-      .brisa-chat-row--unread {
-        background: linear-gradient(
-          90deg,
-          rgba(122, 184, 0, 0.08),
-          rgba(122, 184, 0, 0)
-        );
-      }
-
-      .brisa-chat-row-unread {
-        position: absolute;
-        right: 10px;
-        top: 50%;
-        transform: translateY(-50%);
-        min-width: 16px;
-        height: 16px;
-        padding: 0 6px;
-        border-radius: 999px;
-        background: #e53935;
-        color: #fff;
-        font-size: 10px;
-        font-weight: 700;
-        display: none;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 6px 12px rgba(229, 57, 53, 0.35);
-      }
-
-      /* VENTANA DE CHAT */
-      .brisa-chat-window {
-        position: fixed;
-        bottom: 84px;
-        left: 292px;
-        width: 320px;
-        max-height: 420px;
-        background: linear-gradient(
-          160deg,
-          rgba(255, 255, 255, 0.98),
-          rgba(247, 249, 252, 0.95)
-        );
-        -webkit-backdrop-filter: blur(18px);
-        backdrop-filter: blur(18px);
-        border-radius: 18px;
-        border: 1px solid rgba(15, 23, 42, 0.05);
-        box-shadow: 0 14px 38px rgba(15, 23, 42, 0.16);
-        display: none;
-        flex-direction: column;
-        pointer-events: auto;
-      }
-
-      .brisa-chat-window-header {
-        padding: 8px 12px;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        background: linear-gradient(
-          90deg,
-          rgba(255, 255, 255, 0.72),
-          rgba(255, 255, 255, 0.9)
-        );
-        border-radius: 18px 18px 0 0;
-      }
-
-      .brisa-chat-window-heading {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        min-width: 0;
-        flex: 1 1 auto;
-      }
-
-      .brisa-chat-window-title {
-        font-size: 13px;
-        font-weight: 600;
-        color: #111827;
-        flex: 1;
-      }
-
-      .brisa-chat-window-subtitle {
-        font-size: 11px;
-        color: #6b7280;
-        text-align: center;
-        padding: 0 16px;
-      }
-
-      .brisa-chat-window-actions {
-        display: flex;
-        gap: 4px;
-      }
-
-      .brisa-chat-pill-btn {
-        width: 26px;
-        height: 26px;
-        border-radius: 12px;
-        border: 1px solid rgba(148, 163, 184, 0.4);
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: linear-gradient(180deg, #ffffff, #f4f6f8);
-      }
-
-      .brisa-chat-pill-btn svg {
-        width: 14px;
-        height: 14px;
-        color: #4b5563;
-      }
-
-      .brisa-chat-pill-btn:hover {
-        box-shadow: 0 6px 12px rgba(15, 23, 42, 0.08);
-        transform: translateY(-1px);
-      }
-
-      .brisa-chat-pill-btn[data-tooltip] {
-        position: relative;
-      }
-
-      .brisa-chat-pill-btn[data-tooltip]:hover::after {
-        content: attr(data-tooltip);
-        position: absolute;
-        top: -36px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: #ffffff;
-        color: #4b5563;
-        padding: 6px 10px;
-        border-radius: 10px;
-        border: 1px solid #d1d5db;
-        font-size: 11px;
-        white-space: nowrap;
-        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
-        opacity: 1;
-        pointer-events: none;
-        transition:
-          opacity 120ms ease,
-          transform 120ms ease;
-      }
-
-      .brisa-chat-pill-btn[data-tooltip]::after {
-        content: "";
-        opacity: 0;
-      }
-
-      .brisa-chat-pill-btn[data-tooltip]:hover::before {
-        content: "";
-        position: absolute;
-        top: -10px;
-        left: 50%;
-        transform: translateX(-50%);
-        border: 6px solid transparent;
-        border-bottom-color: #d1d5db;
-        opacity: 1;
-        transition: opacity 120ms ease;
-      }
-
-      .brisa-chat-window-body {
-        padding: 8px 8px 6px;
-        flex: 1;
-        overflow-y: auto;
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-      }
-
-      .brisa-chat-msg {
-        max-width: 80%;
-        border-radius: 18px;
-        padding: 6px 8px;
-        padding-right: 26px;
-        font-size: 12px;
-        line-height: 1.35;
-        display: inline-flex;
-        flex-direction: column;
-        gap: 2px;
-        position: relative;
-      }
-
-      .brisa-chat-msg--me {
-        margin-left: auto;
-        background: linear-gradient(135deg, #7ab800, #5a8a00);
-        color: #ffffff;
-        border-radius: 18px 18px 8px 18px;
-      }
-
-      .brisa-chat-msg--other {
-        margin-right: auto;
-        background: rgba(243, 244, 246, 0.96);
-        color: #111827;
-        border-radius: 18px 18px 18px 8px;
-      }
-
-      .brisa-chat-msg-author {
-        font-size: 10px;
-        font-weight: 600;
-        opacity: 0.8;
-      }
-
-      .brisa-chat-msg-time {
-        font-size: 10px;
-        opacity: 0.7;
-        align-self: flex-end;
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        gap: 6px;
-        width: 100%;
-      }
-
-      .brisa-chat-msg--me .brisa-chat-msg-author,
-      .brisa-chat-msg--me .brisa-chat-msg-time,
-      .brisa-chat-msg--me .brisa-chat-status-icon,
-      .brisa-chat-msg--me .brisa-chat-delete-btn {
-        color: #ffffff;
-      }
-
-      .brisa-chat-msg--me .brisa-chat-msg-author,
-      .brisa-chat-msg--me .brisa-chat-msg-time {
-        opacity: 0.92;
-      }
-
-      .brisa-chat-window-footer {
-        padding: 6px 8px 8px;
-        border-top: 1px solid rgba(0, 0, 0, 0.04);
-        display: flex;
-        gap: 4px;
-      }
-
-      .brisa-chat-input {
-        flex: 1;
-        border-radius: 999px;
-        border: 1px solid rgba(148, 163, 184, 0.8);
-        padding: 6px 10px;
-        font-size: 12px;
-        outline: none;
-      }
-
-      .brisa-chat-input:focus {
-        border-color: #7ab800;
-        box-shadow: 0 0 0 1px rgba(122, 184, 0, 0.35);
-      }
-
-      .brisa-chat-send-btn {
-        border-radius: 999px;
-        border: none;
-        padding: 0 12px;
-        background: linear-gradient(135deg, #7ab800, #5a8a00);
-        color: #fff;
-        font-size: 12px;
-        font-weight: 500;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 4px;
-      }
-
-      .brisa-chat-send-btn svg {
-        width: 14px;
-        height: 14px;
-      }
-
-      /* PÍLDORA MINIMIZADA */
-      .brisa-chat-pill {
-        position: fixed;
-        bottom: 18px;
-        left: 86px;
-        height: 34px;
-        max-width: 220px;
-        padding: 0 12px;
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.9);
-        -webkit-backdrop-filter: blur(14px);
-        backdrop-filter: blur(14px);
-        border: 1px solid rgba(209, 213, 219, 0.85);
-        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
-        display: none;
-        align-items: center;
-        gap: 6px;
-        cursor: pointer;
-        pointer-events: auto;
-      }
-
-      .brisa-chat-pill-tray {
-        position: fixed;
-        bottom: 18px;
-        left: 86px;
-        display: flex;
-        flex-direction: column-reverse;
-        gap: 8px;
-        align-items: flex-start;
-        z-index: 9999;
-        pointer-events: auto;
-      }
-
-      .brisa-chat-pill--tray {
-        position: static;
-        width: 210px;
-        pointer-events: auto;
-        display: flex;
-        align-items: center;
-        padding-left: 10px;
-        padding-right: 10px;
-      }
-
-      .brisa-chat-pill-label {
-        font-size: 12px;
-        color: #111827;
-        white-space: nowrap;
-        text-overflow: ellipsis;
-        overflow: hidden;
-        flex: 1;
-        min-width: 0;
-      }
-
-      .brisa-chat-pill-dot {
-        width: 7px;
-        height: 7px;
-        border-radius: 999px;
-        background: #7ab800;
-      }
-
-      .brisa-chat-pill-actions {
-        display: flex;
-        gap: 4px;
-        margin-left: 6px;
-        margin-left: auto;
-      }
-
-      .brisa-chat-status-icon {
-        font-size: 11px;
-        vertical-align: middle;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 18px;
-        margin-left: 2px;
-      }
-
-      .brisa-chat-status-icon--pending {
-        color: #ffffff;
-        background: rgba(255, 255, 255, 0.18);
-        padding: 1px 4px;
-        border-radius: 10px;
-      }
-
-      .brisa-chat-status-icon--sent {
-        color: #ffffff;
-        background: rgba(255, 255, 255, 0.18);
-        padding: 1px 4px;
-        border-radius: 10px;
-      }
-
-      .brisa-chat-status-icon--read {
-        color: #ffffff;
-        background: rgba(255, 255, 255, 0.18);
-        padding: 1px 4px;
-        border-radius: 10px;
-        font-weight: 700;
-      }
-
-      .brisa-chat-delete-btn {
-        position: absolute;
-        top: 6px;
-        right: 6px;
-        border: none;
-        background: transparent;
-        color: #ffffff;
-        font-size: 12px;
-        cursor: pointer;
-        opacity: 0.7;
-      }
-
-      .brisa-chat-delete-btn:hover {
-        opacity: 1;
-        transform: scale(1.05);
-      }
-
-      .brisa-chat-toast {
-        position: fixed;
-        left: 18px;
-        bottom: 140px;
-        padding: 10px 14px;
-        border-radius: 12px;
-        background: rgba(17, 24, 39, 0.85);
-        color: #fff;
-        font-size: 12px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
-        opacity: 0;
-        transform: translateY(10px);
-        transition: all 0.25s ease;
-        pointer-events: none;
-        z-index: 10000;
-      }
-
-      .brisa-chat-toast.is-visible {
-        opacity: 1;
-        transform: translateY(0);
-      }
-
-      .brisa-chat-mini-modal {
-        position: fixed;
-        inset: 0;
-        display: none;
-        align-items: flex-end;
-        justify-content: center;
-        padding: 0 16px 120px;
-        background: rgba(0, 0, 0, 0.08);
-        z-index: 10000;
-        pointer-events: auto;
-      }
-
-      .brisa-chat-mini-modal.is-visible {
-        display: flex;
-      }
-
-      .brisa-chat-mini-card {
-        background: #ffffff;
-        border: 1px solid rgba(148, 163, 184, 0.35);
-        border-radius: 14px;
-        box-shadow: 0 14px 36px rgba(0, 0, 0, 0.12);
-        padding: 12px;
-        width: min(260px, 90vw);
-        pointer-events: auto;
-      }
-
-      .brisa-chat-mini-title {
-        font-size: 13px;
-        font-weight: 700;
-        color: #111827;
-        margin-bottom: 8px;
-      }
-
-      .brisa-chat-mini-input {
-        width: 100%;
-        border: 1px solid rgba(148, 163, 184, 0.6);
-        border-radius: 10px;
-        padding: 8px 10px;
-        font-size: 13px;
-        margin-bottom: 10px;
-      }
-
-      .brisa-chat-mini-actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: 8px;
-      }
-
-      .brisa-chat-mini-btn {
-        border: 1px solid rgba(148, 163, 184, 0.45);
-        background: #ffffff;
-        color: #374151;
-        border-radius: 10px;
-        padding: 6px 10px;
-        font-size: 12px;
-        cursor: pointer;
-      }
-
-      .brisa-chat-mini-btn--danger {
-        background: linear-gradient(135deg, #ef4444, #dc2626);
-        color: #fff;
-        border: none;
-      }
-
-      .brisa-chat-pill-btn-mini {
-        width: 20px;
-        height: 20px;
-        border-radius: 8px;
-        border: 1px solid rgba(148, 163, 184, 0.45);
-        background: linear-gradient(180deg, #ffffff, #f4f6f8);
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        font-size: 11px;
-        color: #4b5563;
-        transition:
-          transform 0.12s ease,
-          box-shadow 0.12s ease;
-      }
-
-      .brisa-chat-pill-btn-mini:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 6px 12px rgba(15, 23, 42, 0.06);
-      }
-
-      .brisa-chat-pill--blink {
-        animation: brisa-pill-blink 1s infinite;
-      }
-
-      @keyframes brisa-pill-blink {
-        0%,
-        100% {
-          background: rgba(255, 255, 255, 0.9);
-        }
-
-        50% {
-          background: linear-gradient(135deg, #7ab800, #5a8a00);
-          color: #fff;
-        }
-      }
-
-      .brisa-chat-mobile-overlay {
-        position: fixed;
-        inset: 0;
-        z-index: 95;
-        background: rgba(17, 24, 39, 0.6);
-        opacity: 0;
-        visibility: hidden;
-        pointer-events: none;
-        transition:
-          opacity 300ms ease,
-          visibility 300ms ease;
-      }
-
-      .brisa-chat-mobile-viewport {
-        position: fixed;
-        inset: 0;
-        z-index: 100;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 16px;
-        pointer-events: none;
-      }
-
-      .brisa-chat-mobile-stack {
-        position: relative;
-        display: grid;
-        width: min(95vw, 420px);
-        max-width: calc(100vw - 32px);
-        height: min(85vh, calc(100dvh - 32px));
-        max-height: min(85vh, calc(100dvh - 32px));
-      }
-
-      .brisa-chat-window-back {
-        display: none;
-      }
-
-      /* MOBILE (simple ajuste) */
-      @media (max-width: 768px), (display-mode: standalone) {
-        .brisa-chat-fab {
-          left: auto;
-          right: 8px;
-          bottom: calc(
-            var(--bottom-nav-h) + 36px + env(safe-area-inset-bottom)
-          );
-        }
-
-        .brisa-chat-panel {
-          right: 0;
-          left: auto;
-          width: 18rem;
-        }
-
-        .brisa-chat-window {
-          left: 10px;
-          right: 10px;
-          width: auto;
-          bottom: calc(
-            var(--bottom-nav-h) + 84px + env(safe-area-inset-bottom)
-          );
-        }
-
-        .brisa-chat-pill {
-          left: 78px;
-          right: auto;
-          max-width: 50vw;
-          bottom: calc(
-            var(--bottom-nav-h) + 16px + env(safe-area-inset-bottom)
-          );
-        }
-
-        .brisa-chat-pill-tray {
-          bottom: calc(
-            var(--bottom-nav-h) + 16px + env(safe-area-inset-bottom)
-          );
-        }
-
-        .brisa-chat-toast {
-          bottom: calc(
-            var(--bottom-nav-h) + 120px + env(safe-area-inset-bottom)
-          );
-        }
-
-        .brisa-chat-mini-modal {
-          padding-bottom: calc(
-            var(--bottom-nav-h) + 56px + env(safe-area-inset-bottom)
-          );
-        }
-      }
-
-      @media (max-width: 640px) {
-        #brisa-chat-root.brisa-chat-root--mobile-open {
-          pointer-events: auto;
-        }
-
-        #brisa-chat-root.brisa-chat-root--mobile-open
-          .brisa-chat-mobile-overlay {
-          opacity: 1;
-          visibility: visible;
-          pointer-events: auto;
-        }
-
-        #brisa-chat-root.brisa-chat-root--mobile-open
-          .brisa-chat-mobile-viewport {
-          pointer-events: auto;
-        }
-
-        #brisa-chat-root.brisa-chat-root--mobile-open .brisa-chat-fab {
-          position: relative;
-          inset: auto;
-          left: auto;
-          right: auto;
-          top: auto;
-          bottom: auto;
-          width: 100%;
-          height: 100%;
-          display: block;
-          pointer-events: auto;
-          z-index: 56;
-        }
-
-        #brisa-chat-root.brisa-chat-root--mobile-open .brisa-chat-bubble,
-        #brisa-chat-root.brisa-chat-root--mobile-open .brisa-chat-pill,
-        #brisa-chat-root.brisa-chat-root--mobile-open .brisa-chat-pill-tray {
-          opacity: 0;
-          visibility: hidden;
-          pointer-events: none;
-        }
-
-        #brisa-chat-root.brisa-chat-root--mobile-open .brisa-chat-bubble {
-          transform: scale(0.92);
-        }
-
-        .brisa-chat-fab .brisa-chat-panel,
-        .brisa-chat-window {
-          position: absolute;
-          inset: 0;
-          top: auto;
-          left: auto;
-          right: auto;
-          bottom: auto;
-          width: 100%;
-          max-width: none;
-          height: 100%;
-          max-height: none;
-          border: 2px solid #7ab800;
-          border-radius: 24px;
-          background: #ffffff;
-          box-shadow: 0 20px 60px -15px rgba(0, 0, 0, 0.3);
-          overflow: hidden;
-          transition:
-            opacity 300ms ease,
-            transform 300ms ease,
-            visibility 300ms ease;
-          animation: none !important;
-          filter: none !important;
-          clip-path: none !important;
-        }
-
-        .brisa-chat-fab .brisa-chat-panel {
-          z-index: 56;
-          display: flex;
-          flex-direction: column;
-          transform: translate3d(0, 12px, 0) scale(0.98);
-          transform-origin: center;
-        }
-
-        .brisa-chat-window {
-          z-index: 60;
-          transform: translate3d(0, 12px, 0) scale(0.98);
-          transform-origin: center;
-        }
-
-        .brisa-chat-fab .brisa-chat-panel[data-chat-state="open"],
-        .brisa-chat-fab .brisa-chat-panel[data-chat-state="opening"],
-        .brisa-chat-window[data-chat-state="open"],
-        .brisa-chat-window[data-chat-state="opening"] {
-          opacity: 1;
-          visibility: visible;
-          pointer-events: auto;
-        }
-
-        .brisa-chat-fab .brisa-chat-panel[data-chat-state="open"],
-        .brisa-chat-fab .brisa-chat-panel[data-chat-state="opening"] {
-          transform: translate3d(0, 0, 0) scale(1);
-        }
-
-        .brisa-chat-window[data-chat-state="open"],
-        .brisa-chat-window[data-chat-state="opening"] {
-          transform: translate3d(0, 0, 0) scale(1);
-        }
-
-        #brisa-chat-root.brisa-chat-root--mobile-detail .brisa-chat-panel {
-          transform: translate3d(0, 0, 0) scale(0.985);
-          opacity: 0.96;
-          pointer-events: none;
-        }
-
-        .brisa-chat-window-back {
-          display: inline-flex;
-          order: 0;
-        }
-
-        .brisa-chat-window-actions {
-          margin-left: auto;
-          gap: 8px;
-          align-items: center;
-        }
-
-        #brisa-chat-window-min {
-          display: none;
-        }
-
-        #brisa-chat-delete-conversation {
-          order: 1;
-        }
-
-        #brisa-chat-window-close {
-          order: 2;
-        }
-
-        .brisa-chat-window-footer {
-          padding-bottom: calc(8px + env(safe-area-inset-bottom));
-        }
-
-        .brisa-chat-pill-btn {
-          width: 44px;
-          height: 44px;
-          border-radius: 14px;
-        }
-      }
-
-      @media (min-width: 1024px) {
-        .brisa-chat-fab {
-          left: 32px;
-        }
-      }
-
       /* User panel */
       .user-panel {
         position: relative;
@@ -1896,31 +1111,6 @@
         padding-top: 2px;
       }
 
-      .splash-screen {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        background-color: #ffffff;
-        z-index: 9999999;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        transition: opacity 0.6s ease-out;
-      }
-
-      .splash-screen__spinner {
-        width: 40px;
-        height: 40px;
-        border: 4px solid #f3f3f3;
-        border-top: 4px solid #4ade80;
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-        margin-top: 20px;
-      }
-
       .hero-section--compact {
         padding-top: 9rem;
         padding-bottom: 1rem;
@@ -2098,47 +1288,24 @@
   </head>
 
   <body>
-    <div id="splash-screen" class="splash-screen">
-      <img
-        src="assets/images/logo-dpto-medico-large.png"
-        class="splash-logo"
-        alt="Departamento Médico"
-      />
-      <div class="splash-screen__spinner"></div>
-      <style>
-        @keyframes spin {
-          0% {
-            transform: rotate(0deg);
-          }
-          100% {
-            transform: rotate(360deg);
-          }
-        }
-
-        @keyframes pulse {
-          0% {
-            transform: scale(1);
-          }
-          50% {
-            transform: scale(1.03);
-          }
-          100% {
-            transform: scale(1);
-          }
-        }
-
-        .splash-logo {
-          width: 280px;
-          height: auto;
-          animation: pulse 2s infinite;
-        }
-
-        @media (min-width: 1024px) {
-          .splash-logo {
-            width: 450px;
-          }
-        }
-      </style>
+    <div id="splash-screen" class="splash-screen" aria-live="polite" aria-busy="true">
+      <div class="splash-screen__content">
+        <img
+          src="assets/images/logo-dpto-medico-large.png"
+          class="splash-logo splash-screen__logo"
+          alt="Departamento Médico"
+          width="1024"
+          height="1024"
+          decoding="async"
+        />
+        <div class="splash-screen__loader">
+          <div class="dm-brisa-loader dm-brisa-loader--desktop-splash" aria-hidden="true">
+            <span class="dm-brisa-loader__ring"></span>
+            <span class="dm-brisa-loader__brand">BRISA</span>
+          </div>
+          <p class="splash-screen__loader-text">Cargando…</p>
+        </div>
+      </div>
     </div>
 
     <div id="app">
@@ -2462,13 +1629,80 @@
               </div>
               <div class="portal-submenu" id="portal-bubble" aria-hidden="true">
                 <a
+                  href="/galeriadearte.html"
+                  class="portal-link"
+                  id="portal-gallery"
+                  data-portal-action="gallery"
+                  aria-label="Galería de Arte"
+                >
+                  <span class="portal-link__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" focusable="false">
+                      <rect x="4" y="5" width="16" height="14" rx="2.4"></rect>
+                      <path d="M7.5 16.5l3.2-3.2 2.2 2.2 2.8-3 2.8 4"></path>
+                      <circle cx="9" cy="9" r="1.15"></circle>
+                    </svg>
+                  </span>
+                  <span class="portal-link__tooltip" aria-hidden="true"
+                    >Galería de Arte</span
+                  >
+                </a>
+                <a
                   href="https://brisasaludybienestar.com/"
                   target="_blank"
                   rel="noopener noreferrer"
                   class="portal-link"
                   id="portal-action"
+                  data-portal-action="operativa"
+                  aria-label="Gestión operativa"
                 >
-                  <i class="fa-solid fa-globe"></i>
+                  <span class="portal-link__icon" aria-hidden="true">
+                    <i class="fa-solid fa-globe"></i>
+                  </span>
+                  <span class="portal-link__tooltip" aria-hidden="true"
+                    >Gestión operativa</span
+                  >
+                </a>
+                <a
+                  href="/intereses-hobbies.html"
+                  class="portal-link"
+                  id="portal-hobbies"
+                  data-portal-action="hobbies"
+                  aria-label="Intereses y Hobbies del Equipo"
+                >
+                  <span class="portal-link__icon portal-link__icon--hobbies" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" focusable="false">
+                      <circle cx="12" cy="6.4" r="2.15"></circle>
+                      <circle cx="6.5" cy="17.2" r="2.05"></circle>
+                      <circle cx="17.5" cy="17.2" r="2.05"></circle>
+                      <path d="M10.3 8.2 7.5 15.3"></path>
+                      <path d="M13.7 8.2l2.8 7.1"></path>
+                      <path d="M8.8 17.2h6.4"></path>
+                      <path d="M8.7 12.2c.8-1.45 2-2.15 3.3-2.15s2.5.7 3.3 2.15"></path>
+                    </svg>
+                  </span>
+                  <span class="portal-link__tooltip" aria-hidden="true"
+                    >Intereses y Hobbies del Equipo</span
+                  >
+                </a>
+                <a
+                  href="/bitacora-cientifica.html"
+                  class="portal-link"
+                  id="portal-logbook"
+                  data-portal-action="bitacora"
+                  aria-label="Abrir Bitácora Científica"
+                >
+                  <span class="portal-link__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" focusable="false">
+                      <path d="M6.5 4.5h8.8a2.2 2.2 0 0 1 2.2 2.2v12.8H8.2a2.7 2.7 0 0 1-2.7-2.7V5.5a1 1 0 0 1 1-1Z"></path>
+                      <path d="M8.2 19.5a2.7 2.7 0 0 1 0-5.4h9.3"></path>
+                      <path d="M10 8h4"></path>
+                      <path d="M10 11h2.6"></path>
+                      <path d="M15.8 8.4l1.7 1.7"></path>
+                    </svg>
+                  </span>
+                  <span class="portal-link__tooltip" aria-hidden="true"
+                    >Bitácora Científica</span
+                  >
                 </a>
               </div>
             </div>
@@ -2635,8 +1869,9 @@
                   id="kpi-members"
                   class="kpi-value tabular-nums"
                   data-dynamic="false"
+                  data-kpi-static-value="32"
                 >
-                  32
+                  0
                 </div>
                 <div class="kpi-label">Integrantes del equipo</div>
               </article>
@@ -2689,7 +1924,7 @@
                           class="referente-hero-photo referente-hero-photo--asset-framed"
                         >
                           <img
-                            src="assets/images/avatar-leila-cura-featured-tight-20260411.png"
+                            src="assets/images/avatar-leila-cura-featured-tight-20260411.png?v=20260430-orgtree-avatars-1"
                             alt="Dra. Leila Cura"
                             width="1000"
                             height="1000"
@@ -2703,7 +1938,7 @@
                             DIRECCIÓN DEL DEPARTAMENTO MÉDICO
                           </p>
                           <p class="referente-hero-subrole">
-                            CEO de Brisa y Gerente de Salud de PAE
+                            Presidente de Brisa y Gerente de Salud de PAE
                           </p>
                           <p class="referente-hero-desc">
                             Dirección general y visión estratégica de los
@@ -2732,7 +1967,7 @@
                     >
                       <div class="referente__img-wrapper">
                         <img
-                          src="assets/images/avatar-silva-new.png"
+                          src="assets/images/avatar-silva-new.png?v=20260430-orgtree-avatars-1"
                           alt="Gustavo Silva"
                           class="referente__img"
                           width="1000"
@@ -2766,7 +2001,7 @@
                     >
                       <div class="referente__img-wrapper">
                         <img
-                          src="assets/images/avatar-azcarate-new.png"
+                          src="assets/images/avatar-azcarate-new.png?v=20260430-orgtree-avatars-1"
                           alt="Juan Martín Azcárate"
                           class="referente__img"
                           width="1000"
@@ -2796,11 +2031,11 @@
 
                     <!-- Leader 3 -->
                     <div
-                      class="referente__card leader-card reveal-on-scroll delay-300"
+                      class="referente__card leader-card leader-card--medina reveal-on-scroll delay-300"
                     >
                       <div class="referente__img-wrapper">
                         <img
-                          src="assets/images/avatar-medina-new.png"
+                          src="assets/images/avatar-medina-new.png?v=20260430-orgtree-avatars-1"
                           alt="Leandro Medina"
                           class="referente__img"
                           width="1000"
@@ -2812,10 +2047,9 @@
                       <div class="referente__content">
                         <div class="leader-card__header">
                           <h3 class="referente__name">Leandro Medina</h3>
-                          <div
-                            class="leader-card__role-slot"
-                            aria-hidden="true"
-                          ></div>
+                          <p class="leader-card__role-highlight">
+                            COORDINADOR DE DEPARTAMENTO
+                          </p>
                           <p class="referente__role referente__role--secondary">
                             LÍDER DE SALUD DE MPSA/FSE
                           </p>
@@ -2834,7 +2068,7 @@
                 <summary
                   class="dm-accordion__summary dm-accordion__summary--coordinadores section-title--unified"
                 >
-                  Coordinadores
+                  Coordinadores de Departamento
                 </summary>
                 <div class="dm-accordion__content">
                   <div class="coordinadores__container">
@@ -2844,7 +2078,7 @@
                     >
                       <div class="coordinator__img-wrapper">
                         <img
-                          src="assets/images/coord-maurino-new.png"
+                          src="assets/images/coord-maurino-new.png?v=20260430-orgtree-avatars-1"
                           alt="Juan Maurino"
                           class="coordinator__img"
                           width="1000"
@@ -2863,7 +2097,7 @@
                     >
                       <div class="coordinator__img-wrapper">
                         <img
-                          src="assets/images/coord-bianchi-new.png"
+                          src="assets/images/coord-bianchi-new.png?v=20260430-orgtree-avatars-1"
                           alt="Mario Bianchi"
                           class="coordinator__img"
                           width="1000"
@@ -2882,7 +2116,7 @@
                     >
                       <div class="coordinator__img-wrapper">
                         <img
-                          src="assets/images/coord-aciar-new.png"
+                          src="assets/images/coord-aciar-new.png?v=20260430-orgtree-avatars-1"
                           alt="Sergio Aciar"
                           class="coordinator__img"
                           width="1000"
@@ -2901,7 +2135,7 @@
                     >
                       <div class="coordinator__img-wrapper">
                         <img
-                          src="assets/images/coord-rodriguez-new.png"
+                          src="assets/images/coord-rodriguez-new.png?v=20260430-orgtree-avatars-1"
                           alt="Hernán Rodríguez"
                           class="coordinator__img"
                           width="1000"
@@ -2920,7 +2154,7 @@
                     >
                       <div class="coordinator__img-wrapper">
                         <img
-                          src="assets/images/coord-sabha-new.png"
+                          src="assets/images/coord-sabha-new.png?v=20260430-orgtree-avatars-1"
                           alt="Roberto Sabha"
                           class="coordinator__img"
                           width="1000"
@@ -3038,7 +2272,46 @@
                 <!-- Director Card -->
                 <div class="structure__director-container">
                   <div class="structure__director-card">
-                    <div class="structure__director-icon-wrapper">
+                    <div
+                      class="structure__director-avatar structure-avatar"
+                      data-dm-avatar-uid="LCura"
+                      data-dm-author="Dra. Leila Cura"
+                      data-dm-avatar-name="Dra. Leila Cura"
+                      data-dm-avatar-business="Upstream y Downstream"
+                      data-dm-avatar-role-lines="Directora de Departamento Médico Brisa|Presidente de Brisa salud y bienestar|Gerente de Salud de PAE"
+                      data-dm-avatar-zoom
+                    >
+                      <img
+                        class="structure-avatar__img"
+                        data-dm-avatar-img
+                        alt="Dra. Leila Cura"
+                        hidden
+                      />
+                      <span
+                        class="structure-avatar__fallback"
+                        data-dm-avatar-fallback
+                        aria-hidden="true"
+                      >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="32"
+                        height="32"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg>
+                      </span>
+                    </div>
+                    <div
+                      class="structure__director-icon-wrapper structure__director-ribbon"
+                      aria-hidden="true"
+                    >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         width="32"
@@ -3062,7 +2335,7 @@
                         Directora del Departamento Médico
                       </p>
                       <div class="structure__director-subroles">
-                        <span>CEO de Brisa</span>
+                        <span>Presidente de Brisa</span>
                         <span class="dot-separator"></span>
                         <span>Gerente de Salud de PAE</span>
                       </div>
@@ -3098,54 +2371,72 @@
               </h2>
             </div>
             <div
-              class="flex flex-col sm:flex-row gap-4 justify-center max-w-3xl mx-auto mb-16 w-full px-4"
+              class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 justify-center max-w-5xl mx-auto mb-16 w-full px-4"
             >
               <!-- Button 1: Documento Estructural -->
               <a
-                href="https://panamericanenergy.sharepoint.com/:w:/t/DepartamentoMdico/IQCn9k1SWqvHQ7LwvVmqlXc7Ab3PcoOW1hEzfo1loMO35fk?e=ZOxDy9"
+                href="/assets/docs/documento-base-departamento-medico-brisa.pdf"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="flex-1 group relative flex items-center justify-center gap-3 px-6 py-5 bg-white border border-gray-200 rounded-xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] hover:shadow-[0_8px_30px_-4px_rgba(37,99,235,0.2)] hover:border-blue-200 hover:-translate-y-1 transition-all duration-300"
+                data-pdf-viewer-trigger
+                data-pdf-title="Documento Estructural"
+                data-pdf-src="/assets/docs/documento-base-departamento-medico-brisa.pdf"
+                data-pdf-download="documento-base-departamento-medico-brisa.pdf"
+                class="dm-doc-card dm-doc-card--blue"
               >
-                <div
-                  class="p-2.5 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors duration-300"
-                >
-                  <i data-lucide="file-text" class="w-6 h-6"></i>
-                </div>
-                <div class="flex flex-col text-left">
-                  <span
-                    class="font-bold text-gray-800 group-hover:text-blue-700 text-base sm:text-lg leading-tight transition-colors"
-                    >Documento Estructural</span
-                  >
-                  <span
-                    class="text-xs text-gray-400 group-hover:text-blue-400 transition-colors mt-0.5"
-                    >Ver documentación oficial</span
-                  >
-                </div>
+                <span class="dm-doc-card__title">Documento Estructural</span>
+                <span class="dm-doc-card__body">
+                  <span class="dm-doc-card__icon">
+                    <i data-lucide="file-text"></i>
+                  </span>
+                  <span class="dm-doc-card__desc">
+                    Ver documentación oficial
+                  </span>
+                </span>
               </a>
 
-              <!-- Button 2: Documento de Conformación -->
+              <!-- Button 2: Modelo del Departamento -->
               <a
-                href="https://panamericanenergy.sharepoint.com/:w:/t/DepartamentoMdico/IQDGM2EdNEL1Tb8NrYRdkc_MATLevPm_etGV-klGCdtGrCI?e=luZdoc"
+                href="/assets/docs/presentacion-departamento-medico.pdf"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="flex-1 group relative flex items-center justify-center gap-3 px-6 py-5 bg-white border border-gray-200 rounded-xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] hover:shadow-[0_8px_30px_-4px_rgba(122,184,0,0.25)] hover:border-brisa hover:-translate-y-1 transition-all duration-300"
+                data-pdf-viewer-trigger
+                data-pdf-title="Modelo del Departamento"
+                data-pdf-src="/assets/docs/presentacion-departamento-medico.pdf"
+                data-pdf-download="presentacion-departamento-medico.pdf"
+                class="dm-doc-card dm-doc-card--blue"
               >
-                <div
-                  class="p-2.5 bg-lime-50 text-brisa rounded-lg group-hover:bg-brisa group-hover:text-white transition-colors duration-300"
-                >
-                  <i data-lucide="users" class="w-6 h-6"></i>
-                </div>
-                <div class="flex flex-col text-left">
-                  <span
-                    class="font-bold text-gray-800 group-hover:text-brisa text-base sm:text-lg leading-tight transition-colors"
-                    >Conformación de Comités</span
-                  >
-                  <span
-                    class="text-xs text-gray-400 group-hover:text-lime-500 transition-colors mt-0.5"
-                    >Ver integrantes y roles</span
-                  >
-                </div>
+                <span class="dm-doc-card__title">Modelo del Departamento</span>
+                <span class="dm-doc-card__body">
+                  <span class="dm-doc-card__icon">
+                    <i data-lucide="presentation"></i>
+                  </span>
+                  <span class="dm-doc-card__desc">
+                    Ver propósito, estructura y funcionamiento
+                  </span>
+                </span>
+              </a>
+
+              <!-- Button 3: Documento de Conformación -->
+              <a
+                href="/assets/docs/procedimiento-conformacion-comites-medicos.pdf"
+                target="_blank"
+                rel="noopener noreferrer"
+                data-pdf-viewer-trigger
+                data-pdf-title="Conformación de Comités"
+                data-pdf-src="/assets/docs/procedimiento-conformacion-comites-medicos.pdf"
+                data-pdf-download="procedimiento-conformacion-comites-medicos.pdf"
+                class="dm-doc-card dm-doc-card--green"
+              >
+                <span class="dm-doc-card__title">Conformación de Comités</span>
+                <span class="dm-doc-card__body">
+                  <span class="dm-doc-card__icon">
+                    <i data-lucide="users"></i>
+                  </span>
+                  <span class="dm-doc-card__desc">
+                    Ver integrantes y roles
+                  </span>
+                </span>
               </a>
             </div>
 
@@ -3178,9 +2469,15 @@
                 class="comite__card reveal-on-scroll delay-100"
                 data-committee-id="comite_ejecutivo_emergencias"
                 data-link="pages/comites/comite-ejecutivo-emergencias.html"
-              >
-                <div>
-                  <header class="comite__card-header">
+                aria-label="Comité Ejecutivo de Emergencias"
+                role="link"
+                tabindex="0">
+                <div class="comite__content">
+                  <div class="comite__image-wrap">
+                    <img class="comite__image" src="assets/images/committees/committee-emergencias.png?v=20260508-committee-frame-2" width="1254" height="1254" alt="Comité Ejecutivo de Emergencias. Protocolos y gestión de respuesta ante emergencias médicas." loading="lazy" decoding="async" onload="this.closest('.comite__image-wrap')?.classList.toggle('is-image-failed', !this.naturalWidth)" onerror="this.closest('.comite__image-wrap')?.classList.add('is-image-failed')">
+                    <span class="comite__image-fallback" aria-hidden="true"><i data-lucide="alert-triangle"></i></span>
+                  </div>
+                  <header class="comite__card-header comite__text-overlay">
                     <div class="comite__kicker">
                       <span class="comite__icon-badge" aria-hidden="true"
                         ><i data-lucide="alert-triangle"></i
@@ -3194,43 +2491,18 @@
                       ></span>
                     </div>
                     <h3 class="comite__title">
-                      <span class="comite__title-prefix">Comité </span>Ejecutivo
-                      de Emergencias
+                      <span class="comite__title-line">Comité Ejecutivo</span>
+                      <span class="comite__title-line">de Emergencias</span>
                     </h3>
                     <p class="comite__desc">
-                      Protocolos y gestión de respuesta ante emergencias
-                      médicas.
+                      <span class="comite__desc-line">Protocolos y gestión de respuesta</span>
+                      <span class="comite__desc-line">ante emergencias médicas.</span>
                     </p>
                   </header>
-                  <div class="committee-stats">
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Integrantes</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
-                    <div class="stats-divider"></div>
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Proyectos</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
+                  <div class="comite__back" aria-hidden="true">
+                    <img class="comite__back-logo" src="assets/images/Logo%20Brisa%20Blanco%20fondo%20verde.png" alt="" loading="lazy" decoding="async">
                   </div>
                 </div>
-                <footer class="comite__card-footer">
-                  <div class="comite__actions">
-                    <button
-                      class="comite__join-btn comite__join-trigger"
-                      data-committee-id="comite_ejecutivo_emergencias"
-                      type="button"
-                    >
-                      <span class="icon">+</span>
-                      <span>Unirme</span>
-                    </button>
-                    <a
-                      href="pages/comites/comite-ejecutivo-emergencias.html"
-                      class="comite__btn-secondary"
-                      >Ingresar al comité</a
-                    >
-                  </div>
-                </footer>
               </article>
 
               <!-- Comité 2 -->
@@ -3238,9 +2510,15 @@
                 class="comite__card reveal-on-scroll delay-200"
                 data-committee-id="comite_salud_ocupacional"
                 data-link="pages/comites/salud-ocupacional.html"
-              >
-                <div>
-                  <header class="comite__card-header">
+                aria-label="Comité de Salud Ocupacional"
+                role="link"
+                tabindex="0">
+                <div class="comite__content">
+                  <div class="comite__image-wrap">
+                    <img class="comite__image" src="assets/images/committees/committee-salud-ocupacional.png?v=20260508-committee-frame-2" width="1254" height="1254" alt="Comité de Salud Ocupacional. Seguridad, higiene y medicina del trabajo." loading="lazy" decoding="async" onload="this.closest('.comite__image-wrap')?.classList.toggle('is-image-failed', !this.naturalWidth)" onerror="this.closest('.comite__image-wrap')?.classList.add('is-image-failed')">
+                    <span class="comite__image-fallback" aria-hidden="true"><i data-lucide="shield"></i></span>
+                  </div>
+                  <header class="comite__card-header comite__text-overlay">
                     <div class="comite__kicker">
                       <span class="comite__icon-badge" aria-hidden="true"
                         ><i data-lucide="shield"></i
@@ -3254,42 +2532,18 @@
                       ></span>
                     </div>
                     <h3 class="comite__title">
-                      <span class="comite__title-prefix">Comité de </span>Salud
-                      Ocupacional
+                      <span class="comite__title-line">Comité de</span>
+                      <span class="comite__title-line">Salud Ocupacional</span>
                     </h3>
                     <p class="comite__desc">
-                      Seguridad, higiene y medicina del trabajo.
+                      <span class="comite__desc-line">Seguridad, higiene y medicina</span>
+                      <span class="comite__desc-line">del trabajo.</span>
                     </p>
                   </header>
-                  <div class="committee-stats">
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Integrantes</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
-                    <div class="stats-divider"></div>
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Proyectos</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
+                  <div class="comite__back" aria-hidden="true">
+                    <img class="comite__back-logo" src="assets/images/Logo%20Brisa%20Blanco%20fondo%20verde.png" alt="" loading="lazy" decoding="async">
                   </div>
                 </div>
-                <footer class="comite__card-footer">
-                  <div class="comite__actions">
-                    <button
-                      class="comite__join-btn comite__join-trigger"
-                      data-committee-id="comite_salud_ocupacional"
-                      type="button"
-                    >
-                      <span class="icon">+</span>
-                      <span>Unirme</span>
-                    </button>
-                    <a
-                      href="pages/comites/salud-ocupacional.html"
-                      class="comite__btn-secondary"
-                      >Ingresar al comité</a
-                    >
-                  </div>
-                </footer>
               </article>
 
               <!-- Comité 3 -->
@@ -3297,9 +2551,15 @@
                 class="comite__card reveal-on-scroll delay-300"
                 data-committee-id="comite_calidad_seguridad"
                 data-link="pages/comites/comite-calidad-seguridad.html"
-              >
-                <div>
-                  <header class="comite__card-header">
+                aria-label="Comité de Calidad y Seguridad"
+                role="link"
+                tabindex="0">
+                <div class="comite__content">
+                  <div class="comite__image-wrap">
+                    <img class="comite__image" src="assets/images/committees/committee-calidad-seguridad.png?v=20260502-committee-cards-precision-1" width="1254" height="1254" alt="Comité de Calidad y Seguridad. Estándares de calidad y seguridad del paciente." loading="lazy" decoding="async" onload="this.closest('.comite__image-wrap')?.classList.toggle('is-image-failed', !this.naturalWidth)" onerror="this.closest('.comite__image-wrap')?.classList.add('is-image-failed')">
+                    <span class="comite__image-fallback" aria-hidden="true"><i data-lucide="check-circle"></i></span>
+                  </div>
+                  <header class="comite__card-header comite__text-overlay">
                     <div class="comite__kicker">
                       <span class="comite__icon-badge" aria-hidden="true"
                         ><i data-lucide="check-circle"></i
@@ -3313,42 +2573,18 @@
                       ></span>
                     </div>
                     <h3 class="comite__title">
-                      <span class="comite__title-prefix">Comité de </span
-                      >Calidad y Seguridad
+                      <span class="comite__title-line">Comité de</span>
+                      <span class="comite__title-line">Calidad y Seguridad</span>
                     </h3>
                     <p class="comite__desc">
-                      Estándares de calidad y seguridad del paciente.
+                      <span class="comite__desc-line">Estándares de calidad y seguridad</span>
+                      <span class="comite__desc-line">del paciente.</span>
                     </p>
                   </header>
-                  <div class="committee-stats">
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Integrantes</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
-                    <div class="stats-divider"></div>
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Proyectos</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
+                  <div class="comite__back" aria-hidden="true">
+                    <img class="comite__back-logo" src="assets/images/Logo%20Brisa%20Blanco%20fondo%20verde.png" alt="" loading="lazy" decoding="async">
                   </div>
                 </div>
-                <footer class="comite__card-footer">
-                  <div class="comite__actions">
-                    <button
-                      class="comite__join-btn comite__join-trigger"
-                      data-committee-id="comite_calidad_seguridad"
-                      type="button"
-                    >
-                      <span class="icon">+</span>
-                      <span>Unirme</span>
-                    </button>
-                    <a
-                      href="pages/comites/comite-calidad-seguridad.html"
-                      class="comite__btn-secondary"
-                      >Ingresar al comité</a
-                    >
-                  </div>
-                </footer>
               </article>
 
               <!-- Comité 4 -->
@@ -3356,9 +2592,15 @@
                 class="comite__card reveal-on-scroll delay-100"
                 data-committee-id="comite_salud_digital"
                 data-link="pages/comites/comite-salud-digital.html"
-              >
-                <div>
-                  <header class="comite__card-header">
+                aria-label="Comité de Salud Digital e Innovación"
+                role="link"
+                tabindex="0">
+                <div class="comite__content">
+                  <div class="comite__image-wrap">
+                    <img class="comite__image" src="assets/images/committees/committee-salud-digital-innovacion.png?v=20260508-committee-frame-2" width="1254" height="1254" alt="Comité de Salud Digital e Innovación. Transformación e innovación digital en salud." loading="lazy" decoding="async" onload="this.closest('.comite__image-wrap')?.classList.toggle('is-image-failed', !this.naturalWidth)" onerror="this.closest('.comite__image-wrap')?.classList.add('is-image-failed')">
+                    <span class="comite__image-fallback" aria-hidden="true"><i data-lucide="laptop"></i></span>
+                  </div>
+                  <header class="comite__card-header comite__text-overlay">
                     <div class="comite__kicker">
                       <span class="comite__icon-badge" aria-hidden="true"
                         ><i data-lucide="laptop"></i
@@ -3372,42 +2614,18 @@
                       ></span>
                     </div>
                     <h3 class="comite__title">
-                      <span class="comite__title-prefix">Comité de </span>Salud
-                      Digital e Innovación
+                      <span class="comite__title-line">Comité de Salud</span>
+                      <span class="comite__title-line">Digital e Innovación</span>
                     </h3>
                     <p class="comite__desc">
-                      Transformación e innovación digital en salud.
+                      <span class="comite__desc-line">Transformación e innovación digital</span>
+                      <span class="comite__desc-line">en salud.</span>
                     </p>
                   </header>
-                  <div class="committee-stats">
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Integrantes</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
-                    <div class="stats-divider"></div>
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Proyectos</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
+                  <div class="comite__back" aria-hidden="true">
+                    <img class="comite__back-logo" src="assets/images/Logo%20Brisa%20Blanco%20fondo%20verde.png" alt="" loading="lazy" decoding="async">
                   </div>
                 </div>
-                <footer class="comite__card-footer">
-                  <div class="comite__actions">
-                    <button
-                      class="comite__join-btn comite__join-trigger"
-                      data-committee-id="comite_salud_digital"
-                      type="button"
-                    >
-                      <span class="icon">+</span>
-                      <span>Unirme</span>
-                    </button>
-                    <a
-                      href="pages/comites/comite-salud-digital.html"
-                      class="comite__btn-secondary"
-                      >Ingresar al comité</a
-                    >
-                  </div>
-                </footer>
               </article>
 
               <!-- Comité 5 -->
@@ -3415,9 +2633,15 @@
                 class="comite__card reveal-on-scroll delay-200"
                 data-committee-id="comite_docencia_investigacion"
                 data-link="pages/comites/comite-docencia-investigacion.html"
-              >
-                <div>
-                  <header class="comite__card-header">
+                aria-label="Comité de Docencia e Investigación"
+                role="link"
+                tabindex="0">
+                <div class="comite__content">
+                  <div class="comite__image-wrap">
+                    <img class="comite__image" src="assets/images/committees/committee-docencia-investigacion.png?v=20260508-committee-frame-2" width="1254" height="1254" alt="Comité de Docencia e Investigación. Formación continua y desarrollo científico." loading="lazy" decoding="async" onload="this.closest('.comite__image-wrap')?.classList.toggle('is-image-failed', !this.naturalWidth)" onerror="this.closest('.comite__image-wrap')?.classList.add('is-image-failed')">
+                    <span class="comite__image-fallback" aria-hidden="true"><i data-lucide="graduation-cap"></i></span>
+                  </div>
+                  <header class="comite__card-header comite__text-overlay">
                     <div class="comite__kicker">
                       <span class="comite__icon-badge" aria-hidden="true"
                         ><i data-lucide="graduation-cap"></i
@@ -3431,42 +2655,18 @@
                       ></span>
                     </div>
                     <h3 class="comite__title">
-                      <span class="comite__title-prefix">Comité de </span
-                      >Docencia e Investigación
+                      <span class="comite__title-line">Comité de Docencia</span>
+                      <span class="comite__title-line">e Investigación</span>
                     </h3>
                     <p class="comite__desc">
-                      Formación continua y desarrollo científico.
+                      <span class="comite__desc-line">Formación continua y desarrollo</span>
+                      <span class="comite__desc-line">científico.</span>
                     </p>
                   </header>
-                  <div class="committee-stats">
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Integrantes</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
-                    <div class="stats-divider"></div>
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Proyectos</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
+                  <div class="comite__back" aria-hidden="true">
+                    <img class="comite__back-logo" src="assets/images/Logo%20Brisa%20Blanco%20fondo%20verde.png" alt="" loading="lazy" decoding="async">
                   </div>
                 </div>
-                <footer class="comite__card-footer">
-                  <div class="comite__actions">
-                    <button
-                      class="comite__join-btn comite__join-trigger"
-                      data-committee-id="comite_docencia_investigacion"
-                      type="button"
-                    >
-                      <span class="icon">+</span>
-                      <span>Unirme</span>
-                    </button>
-                    <a
-                      href="pages/comites/comite-docencia-investigacion.html"
-                      class="comite__btn-secondary"
-                      >Ingresar al comité</a
-                    >
-                  </div>
-                </footer>
               </article>
 
               <!-- Comité 6 -->
@@ -3474,9 +2674,15 @@
                 class="comite__card reveal-on-scroll delay-300"
                 data-committee-id="comite_farmacia_terapeutica"
                 data-link="pages/comites/comite-farmacia-terapeutica.html"
-              >
-                <div>
-                  <header class="comite__card-header">
+                aria-label="Comité de Farmacia y Terapéutica"
+                role="link"
+                tabindex="0">
+                <div class="comite__content">
+                  <div class="comite__image-wrap">
+                    <img class="comite__image" src="assets/images/committees/committee-farmacia-terapeutica.png?v=20260508-committee-frame-2" width="1254" height="1254" alt="Comité de Farmacia y Terapéutica. Gestión de medicamentos y tratamientos." loading="lazy" decoding="async" onload="this.closest('.comite__image-wrap')?.classList.toggle('is-image-failed', !this.naturalWidth)" onerror="this.closest('.comite__image-wrap')?.classList.add('is-image-failed')">
+                    <span class="comite__image-fallback" aria-hidden="true"><i data-lucide="pill"></i></span>
+                  </div>
+                  <header class="comite__card-header comite__text-overlay">
                     <div class="comite__kicker">
                       <span class="comite__icon-badge" aria-hidden="true"
                         ><i data-lucide="pill"></i
@@ -3490,42 +2696,18 @@
                       ></span>
                     </div>
                     <h3 class="comite__title">
-                      <span class="comite__title-prefix">Comité de </span
-                      >Farmacia y Terapéutica
+                      <span class="comite__title-line">Comité de Farmacia y</span>
+                      <span class="comite__title-line">Terapéutica</span>
                     </h3>
                     <p class="comite__desc">
-                      Gestión de medicamentos y tratamientos.
+                      <span class="comite__desc-line">Gestión de medicamentos y</span>
+                      <span class="comite__desc-line">tratamientos.</span>
                     </p>
                   </header>
-                  <div class="committee-stats">
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Integrantes</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
-                    <div class="stats-divider"></div>
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Proyectos</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
+                  <div class="comite__back" aria-hidden="true">
+                    <img class="comite__back-logo" src="assets/images/Logo%20Brisa%20Blanco%20fondo%20verde.png" alt="" loading="lazy" decoding="async">
                   </div>
                 </div>
-                <footer class="comite__card-footer">
-                  <div class="comite__actions">
-                    <button
-                      class="comite__join-btn comite__join-trigger"
-                      data-committee-id="comite_farmacia_terapeutica"
-                      type="button"
-                    >
-                      <span class="icon">+</span>
-                      <span>Unirme</span>
-                    </button>
-                    <a
-                      href="pages/comites/comite-farmacia-terapeutica.html"
-                      class="comite__btn-secondary"
-                      >Ingresar al comité</a
-                    >
-                  </div>
-                </footer>
               </article>
 
               <!-- Comité 7 -->
@@ -3533,9 +2715,15 @@
                 class="comite__card reveal-on-scroll delay-100"
                 data-committee-id="comite_bioetica"
                 data-link="pages/comites/comite-bioetica.html"
-              >
-                <div>
-                  <header class="comite__card-header">
+                aria-label="Comité de Bioética"
+                role="link"
+                tabindex="0">
+                <div class="comite__content">
+                  <div class="comite__image-wrap">
+                    <img class="comite__image" src="assets/images/committees/committee-bioetica.png?v=20260508-bioetica-frame-2" width="1254" height="1254" alt="Comité de Bioética. Análisis ético de la práctica médica." loading="lazy" decoding="async" onload="this.closest('.comite__image-wrap')?.classList.toggle('is-image-failed', !this.naturalWidth)" onerror="this.closest('.comite__image-wrap')?.classList.add('is-image-failed')">
+                    <span class="comite__image-fallback" aria-hidden="true"><i data-lucide="scale"></i></span>
+                  </div>
+                  <header class="comite__card-header comite__text-overlay">
                     <div class="comite__kicker">
                       <span class="comite__icon-badge" aria-hidden="true"
                         ><i data-lucide="scale"></i
@@ -3549,42 +2737,18 @@
                       ></span>
                     </div>
                     <h3 class="comite__title">
-                      <span class="comite__title-prefix">Comité de </span
-                      >Bioética
+                      <span class="comite__title-line">Comité de</span>
+                      <span class="comite__title-line">Bioética</span>
                     </h3>
                     <p class="comite__desc">
-                      Análisis ético de la práctica médica.
+                      <span class="comite__desc-line">Análisis ético de la práctica</span>
+                      <span class="comite__desc-line">médica.</span>
                     </p>
                   </header>
-                  <div class="committee-stats">
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Integrantes</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
-                    <div class="stats-divider"></div>
-                    <div class="committee-stat-item">
-                      <span class="committee-stat-label">Proyectos</span>
-                      <span class="committee-stat-value">...</span>
-                    </div>
+                  <div class="comite__back" aria-hidden="true">
+                    <img class="comite__back-logo" src="assets/images/Logo%20Brisa%20Blanco%20fondo%20verde.png" alt="" loading="lazy" decoding="async">
                   </div>
                 </div>
-                <footer class="comite__card-footer">
-                  <div class="comite__actions">
-                    <button
-                      class="comite__join-btn comite__join-trigger"
-                      data-committee-id="comite_bioetica"
-                      type="button"
-                    >
-                      <span class="icon">+</span>
-                      <span>Unirme</span>
-                    </button>
-                    <a
-                      href="pages/comites/comite-bioetica.html"
-                      class="comite__btn-secondary"
-                      >Ingresar al comité</a
-                    >
-                  </div>
-                </footer>
               </article>
             </div>
           </div>
@@ -3767,7 +2931,7 @@
         <section
           class="dm-carousel-section reveal-on-scroll"
           id="carrete"
-          aria-label="Centro de Recursos Visuales"
+          aria-label="Centro de Recursos Visuales de Actividad Laboral"
         >
           <div
             id="dm-muro-composer"
@@ -3820,7 +2984,7 @@
               <h2
                 class="section__title dm-title dm-title-center section-title--unified"
               >
-                <span class="dm-title-line">Centro de Recursos Visuales</span>
+                <span class="dm-title-line">Centro de Recursos Visuales de Actividad Laboral</span>
               </h2>
             </div>
             <div class="dm-carousel-actions"></div>
@@ -4005,6 +3169,49 @@
           </div>
         </section>
 
+        <!-- Lightbox de imagen del Centro de Recursos Visuales -->
+        <div
+          id="dm-carousel-lightbox"
+          class="dm-carousel-lightbox"
+          aria-hidden="true"
+        >
+          <button
+            class="dm-carousel-lightbox__backdrop"
+            type="button"
+            data-carousel-lightbox-close
+            aria-label="Cerrar imagen ampliada"
+          ></button>
+          <div
+            id="dm-carousel-lightbox-dialog"
+            class="dm-carousel-lightbox__dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="dm-carousel-lightbox-title"
+            tabindex="-1"
+          >
+            <button
+              id="dm-carousel-lightbox-close"
+              class="dm-carousel-lightbox__close"
+              type="button"
+              aria-label="Cerrar imagen ampliada"
+            >
+              &times;
+            </button>
+            <figure class="dm-carousel-lightbox__figure">
+              <img
+                id="dm-carousel-lightbox-img"
+                class="dm-carousel-lightbox__img"
+                alt=""
+                decoding="async"
+              />
+              <figcaption class="dm-carousel-lightbox__caption">
+                <span id="dm-carousel-lightbox-title"></span>
+                <span id="dm-carousel-lightbox-meta"></span>
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+
         <!-- Modal carga de imágenes -->
         <div
           id="dm-carousel-modal"
@@ -4098,6 +3305,90 @@
               class="dm-carousel-error is-hidden"
               role="alert"
             ></div>
+          </div>
+        </div>
+        <div
+          id="dm-pdf-viewer-modal"
+          class="dm-pdf-viewer"
+          aria-hidden="true"
+          hidden
+        >
+          <div
+            class="dm-pdf-viewer__dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="dm-pdf-viewer-title"
+            tabindex="-1"
+          >
+            <div class="dm-pdf-viewer__header">
+              <h3 id="dm-pdf-viewer-title" class="dm-pdf-viewer__title">
+                Documento
+              </h3>
+              <div class="dm-pdf-viewer__actions">
+                <a
+                  id="dm-pdf-viewer-open"
+                  class="dm-pdf-viewer__btn"
+                  href="#"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Abrir en nueva pestaña
+                </a>
+                <a
+                  id="dm-pdf-viewer-download"
+                  class="dm-pdf-viewer__btn"
+                  href="#"
+                  download
+                >
+                  Descargar
+                </a>
+                <button
+                  id="dm-pdf-viewer-close"
+                  class="dm-pdf-viewer__btn dm-pdf-viewer__btn--close"
+                  type="button"
+                  aria-label="Cerrar visor PDF"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+            <div class="dm-pdf-viewer__body">
+              <iframe
+                id="dm-pdf-viewer-frame"
+                class="dm-pdf-viewer__frame"
+                title="Visualizador PDF"
+                loading="lazy"
+              ></iframe>
+              <div
+                id="dm-pdf-viewer-fallback"
+                class="dm-pdf-viewer__fallback"
+                hidden
+              >
+                <p class="dm-pdf-viewer__fallback-copy">
+                  Si tu navegador no puede mostrar el PDF embebido, abrilo en
+                  una pestaña nueva o descargalo.
+                </p>
+                <div class="dm-pdf-viewer__fallback-actions">
+                  <a
+                    class="dm-pdf-viewer__btn"
+                    data-pdf-viewer-open-link
+                    href="#"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Abrir en nueva pestaña
+                  </a>
+                  <a
+                    class="dm-pdf-viewer__btn"
+                    data-pdf-viewer-download-link
+                    href="#"
+                    download
+                  >
+                    Descargar
+                  </a>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -4197,49 +3488,16 @@
                   <i data-lucide="calendar" class="w-8 h-8 text-brisa"></i>
                   Calendario – Cronograma de Actividades
                 </h2>
-              </div>
-              <div class="calendar-controls">
-                <div
-                  class="calendar-toggle-group"
-                  role="group"
-                  aria-label="Vista del calendario"
-                >
-                  <button
-                    type="button"
-                    class="calendar-toggle is-active"
-                    data-calendar-mode="MONTH"
-                    aria-pressed="true"
-                  >
-                    Mes
-                  </button>
-                  <button
-                    type="button"
-                    class="calendar-toggle"
-                    data-calendar-mode="AGENDA"
-                    aria-pressed="false"
-                  >
-                    Agenda
-                  </button>
-                </div>
+                <p class="calendar-header__subtitle">
+                  Seguimiento mensual, agenda compartida y notas operativas del
+                  equipo.
+                </p>
               </div>
               <div class="calendar-container">
-                <a
-                  class="calendar-edit-btn calendar-edit-btn--floating"
-                  href="https://calendar.google.com/calendar/u/0/r?cid=aca87c4282b359a629e92fa3a0fcf15d043c5647e3eb7a081f74f9d4365bd559@group.calendar.google.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  >Editar Calendario</a
-                >
-                <iframe
-                  id="calendar-iframe"
-                  loading="lazy"
-                  title="Calendario de actividades"
-                  src="https://calendar.google.com/calendar/embed?src=aca87c4282b359a629e92fa3a0fcf15d043c5647e3eb7a081f74f9d4365bd559%40group.calendar.google.com&ctz=America%2FArgentina%2FBuenos_Aires&mode=MONTH"
-                  frameborder="0"
-                  scrolling="no"
-                  allowfullscreen
-                >
-                </iframe>
+                <div
+                  id="department-calendar-root"
+                  data-department-calendar
+                ></div>
               </div>
             </div>
           </div>
@@ -4268,7 +3526,7 @@
             />
           </div>
           <p class="footer__copy">
-            &copy; 2025
+            &copy; 2026
             <span class="footer__brand">Brisa Salud y Bienestar</span>. Todos
             los derechos reservados.
           </p>
@@ -4347,7 +3605,7 @@
 
       <!-- SweetAlert2 -->
       <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.26.24"></script>
-      <script src="js/app.js"></script>
+      <script src="js/app.js?v=20260505-specialists-franchella-jorge-1"></script>
 
       <!-- Lucide para iconos del foro general -->
       <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
@@ -4816,7 +4074,7 @@
         import {
           hydrateAvatars,
           resolveUidForAuthor,
-        } from "/assets/js/common/user-profiles.js";
+        } from "/assets/js/common/user-profiles.js?v=20260430-orgtree-avatars-1";
         import {
           escapeAttribute,
           escapeHTML,
@@ -6129,7 +5387,7 @@
           const loadChat = () => {
             if (chatLoaded) return Promise.resolve();
             if (chatLoading) return chatLoading;
-            chatLoading = import("/js/chat.js?v=20260307-chat-aladdin-1")
+            chatLoading = import("/js/chat.js?v=20260508-boti-header-2")
               .then(() => {
                 chatLoaded = true;
               })
@@ -6172,7 +5430,7 @@
       </script>
       <script
         type="module"
-        src="assets/js/pages/index.js?v=20260306-chat-desktop-layout-1"
+        src="assets/js/pages/index.js?v=20260508-visual-resources-1"
       ></script>
       <script type="module">
         import {
@@ -6214,6 +5472,7 @@
               scope: ROOT_SW_SCOPE,
             });
           }
+          registration.update().catch(() => {});
           sendFirebaseInitToRootWorker(registration);
           return registration;
         };

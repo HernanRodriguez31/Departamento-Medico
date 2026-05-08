@@ -1926,7 +1926,7 @@
                                         <div class="referente-hero-body">
                                             <h3 class="referente-hero-name">Dra. Leila Cura</h3>
                                             <p class="referente-hero-role">DIRECCIÓN DEL DEPARTAMENTO MÉDICO</p>
-                                            <p class="referente-hero-subrole">CEO de Brisa y Gerente de Salud de PAE</p>
+                                            <p class="referente-hero-subrole">Presidente de Brisa y Gerente de Salud de PAE</p>
                                             <p class="referente-hero-desc">
                                                 Dirección general y visión estratégica de los servicios de salud<br>
                                                 corporativos, asegurando estándares de excelencia médica.
@@ -2138,7 +2138,7 @@
                                     <h2 class="structure__director-name">Dra. Leila Cura</h2>
                                     <p class="structure__director-role">Directora del Departamento Médico</p>
                                     <div class="structure__director-subroles">
-                                        <span>CEO de Brisa</span>
+                                        <span>Presidente de Brisa</span>
                                         <span class="dot-separator"></span>
                                         <span>Gerente de Salud de PAE</span>
                                     </div>
@@ -4147,7 +4147,7 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
 
     </script>
 
-    <script type="module" src="/js/chat.js?v=20260307-chat-aladdin-1"></script>
+    <script type="module" src="/js/chat.js?v=20260508-boti-header-2"></script>
     <script type="module">
         import { isChatHash } from "/assets/js/common/routes.js";
 
@@ -4157,7 +4157,7 @@ const canManageForumMessage = (msg, user) => Boolean(user) && (isAdmin || isForu
             const loadChat = () => {
                 if (chatLoaded) return Promise.resolve();
                 if (chatLoading) return chatLoading;
-                chatLoading = import('/js/chat.js?v=20260307-chat-aladdin-1')
+                chatLoading = import('/js/chat.js?v=20260508-boti-header-2')
                     .then(() => {
                         chatLoaded = true;
                     })
