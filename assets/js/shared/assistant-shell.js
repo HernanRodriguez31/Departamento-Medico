@@ -1,6 +1,6 @@
 import { getFirebase } from "../common/firebaseClient.js";
 
-const DEFAULT_SRC = "/asistente-ia/index.html?embed=1";
+const DEFAULT_SRC = "/asistente-ia/index.html?embed=1&v=20260506-committee-bot-brisa-1";
 const FRAME_SOURCES = {
   gemini: `${DEFAULT_SRC}&model=gemini`,
   gpt: `${DEFAULT_SRC}&model=gpt`
@@ -53,18 +53,17 @@ const buildShellMarkup = () => `
           <img class="dm-ai-title__icon" src="${ASSISTANT_ICON_SRC}" alt="" aria-hidden="true" />
           <span class="dm-ai-title__copy">
             <span class="dm-ai-title__label">Boti Brisa</span>
-            <span class="dm-ai-title__meta">IA del servicio</span>
+            <span class="dm-ai-title__meta">Tu asistente guía</span>
           </span>
         </div>
         <div class="dm-ai-header-actions">
-          <span class="dm-ai-model-chip" data-dm-ai-model-chip>Gemini</span>
           <button class="dm-ai-close" type="button" data-dm-ai-close aria-label="Cerrar asistente">×</button>
         </div>
       </div>
     </div>
     <div class="dm-ai-body">
-      <iframe class="dm-ai-iframe" data-dm-ai-frame="gemini" title="Asistente IA Gemini" loading="lazy" data-src="${FRAME_SOURCES.gemini}" aria-hidden="true"></iframe>
-      <iframe class="dm-ai-iframe" data-dm-ai-frame="gpt" title="Asistente IA ChatGPT" loading="lazy" data-src="${FRAME_SOURCES.gpt}" aria-hidden="true"></iframe>
+      <iframe class="dm-ai-iframe" data-dm-ai-frame="gemini" title="Asistente IA Gemini" loading="eager" data-src="${FRAME_SOURCES.gemini}" aria-hidden="true"></iframe>
+      <iframe class="dm-ai-iframe" data-dm-ai-frame="gpt" title="Asistente IA ChatGPT" loading="eager" data-src="${FRAME_SOURCES.gpt}" aria-hidden="true"></iframe>
     </div>
   </section>
 `;
@@ -90,8 +89,36 @@ const createShell = (variant) => {
   return shell;
 };
 
+const getCurrentUserMeta = () => {
+  try {
+    const { auth } = getFirebase();
+    const user = auth.currentUser;
+    if (!user) {
+      return {
+        uid: "",
+        displayName: "",
+        email: "",
+        isAuthenticated: false
+      };
+    }
+    return {
+      uid: user.uid || "",
+      displayName: user.displayName || user.email || "Usuario",
+      email: user.email || "",
+      isAuthenticated: true
+    };
+  } catch (error) {
+    return {
+      uid: "",
+      displayName: "",
+      email: "",
+      isAuthenticated: false
+    };
+  }
+};
+
 const setupAuthBridge = () => {
-  if (typeof window === "undefined" || window.dmGetAuthToken) return;
+  if (typeof window === "undefined") return;
   window.dmGetAuthToken = async () => {
     try {
       const { auth } = getFirebase();
@@ -102,6 +129,7 @@ const setupAuthBridge = () => {
       return null;
     }
   };
+  window.dmGetCurrentUserMeta = async () => getCurrentUserMeta();
 };
 
 export const initAssistantShell = ({ variant = "mobile" } = {}) => {
@@ -128,12 +156,13 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
     gpt: shell.querySelector('[data-dm-ai-frame="gpt"]')
   };
   const panel = shell.querySelector(".dm-ai-panel");
-  const modelChip = shell.querySelector("[data-dm-ai-model-chip]");
   const triggers = [
     document.getElementById("aiFab"),
-    document.getElementById("dmAssistantFab")
+    document.getElementById("dmAssistantFab"),
+    document.getElementById("committee-assistant-bubble")
   ].filter(Boolean);
   let panelOutsideListenerActive = false;
+  let authUnsubscribe = null;
 
   const storedModel = (() => {
     try {
@@ -159,11 +188,6 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
     scrollLocked: false,
     scrollY: 0,
     bodyStyles: {}
-  };
-
-  const MODEL_LABELS = {
-    gemini: "Gemini",
-    gpt: "ChatGPT"
   };
 
   const dispatchShellState = (source = "internal") => {
@@ -330,14 +354,19 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
     modelButtons.forEach((btn) => {
       const isActive = btn.dataset.dmAiModel === state.activeModel;
       btn.classList.toggle("is-active", isActive);
+      btn.setAttribute("aria-pressed", isActive ? "true" : "false");
     });
   };
 
   const syncShellModelState = () => {
     const nextModel = state.activeModel === "gpt" ? "gpt" : "gemini";
     shell.dataset.activeModel = nextModel;
-    if (modelChip) {
-      modelChip.textContent = MODEL_LABELS[nextModel] || "Modelo";
+    shell.classList.toggle("is-chatgpt", nextModel === "gpt");
+    shell.classList.toggle("is-gemini", nextModel === "gemini");
+    if (selector) {
+      selector.dataset.activeModel = nextModel;
+      selector.classList.toggle("is-chatgpt", nextModel === "gpt");
+      selector.classList.toggle("is-gemini", nextModel === "gemini");
     }
   };
 
@@ -363,27 +392,44 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
     dispatchShellState("model-change");
   };
 
-  // Keep one iframe per model so each conversation stays alive.
+  const sendUserContextToIframe = (model) => {
+    const frame = frames[model];
+    if (!frame || !frame.contentWindow) return;
+    frame.contentWindow.postMessage(
+      {
+        type: "dm-ai-user-context",
+        user: getCurrentUserMeta()
+      },
+      window.location.origin
+    );
+  };
+
+  const broadcastUserContext = () => {
+    Object.keys(frames).forEach((model) => sendUserContextToIframe(model));
+  };
+
+  // Keep one iframe per model so each conversation stays alive per authenticated user.
   const ensureFrameLoaded = (modelKey) => {
     const frame = frames[modelKey];
     if (!frame) return Promise.resolve();
     if (state.framesLoaded[modelKey]) return Promise.resolve();
     state.framesLoaded[modelKey] = true;
-    return new Promise((resolve) => {
-      frame.addEventListener(
-        "load",
-        () => {
-          resolve();
-        },
-        { once: true }
-      );
-      frame.src = frame.dataset.src || FRAME_SOURCES[modelKey];
-    });
+    frame.loading = "eager";
+    frame.addEventListener(
+      "load",
+      () => {
+        sendUserContextToIframe(modelKey);
+      },
+      { once: true }
+    );
+    frame.src = frame.dataset.src || FRAME_SOURCES[modelKey];
+    return Promise.resolve();
   };
 
   const sendModelToIframe = (model) => {
     const frame = frames[model];
     if (!frame || !frame.contentWindow || !model) return;
+    sendUserContextToIframe(model);
     frame.contentWindow.postMessage(
       { type: "dm-ai-select-model", model },
       window.location.origin
@@ -516,7 +562,8 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
     if (!state.pickerOpen) return;
     const target = event.target;
     const clickedSelector = selector && selector.contains(target);
-    const clickedTrigger = triggers.some((trigger) => trigger.contains(target));
+    const clickedTrigger = triggers.some((trigger) => trigger.contains(target)) ||
+      Boolean(target?.closest?.("#committee-assistant-bubble"));
     if (!clickedSelector && !clickedTrigger) {
       closePicker();
     }
@@ -528,7 +575,8 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
     if (!isDesktop()) return;
     const target = event.target;
     if (panel && panel.contains(target)) return;
-    const clickedTrigger = triggers.some((trigger) => trigger.contains(target));
+    const clickedTrigger = triggers.some((trigger) => trigger.contains(target)) ||
+      Boolean(target?.closest?.("#committee-assistant-bubble"));
     if (clickedTrigger) return;
     closePanel();
   };
@@ -567,9 +615,19 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
       if (activeFrame && event.source !== activeFrame.contentWindow) return;
       setActiveModel(payload.model, { persist: true, notify: false });
     }
+    if (payload.type === "dm-ai-request-user-context") {
+      const targetFrame = Object.values(frames).find((frame) => frame?.contentWindow === event.source);
+      if (!targetFrame) return;
+      targetFrame.contentWindow.postMessage(
+        { type: "dm-ai-user-context", user: getCurrentUserMeta() },
+        window.location.origin
+      );
+      return;
+    }
     if (payload.type === "dm-ai-ready") {
       const activeFrame = frames[state.activeModel];
       if (activeFrame && event.source !== activeFrame.contentWindow) return;
+      sendUserContextToIframe(state.activeModel);
       sendModelToIframe(state.activeModel);
     }
     if (payload.type === "dm-ai-swipe-intent" && payload.direction) {
@@ -638,6 +696,17 @@ export const initAssistantShell = ({ variant = "mobile" } = {}) => {
     } else {
       window.setTimeout(warmup, 1400);
     }
+  }
+
+  try {
+    const { auth } = getFirebase();
+    if (auth && typeof auth.onAuthStateChanged === "function") {
+      authUnsubscribe = auth.onAuthStateChanged(() => {
+        broadcastUserContext();
+      });
+    }
+  } catch (error) {
+    authUnsubscribe = null;
   }
 
   // Guard: if a previous session left the body locked, release it.

@@ -42,7 +42,9 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   const USER_DIRECTORY_TTL_MS = 5 * 60 * 1000;
   const ASSISTANT_MODEL_STORAGE_KEY = 'dm_ai_model';
   const ASSISTANT_DEFAULT_MODEL = 'gemini';
-  const ASSISTANT_SHELL_MODULE_URL = '/assets/js/shared/assistant-shell.js?v=20260306-chat-desktop-layout-1';
+  const ASSISTANT_SHELL_MODULE_URL = '/assets/js/shared/assistant-shell.js?v=20260508-boti-header-2';
+  const ASSISTANT_ICON_SRC = '/asistente-ia/boti-brisa.jpg';
+  const CHAT_STYLESHEET_URL = '/assets/css/shared/brisa-chat.css?v=20260504-bitacora-dock-chat-polish-2';
   const VIRTUAL_REPLIES = [
     'Estoy en línea, contame tu caso.',
     'Recibido, ¿algún detalle extra?',
@@ -64,6 +66,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     try {
       const pathname = window.location.pathname || '';
       if (pathname.startsWith('/app/')) return 'app';
+      if (pathname.endsWith('/bitacora-cientifica.html') || pathname.includes('/bitacora-cientifica')) return 'bitacora';
       if (pathname.includes('/pages/comites/')) return 'committee';
     } catch (error) {}
     return 'home';
@@ -217,6 +220,13 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   };
 
   const ensureChatStylesInjected = () => {
+    if (!document.querySelector('link[data-brisa-chat-css], link[href*="/assets/css/shared/brisa-chat.css"]')) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = CHAT_STYLESHEET_URL;
+      link.dataset.brisaChatCss = 'true';
+      document.head.appendChild(link);
+    }
     if (document.getElementById('brisa-chat-pulse-style')) return;
     const style = document.createElement('style');
     style.id = 'brisa-chat-pulse-style';
@@ -789,6 +799,18 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
           );
         }
 
+        #brisa-chat-root[data-chat-context="bitacora"] {
+          --dm-fab-bottom: 2rem;
+          --brisa-chat-fab-left: 32px;
+          --brisa-chat-window-left: calc(
+            var(--brisa-chat-fab-left, 32px) +
+            var(--dm-chat-fab-size, 58px) +
+            var(--brisa-chat-panel-gap, 16px) +
+            var(--brisa-chat-panel-width, 18rem) +
+            var(--brisa-chat-window-gap, 18px)
+          );
+        }
+
         #brisa-chat-root[data-chat-context="committee"] {
           --dm-fab-bottom: 18px;
           --brisa-chat-fab-left: 18px;
@@ -810,6 +832,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         }
 
         #brisa-chat-root[data-chat-context="home"] .brisa-chat-fab[data-side="left"] .brisa-chat-panel,
+        #brisa-chat-root[data-chat-context="bitacora"] .brisa-chat-fab[data-side="left"] .brisa-chat-panel,
         #brisa-chat-root[data-chat-context="app"] .brisa-chat-fab[data-side="left"] .brisa-chat-panel {
           left: calc(100% + var(--brisa-chat-panel-gap, 16px));
           right: auto;
@@ -1221,15 +1244,16 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         }
 
         #brisa-chat-window-min {
-          display: none;
-        }
-
-        #brisa-chat-delete-conversation {
+          display: inline-flex;
           order: 1;
         }
 
-        #brisa-chat-window-close {
+        #brisa-chat-delete-conversation {
           order: 2;
+        }
+
+        #brisa-chat-window-close {
+          order: 3;
         }
 
         .brisa-chat-pill-btn {
@@ -1273,6 +1297,30 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         pointer-events: auto;
       }
 
+      .dm-ai-shell,
+      .dm-ai-selector {
+        --bot-accent: #0f9f82;
+        --bot-accent-soft: rgba(15, 159, 130, 0.12);
+        --bot-accent-border: rgba(15, 159, 130, 0.24);
+        --bot-shadow: 0 30px 80px rgba(15, 23, 42, 0.22), 0 14px 36px rgba(15, 159, 130, 0.14);
+      }
+
+      .dm-ai-shell.is-chatgpt,
+      .dm-ai-selector.is-chatgpt {
+        --bot-accent: #0f9f82;
+        --bot-accent-soft: rgba(15, 159, 130, 0.12);
+        --bot-accent-border: rgba(15, 159, 130, 0.24);
+        --bot-shadow: 0 30px 80px rgba(15, 23, 42, 0.22), 0 14px 36px rgba(15, 159, 130, 0.14);
+      }
+
+      .dm-ai-shell.is-gemini,
+      .dm-ai-selector.is-gemini {
+        --bot-accent: #6d5dfc;
+        --bot-accent-soft: rgba(109, 93, 252, 0.13);
+        --bot-accent-border: rgba(109, 93, 252, 0.25);
+        --bot-shadow: 0 30px 80px rgba(15, 23, 42, 0.22), 0 14px 36px rgba(91, 108, 255, 0.15);
+      }
+
       .dm-ai-selector {
         position: fixed;
         left: 88px;
@@ -1297,19 +1345,38 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         width: 44px;
         height: 44px;
         border-radius: 999px;
-        border: 1.5px solid var(--primary-color, #2e6b46);
-        background: #ffffff;
+        border: 1.5px solid var(--bot-accent-border);
+        background: linear-gradient(180deg, #ffffff 0%, #f8fbf9 100%);
         display: grid;
         place-items: center;
-        box-shadow: 0 8px 18px rgba(46, 107, 70, 0.18);
+        box-shadow: 0 10px 22px rgba(15, 23, 42, 0.1), 0 5px 14px var(--bot-accent-soft);
         color: #0f172a;
         cursor: pointer;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+      }
+
+      .dm-ai-selector__btn[data-dm-ai-model="gpt"] {
+        --bot-accent: #0f9f82;
+        --bot-accent-soft: rgba(15, 159, 130, 0.14);
+        --bot-accent-border: rgba(15, 159, 130, 0.28);
+      }
+
+      .dm-ai-selector__btn[data-dm-ai-model="gemini"] {
+        --bot-accent: #6d5dfc;
+        --bot-accent-soft: rgba(109, 93, 252, 0.14);
+        --bot-accent-border: rgba(109, 93, 252, 0.28);
       }
 
       .dm-ai-selector__btn.is-active {
-        box-shadow: 0 10px 22px rgba(46, 107, 70, 0.28);
-        transform: translateY(-1px);
+        border-color: color-mix(in srgb, var(--bot-accent) 68%, #ffffff);
+        background: linear-gradient(180deg, #ffffff 0%, var(--bot-accent-soft) 100%);
+        box-shadow: 0 14px 28px rgba(15, 23, 42, 0.14), 0 8px 18px var(--bot-accent-soft);
+        transform: translateY(-2px);
+      }
+
+      .dm-ai-selector__btn:focus-visible {
+        outline: 3px solid var(--bot-accent-soft);
+        outline-offset: 3px;
       }
 
       .dm-ai-selector__btn svg {
@@ -1332,13 +1399,14 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         width: 440px;
         height: 600px;
         max-height: calc(100vh - 24px);
-        background: #ffffff;
-        border-radius: 18px;
-        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 252, 250, 0.96) 100%);
+        border: 1px solid var(--bot-accent-border);
+        border-radius: 36px;
+        box-shadow: var(--bot-shadow);
         display: flex;
         flex-direction: column;
         opacity: 0;
-        transition: transform 0.2s ease, opacity 0.2s ease;
+        transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
         z-index: 99999;
         overflow: hidden;
       }
@@ -1363,12 +1431,16 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       }
 
       .dm-ai-shell .dm-ai-header {
+        position: relative;
         display: flex;
         flex-direction: column;
         gap: 8px;
-        padding: 10px 16px 12px;
-        border-bottom: 1px solid #e2e8f0;
-        background: #ffffff;
+        min-height: 78px;
+        padding: 12px 56px 14px 14px;
+        border-bottom: 1px solid var(--bot-accent-border);
+        background:
+          radial-gradient(circle at 15% 0%, var(--bot-accent-soft), transparent 42%),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 252, 250, 0.92));
         touch-action: pan-y;
       }
 
@@ -1376,43 +1448,102 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         width: 44px;
         height: 5px;
         border-radius: 999px;
-        background: rgba(148, 163, 184, 0.5);
+        background: var(--bot-accent-border);
         margin: 0 auto;
       }
 
       .dm-ai-shell .dm-ai-header-row {
-        display: flex;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
         align-items: center;
-        justify-content: space-between;
-        gap: 12px;
+        gap: 10px;
+        width: 100%;
       }
 
       .dm-ai-shell .dm-ai-title {
-        display: inline-flex;
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr);
         align-items: center;
-        gap: 10px;
+        gap: 9px;
         font-weight: 700;
         color: #0f172a;
+        min-width: 0;
+        flex: 1 1 auto;
       }
 
       .dm-ai-shell .dm-ai-title__icon {
-        width: 28px;
-        height: 28px;
+        width: 34px;
+        height: 34px;
         border-radius: 999px;
         object-fit: cover;
-        border: 1px solid rgba(122, 184, 0, 0.4);
+        border: 2px solid rgba(255, 255, 255, 0.9);
+        box-shadow: 0 6px 16px var(--bot-accent-soft);
+      }
+
+      .dm-ai-shell .dm-ai-title__copy {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        gap: 2px;
+        line-height: 1.08;
+      }
+
+      .dm-ai-shell .dm-ai-title__label {
+        display: block;
+        font-size: 1rem;
+        font-weight: 800;
+        letter-spacing: 0;
+        color: #101827;
+      }
+
+      .dm-ai-shell .dm-ai-title__meta {
+        display: block;
+        font-size: 0.76rem;
+        font-weight: 650;
+        color: #64748b;
+      }
+
+      .dm-ai-shell .dm-ai-header-actions {
+        position: absolute;
+        top: 25px;
+        right: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0;
+        flex: 0 0 auto;
+      }
+
+      .dm-ai-shell .dm-ai-model-chip {
+        display: none !important;
       }
 
       .dm-ai-shell .dm-ai-close {
-        width: 32px;
-        height: 32px;
+        display: grid;
+        place-items: center;
+        width: 36px;
+        height: 36px;
+        line-height: 1;
         border-radius: 999px;
-        border: 1px solid rgba(148, 163, 184, 0.4);
-        background: #f8fafc;
-        color: #0f172a;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        background: rgba(255, 255, 255, 0.86);
+        color: #334155;
         font-size: 1.1rem;
         font-weight: 700;
         cursor: pointer;
+        box-shadow: 0 7px 16px rgba(15, 23, 42, 0.08);
+        transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+      }
+
+      .dm-ai-shell .dm-ai-close:hover {
+        border-color: var(--bot-accent-border);
+        box-shadow: 0 10px 20px rgba(15, 23, 42, 0.12);
+        transform: translateY(-1px);
+      }
+
+      .dm-ai-shell .dm-ai-close:focus-visible {
+        outline: 3px solid var(--bot-accent-soft);
+        outline-offset: 3px;
       }
 
       .dm-ai-shell--desktop .dm-ai-body,
@@ -1507,18 +1638,29 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
 
         .dm-ai-shell .dm-ai-panel {
           position: absolute;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          height: 85vh;
-          background: #ffffff;
-          border-radius: 18px 18px 0 0;
-          box-shadow: 0 -24px 50px rgba(15, 23, 42, 0.2);
+          left: max(10px, env(safe-area-inset-left));
+          right: max(10px, env(safe-area-inset-right));
+          bottom: max(10px, env(safe-area-inset-bottom));
+          height: min(86vh, 760px);
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 252, 250, 0.96) 100%);
+          border: 1px solid var(--bot-accent-border);
+          border-radius: 34px;
+          box-shadow: var(--bot-shadow);
           overflow: hidden;
           display: flex;
           flex-direction: column;
-          transform: translateY(100%);
+          transform: translateY(calc(100% + 16px));
           transition: transform 0.25s ease;
+        }
+
+        .dm-ai-shell .dm-ai-header {
+          min-height: 76px;
+          padding: 12px 54px 14px 14px;
+        }
+
+        .dm-ai-shell .dm-ai-header-actions {
+          top: 25px;
+          right: 13px;
         }
 
         .dm-ai-shell.is-open .dm-ai-panel {
@@ -1985,7 +2127,20 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
       root.id = 'brisa-chat-root';
       document.body.appendChild(root);
     }
-    root.dataset.chatContext = detectChatDesktopContext();
+    const chatContext = detectChatDesktopContext();
+    root.dataset.chatContext = chatContext;
+    const committeeAssistantButton = chatContext === 'committee'
+      ? `
+      <button class="committee-assistant-bubble" id="committee-assistant-bubble" type="button" aria-label="Abrir Bot Brisa" title="Abrir Bot Brisa">
+        <span class="committee-assistant-bubble__avatar" aria-hidden="true">
+          <img src="${ASSISTANT_ICON_SRC}" alt="" loading="lazy" draggable="false" />
+        </span>
+        <span class="committee-assistant-bubble__copy">
+          <span>Bot</span>
+          <span>Brisa</span>
+        </span>
+      </button>`
+      : "";
 
     root.innerHTML = `
       <div class="brisa-chat-mobile-overlay hidden fixed inset-0 z-[9999] bg-black/60 flex items-center justify-center p-4 transition-opacity duration-300" id="brisa-chat-mobile-overlay" aria-hidden="true">
@@ -1993,6 +2148,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
           <div class="brisa-chat-mobile-stack relative w-full max-w-md max-h-[85dvh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden" id="brisa-chat-mobile-stack" role="dialog" aria-modal="true" aria-label="Chat médico"></div>
         </div>
       </div>
+      ${committeeAssistantButton}
       <div class="brisa-chat-fab" id="brisa-chat-fab" data-side="${BUBBLE_DEFAULT_SIDE}">
         <div class="brisa-chat-panel" id="brisa-chat-panel">
           <div class="brisa-chat-panel-header">
@@ -2259,28 +2415,41 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     html.style.touchAction = '';
   }
 
+  function dispatchMobileScrollRelease(source = 'chat') {
+    try {
+      window.dispatchEvent(new CustomEvent('dm:mobile-scroll-release', {
+        detail: { source }
+      }));
+    } catch (e) {}
+  }
+
   function setDocumentScrollLocked(locked) {
     const body = document.body;
     const html = document.documentElement;
     if (!body || !html) return;
     if (locked) {
-      if (!body.dataset.brisaChatOverflow) {
+      if (body.dataset.brisaChatScrollLocked !== '1') {
+        body.dataset.brisaChatScrollLocked = '1';
         body.dataset.brisaChatOverflow = body.style.overflow || '';
         body.dataset.brisaChatTouchAction = body.style.touchAction || '';
         html.dataset.brisaChatOverflow = html.style.overflow || '';
+        html.dataset.brisaChatTouchAction = html.style.touchAction || '';
       }
       body.style.overflow = 'hidden';
       body.style.touchAction = 'none';
       html.style.overflow = 'hidden';
       return;
     }
-    if (body.dataset.brisaChatOverflow !== undefined) {
+    if (body.dataset.brisaChatScrollLocked === '1') {
       body.style.overflow = body.dataset.brisaChatOverflow;
       body.style.touchAction = body.dataset.brisaChatTouchAction || '';
       html.style.overflow = html.dataset.brisaChatOverflow || '';
+      html.style.touchAction = html.dataset.brisaChatTouchAction || '';
+      delete body.dataset.brisaChatScrollLocked;
       delete body.dataset.brisaChatOverflow;
       delete body.dataset.brisaChatTouchAction;
       delete html.dataset.brisaChatOverflow;
+      delete html.dataset.brisaChatTouchAction;
     }
     forceReleaseDocumentScrollState();
   }
@@ -2343,7 +2512,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     return true;
   }
 
-  function closeMobileHub() {
+  function closeMobileHub({ preserveConversation = false, minimized = false, source = 'chat' } = {}) {
     if (!isCompactMobileChat()) return false;
     const root = getChatRoot();
     const overlay = document.getElementById('brisa-chat-mobile-overlay');
@@ -2351,6 +2520,8 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     const panel = document.getElementById('brisa-chat-panel');
     const win = document.getElementById('brisa-chat-window');
     if (!root || !overlay || !viewport || !panel || !win) return false;
+    const preservedConversationId = activeConversationId;
+    const preservedPeer = activePeer;
 
     root.classList.remove('brisa-chat-root--mobile-detail', 'brisa-chat-root--mobile-open');
     root.style.pointerEvents = '';
@@ -2367,18 +2538,21 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     syncMobileModalPlacement(false);
     moveFocusOutsideMobileChat();
     restoreFocusAfterHubClose();
-    activeConversationId = null;
-    activePeer = null;
+    if (!preserveConversation) {
+      activeConversationId = null;
+      activePeer = null;
+    }
     requestAnimationFrame(() => {
       moveFocusOutsideMobileChat();
       restoreFocusAfterHubClose();
     });
     setChatState({
-      isChatOpen: false,
-      isMinimized: false,
-      activeConversationId: null,
-      activePeerUid: null
+      isChatOpen: preserveConversation,
+      isMinimized: Boolean(minimized),
+      activeConversationId: preserveConversation ? preservedConversationId : null,
+      activePeerUid: preserveConversation ? preservedPeer?.uid || null : null
     });
+    dispatchMobileScrollRelease(source);
     return true;
   }
 
@@ -2742,12 +2916,19 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
   function updateAssistantQuickRow() {
     const row = document.getElementById('brisa-chat-quick-ai');
     const badge = document.getElementById('brisa-chat-quick-ai-model');
-    if (!row || !badge) return;
     const model = resolveAssistantModel();
     const label = getAssistantModelLabel(model);
-    row.dataset.model = model;
-    row.setAttribute('aria-label', `Abrir Asistente IA en ${label}`);
-    badge.textContent = label;
+    if (row && badge) {
+      row.dataset.model = model;
+      row.setAttribute('aria-label', `Abrir Asistente IA en ${label}`);
+      badge.textContent = label;
+    }
+    const assistantBubble = document.getElementById('committee-assistant-bubble');
+    if (assistantBubble) {
+      assistantBubble.dataset.model = model;
+      assistantBubble.setAttribute('aria-label', `Abrir Bot Brisa en ${label}`);
+      assistantBubble.setAttribute('title', `Abrir Bot Brisa en ${label}`);
+    }
   }
 
   async function ensureAssistantShellReady() {
@@ -3712,16 +3893,21 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
           <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
         </svg>`;
       statusNode = document.createElement('span');
+      let statusLabel = 'Entregado';
       if (isPending) {
         statusNode.className = 'brisa-chat-status-icon brisa-chat-status-icon--pending';
         statusNode.textContent = '✓';
+        statusLabel = 'Enviando';
       } else if (isRead) {
         statusNode.className = 'brisa-chat-status-icon brisa-chat-status-icon--read';
         statusNode.textContent = '✓✓';
+        statusLabel = 'Leído';
       } else {
         statusNode.className = 'brisa-chat-status-icon brisa-chat-status-icon--sent';
         statusNode.textContent = '✓✓';
       }
+      statusNode.title = statusLabel;
+      statusNode.setAttribute('aria-label', statusLabel);
       if (canDelete) {
         deleteBtn = document.createElement('button');
         deleteBtn.className = 'brisa-chat-delete-btn';
@@ -4134,7 +4320,20 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     if (isEmbeddedMode()) return;
     if (!activeConversationId || !activePeer) return;
     if (isCompactMobileChat()) {
-      closeMobileDetail();
+      const conversationId = activeConversationId;
+      const peerUid = activePeer.uid;
+      stopBlink(conversationId);
+      closeMobileHub({
+        preserveConversation: true,
+        minimized: true,
+        source: 'chat-minimize'
+      });
+      setChatState({
+        isChatOpen: true,
+        isMinimized: true,
+        activeConversationId: conversationId,
+        activePeerUid: peerUid
+      });
       return;
     }
     const conversationId = activeConversationId;
@@ -4309,6 +4508,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     const quickGroup = document.getElementById('brisa-chat-quick-group');
     const quickForo = document.getElementById('brisa-chat-quick-foro');
     const quickAi = document.getElementById('brisa-chat-quick-ai');
+    const assistantBubble = document.getElementById('committee-assistant-bubble');
     const deleteModal = document.getElementById('brisa-chat-delete-modal');
     const deletePass = document.getElementById('brisa-chat-delete-pass');
     const deleteCancel = document.getElementById('brisa-chat-delete-cancel');
@@ -4926,7 +5126,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
     if (winMin && win) {
       winMin.addEventListener('click', () => {
         if (isCompactMobileChat() && !isEmbeddedMode()) {
-          closeMobileDetail();
+          minimizeActiveConversation();
           return;
         }
         minimizeActiveConversation();
@@ -4958,41 +5158,63 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         openSpecialConversation('dm_foro_general', 'Foro general', 'Mensajes vinculados al foro', { origin: 'panel' });
       });
     }
+    const openAssistantFromAnchor = async (anchorEl = null) => {
+      try {
+        const context = getChatContext();
+        if (isCompactMobileChat() && !isEmbeddedMode()) {
+          closeMobileHub();
+        } else {
+          closeUsersPanel({ origin: 'bubble' });
+        }
+        setChatState({
+          isChatOpen: false,
+          isMinimized: true,
+          activeConversationId: null,
+          activePeerUid: null
+        });
+        const shell = await ensureAssistantShellReady();
+        const model = resolveAssistantModel();
+        await shell.openChat?.(model, { anchorEl, context });
+        updateAssistantQuickRow();
+      } catch (error) {
+        console.warn('No se pudo abrir el Asistente IA desde el chat:', error);
+      }
+    };
+
+    if (assistantBubble) {
+      assistantBubble.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const anchorEl = isElementVisible(assistantBubble) ? assistantBubble : null;
+        openAssistantFromAnchor(anchorEl);
+      });
+      assistantBubble.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          const anchorEl = isElementVisible(assistantBubble) ? assistantBubble : null;
+          openAssistantFromAnchor(anchorEl);
+        }
+      });
+    }
+
     if (quickAi) {
-      const openAssistant = async () => {
-        try {
+      quickAi.addEventListener('click', () => {
+        const anchorEl = resolveAssistantAnchorForChat({
+          panel,
+          windowEl: win,
+          bubble
+        });
+        openAssistantFromAnchor(anchorEl);
+      });
+      quickAi.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
           const anchorEl = resolveAssistantAnchorForChat({
             panel,
             windowEl: win,
             bubble
           });
-          const context = getChatContext();
-          if (isCompactMobileChat() && !isEmbeddedMode()) {
-            closeMobileHub();
-          } else {
-            closeUsersPanel({ origin: 'bubble' });
-          }
-          setChatState({
-            isChatOpen: false,
-            isMinimized: true,
-            activeConversationId: null,
-            activePeerUid: null
-          });
-          const shell = await ensureAssistantShellReady();
-          const model = resolveAssistantModel();
-          await shell.openChat?.(model, { anchorEl, context });
-          updateAssistantQuickRow();
-        } catch (error) {
-          console.warn('No se pudo abrir el Asistente IA desde el chat:', error);
-        }
-      };
-      quickAi.addEventListener('click', () => {
-        openAssistant();
-      });
-      quickAi.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          openAssistant();
+          openAssistantFromAnchor(anchorEl);
         }
       });
     }

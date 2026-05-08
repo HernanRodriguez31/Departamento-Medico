@@ -166,6 +166,39 @@
     justify-content: center;
 }
 
+.structure-avatar {
+    position: relative;
+    overflow: hidden;
+    flex: 0 0 auto;
+}
+
+.structure-avatar__img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: inherit;
+}
+
+.structure-avatar__img[hidden],
+.structure-avatar__fallback[hidden] {
+    display: none !important;
+}
+
+.structure-avatar__fallback {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+
+.structure__director-icon-wrapper.structure-avatar {
+    width: 4.5rem;
+    height: 4.5rem;
+    padding: 0;
+}
+
 .structure__director-content {
     margin-top: 1.5rem;
 }
@@ -348,6 +381,12 @@
     color: #4b5563;
 }
 
+.leader-icon-circle.structure-avatar {
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+}
+
 .leader-info {
     display: flex;
     flex-direction: column;
@@ -387,6 +426,70 @@
 
 .group-content-inner {
     overflow: hidden;
+}
+
+.group-card--direct-staff .group-header-btn {
+    align-items: center;
+}
+
+.group-card--direct-staff .group-title-text h2 {
+    max-width: 26rem;
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+    .group-card--no-leader .group-chevron {
+        grid-column: 3;
+        justify-self: end;
+    }
+}
+
+.direct-staff-panel {
+    padding: 1rem;
+    background: linear-gradient(180deg, rgba(248, 252, 245, 0.82) 0%, rgba(255, 255, 255, 0.98) 100%);
+    border: 1px solid rgba(122, 184, 0, 0.16);
+    border-radius: 0.9rem;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.direct-staff-panel__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.9rem;
+    color: #64748b;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    line-height: 1.15;
+    text-transform: uppercase;
+}
+
+.direct-staff-panel__count {
+    color: var(--first-color-ink);
+    white-space: nowrap;
+}
+
+.direct-staff-grid {
+    align-items: stretch;
+}
+
+.direct-staff-grid .staff-badge {
+    min-height: 3.15rem;
+}
+
+@media (min-width: 640px) {
+    .direct-staff-panel {
+        padding: 1.15rem 1.25rem 1.25rem;
+    }
+}
+
+@media (max-width: 420px) {
+    .direct-staff-panel__header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
 }
 
 /* Regions Accordion */
@@ -535,6 +638,18 @@
     background-color: #ecfdf5;
     color: var(--first-color);
     transition: background-color 0.3s;
+}
+
+.staff-icon-circle.structure-avatar {
+    width: 1.625rem;
+    height: 1.625rem;
+    padding: 0;
+}
+
+.coordination-card__icon.structure-avatar {
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
 }
 
 .staff-badge:hover .staff-icon-circle {

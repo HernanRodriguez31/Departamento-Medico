@@ -36,9 +36,11 @@ import { COLLECTIONS } from "../common/collections.js";
 import { requireAuth, buildLoginRedirectUrl } from "../shared/authGate.js";
 import { handleFirebaseError, debugLog } from "../shared/errors.js";
 import { initAssistantShell } from "../shared/assistant-shell.js?v=20260306-chat-desktop-layout-1";
-import { initUserMenu } from "../common/user-menu.js?v=20260305-session-1";
-import { hydrateAvatars } from "../common/user-profiles.js";
+import { initUserMenu } from "../common/user-menu.js?v=20260430-orgtree-avatars-1";
+import { hydrateAvatars } from "../common/user-profiles.js?v=20260430-orgtree-avatars-1";
 import { initSessionGuard } from "../shared/sessionGuard.js?v=20260305-session-1";
+import { initPdfViewer } from "../common/pdf-viewer.js";
+import { initDepartmentCalendar } from "../common/department-calendar.js?v=20260506-committee-calendars-1";
 import {
   toggleCarouselCommentLikeForCurrentUser,
   toggleCarouselLikeForCurrentUser,
@@ -47,6 +49,8 @@ import {
 function ensureFirebase() {
   return getFirebase();
 }
+
+const APP_ID = window.__APP_ID__ || "departamento-medico-brisa";
 
 const { POSTS: POSTS_COLLECTION, COMMENTS: COMMENTS_COLLECTION, USERS: USERS_COLLECTION } = COLLECTIONS;
 
@@ -111,10 +115,18 @@ async function initCarouselModule() {
   const overlayPrev = document.getElementById("dm-overlay-prev");
   const overlayNext = document.getElementById("dm-overlay-next");
   const visitsBadge = document.getElementById("contador-visitas");
+  const VISITS_COUNTER_DOC_ID = "home_visits";
+  const VISITS_RESET_BASELINE = 6046;
   const addBtn = document.getElementById("dm-carousel-add") || btnAddImage;
   const infoReference = document.getElementById("dm-carousel-reference");
   const infoAuthor = document.getElementById("dm-carousel-author");
   const modal = document.getElementById("dm-carousel-modal");
+  const imageLightbox = document.getElementById("dm-carousel-lightbox");
+  const imageLightboxDialog = document.getElementById("dm-carousel-lightbox-dialog");
+  const imageLightboxImg = document.getElementById("dm-carousel-lightbox-img");
+  const imageLightboxTitle = document.getElementById("dm-carousel-lightbox-title");
+  const imageLightboxMeta = document.getElementById("dm-carousel-lightbox-meta");
+  const imageLightboxClose = document.getElementById("dm-carousel-lightbox-close");
   const modalClose = document.getElementById("dm-carousel-modal-close");
   const modalCancel = document.getElementById("dm-carousel-cancel");
   const form =
@@ -131,6 +143,9 @@ async function initCarouselModule() {
   if (modal?.parentElement && modal.parentElement !== document.body) {
     // Keep the modal outside transformed sections so it overlays the viewport.
     document.body.appendChild(modal);
+  }
+  if (imageLightbox?.parentElement && imageLightbox.parentElement !== document.body) {
+    document.body.appendChild(imageLightbox);
   }
   const loader = document.getElementById("dm-loading");
   const speedDownBtn = document.getElementById("dm-slower");
@@ -185,71 +200,6 @@ async function initCarouselModule() {
   };
   applyAdminUi();
 
-  const setupCalendarModeToggle = () => {
-    const iframe = document.getElementById("calendar-iframe");
-    const buttons = document.querySelectorAll("[data-calendar-mode]");
-    if (!iframe || buttons.length === 0) return;
-
-    const storageKey = "dm-calendar-mode";
-    const normalizeMode = (mode) => (mode === "AGENDA" ? "AGENDA" : "MONTH");
-    const getModeFromSrc = () => {
-      try {
-        const url = new URL(iframe.src, window.location.href);
-        return normalizeMode(url.searchParams.get("mode"));
-      } catch (e) {
-        return "MONTH";
-      }
-    };
-    const updateButtons = (mode) => {
-      buttons.forEach((btn) => {
-        const isActive = btn.dataset.calendarMode === mode;
-        btn.classList.toggle("is-active", isActive);
-        btn.setAttribute("aria-pressed", isActive ? "true" : "false");
-      });
-    };
-    const updateIframe = (mode) => {
-      try {
-        const url = new URL(iframe.src, window.location.href);
-        if (url.searchParams.get("mode") === mode) return;
-        url.searchParams.set("mode", mode);
-        iframe.src = url.toString();
-      } catch (e) {
-        console.warn("No se pudo actualizar el calendario:", e);
-      }
-    };
-
-    let currentMode = getModeFromSrc();
-    try {
-      const stored = localStorage.getItem(storageKey);
-      if (stored) currentMode = normalizeMode(stored);
-    } catch (e) {
-      // Ignore storage errors.
-    }
-
-    updateButtons(currentMode);
-    updateIframe(currentMode);
-
-    buttons.forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const nextMode = normalizeMode(btn.dataset.calendarMode);
-        if (nextMode === currentMode) {
-          updateButtons(currentMode);
-          return;
-        }
-        currentMode = nextMode;
-        updateButtons(currentMode);
-        updateIframe(currentMode);
-        try {
-          localStorage.setItem(storageKey, currentMode);
-        } catch (e) {
-          // Ignore storage errors.
-        }
-      });
-    });
-  };
-
-  setupCalendarModeToggle();
-
   let committeeMembersStatsUnsub = null;
   let committeeTopicsStatsUnsub = null;
   let committeeStatsSubscriptionSeq = 0;
@@ -264,6 +214,309 @@ async function initCarouselModule() {
     if (typeof unsubscribeTopics === "function") unsubscribeTopics();
   };
 
+  const parseKpiNumber = (value) => {
+    const parsed = Number.parseInt(String(value).replace(/[^\d-]/g, ""), 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const shouldReduceKpiMotion = () =>
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const KPI_COUNT_DURATION = 320;
+  const KPI_TEMPORARY_TICK_MS = 58;
+  const KPI_TEMPORARY_FALLBACK_MS = 6500;
+  const KPI_COUNT_IDS = ["kpi-members", "kpi-committees", "kpi-projects"];
+  const easeOutCubic = (progress) => 1 - Math.pow(1 - progress, 3);
+
+  const cancelKpiCount = (el) => {
+    const frameId = Number(el?.dataset.kpiFrameId);
+    if (Number.isFinite(frameId) && frameId > 0) {
+      window.cancelAnimationFrame(frameId);
+    }
+    if (!el) return;
+    delete el.dataset.kpiFrameId;
+    delete el.dataset.kpiAnimating;
+  };
+
+  const finishKpiValue = (el, target) => {
+    if (!el) return;
+    el.textContent = String(target);
+    el.dataset.kpiTarget = String(target);
+    el.dataset.kpiHasCounted = "true";
+    delete el.dataset.kpiFrameId;
+    delete el.dataset.kpiAnimating;
+  };
+
+  const animateKpiBatch = (items, { forceDuration = false, holdFinalUntilEnd = false } = {}) => {
+    const entries = items
+      .map(({ el, target, from, fromZero = false }) => {
+        if (!el || !Number.isFinite(target)) return null;
+        const start = Number.isFinite(from) ? from : fromZero ? 0 : (parseKpiNumber(el.textContent) ?? 0);
+        cancelKpiCount(el);
+        el.dataset.kpiTarget = String(target);
+        return { el, start, target };
+      })
+      .filter(Boolean);
+
+    if (!entries.length) return;
+
+    if (shouldReduceKpiMotion() || (!forceDuration && entries.every((entry) => entry.start === entry.target))) {
+      entries.forEach(({ el, target }) => finishKpiValue(el, target));
+      return;
+    }
+
+    let startTime = 0;
+
+    entries.forEach(({ el, start }) => {
+      el.dataset.kpiAnimating = "true";
+      el.textContent = String(start);
+    });
+
+    const tick = (timestamp) => {
+      if (!startTime) startTime = timestamp;
+      const progress = Math.min(1, (timestamp - startTime) / KPI_COUNT_DURATION);
+      entries.forEach(({ el, start, target }) => {
+        let current = Math.round(start + (target - start) * easeOutCubic(progress));
+        if (holdFinalUntilEnd && progress < 1 && start !== target && current === target) {
+          current = target > start ? target - 1 : target + 1;
+        }
+        el.textContent = String(current);
+      });
+
+      if (progress < 1) {
+        const frameId = window.requestAnimationFrame(tick);
+        entries.forEach(({ el }) => {
+          el.dataset.kpiFrameId = String(frameId);
+        });
+        return;
+      }
+
+      entries.forEach(({ el, target }) => finishKpiValue(el, target));
+    };
+
+    const frameId = window.requestAnimationFrame(tick);
+    entries.forEach(({ el }) => {
+      el.dataset.kpiFrameId = String(frameId);
+    });
+  };
+
+  const animateKpiValue = (el, target, options = {}) => {
+    animateKpiBatch([{ el, target, ...options }]);
+  };
+
+  const createKpiCountController = () => {
+    const root = document.getElementById("kpi");
+    const kpiEls = KPI_COUNT_IDS.map((id) => document.getElementById(id)).filter(Boolean);
+    const managedEls = new Set(kpiEls);
+    const targets = new Map();
+    const placeholders = new Map();
+    const state = {
+      reducedMotion: shouldReduceKpiMotion(),
+      visualReady: shouldReduceKpiMotion() || !root,
+      introStarted: false,
+      finalStarted: shouldReduceKpiMotion() || !root || kpiEls.length === 0,
+    };
+    let observer = null;
+    let mutationObserver = null;
+    let visibilityFallbackTimer = null;
+    let temporaryFrame = null;
+    let temporaryFallbackTimer = null;
+
+    const cleanupVisibilityWatchers = () => {
+      observer?.disconnect();
+      mutationObserver?.disconnect();
+      window.removeEventListener("scroll", tryMarkVisible);
+      window.removeEventListener("resize", tryMarkVisible);
+      window.clearTimeout(visibilityFallbackTimer);
+    };
+
+    const stopTemporaryCount = () => {
+      if (Number.isFinite(temporaryFrame) && temporaryFrame > 0) {
+        window.cancelAnimationFrame(temporaryFrame);
+      }
+      window.clearTimeout(temporaryFallbackTimer);
+      temporaryFrame = null;
+      temporaryFallbackTimer = null;
+      kpiEls.forEach((el) => {
+        delete el.dataset.kpiFrameId;
+        delete el.dataset.kpiAnimating;
+      });
+    };
+
+    const isSplashGone = () => !document.getElementById("splash-screen");
+    const isRootVisible = () => {
+      if (!root) return true;
+      const rect = root.getBoundingClientRect();
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+      const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+      return rect.bottom > 0 && rect.right > 0 && rect.top < viewportHeight && rect.left < viewportWidth;
+    };
+    const hasAllTargets = () => kpiEls.length > 0 && kpiEls.every((el) => targets.has(el));
+    const getFinalStart = (el, target) => {
+      const current = parseKpiNumber(el.textContent) ?? 0;
+      if (current !== target) return current;
+      if (target > 0) return target - 1;
+      return 1;
+    };
+    const startFinalBatch = () => {
+      if (state.finalStarted || !hasAllTargets()) return;
+      state.finalStarted = true;
+      stopTemporaryCount();
+      cleanupVisibilityWatchers();
+      const entries = kpiEls.map((el) => {
+        const target = targets.get(el);
+        return { el, target, from: getFinalStart(el, target) };
+      });
+      animateKpiBatch(entries, { forceDuration: true, holdFinalUntilEnd: true });
+    };
+    const applyTemporaryFallback = () => {
+      if (state.finalStarted) return;
+      state.finalStarted = true;
+      stopTemporaryCount();
+      cleanupVisibilityWatchers();
+      const entries = [];
+      kpiEls.forEach((el) => {
+        if (targets.has(el)) {
+          const target = targets.get(el);
+          entries.push({ el, target, from: getFinalStart(el, target) });
+          return;
+        }
+        cancelKpiCount(el);
+        delete el.dataset.kpiTarget;
+        el.textContent = placeholders.get(el) || "—";
+      });
+      animateKpiBatch(entries, { forceDuration: true, holdFinalUntilEnd: true });
+    };
+    const getTemporaryValue = (el, elapsed, index) => {
+      const target = targets.get(el);
+      const ceiling = Number.isFinite(target) ? Math.max(9, Math.min(42, target + 6)) : 12 + index;
+      const step = Math.floor(elapsed / KPI_TEMPORARY_TICK_MS);
+      return step % (ceiling + 1);
+    };
+    const startTemporaryCount = () => {
+      if (state.introStarted || state.finalStarted) return;
+      state.introStarted = true;
+      let startTime = 0;
+      kpiEls.forEach((el) => {
+        cancelKpiCount(el);
+        el.textContent = "0";
+        el.dataset.kpiAnimating = "true";
+      });
+      const tick = (timestamp) => {
+        if (state.finalStarted) return;
+        if (!startTime) startTime = timestamp;
+        const elapsed = timestamp - startTime;
+        kpiEls.forEach((el, index) => {
+          el.textContent = String(getTemporaryValue(el, elapsed, index));
+        });
+        temporaryFrame = window.requestAnimationFrame(tick);
+        kpiEls.forEach((el) => {
+          el.dataset.kpiFrameId = String(temporaryFrame);
+        });
+      };
+      temporaryFrame = window.requestAnimationFrame(tick);
+      temporaryFallbackTimer = window.setTimeout(applyTemporaryFallback, KPI_TEMPORARY_FALLBACK_MS);
+    };
+    const syncIntroState = () => {
+      if (!state.visualReady || state.finalStarted) return;
+      if (hasAllTargets()) {
+        startFinalBatch();
+        return;
+      }
+      startTemporaryCount();
+    };
+    const markVisible = () => {
+      if (state.visualReady) return;
+      state.visualReady = true;
+      cleanupVisibilityWatchers();
+      syncIntroState();
+    };
+    const tryMarkVisible = () => {
+      if (state.visualReady || !isSplashGone() || !isRootVisible()) return;
+      markVisible();
+    };
+    const observeKpiVisibility = () => {
+      if (state.visualReady) return;
+      tryMarkVisible();
+      if (state.visualReady) return;
+
+      if ("IntersectionObserver" in window) {
+        observer = new IntersectionObserver(() => tryMarkVisible(), { threshold: 0.15 });
+        observer.observe(root);
+      } else {
+        window.addEventListener("scroll", tryMarkVisible, { passive: true });
+        window.addEventListener("resize", tryMarkVisible, { passive: true });
+      }
+    };
+
+    if (!state.finalStarted) {
+      if (isSplashGone()) {
+        observeKpiVisibility();
+      } else {
+        mutationObserver = new MutationObserver(() => {
+          if (!isSplashGone()) return;
+          mutationObserver?.disconnect();
+          observeKpiVisibility();
+        });
+        mutationObserver.observe(document.body || document.documentElement, {
+          childList: true,
+          subtree: true,
+        });
+        visibilityFallbackTimer = window.setTimeout(observeKpiVisibility, 2600);
+      }
+    }
+
+    return {
+      set(el, value) {
+        if (!el) return;
+
+        const target = parseKpiNumber(value);
+        const isManaged = managedEls.has(el);
+        if (target === null) {
+          placeholders.set(el, String(value));
+          if (isManaged && !state.finalStarted) {
+            if (!state.introStarted) {
+              cancelKpiCount(el);
+              el.textContent = "0";
+            }
+            return;
+          }
+          if (el.dataset.kpiTarget) return;
+          cancelKpiCount(el);
+          delete el.dataset.kpiTarget;
+          el.textContent = String(value);
+          return;
+        }
+
+        const targetText = String(target);
+        const previousTarget = el.dataset.kpiTarget;
+        targets.set(el, target);
+        placeholders.delete(el);
+        el.dataset.kpiTarget = targetText;
+
+        if (state.reducedMotion || !isManaged) {
+          cancelKpiCount(el);
+          finishKpiValue(el, target);
+          return;
+        }
+
+        if (!state.finalStarted) {
+          if (!state.introStarted) {
+            cancelKpiCount(el);
+            el.textContent = "0";
+          }
+          syncIntroState();
+          return;
+        }
+
+        if (previousTarget === targetText && el.dataset.kpiAnimating === "true") return;
+        if (previousTarget === targetText && el.dataset.kpiHasCounted === "true" && el.textContent.trim() === targetText) return;
+        animateKpiValue(el, target);
+      },
+    };
+  };
+
   const loadCommitteeStats = () => {
     const committeeDataPath = (...segments) => [
       "artifacts",
@@ -275,11 +528,19 @@ async function initCarouselModule() {
     const kpiCommittees = document.getElementById("kpi-committees");
     const kpiMembers = document.getElementById("kpi-members");
     const kpiProjects = document.getElementById("kpi-projects");
+    const kpiCounter = createKpiCountController();
     const setKpis = (committees, members, projects) => {
-      if (kpiCommittees) kpiCommittees.textContent = String(committees);
-      if (kpiMembers && kpiMembers.dataset.dynamic === "true") kpiMembers.textContent = String(members);
-      if (kpiProjects) kpiProjects.textContent = String(projects);
+      kpiCounter.set(kpiCommittees, committees);
+      if (kpiMembers && kpiMembers.dataset.dynamic === "true") kpiCounter.set(kpiMembers, members);
+      kpiCounter.set(kpiProjects, projects);
     };
+    if (kpiMembers && kpiMembers.dataset.dynamic !== "true") {
+      const staticMembers = parseKpiNumber(kpiMembers.dataset.kpiStaticValue || kpiMembers.textContent);
+      if (staticMembers !== null) {
+        kpiMembers.dataset.kpiStaticValue = String(staticMembers);
+        kpiCounter.set(kpiMembers, staticMembers);
+      }
+    }
     const cards = Array.from(document.querySelectorAll("#comites .comite__card"));
     const committeeIds = cards
       .map((card) => card.getAttribute("data-committee-id"))
@@ -520,7 +781,28 @@ async function initCarouselModule() {
   };
 
   const setupCommitteeCards = () => {
+    const COMMITTEE_CARD_NAV_DELAY_MS = 720;
+    const COMMITTEE_CARD_REDUCED_MOTION_DELAY_MS = 80;
     const cards = document.querySelectorAll("#comites .comite__card");
+    const resetCommitteeCardFlipState = () => {
+      document.querySelectorAll("#comites .comite__card.is-flipping").forEach((card) => {
+        card.classList.remove("is-flipping");
+        card.removeAttribute("aria-busy");
+        delete card.dataset.comiteNavigating;
+      });
+    };
+    const navigateWithFlip = (card, link) => {
+      if (!link || card.dataset.comiteNavigating === "1") return;
+      const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true;
+      card.dataset.comiteNavigating = "1";
+      card.setAttribute("aria-busy", "true");
+      if (!prefersReducedMotion) {
+        card.classList.add("is-flipping");
+      }
+      window.setTimeout(() => {
+        window.location.href = link;
+      }, prefersReducedMotion ? COMMITTEE_CARD_REDUCED_MOTION_DELAY_MS : COMMITTEE_CARD_NAV_DELAY_MS);
+    };
     cards.forEach((card) => {
       if (card.dataset.comiteNavBound === "1") return;
       const link = card.dataset.link || card.getAttribute("data-link");
@@ -530,16 +812,24 @@ async function initCarouselModule() {
       card.setAttribute("role", "link");
       card.addEventListener("click", (e) => {
         if (e.target && e.target.closest("button, a, input, textarea, select, label")) return;
-        window.location.href = link;
+        navigateWithFlip(card, link);
       });
       card.addEventListener("keydown", (e) => {
         if (document.activeElement !== card) return;
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          window.location.href = link;
+          navigateWithFlip(card, link);
         }
       });
     });
+    resetCommitteeCardFlipState();
+    if (document.body && document.body.dataset.comiteFlipResetBound !== "1") {
+      document.body.dataset.comiteFlipResetBound = "1";
+      window.addEventListener("pageshow", resetCommitteeCardFlipState);
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") resetCommitteeCardFlipState();
+      });
+    }
     if (window.lucide && typeof window.lucide.createIcons === "function") {
       window.lucide.createIcons();
     }
@@ -597,10 +887,10 @@ async function initCarouselModule() {
   const displayModeQuery = window.matchMedia("(display-mode: standalone)");
   let feedMode = feedQuery.matches || displayModeQuery.matches;
   let autoTimer = null;
-  const defaultSpeed = 10000; // 10 segundos por defecto
+  const defaultSpeed = 15000; // 15 segundos por defecto
   const storedSpeed = Number(localStorage.getItem("dm-speed"));
   let autoplaySpeed = Number.isFinite(storedSpeed) && storedSpeed > 0 ? storedSpeed : defaultSpeed;
-  // Forzar nuevo estándar: mínimo 10s al iniciar
+  // Forzar nuevo estándar: mínimo 15s al iniciar
   if (!Number.isFinite(storedSpeed) || storedSpeed < defaultSpeed) {
     autoplaySpeed = defaultSpeed;
     localStorage.setItem("dm-speed", defaultSpeed);
@@ -770,6 +1060,11 @@ async function initCarouselModule() {
     };
   };
 
+  const isVisualResourcePost = (post = {}) => {
+    const type = post.type || "";
+    return !type || type === "image" || type === "text";
+  };
+
   const mergePosts = (incoming, { reset = false } = {}) => {
     if (reset) {
       feedPosts = incoming;
@@ -814,7 +1109,10 @@ async function initCarouselModule() {
         q = query(collection(db, POSTS_COLLECTION), orderBy("createdAt", "desc"), startAfter(lastPostDoc), limit(PAGE_SIZE));
       }
       const snap = await getDocs(q);
-      const incoming = snap.docs.map(mapPostDoc).filter((s) => s.imageUrl || s.text || s.title);
+      const incoming = snap.docs
+        .map(mapPostDoc)
+        .filter(isVisualResourcePost)
+        .filter((s) => s.imageUrl || s.text || s.title);
       mergePosts(incoming, { reset });
       if (snap.docs.length > 0) {
         lastPostDoc = snap.docs[snap.docs.length - 1];
@@ -860,13 +1158,14 @@ async function initCarouselModule() {
 
   const subscribeVisits = () => {
     if (!db || !visitsBadge || visitsSubscribed) return;
-    const visitsRef = doc(db, "dm_meta", "home_visits");
+    updateVisitsUI(0);
+    const visitsRef = doc(db, "dm_meta", VISITS_COUNTER_DOC_ID);
     onSnapshot(
       visitsRef,
       (snap) => {
         const data = snap.data();
         const safeCount = Number.isFinite(data?.count) ? data.count : 0;
-        updateVisitsUI(safeCount);
+        updateVisitsUI(Math.max(0, safeCount - VISITS_RESET_BASELINE));
       },
       (err) => {
         console.error("[Visitas] Error leyendo contador", err);
@@ -1008,6 +1307,74 @@ async function initCarouselModule() {
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
+
+  let carouselLightboxReturnFocus = null;
+  let carouselLightboxWasAutoplayRunning = false;
+
+  const isCarouselLightboxOpen = () => imageLightbox?.classList.contains("is-open") === true;
+
+  const getLightboxImageSrc = (imgEl, current = {}) =>
+    imgEl?.dataset.full || current.imageUrl || imgEl?.currentSrc || imgEl?.src || "";
+
+  const openCarouselLightbox = (imgEl) => {
+    if (feedMode || !imageLightbox || !imageLightboxImg || !slides.length) return;
+    const current = slides[getVisualIndex()];
+    const src = getLightboxImageSrc(imgEl, current);
+    if (!src) return;
+
+    carouselLightboxReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    carouselLightboxWasAutoplayRunning = autoplayRunning;
+    if (autoTimer) {
+      clearInterval(autoTimer);
+      autoTimer = null;
+    }
+
+    imageLightboxImg.src = src;
+    imageLightboxImg.alt = current?.title ? `Imagen ampliada: ${current.title}` : imgEl?.alt || "Imagen ampliada";
+    if (imageLightboxTitle) {
+      imageLightboxTitle.textContent = current?.title || "Imagen del Centro de Recursos Visuales de Actividad Laboral";
+    }
+    if (imageLightboxMeta) {
+      imageLightboxMeta.textContent = current ? formatMeta(current) : "";
+    }
+    imageLightbox.classList.add("is-open");
+    imageLightbox.setAttribute("aria-hidden", "false");
+    document.body.classList.add("dm-carousel-lightbox-open");
+    requestAnimationFrame(() => {
+      imageLightboxDialog?.focus({ preventScroll: true });
+    });
+  };
+
+  const closeCarouselLightbox = () => {
+    if (!isCarouselLightboxOpen()) return;
+    imageLightbox.classList.remove("is-open");
+    imageLightbox.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("dm-carousel-lightbox-open");
+    if (imageLightboxImg) {
+      imageLightboxImg.removeAttribute("src");
+      imageLightboxImg.alt = "";
+    }
+    if (imageLightboxTitle) imageLightboxTitle.textContent = "";
+    if (imageLightboxMeta) imageLightboxMeta.textContent = "";
+    if (carouselLightboxWasAutoplayRunning) {
+      resetAuto();
+    }
+    carouselLightboxWasAutoplayRunning = false;
+    carouselLightboxReturnFocus?.focus?.({ preventScroll: true });
+    carouselLightboxReturnFocus = null;
+  };
+
+  imageLightbox?.addEventListener("click", (event) => {
+    if (event.target.closest("[data-carousel-lightbox-close]")) {
+      closeCarouselLightbox();
+    }
+  });
+  imageLightboxClose?.addEventListener("click", closeCarouselLightbox);
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && isCarouselLightboxOpen()) {
+      closeCarouselLightbox();
+    }
+  });
 
   const buildLikeTooltipText = (names = []) => {
     const list = Array.isArray(names) ? names.filter(Boolean) : [];
@@ -1830,7 +2197,30 @@ async function initCarouselModule() {
     slideEls.forEach((slideEl) => {
       const img = slideEl.querySelector(".dm-carousel-img");
       if (!img) return;
+      const slideIndex = Number(slideEl.dataset.idx);
+      const slideData = Number.isFinite(slideIndex) ? slides[slideIndex] : null;
       initPostImage(img);
+      img.classList.add("dm-carousel-img--expandable");
+      img.setAttribute("role", "button");
+      img.setAttribute("tabindex", "0");
+      img.setAttribute(
+        "aria-label",
+        slideData?.title
+          ? `Ampliar ${slideData.title}`
+          : "Ampliar imagen del Centro de Recursos Visuales de Actividad Laboral"
+      );
+      img.addEventListener("click", (event) => {
+        if (feedMode) return;
+        event.preventDefault();
+        openCarouselLightbox(img);
+      });
+      img.addEventListener("keydown", (event) => {
+        if (feedMode) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          openCarouselLightbox(img);
+        }
+      });
       const handleOrientation = () => {
         if (img.naturalHeight > img.naturalWidth) {
           slideEl.classList.add("vertical");
@@ -1856,6 +2246,9 @@ async function initCarouselModule() {
     if (feedMode && autoTimer) {
       clearInterval(autoTimer);
       autoTimer = null;
+    }
+    if (feedMode) {
+      closeCarouselLightbox();
     }
     renderSlides();
   };
@@ -1914,12 +2307,14 @@ async function initCarouselModule() {
 
   const handleWheel = (event) => {
     if (feedMode || !slides.length || isTransitioning) return;
-    const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
-    if (Math.abs(delta) < WHEEL_THRESHOLD) return;
+    const absX = Math.abs(event.deltaX);
+    const absY = Math.abs(event.deltaY);
+    const isHorizontalIntent = absX > WHEEL_THRESHOLD && absX > absY * 1.2;
+    if (!isHorizontalIntent) return;
     event.preventDefault();
     if (wheelLock) return;
     wheelLock = true;
-    moveTo(delta > 0 ? currentIndex + 1 : currentIndex - 1);
+    moveTo(event.deltaX > 0 ? currentIndex + 1 : currentIndex - 1);
     resetAuto();
     setTimeout(() => {
       wheelLock = false;
@@ -2411,7 +2806,7 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
   const portalWrapper = document.getElementById("portal-wrapper");
   const portalButton = document.getElementById("btn-portal");
   const portalBubble = document.getElementById("portal-bubble");
-  const portalAction = document.getElementById("portal-action");
+  const portalActions = portalBubble ? Array.from(portalBubble.querySelectorAll(".portal-link")) : [];
 
   // Keep original placement so we can restore when leaving desktop
   const originalParent = fab?.parentElement || null;
@@ -2458,6 +2853,7 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
   let activeCubeIndex = 0;
   let keyboardNavActive = false;
   let suppressAiFocusOpen = false;
+  let suppressPortalFocusOpen = false;
 
   const refreshNavCubes = () => {
     navCubes = Array.from(sidebar.querySelectorAll(".dm-cube"));
@@ -2470,6 +2866,11 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
   const isPortalCube = (btn) => btn && btn.id === "btn-portal";
   const getAssistantShell = () => assistantShell || window.__dmAssistantShell;
   const isAssistantMenuOpen = () => Boolean(getAssistantShell()?.state?.pickerOpen);
+  const focusPortalAction = (index = 0) => {
+    if (!portalActions.length) return;
+    const safeIndex = (index + portalActions.length) % portalActions.length;
+    portalActions[safeIndex]?.focus({ preventScroll: true });
+  };
   const showPortalBubble = () => {
     if (!portalWrapper || !portalBubble) return;
     portalWrapper.classList.add("is-open");
@@ -2527,9 +2928,7 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
     return href ? /^https?:/i.test(href) : false;
   };
 
-  const scrollToCubeTarget = (btn) => {
-    if (isExternalCube(btn)) return;
-    const targetSel = btn.getAttribute("data-target") || "";
+  const scrollToTargetSelector = (targetSel) => {
     if (!targetSel || targetSel === "#top") {
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
@@ -2542,6 +2941,38 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
     const y = target.getBoundingClientRect().top + window.pageYOffset - headerH - 16;
 
     window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
+  };
+
+  const scrollToCubeTarget = (btn) => {
+    if (isExternalCube(btn)) return;
+    scrollToTargetSelector(btn.getAttribute("data-target") || "");
+  };
+
+  const activatePortalAction = (action, event) => {
+    if (!action) return;
+    if (action.getAttribute("aria-disabled") === "true") {
+      event?.preventDefault();
+      return;
+    }
+    if (action.tagName === "A") {
+      const params = new URLSearchParams(window.location.search || "");
+      const href = action.getAttribute("href") || "";
+      if (params.get("dmEmulators") === "1" && href.startsWith("/")) {
+        event?.preventDefault();
+        const target = new URL(href, window.location.origin);
+        target.searchParams.set("dmEmulators", "1");
+        window.location.href = `${target.pathname}${target.search}${target.hash}`;
+      }
+      closePortalMenu();
+      return;
+    }
+    if (action.dataset.portalAction === "gallery") {
+      event?.preventDefault();
+      scrollToTargetSelector(action.getAttribute("data-target") || "#carrete");
+      closePortalMenu();
+      return;
+    }
+    closePortalMenu();
   };
 
   const clearCubeSelection = ({ closePicker = false } = {}) => {
@@ -2626,9 +3057,6 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
             event.preventDefault();
             event.stopPropagation();
             togglePortalMenu();
-            if (portalWrapper?.classList.contains("is-open")) {
-              portalAction?.focus({ preventScroll: true });
-            }
             return;
           }
           if (isAssistantCube(btn)) {
@@ -2691,33 +3119,69 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
   }
 
   if (portalWrapper && portalButton && portalBubble) {
-    portalWrapper.addEventListener("focusin", openPortalMenu);
+    const markPortalMouseIntent = () => {
+      if (!mq.matches) return;
+      suppressPortalFocusOpen = true;
+      window.setTimeout(() => {
+        suppressPortalFocusOpen = false;
+      }, 0);
+    };
+    portalButton.addEventListener("pointerdown", markPortalMouseIntent);
+    portalButton.addEventListener("mousedown", markPortalMouseIntent);
+    portalWrapper.addEventListener("focusin", () => {
+      if (suppressPortalFocusOpen) {
+        suppressPortalFocusOpen = false;
+        return;
+      }
+      openPortalMenu();
+    });
     portalWrapper.addEventListener("focusout", () => {
       window.setTimeout(() => {
         if (!portalWrapper.contains(document.activeElement)) closePortalMenu();
       }, 0);
     });
     portalButton.addEventListener("keydown", (event) => {
-      if (event.key === "ArrowRight" || event.key === "Enter") {
+      if (event.key === "ArrowRight" || event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         closeAllMenus();
         openPortalMenu();
-        portalAction?.focus({ preventScroll: true });
+        focusPortalAction(0);
       }
     });
   }
 
-  if (portalAction && portalButton) {
-    portalAction.addEventListener("keydown", (event) => {
-      if (event.key === "ArrowLeft") {
-        event.preventDefault();
-        portalButton.focus({ preventScroll: true });
-        return;
-      }
-      if (event.key === "Enter") return;
-    });
-    portalAction.addEventListener("click", (event) => {
-      event.stopPropagation();
+  if (portalActions.length && portalButton) {
+    portalActions.forEach((action, index) => {
+      action.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowLeft") {
+          event.preventDefault();
+          portalButton.focus({ preventScroll: true });
+          return;
+        }
+        if (event.key === "Escape") {
+          event.preventDefault();
+          closePortalMenu();
+          suppressPortalFocusOpen = true;
+          portalButton.focus({ preventScroll: true });
+          return;
+        }
+        if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+          event.preventDefault();
+          event.stopPropagation();
+          focusPortalAction(index + (event.key === "ArrowDown" ? 1 : -1));
+          return;
+        }
+        if (
+          (event.key === "Enter" || event.key === " ") &&
+          action.getAttribute("aria-disabled") === "true"
+        ) {
+          event.preventDefault();
+        }
+      });
+      action.addEventListener("click", (event) => {
+        event.stopPropagation();
+        activatePortalAction(action, event);
+      });
     });
   }
 
@@ -2841,38 +3305,20 @@ const initProgressiveMedia = () => {
   });
 };
 
-const initCalendarProgressive = () => {
-  const container = document.querySelector(".calendar-container");
-  if (!container) return;
-  const frame = container.querySelector("iframe");
-  if (!frame) return;
-
-  frame.classList.add("dm-calendar-frame");
-  if (!frame.hasAttribute("loading")) frame.setAttribute("loading", "lazy");
-  if (!frame.getAttribute("title")) frame.setAttribute("title", "Calendario de actividades");
-
-  container.classList.add("is-loading");
-  const fallbackTimer = window.setTimeout(() => {
-    if (!container.classList.contains("is-loaded")) {
-      container.classList.remove("is-loading");
-    }
-  }, 4000);
-
-  const markLoaded = () => {
-    window.clearTimeout(fallbackTimer);
-    container.classList.add("is-loaded");
-    container.classList.remove("is-loading");
-  };
-
-  frame.addEventListener("load", markLoaded, { once: true });
-};
-
 const boot = () => {
   const { auth, db } = ensureFirebase();
   initSessionGuard({ auth, db, fallbackHash: "#estructura" });
   initRevealAnimations();
   initProgressiveMedia();
-  initCalendarProgressive();
+  initDepartmentCalendar({
+    auth,
+    db,
+    appId: APP_ID,
+    rootSelector: "#department-calendar-root",
+    pageVariant: "index",
+    calendarContext: { scope: "home" },
+  });
+  initPdfViewer();
   initUserMenu({ variant: "desktop" });
   const assistantShell = initAssistantShell({ variant: "desktop" });
   initDesktopQuickSidebar({ assistantShell });

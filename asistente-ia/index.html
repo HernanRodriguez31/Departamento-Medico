@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Asistente Médico IA - Boti Brisa</title>
+    <script>
+        try {
+            ['dm_ai_state_v1', 'dm_ai_reset_once_v1'].forEach((key) => localStorage.removeItem(key));
+        } catch (error) {}
+    </script>
     
     <!-- 1. Tailwind CSS (Estilos) -->
     <script src="https://cdn.tailwindcss.com/3.4.17"></script>
@@ -55,6 +60,144 @@
             min-height: 0;
             overflow-y: auto;
             overscroll-behavior: contain;
+        }
+
+        .dm-ai-widget {
+            --bot-accent: #0f9f82;
+            --bot-accent-strong: #0b7f69;
+            --bot-accent-soft: rgba(15, 159, 130, 0.12);
+            --bot-accent-border: rgba(15, 159, 130, 0.24);
+            --bot-shadow: 0 28px 74px rgba(15, 23, 42, 0.18), 0 12px 30px rgba(15, 159, 130, 0.12);
+        }
+
+        .dm-ai-widget.is-gemini {
+            --bot-accent: #6d5dfc;
+            --bot-accent-strong: #5145d8;
+            --bot-accent-soft: rgba(109, 93, 252, 0.13);
+            --bot-accent-border: rgba(109, 93, 252, 0.25);
+            --bot-shadow: 0 28px 74px rgba(15, 23, 42, 0.18), 0 12px 30px rgba(91, 108, 255, 0.14);
+        }
+
+        .dm-ai-widget .dm-chat-frame {
+            border-radius: 30px !important;
+            box-shadow: var(--bot-shadow) !important;
+        }
+
+        .dm-ai-widget.is-embed .dm-chat-frame {
+            border: 0 !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            background: linear-gradient(180deg, #fbfef8 0%, #f8fafc 100%) !important;
+        }
+
+        .dm-ai-assistant-header {
+            background:
+                radial-gradient(circle at 12% 0%, var(--bot-accent-soft), transparent 42%),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 252, 250, 0.9)) !important;
+            border-bottom: 1px solid var(--bot-accent-border) !important;
+        }
+
+        .dm-ai-assistant-avatar {
+            border: 2px solid rgba(255, 255, 255, 0.9);
+            box-shadow: 0 8px 18px var(--bot-accent-soft);
+        }
+
+        .dm-ai-assistant-title {
+            display: block;
+            color: #101827;
+            font-size: 1rem;
+            font-weight: 850;
+            line-height: 1.05;
+            letter-spacing: 0;
+        }
+
+        .dm-ai-assistant-subtitle {
+            display: block;
+            color: #64748b;
+            font-size: 0.76rem;
+            font-weight: 650;
+            line-height: 1.15;
+        }
+
+        .dm-ai-model-strip {
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(248, 252, 250, 0.72)) !important;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.18) !important;
+        }
+
+        .dm-ai-model-pill,
+        .dm-ai-model-current {
+            border: 1px solid var(--bot-accent-border) !important;
+            background: var(--bot-accent-soft) !important;
+        }
+
+        .dm-ai-model-pill {
+            color: #0f172a;
+            border-radius: 999px;
+            font-weight: 800;
+            line-height: 1;
+            white-space: nowrap;
+        }
+
+        .dm-ai-toggle {
+            background: var(--bot-accent) !important;
+        }
+
+        .dm-ai-close-button,
+        .dm-ai-icon-action,
+        .dm-ai-send-button {
+            outline: none;
+        }
+
+        .dm-ai-close-button:focus-visible,
+        .dm-ai-icon-action:focus-visible,
+        .dm-ai-send-button:focus-visible,
+        .dm-ai-model-btn:focus-visible,
+        .dm-ai-toggle:focus-visible {
+            outline: 3px solid var(--bot-accent-soft);
+            outline-offset: 3px;
+        }
+
+        .dm-chat-messages {
+            background:
+                radial-gradient(circle at 18% 8%, var(--bot-accent-soft), transparent 32%),
+                linear-gradient(180deg, #f8fbf7 0%, #f8fafc 100%) !important;
+        }
+
+        .dm-ai-message-bubble {
+            border-color: rgba(148, 163, 184, 0.18) !important;
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06) !important;
+        }
+
+        .dm-ai-message-bubble--assistant {
+            background: rgba(255, 255, 255, 0.82) !important;
+            border-color: var(--bot-accent-border) !important;
+        }
+
+        .dm-ai-message-bubble--user {
+            background: #ffffff !important;
+            border-color: rgba(15, 23, 42, 0.08) !important;
+        }
+
+        .dm-ai-message-bubble--system {
+            background: rgba(255, 255, 255, 0.74) !important;
+        }
+
+        .dm-ai-input-shell {
+            border-color: var(--bot-accent-border) !important;
+            box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08) !important;
+        }
+
+        .dm-ai-input-shell:focus-within {
+            box-shadow: 0 0 0 4px var(--bot-accent-soft), 0 16px 36px rgba(15, 23, 42, 0.1) !important;
+        }
+
+        .dm-ai-send-button:not(:disabled) {
+            background: var(--bot-accent) !important;
+        }
+
+        .dm-ai-send-button:not(:disabled):hover {
+            background: var(--bot-accent-strong) !important;
         }
 
         .dm-ai-loader {
@@ -151,42 +294,158 @@
                 .replace(/\s+/g, ' ')            // Quitar espacios extra
                 .trim();
         };
-        // Variable global para guardar la charla fuera de la funcion
-        // El 'role: user' eres tu, 'role: model' es Boti.
+        const AI_SESSION_PREFIX = 'dm_ai_session_v2';
+        const AI_ANON_SESSION_KEY = 'dm_ai_anon_session_v1';
+        const LEGACY_AI_STATE_KEYS = ['dm_ai_state_v1', 'dm_ai_reset_once_v1'];
+        let anonSessionFallback = '';
+
+        const getNextLocalMidnightMs = (from = new Date()) => {
+            const next = new Date(from);
+            next.setHours(24, 0, 0, 0);
+            return next.getTime();
+        };
+
+        const safeStorage = (storageName) => {
+            try {
+                const storage = window[storageName];
+                const testKey = `dm_ai_storage_test_${Date.now()}`;
+                storage.setItem(testKey, '1');
+                storage.removeItem(testKey);
+                return storage;
+            } catch (error) {
+                return null;
+            }
+        };
+
+        const getAnonymousSessionId = () => {
+            const storage = safeStorage('sessionStorage');
+            if (storage) {
+                const existing = storage.getItem(AI_ANON_SESSION_KEY);
+                if (existing) return existing;
+                const next = (window.crypto?.randomUUID?.() || `anon-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+                storage.setItem(AI_ANON_SESSION_KEY, next);
+                return next;
+            }
+            if (!anonSessionFallback) {
+                anonSessionFallback = `anon-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+            }
+            return anonSessionFallback;
+        };
+
+        const normalizeAiUserContext = (user = {}, fallbackName = 'Doctor/a') => {
+            const uid = String(user?.uid || '').trim();
+            if (uid) {
+                return {
+                    uid,
+                    displayName: String(user?.displayName || user?.email || fallbackName || 'Usuario').trim() || 'Usuario',
+                    email: String(user?.email || '').trim(),
+                    isAuthenticated: user?.isAuthenticated !== false
+                };
+            }
+            return {
+                uid: `anon:${getAnonymousSessionId()}`,
+                displayName: String(user?.displayName || fallbackName || 'Usuario').trim() || 'Usuario',
+                email: '',
+                isAuthenticated: false
+            };
+        };
+
+        const normalizeModelKey = (model) => (model === 'gpt' ? 'gpt' : 'gemini');
+        const getSessionKey = (uid, model) => `${AI_SESSION_PREFIX}:${uid}:${normalizeModelKey(model)}`;
+        const sanitizeMessagesForStorage = (list = []) => (
+            Array.isArray(list)
+                ? list
+                    .filter((message) => message && typeof message === 'object')
+                    .map(({ image, ...rest }) => rest)
+                : []
+        );
+
+        const readStoredMessagesForModel = (userContext, model) => {
+            const storage = safeStorage('sessionStorage');
+            if (!storage || !userContext?.uid) return [];
+            const key = getSessionKey(userContext.uid, model);
+            try {
+                const raw = storage.getItem(key);
+                if (!raw) return [];
+                const parsed = JSON.parse(raw);
+                const expiresAt = Number(parsed?.expiresAt || 0);
+                if (!expiresAt || expiresAt <= Date.now()) {
+                    storage.removeItem(key);
+                    return [];
+                }
+                return sanitizeMessagesForStorage(parsed.messages || []);
+            } catch (error) {
+                storage.removeItem(key);
+                return [];
+            }
+        };
+
+        const readStoredMessagesByModel = (userContext) => ({
+            gemini: readStoredMessagesForModel(userContext, 'gemini'),
+            gpt: readStoredMessagesForModel(userContext, 'gpt')
+        });
+
+        const persistMessagesByModel = (userContext, messagesByModel = {}) => {
+            const storage = safeStorage('sessionStorage');
+            if (!storage || !userContext?.uid) return;
+            const now = Date.now();
+            const expiresAt = getNextLocalMidnightMs(new Date(now));
+            ['gemini', 'gpt'].forEach((model) => {
+                const messages = sanitizeMessagesForStorage(messagesByModel[model] || []);
+                storage.setItem(
+                    getSessionKey(userContext.uid, model),
+                    JSON.stringify({
+                        uid: userContext.uid,
+                        model,
+                        updatedAt: now,
+                        expiresAt,
+                        messages
+                    })
+                );
+            });
+        };
+
+        const clearStoredMessagesForUser = (userContext) => {
+            const storage = safeStorage('sessionStorage');
+            if (!storage || !userContext?.uid) return;
+            ['gemini', 'gpt'].forEach((model) => storage.removeItem(getSessionKey(userContext.uid, model)));
+        };
+
+        const clearLegacyAiState = () => {
+            try {
+                LEGACY_AI_STATE_KEYS.forEach((key) => localStorage.removeItem(key));
+            } catch (error) {
+                // no-op
+            }
+        };
+        clearLegacyAiState();
+
+        // Variable en memoria solamente. Nunca se comparte entre usuarios ni se persiste.
         let historialClinico = [];
 
         // AHORA EL WIDGET ACEPTA EL NOMBRE DEL USUARIO DESDE "AFUERA"
         const MedicalChatWidget = ({ nombreUsuario = "Doctor/a" }) => {
             const isEmbedMode = new URLSearchParams(window.location.search).get('embed') === '1';
-            const AI_STATE_KEY = 'dm_ai_state_v1';
-            const RESET_ONCE_KEY = 'dm_ai_reset_once_v1';
-            const shouldResetOnce = (() => {
-                try {
-                    return localStorage.getItem(RESET_ONCE_KEY) !== 'done';
-                } catch (error) {
-                    return false;
-                }
-            })();
-            const storedState = (() => {
-                if (shouldResetOnce) return {};
-                try {
-                    const raw = localStorage.getItem(AI_STATE_KEY);
-                    return raw ? JSON.parse(raw) : {};
-                } catch (error) {
-                    return {};
-                }
-            })();
+            const initialUserContext = normalizeAiUserContext(null, nombreUsuario);
             const urlModel = new URLSearchParams(window.location.search).get('model');
             const initialModel = (urlModel === 'gpt' || urlModel === 'gemini')
                 ? urlModel
-                : (storedState.selectedModel || 'gemini');
+                : (() => {
+                    try {
+                        const storedModel = localStorage.getItem('dm_ai_model');
+                        return storedModel === 'gpt' || storedModel === 'gemini' ? storedModel : 'gemini';
+                    } catch (error) {
+                        return 'gemini';
+                    }
+                })();
             const [isChatOpen, setIsChatOpen] = useState(isEmbedMode);
             const [isExpanded, setIsExpanded] = useState(isEmbedMode);
             const [isModelPickerOpen, setIsModelPickerOpen] = useState(false);
             const [selectedModel, setSelectedModel] = useState(initialModel);
-            const [messagesByModel, setMessagesByModel] = useState(storedState.messagesByModel || {});
-            const [resetOncePending, setResetOncePending] = useState(shouldResetOnce);
+            const [aiUserContext, setAiUserContext] = useState(initialUserContext);
+            const [messagesByModel, setMessagesByModel] = useState(() => readStoredMessagesByModel(initialUserContext));
             const messages = messagesByModel[selectedModel] || [];
+            const currentAiUserRef = useRef(initialUserContext.uid);
 
             const updateMessagesForModel = (modelKey, updater) => {
                 setMessagesByModel((prev) => {
@@ -315,6 +574,7 @@
             const messagesEndRef = useRef(null);
             const textareaRef = useRef(null);
             const aiEndpointRef = useRef(null);
+            const aiEndpointForcedRef = useRef(false);
             const aiLoggedRef = useRef(false);
             const embeddedSwipeRef = useRef({
                 pointerId: null,
@@ -328,8 +588,10 @@
             useEffect(() => {
                 const loader = document.getElementById('app-loader');
                 if (loader) loader.remove();
+                clearLegacyAiState();
                 try {
                     window.parent?.postMessage({ type: 'dm-ai-ready' }, window.location.origin);
+                    window.parent?.postMessage({ type: 'dm-ai-request-user-context' }, window.location.origin);
                 } catch (error) {
                     // no-op
                 }
@@ -337,38 +599,46 @@
 
             useEffect(() => {
                 try {
-                    const sanitized = Object.fromEntries(
-                        Object.entries(messagesByModel || {}).map(([key, list]) => [
-                            key,
-                            (list || []).map(({ image, ...rest }) => rest)
-                        ])
-                    );
-                    localStorage.setItem('dm_ai_state_v1', JSON.stringify({
-                        selectedModel,
-                        messagesByModel: sanitized
-                    }));
+                    if (!aiUserContext?.uid || currentAiUserRef.current !== aiUserContext.uid) return;
+                    persistMessagesByModel(aiUserContext, messagesByModel);
                     if (!isEmbedMode) {
                         localStorage.setItem('dm_ai_model', selectedModel);
                     }
                 } catch (error) {
                     // no-op
                 }
-            }, [selectedModel, messagesByModel]);
+            }, [selectedModel, messagesByModel, aiUserContext.uid, isEmbedMode]);
 
-            const getAllParams = () =>
-                new URLSearchParams(
-                    (window.parent && window.parent !== window
-                        ? window.parent.location.search
-                        : window.location.search) || ""
-                );
+            const getAllParams = () => {
+                const params = new URLSearchParams(window.location.search || "");
+                try {
+                    if (window.parent && window.parent !== window) {
+                        const parentParams = new URLSearchParams(window.parent.location.search || "");
+                        parentParams.forEach((value, key) => params.set(key, value));
+                    }
+                } catch (error) {
+                    // no-op
+                }
+                return params;
+            };
             const isDebugAi = getAllParams().get("debugAi") === "1";
             const DEFAULT_AI_ENDPOINT = "/api/ai";
+            const CLOUD_AI_ENDPOINT = "https://us-central1-departamento-medico-brisa.cloudfunctions.net/aiChat";
             const ATTACHMENTS_DISABLED_MESSAGE = "Los archivos adjuntos no estan habilitados en este momento. Envia la consulta solo en texto.";
+            const isLocalStaticHost = () => {
+                const { hostname, port } = window.location;
+                return (hostname === "127.0.0.1" || hostname === "localhost") && port === "5502";
+            };
             const resolveAiEndpoint = () => {
                 const params = getAllParams();
                 const forcedEndpoint = params.get("aiEndpoint");
 
-                if (forcedEndpoint) return forcedEndpoint;
+                if (forcedEndpoint) {
+                    aiEndpointForcedRef.current = true;
+                    return forcedEndpoint;
+                }
+                aiEndpointForcedRef.current = false;
+                if (isLocalStaticHost()) return CLOUD_AI_ENDPOINT;
                 return DEFAULT_AI_ENDPOINT;
             };
             if (!aiEndpointRef.current) {
@@ -384,10 +654,33 @@
                 const detail = data?.error || "unknown";
                 return `AI error HTTP ${status}: ${detail}`;
             };
-            const handleAiFailure = (provider, status, data, fallbackMessage) => {
+            const handleAiFailure = (provider, status, data, fallbackMessage, endpoint = AI_ENDPOINT) => {
                 if (!isDebugAi) return fallbackMessage;
-                console.info({ endpoint: AI_ENDPOINT, provider, status, data });
+                console.info({ endpoint, provider, status, data });
                 return buildAiErrorMessage(status, data);
+            };
+            const shouldRetryWithCloudEndpoint = (endpoint, response) => {
+                if (aiEndpointForcedRef.current) return false;
+                if (!isLocalStaticHost()) return false;
+                if (!response || ![404, 405, 501].includes(response.status)) return false;
+                try {
+                    const url = new URL(endpoint, window.location.href);
+                    return url.origin === window.location.origin && url.pathname === DEFAULT_AI_ENDPOINT;
+                } catch (error) {
+                    return endpoint === DEFAULT_AI_ENDPOINT;
+                }
+            };
+            const postAiRequest = async (requestOptions) => {
+                const readResponse = async (endpoint) => {
+                    const response = await fetch(endpoint, requestOptions);
+                    const data = await response.json().catch(() => ({}));
+                    return { response, data, endpoint };
+                };
+                const first = await readResponse(AI_ENDPOINT);
+                if (!shouldRetryWithCloudEndpoint(AI_ENDPOINT, first.response)) {
+                    return first;
+                }
+                return readResponse(CLOUD_AI_ENDPOINT);
             };
             const getAuthToken = async () => {
                 try {
@@ -418,7 +711,7 @@
 
                 try {
                     // SAFETY CHECK: Definimos nombre por defecto si falla
-                    const nombreFinal = (typeof nombreUsuario !== 'undefined') ? nombreUsuario : "Doctor/a";
+                    const nombreFinal = aiUserContext?.displayName || nombreUsuario || "Doctor/a";
                     const fechaHoy = new Date().toLocaleString();
 
                     // GESTI�N DE PROTOCOLOS (Si existe la funci�n)
@@ -429,25 +722,6 @@
                             console.log("?? Protocolo activado");
                             contextoAdicional = `ATENCI�N: USA ESTE PROTOCOLO INTERNO:\n${protocolosEncontrados.map(p => `--- ${p.titulo} ---\n${p.contenido}`).join('\n')}`;
                         }
-                    }
-
-                    // INICIALIZACI�N SEGURA DEL HISTORIAL
-                    // Si por alguna raz�n historialClinico no existe, lo creamos al vuelo para no romper nada
-                    let historialParaEnvio = [];
-                    if (typeof historialClinico !== 'undefined') {
-                        historialParaEnvio = historialClinico;
-                    } else {
-                        historialParaEnvio = []; 
-                    }
-
-                    if (historialParaEnvio.length === 0) {
-                        const promptSistema = `
-                        ACT�A COMO: "Boti Brisa", Asesor M�dico Corporativo.
-                        CONTEXTO: Hoy es ${fechaHoy}. Usuario: ${nombreFinal}.
-                        DIRECTRICES: Prioriza protocolos internos. Tono ejecutivo.
-                        `;
-                        historialParaEnvio.push({ role: "user", parts: [{ text: promptSistema }] });
-                        historialParaEnvio.push({ role: "model", parts: [{ text: "Entendido. Iniciando sistema m�dico." }] });
                     }
 
                     // PREPARAR MENSAJE
@@ -461,9 +735,6 @@
                     if (!token) {
                         return "Necesitas iniciar sesi\u00f3n para usar el asistente.";
                     }
-
-                    // Agregamos al historial
-                    historialParaEnvio.push({ role: "user", parts: partesUsuario });
 
                     const historyContents = (Array.isArray(history) ? history : [])
                         .map((message) => {
@@ -480,6 +751,18 @@
                             return { role: mappedRole, parts: [{ text }] };
                         })
                         .filter(Boolean);
+
+                    const promptSistema = `
+                    ACTUA COMO: "Boti Brisa", Asesor Medico Corporativo.
+                    CONTEXTO: Hoy es ${fechaHoy}. Usuario: ${nombreFinal}.
+                    DIRECTRICES: Prioriza protocolos internos. Tono ejecutivo.
+                    `;
+                    const historialParaEnvio = [
+                        { role: "user", parts: [{ text: promptSistema }] },
+                        { role: "model", parts: [{ text: "Entendido. Iniciando sistema medico." }] },
+                        ...historyContents,
+                        { role: "user", parts: partesUsuario }
+                    ];
 
                     const requestOptions = {
                         method: "POST",
@@ -498,28 +781,21 @@
                         })
                     };
 
-                    const response = await fetch(AI_ENDPOINT, requestOptions);
+                    const { response, data, endpoint } = await postAiRequest(requestOptions);
 
-                    const data = await response.json().catch(() => ({}));
                     if (!response.ok || !data?.ok) {
-                        historialParaEnvio.pop();
                         return handleAiFailure(
                             "gemini",
                             response.status,
                             data,
-                            "Error de conexi�n. Intente refrescar la p�gina."
+                            "Error de conexi�n. Intente refrescar la p�gina.",
+                            endpoint
                         );
                     }
                     const respuestaBot =
                         data?.text ||
                         data?.candidates?.[0]?.content?.parts?.[0]?.text ||
                         "Sin respuesta clinica.";
-
-                    // Guardamos la respuesta
-                    historialParaEnvio.push({ role: "model", parts: [{ text: respuestaBot }] });
-                    
-                    // Actualizamos la variable global si existe
-                    if (typeof historialClinico !== 'undefined') historialClinico = historialParaEnvio;
 
                     return respuestaBot;
 
@@ -571,7 +847,7 @@
                         })
                         .filter(Boolean);
 
-                    const response = await fetch(AI_ENDPOINT, {
+                    const { response, data, endpoint } = await postAiRequest({
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json",
@@ -584,13 +860,13 @@
                         })
                     });
 
-                    const data = await response.json().catch(() => ({}));
                     if (!response.ok || !data?.ok) {
                         return handleAiFailure(
                             "openai",
                             response.status,
                             data,
-                            data?.error || "aiChat failed"
+                            data?.error || "aiChat failed",
+                            endpoint
                         );
                     }
                     return data.text || "Sin respuesta clinica.";
@@ -633,8 +909,8 @@
             const models = {
                 gpt: {
                     id: 'gpt',
-                    name: 'Chat GPT',
-                    shortName: 'Chat GPT',
+                    name: 'ChatGPT',
+                    shortName: 'ChatGPT',
                     color: 'bg-[#10a37f]',
                     hoverColor: 'hover:bg-[#0d8a6a]',
                     buttonColor: 'bg-white',
@@ -644,8 +920,8 @@
                 },
                 gemini: {
                     id: 'gemini',
-                    name: 'Gemini Pro',
-                    shortName: 'Gemini Pro',
+                    name: 'Gemini',
+                    shortName: 'Gemini',
                     color: 'bg-[#1d4ed8]',
                     hoverColor: 'hover:bg-[#1e40af]',
                     buttonColor: 'bg-white',
@@ -672,7 +948,7 @@
                     inputRing: "focus-within:ring-emerald-100"
                 };
             const activeModelMeta = isGemini ? models.gemini : models.gpt;
-            const modelName = isGemini ? "Gemini Pro" : "ChatGPT";
+            const modelName = isGemini ? "Gemini" : "ChatGPT";
 
             const toggleModel = () => {
                 setSelectedModel((prev) => (prev === "gemini" ? "gpt" : "gemini"));
@@ -706,6 +982,17 @@
                 const handleExternalModel = (event) => {
                     if (event.origin !== window.location.origin) return;
                     const payload = event.data || {};
+                    if (payload.type === 'dm-ai-user-context') {
+                        const nextUserContext = normalizeAiUserContext(payload.user, nombreUsuario);
+                        setAiUserContext((prev) => (
+                            prev.uid === nextUserContext.uid
+                                && prev.displayName === nextUserContext.displayName
+                                && prev.email === nextUserContext.email
+                                ? prev
+                                : nextUserContext
+                        ));
+                        return;
+                    }
                     if (payload.type !== 'dm-ai-select-model') return;
                     const nextModel = payload.model;
                     if (!models[nextModel]) return;
@@ -715,7 +1002,33 @@
                 };
                 window.addEventListener('message', handleExternalModel);
                 return () => window.removeEventListener('message', handleExternalModel);
-            }, [isChatOpen]);
+            }, [nombreUsuario]);
+
+            useEffect(() => {
+                if (!aiUserContext?.uid || currentAiUserRef.current === aiUserContext.uid) return;
+                currentAiUserRef.current = aiUserContext.uid;
+                historialClinico = [];
+                setMessagesByModel(readStoredMessagesByModel(aiUserContext));
+                setInputText('');
+                setSelectedFile(null);
+                setIsTyping(false);
+                setIsModelPickerOpen(false);
+            }, [aiUserContext.uid]);
+
+            useEffect(() => {
+                if (!aiUserContext?.uid) return undefined;
+                const delay = Math.max(1000, getNextLocalMidnightMs() - Date.now() + 250);
+                const timerId = window.setTimeout(() => {
+                    clearStoredMessagesForUser(aiUserContext);
+                    historialClinico = [];
+                    setMessagesByModel({});
+                    setInputText('');
+                    setSelectedFile(null);
+                    setIsTyping(false);
+                    setIsModelPickerOpen(false);
+                }, delay);
+                return () => window.clearTimeout(timerId);
+            }, [aiUserContext.uid]);
 
             useEffect(() => {
                 if (!isEmbedMode) return undefined;
@@ -834,21 +1147,6 @@
             }, [inputText]);
 
             useEffect(() => {
-                if (!resetOncePending || !isChatOpen) return;
-                setMessagesByModel({});
-                if (typeof historialClinico !== 'undefined') {
-                    historialClinico = [];
-                }
-                try {
-                    localStorage.removeItem(AI_STATE_KEY);
-                    localStorage.setItem(RESET_ONCE_KEY, 'done');
-                } catch (error) {
-                    // no-op
-                }
-                setResetOncePending(false);
-            }, [resetOncePending, isChatOpen]);
-
-            useEffect(() => {
                 if (!isChatOpen) return;
                 updateMessages((prev) => {
                     const greetingText = getGreetingText(selectedModel);
@@ -893,14 +1191,8 @@
 
             const clearChat = () => {
                 setMessagesByModel({});
-                if (typeof historialClinico !== 'undefined') {
-                    historialClinico = [];
-                }
-                try {
-                    localStorage.removeItem('dm_ai_state_v1');
-                } catch (error) {
-                    // no-op
-                }
+                historialClinico = [];
+                clearStoredMessagesForUser(aiUserContext);
             };
 
             // --- TU NUEVA FUNCI�N 'HANDLE SEND' MEJORADA ---
@@ -1018,7 +1310,7 @@
             );
 
             return (
-                <div className={shellClass}>
+                <div className={`${shellClass} dm-ai-widget ${isGemini ? "is-gemini" : "is-chatgpt"} ${isEmbedMode ? "is-embed" : "is-floating"}`}>
                 
                 {/* --- 1. VENTANA DE CHAT --- */}
                 {isChatOpen && (
@@ -1027,41 +1319,47 @@
                     >
                     {/* Header */}
                     {!isEmbedMode && (
-                    <div className={`flex items-center justify-between px-4 py-4 ${themeClasses.header} backdrop-blur-md border-b border-white/20`}>
-                        <div className="flex items-center gap-3">
-                            {renderBotAvatar("w-8 h-8 rounded-full")}
-                            <span className="text-white font-bold tracking-tight">Boti Brisa</span>
+                    <div className="dm-ai-assistant-header flex items-center justify-between gap-3 px-4 py-4 backdrop-blur-md">
+                        <div className="flex min-w-0 items-center gap-3">
+                            {renderBotAvatar("dm-ai-assistant-avatar w-10 h-10 rounded-full shrink-0")}
+                            <span className="min-w-0">
+                                <span className="dm-ai-assistant-title">Boti Brisa</span>
+                                <span className="dm-ai-assistant-subtitle">Tu asistente guía</span>
+                            </span>
                         </div>
-                        <button
-                            onClick={requestClosePanel}
-                            data-no-ai-swipe="true"
-                            className="p-2 rounded-full text-white hover:bg-white/15 active:bg-white/20 transition"
-                            title="Cerrar"
-                            aria-label="Cerrar"
-                        >
-                            <X size={18} />
-                        </button>
+                        <div className="flex shrink-0 items-center gap-2">
+                            <span className="dm-ai-model-pill px-3 py-2 text-xs">{modelName}</span>
+                            <button
+                                onClick={requestClosePanel}
+                                data-no-ai-swipe="true"
+                                className="dm-ai-close-button grid h-9 w-9 place-items-center rounded-full border border-slate-200/70 bg-white/85 text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white active:translate-y-0"
+                                title="Cerrar"
+                                aria-label="Cerrar asistente"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
                     </div>
                     )}
 
                     {/* Sub-header */}
-                    <div className={`bg-white/70 backdrop-blur-md border-b border-white/60 flex items-center justify-between gap-3 ${isEmbedMode ? 'px-4 py-3' : 'px-4 py-3'}`}>
-                        <div className="bg-white/90 border border-white/60 shadow-sm rounded-full px-3 py-2 flex items-center gap-2">
+                    <div className={`dm-ai-model-strip backdrop-blur-md flex items-center justify-between gap-3 ${isEmbedMode ? 'px-4 py-3' : 'px-4 py-3'}`}>
+                        <div className="dm-ai-model-current shadow-sm rounded-full px-3 py-2 flex items-center gap-2">
                             <span className="w-5 h-5 flex items-center justify-center">
                                 {activeModelMeta?.icon}
                             </span>
-                            <span className="text-sm font-medium text-slate-800">{modelName}</span>
+                            <span className="text-sm font-bold text-slate-800">{modelName}</span>
                         </div>
                         <div className="flex items-center gap-3">
-                            <span className="text-xs text-slate-500">{isEmbedMode ? 'Modelo' : 'Cambiar modelo'}</span>
+                            <span className="text-xs font-semibold text-slate-500">Cambiar</span>
                             <button
                                 type="button"
                                 role="switch"
                                 aria-checked={isGemini}
-                                aria-label="Cambiar modelo"
+                                aria-label="Cambiar modelo de Boti Brisa"
                                 onClick={toggleModel}
                                 data-no-ai-swipe="true"
-                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition shadow-inner ${themeClasses.toggle}`}
+                                className="dm-ai-toggle relative inline-flex h-6 w-11 items-center rounded-full transition shadow-inner"
                             >
                                 <span
                                     className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${isGemini ? "translate-x-5" : "translate-x-1"}`}
@@ -1076,6 +1374,11 @@
                         {messages.map((msg) => {
                             const isUser = msg.role === 'user';
                             const isSystem = msg.role === 'system';
+                            const semanticBubbleClass = isSystem
+                                ? 'dm-ai-message-bubble--system'
+                                : isUser
+                                    ? 'dm-ai-message-bubble--user'
+                                    : 'dm-ai-message-bubble--assistant';
                             const bubbleClass = isSystem
                                 ? 'bg-white/80 text-slate-500 rounded-xl text-center text-xs border border-slate-200/60 w-full max-w-[90%]'
                                 : isUser
@@ -1090,7 +1393,7 @@
                                     </div>
                                 )}
                                 <div
-                                    className={`px-4 py-3 text-sm leading-relaxed ${bubbleClass}`}
+                                    className={`dm-ai-message-bubble ${semanticBubbleClass} px-4 py-3 text-sm leading-relaxed ${bubbleClass}`}
                                 >
                                     {renderMessageText(msg.text)}
                                 </div>
@@ -1102,7 +1405,7 @@
                             <div className="mr-2 mt-0.5 shrink-0">
                                 {renderBotAvatar("w-8 h-8 rounded-full ring-1 ring-white/70 shadow-sm")}
                             </div>
-                            <div className="bg-white/70 border border-white/60 px-4 py-3 rounded-2xl rounded-tl-none shadow-sm backdrop-blur-sm flex gap-1">
+                            <div className="dm-ai-message-bubble dm-ai-message-bubble--assistant bg-white/70 border border-white/60 px-4 py-3 rounded-2xl rounded-tl-none shadow-sm backdrop-blur-sm flex gap-1">
                                 <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span>
                                 <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce delay-100"></span>
                             </div>
@@ -1130,7 +1433,7 @@
                             </div>
                         )}
 
-                        <div data-no-ai-swipe="true" className={`flex items-center gap-2 min-h-[54px] bg-white border border-gray-200 rounded-full px-3 py-2 shadow-sm transition-all focus-within:ring-2 -translate-y-2 ${themeClasses.inputRing}`}>
+                        <div data-no-ai-swipe="true" className={`dm-ai-input-shell flex items-center gap-2 min-h-[54px] bg-white border border-gray-200 rounded-full px-3 py-2 shadow-sm transition-all -translate-y-2 ${themeClasses.inputRing}`}>
                             
                             {/* Input de archivo oculto + Bot�n Clip */}
                             <input 
@@ -1143,7 +1446,7 @@
                             <button 
                                 onClick={() => fileInputRef.current?.click()}
                                 data-no-ai-swipe="true"
-                                className={`p-2 rounded-xl transition-all duration-200 mb-0.5 ${selectedFile ? 'text-blue-600 bg-blue-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50'}`}
+                                className={`dm-ai-icon-action p-2 rounded-xl transition-all duration-200 mb-0.5 ${selectedFile ? 'text-blue-600 bg-blue-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50'}`}
                                 title="Adjuntar imagen cl�nica"
                             >
                                 <Paperclip size={20} />
@@ -1152,7 +1455,7 @@
                             <button 
                                 onClick={toggleListening}
                                 data-no-ai-swipe="true"
-                                className={`p-2 rounded-xl transition-all duration-200 mb-0.5 ${isListening ? 'bg-red-500 text-white animate-pulse shadow-md' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50'}`}
+                                className={`dm-ai-icon-action p-2 rounded-xl transition-all duration-200 mb-0.5 ${isListening ? 'bg-red-500 text-white animate-pulse shadow-md' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50'}`}
                                 title="Dictar por voz"
                             >
                                 {isListening ? <MicOff size={20} /> : <Mic size={20} />}
@@ -1176,7 +1479,7 @@
                                 onClick={handleSend} 
                                 disabled={(!inputText.trim() && !selectedFile) || isTyping} 
                                 data-no-ai-swipe="true"
-                                className={`p-2.5 rounded-xl mb-0.5 transition-all duration-300 shadow-sm ${(!inputText.trim() && !selectedFile) ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' : `text-white ${themeClasses.send} hover:brightness-95 active:brightness-90 hover:shadow-md active:scale-95`}`}
+                                className={`dm-ai-send-button p-2.5 rounded-xl mb-0.5 transition-all duration-300 shadow-sm ${(!inputText.trim() && !selectedFile) ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' : `text-white ${themeClasses.send} hover:brightness-95 active:brightness-90 hover:shadow-md active:scale-95`}`}
                             >
                                 <Send size={18} />
                             </button>
