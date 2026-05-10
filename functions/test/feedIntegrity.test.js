@@ -81,6 +81,20 @@ test("buildCarouselLikeAggregatePatch returns a parent-doc payload with synced c
   });
 });
 
+test("buildCarouselLikeAggregatePatch fills missing display names from uid fallbacks", () => {
+  const patch = buildCarouselLikeAggregatePatch({
+    likedBy: ["user-a", "user-b", "user-c"],
+    likedNames: ["Dr. A"],
+  });
+
+  assert.deepEqual(patch, {
+    likedBy: ["user-a", "user-b", "user-c"],
+    likedNames: ["Dr. A", "user-b", "user-c"],
+    likesCount: 3,
+    likeCount: 3,
+  });
+});
+
 test("buildCarouselLikeAggregatePatch clamps invalid arrays to a zeroed payload", () => {
   const patch = buildCarouselLikeAggregatePatch({
     likedBy: ["", "   "],

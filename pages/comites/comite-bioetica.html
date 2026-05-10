@@ -1755,8 +1755,10 @@ async function joinCurrentCommittee() {
             <p id="committee-subtitle" class="text-lg text-gray-500 max-w-2xl mx-auto mt-2">Análisis ético de la práctica
                 médica.</p>
             <div id="meta-edit-fields" class="hidden flex flex-col items-center gap-2 mt-3">
+                <label for="meta-title-input" class="sr-only">Título del comité</label>
                 <input id="meta-title-input" type="text"
                     class="w-full max-w-xl text-center text-2xl sm:text-3xl font-extrabold text-gray-900 border border-gray-200 rounded-lg px-3 py-2 shadow-sm focus:ring-2 focus:ring-brisa focus:outline-none">
+                <label for="meta-subtitle-input" class="sr-only">Subtítulo del comité</label>
                 <input id="meta-subtitle-input" type="text"
                     class="w-full max-w-2xl text-center text-base sm:text-lg text-gray-700 border border-gray-200 rounded-lg px-3 py-2 shadow-sm focus:ring-2 focus:ring-brisa focus:outline-none">
                 <div class="flex gap-2">
@@ -1772,7 +1774,7 @@ async function joinCurrentCommittee() {
         <!-- Dashboard Stats -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
             <!-- Integrantes -->
-            <div class="stat-card flex items-center justify-between p-6 h-full" style="--accent:#7ab800">
+            <div class="stat-card stat-card--brisa flex items-center justify-between p-6 h-full">
                 <div>
                     <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Integrantes</p>
                     <p class="text-4xl font-extrabold text-gray-800" id="stat-members">—</p>
@@ -1782,7 +1784,7 @@ async function joinCurrentCommittee() {
                 </div>
             </div>
             <!-- Proyectos -->
-            <div class="stat-card flex items-center justify-between p-6 h-full" style="--accent:#7ab800">
+            <div class="stat-card stat-card--brisa flex items-center justify-between p-6 h-full">
                 <div>
                     <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Proyectos en Proceso</p>
                     <p class="text-4xl font-extrabold text-gray-800" id="stat-active">—</p>
@@ -1792,7 +1794,7 @@ async function joinCurrentCommittee() {
                 </div>
             </div>
             <!-- Finalizados -->
-            <div class="stat-card flex items-center justify-between p-6 h-full" style="--accent:#0d9488">
+            <div class="stat-card stat-card--teal flex items-center justify-between p-6 h-full">
                 <div>
                     <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Trabajos Finalizados</p>
                     <p class="text-4xl font-extrabold text-gray-800" id="stat-finished">—</p>
@@ -1999,7 +2001,7 @@ async function joinCurrentCommittee() {
                     <!-- Members rendered here -->
                 </div>
 
-                <div class="dm-accordion" style="display:none;">
+                <div class="dm-accordion" data-hide-members="true">
                     <button class="dm-accordion-toggle" type="button">
                         <span>Agregar integrante</span>
                         <span class="dm-accordion-chevron">⌄</span>
@@ -2067,7 +2069,8 @@ async function joinCurrentCommittee() {
                         <input type="text" id="pubmed-query" placeholder="Buscar papers, autores, PMID..."
                             class="w-full pl-5 pr-12 py-4 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-brisa focus:ring-4 focus:ring-blue-50 transition-all outline-none text-gray-700 font-medium placeholder-gray-400">
                         <button type="submit"
-                            class="absolute right-2 top-2 bottom-2 bg-[#2b6cb0] text-white p-2.5 rounded-lg hover:bg-blue-800 transition-all shadow-sm transform active:scale-95">
+                            class="absolute right-2 top-2 bottom-2 bg-[#2b6cb0] text-white p-2.5 rounded-lg hover:bg-blue-800 transition-all shadow-sm transform active:scale-95"
+                            title="Buscar en PubMed" aria-label="Buscar en PubMed">
                             <i data-lucide="search" class="w-5 h-5"></i>
                         </button>
                     </form>
@@ -2120,8 +2123,10 @@ async function joinCurrentCommittee() {
                 <i data-lucide="chevron-left" class="w-5 h-5"></i> Regresar a página principal
             </a>
             <button id="scroll-top-btn" onclick="window.scrollTo({ top: 0, behavior: 'smooth' })"
+                aria-label="Volver arriba" title="Volver arriba"
                 class="scroll-to-top-btn bg-brisa text-white p-3.5 rounded-full shadow-lg hover:bg-brisa-dark transition-all transform hover:scale-110 hover:rotate-12 active:scale-95">
                 <i data-lucide="arrow-up" class="w-6 h-6"></i>
+                <span class="sr-only">Volver arriba</span>
             </button>
         </div>
 

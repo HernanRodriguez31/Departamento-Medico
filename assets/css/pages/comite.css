@@ -179,6 +179,14 @@ body {
     background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
 }
 
+.stat-card--brisa {
+    --accent: #7ab800;
+}
+
+.stat-card--teal {
+    --accent: #0d9488;
+}
+
 .stat-card::after {
     content: '';
     position: absolute;

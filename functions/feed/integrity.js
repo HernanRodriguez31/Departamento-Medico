@@ -54,9 +54,10 @@ const buildCarouselLikeAggregatePatch = ({
   const normalizedLikedBy = Array.isArray(likedBy)
     ? likedBy.map(cleanString).filter(Boolean)
     : [];
-  const normalizedLikedNames = Array.isArray(likedNames)
-    ? likedNames.map(cleanString).filter(Boolean)
-    : [];
+  const sourceNames = Array.isArray(likedNames) ? likedNames : [];
+  const normalizedLikedNames = normalizedLikedBy.map((uid, index) =>
+    normalizeLikeName(sourceNames[index], uid)
+  );
   const count = normalizedLikedBy.length;
   return {
     likedBy: normalizedLikedBy,

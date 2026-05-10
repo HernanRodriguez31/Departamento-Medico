@@ -8,10 +8,12 @@ import { waitForAuth } from "/assets/js/shared/authGate.js";
 const FUNCTIONS_REGION = "us-central1";
 const TOGGLE_CAROUSEL_LIKE_FUNCTION = "toggleCarouselLike";
 const TOGGLE_CAROUSEL_COMMENT_LIKE_FUNCTION = "toggleCarouselCommentLike";
+const SYNC_CAROUSEL_LIKE_AGGREGATE_FUNCTION = "syncCarouselLikeAggregate";
 const REGISTER_HOME_VISIT_FUNCTION = "registerHomeVisit";
 
 let toggleCarouselLikeCallable = null;
 let toggleCarouselCommentLikeCallable = null;
+let syncCarouselLikeAggregateCallable = null;
 let registerHomeVisitCallable = null;
 
 const cleanString = (value) => (typeof value === "string" ? value.trim() : "");
@@ -39,6 +41,15 @@ const getToggleCarouselCommentLikeCallable = () => {
     TOGGLE_CAROUSEL_COMMENT_LIKE_FUNCTION,
   );
   return toggleCarouselCommentLikeCallable;
+};
+
+const getSyncCarouselLikeAggregateCallable = () => {
+  if (syncCarouselLikeAggregateCallable) return syncCarouselLikeAggregateCallable;
+  syncCarouselLikeAggregateCallable = httpsCallable(
+    getFunctionsInstance(),
+    SYNC_CAROUSEL_LIKE_AGGREGATE_FUNCTION,
+  );
+  return syncCarouselLikeAggregateCallable;
 };
 
 const getRegisterHomeVisitCallable = () => {
@@ -145,6 +156,41 @@ export const toggleCarouselCommentLikeForCurrentUser = async ({
     return {
       ok: false,
       reason: normalizeCommonReason(error, "toggle_failed"),
+    };
+  }
+};
+
+export const syncCarouselLikeAggregateForCurrentUser = async (postId) => {
+  const normalizedPostId = cleanString(postId);
+  if (!normalizedPostId) {
+    return { ok: false, reason: "invalid_argument" };
+  }
+
+  const user = await waitForCurrentUser();
+  if (!user) {
+    return { ok: false, reason: "auth_required" };
+  }
+
+  try {
+    const response = await getSyncCarouselLikeAggregateCallable()({
+      postId: normalizedPostId,
+    });
+    const data = response?.data || {};
+    return {
+      ok: true,
+      likedBy: Array.isArray(data.likedBy)
+        ? data.likedBy.map(cleanString).filter(Boolean)
+        : [],
+      likedNames: Array.isArray(data.likedNames)
+        ? data.likedNames.map(cleanString).filter(Boolean)
+        : [],
+      likesCount: cleanCount(data.likesCount),
+      likeCount: cleanCount(data.likeCount),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: normalizeCommonReason(error, "repair_failed"),
     };
   }
 };
