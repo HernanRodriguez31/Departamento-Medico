@@ -230,6 +230,41 @@ const syncCarouselLikeAggregates = async (postId) => {
   return aggregates;
 };
 
+exports.syncCarouselLikeAggregate = onCall(async (request) => {
+  const uid = getAuthenticatedUid(request);
+  if (!uid) {
+    throw new HttpsError("unauthenticated", "auth_required");
+  }
+
+  const postId = cleanString(request.data?.postId);
+  if (!postId) {
+    throw new HttpsError("invalid-argument", "invalid_post_id");
+  }
+
+  try {
+    const aggregates = await syncCarouselLikeAggregates(postId);
+    if (!aggregates) {
+      throw new HttpsError("not-found", "post_not_found");
+    }
+    return {
+      likedBy: Array.isArray(aggregates.likedBy) ? aggregates.likedBy : [],
+      likedNames: Array.isArray(aggregates.likedNames) ? aggregates.likedNames : [],
+      likesCount: normalizeCounterValue(aggregates.likesCount),
+      likeCount: normalizeCounterValue(aggregates.likeCount),
+    };
+  } catch (error) {
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+    functions.logger.error("Error reparando agregados de likes del carrusel", {
+      postId,
+      uid,
+      error: serializePushError(error),
+    });
+    throw new HttpsError("internal", "carousel_like_sync_failed");
+  }
+});
+
 const createNotificationDoc = async (payload = {}) => {
   if (!payload?.toUid) return null;
   try {

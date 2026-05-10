@@ -42,6 +42,7 @@ import { initSessionGuard } from "../shared/sessionGuard.js?v=20260305-session-1
 import { initPdfViewer } from "../common/pdf-viewer.js";
 import { initDepartmentCalendar } from "../common/department-calendar.js?v=20260506-committee-calendars-1";
 import {
+  syncCarouselLikeAggregateForCurrentUser,
   toggleCarouselCommentLikeForCurrentUser,
   toggleCarouselLikeForCurrentUser,
 } from "../services/interactions/FeedInteractionService.js";
@@ -99,6 +100,7 @@ async function initCarouselModule() {
     }
   };
   const TRANSPARENT_PIXEL = "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
+  const VISUAL_RESOURCES_TITLE = "Centro de Recursos Visuales en el Ámbito Laboral";
   const appIdMeta = window.__APP_ID__ || "departamento-medico-brisa";
   const track = document.getElementById("dm-carousel-track");
   const dots = document.getElementById("dm-carousel-dots");
@@ -123,10 +125,17 @@ async function initCarouselModule() {
   const modal = document.getElementById("dm-carousel-modal");
   const imageLightbox = document.getElementById("dm-carousel-lightbox");
   const imageLightboxDialog = document.getElementById("dm-carousel-lightbox-dialog");
+  const imageLightboxMedia = document.getElementById("dm-carousel-lightbox-media");
   const imageLightboxImg = document.getElementById("dm-carousel-lightbox-img");
+  const imageLightboxSeal = document.getElementById("dm-carousel-lightbox-seal");
   const imageLightboxTitle = document.getElementById("dm-carousel-lightbox-title");
   const imageLightboxMeta = document.getElementById("dm-carousel-lightbox-meta");
   const imageLightboxClose = document.getElementById("dm-carousel-lightbox-close");
+  const imageLightboxPrev = document.getElementById("dm-carousel-lightbox-prev");
+  const imageLightboxNext = document.getElementById("dm-carousel-lightbox-next");
+  const imageLightboxLike = document.getElementById("dm-carousel-lightbox-like");
+  const imageLightboxLikeCount = document.getElementById("dm-carousel-lightbox-like-count");
+  const imageLightboxCommentsCount = document.getElementById("dm-carousel-lightbox-comments-count");
   const modalClose = document.getElementById("dm-carousel-modal-close");
   const modalCancel = document.getElementById("dm-carousel-cancel");
   const form =
@@ -836,9 +845,13 @@ async function initCarouselModule() {
   };
   setupCommitteeCards();
 
+  let isComposingComment = false;
+  let isSubmittingComment = false;
+  const feedCommentsSubmitting = new Set();
+
   const syncCommentSendState = () => {
     if (!commentSendBtn || !commentInlineInput) return;
-    commentSendBtn.disabled = commentInlineInput.value.trim().length === 0;
+    commentSendBtn.disabled = isSubmittingComment || commentInlineInput.value.trim().length === 0;
   };
   syncCommentSendState();
 
@@ -911,7 +924,6 @@ async function initCarouselModule() {
   let visitsSubscribed = false;
   let unsubscribeComments = null;
   const feedCommentSubscriptions = new Map();
-  let isComposingComment = false;
   const PAGE_SIZE = 10;
   const FEED_SKELETON_COUNT = 6;
   const CAROUSEL_SKELETON_COUNT = 3;
@@ -1024,16 +1036,82 @@ async function initCarouselModule() {
     feedPagerObserver.observe(feedSentinel);
   };
 
+  const pendingLikeAggregateRepairs = new Set();
+  const cleanLikeString = (value) => (typeof value === "string" ? value.trim() : "");
+  const cleanLikeArray = (value) =>
+    Array.isArray(value) ? value.map(cleanLikeString).filter(Boolean) : [];
+  const cleanLikeCount = (value) =>
+    Number.isFinite(value) && value > 0 ? Math.trunc(value) : 0;
+
+  const normalizeCarouselLikeSummary = ({
+    likedBy = [],
+    likedNames = [],
+    likesCount = 0,
+    likeCount = 0
+  } = {}) => {
+    const normalizedLikedBy = cleanLikeArray(likedBy);
+    const normalizedLikedNames = cleanLikeArray(likedNames);
+    const storedLikesCount = Math.max(cleanLikeCount(likesCount), cleanLikeCount(likeCount));
+    const namesCount = normalizedLikedNames.length;
+    const idsCount = normalizedLikedBy.length;
+    const hasLikes = storedLikesCount > 0 || namesCount > 0 || idsCount > 0;
+    const likesAggregateStale =
+      hasLikes && (storedLikesCount !== namesCount || (idsCount > 0 && idsCount !== namesCount));
+    const visibleLikesCount = likesAggregateStale
+      ? namesCount
+      : namesCount || idsCount || storedLikesCount;
+
+    return {
+      likedBy: normalizedLikedBy,
+      likedNames: normalizedLikedNames,
+      likesCount: visibleLikesCount,
+      likeCount: visibleLikesCount,
+      likesAggregateStale,
+      storedLikesCount
+    };
+  };
+
+  const applyLikeSummaryToPost = (postId, rawSummary = {}) => {
+    if (!postId) return;
+    const summary = normalizeCarouselLikeSummary(rawSummary);
+    const apply = (post) => {
+      if (!post) return null;
+      Object.assign(post, summary);
+      return post;
+    };
+    const existing = apply(postsById.get(postId));
+    const feedIdx = feedPosts.findIndex((post) => post.id === postId);
+    if (feedIdx >= 0) apply(feedPosts[feedIdx]);
+    const slideIdx = slides.findIndex((post) => post.id === postId);
+    if (slideIdx >= 0) apply(slides[slideIdx]);
+
+    const postEl = Array.from(track?.querySelectorAll(".dm-post") || []).find(
+      (el) => el.dataset.id === postId
+    );
+    if (postEl) updateFeedLikeUI(postEl, existing || feedPosts[feedIdx] || slides[slideIdx]);
+
+    const current = slides[getVisualIndex()];
+    if (current?.id === postId) {
+      refreshLikeUI();
+      if (isCarouselLightboxOpen()) updateCarouselLightboxMetrics(current);
+    }
+  };
+
+  const requestLikeAggregateRepair = async (post = {}) => {
+    if (!post.id || !post.likesAggregateStale || pendingLikeAggregateRepairs.has(post.id)) return;
+    pendingLikeAggregateRepairs.add(post.id);
+    try {
+      const result = await syncCarouselLikeAggregateForCurrentUser(post.id);
+      if (!result?.ok) return;
+      applyLikeSummaryToPost(post.id, result);
+    } catch (error) {
+      console.warn("[Muro] No se pudo reparar el agregado de likes.", error);
+    }
+  };
+
   const mapPostDoc = (d) => {
     const data = d.data() || {};
-    const likedBy = Array.isArray(data.likedBy) ? data.likedBy : [];
-    const likedNames = Array.isArray(data.likedNames) ? data.likedNames : [];
-    let likesCount = Number.isFinite(data.likesCount) ? data.likesCount : 0;
-    if (likedBy.length > 0) {
-      likesCount = likedBy.length;
-    } else if (likesCount > 0) {
-      likesCount = 0;
-    }
+    const likeSummary = normalizeCarouselLikeSummary(data);
     const createdByName = data.createdByName || data.authorName || data.author || data.createdBy;
     const unidadNegocio =
       data.unidadNegocio || data.businessUnit || data.business_unit || data.bu || data.sector || "";
@@ -1054,9 +1132,8 @@ async function initCarouselModule() {
       unidadGestion,
       createdByName,
       createdAt: data.createdAt,
-      likesCount,
-      likedBy,
-      likedNames
+      ...likeSummary,
+      commentCount: Number.isFinite(data.commentCount) ? data.commentCount : 0
     };
   };
 
@@ -1084,6 +1161,7 @@ async function initCarouselModule() {
       });
     }
     slides = feedPosts.filter((s) => s.imageUrl);
+    feedPosts.forEach(requestLikeAggregateRepair);
   };
 
   const loadPostsPage = async ({ reset = false } = {}) => {
@@ -1316,11 +1394,83 @@ async function initCarouselModule() {
   const getLightboxImageSrc = (imgEl, current = {}) =>
     imgEl?.dataset.full || current.imageUrl || imgEl?.currentSrc || imgEl?.src || "";
 
+  const getCarouselCommentCount = (slide = {}) => {
+    const value = Number(slide?.commentCount ?? slide?.commentsCount ?? 0);
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  };
+
+  const updateCarouselLightboxMetrics = (slide = slides[getVisualIndex()]) => {
+    const likes = Number(slide?.likesCount || 0);
+    const comments = getCarouselCommentCount(slide);
+    if (imageLightboxLikeCount) {
+      imageLightboxLikeCount.textContent = String(likes);
+    }
+    if (imageLightboxCommentsCount) {
+      imageLightboxCommentsCount.textContent = String(comments);
+    }
+    if (imageLightboxLike) {
+      imageLightboxLike.classList.toggle("is-active", hasCurrentUserLiked());
+      imageLightboxLike.setAttribute(
+        "aria-label",
+        hasCurrentUserLiked() ? "Quitar me gusta" : "Me gusta"
+      );
+    }
+  };
+
+  const syncCarouselLightboxMediaGeometry = () => {
+    if (!imageLightboxMedia || !imageLightboxImg || !imageLightboxImg.naturalWidth || !imageLightboxImg.naturalHeight) {
+      return;
+    }
+    const mediaRect = imageLightboxMedia.getBoundingClientRect();
+    if (!mediaRect.width || !mediaRect.height) return;
+    const fitRatio = Math.min(
+      mediaRect.width / imageLightboxImg.naturalWidth,
+      mediaRect.height / imageLightboxImg.naturalHeight
+    );
+    const renderedWidth = imageLightboxImg.naturalWidth * fitRatio;
+    const renderedHeight = imageLightboxImg.naturalHeight * fitRatio;
+    const offsetX = Math.max((mediaRect.width - renderedWidth) / 2, 0) + 16;
+    const offsetY = Math.max((mediaRect.height - renderedHeight) / 2, 0) + 16;
+    imageLightboxMedia.style.setProperty("--dm-lightbox-seal-x", `${Math.round(offsetX)}px`);
+    imageLightboxMedia.style.setProperty("--dm-lightbox-seal-y", `${Math.round(offsetY)}px`);
+  };
+
+  const setCarouselLightboxContent = (index, imgEl = null) => {
+    if (!imageLightboxImg || !slides.length) return false;
+    const safeIndex = ((index % slides.length) + slides.length) % slides.length;
+    if (safeIndex !== currentIndex) {
+      scrollToIndex(safeIndex, { immediate: true });
+    }
+    const current = slides[safeIndex];
+    const slideEl = track?.querySelector(`.dm-carousel-slide[data-idx="${safeIndex}"]`);
+    const activeImg = imgEl || slideEl?.querySelector(".dm-carousel-img");
+    const src = getLightboxImageSrc(activeImg, current);
+    if (!src) return false;
+
+    imageLightboxImg.src = src;
+    imageLightboxImg.alt = current?.title ? `Imagen ampliada: ${current.title}` : activeImg?.alt || "Imagen ampliada";
+    if (imageLightboxTitle) {
+      imageLightboxTitle.textContent = current?.title || `Imagen del ${VISUAL_RESOURCES_TITLE}`;
+    }
+    if (imageLightboxMeta) {
+      imageLightboxMeta.textContent = current ? formatMeta(current) : "";
+    }
+    updateCarouselLightboxMetrics(current);
+    if (imageLightboxImg.complete) {
+      requestAnimationFrame(syncCarouselLightboxMediaGeometry);
+    }
+    const hasMultipleSlides = slides.length > 1;
+    [imageLightboxPrev, imageLightboxNext].forEach((button) => {
+      if (!button) return;
+      button.hidden = !hasMultipleSlides;
+      button.disabled = !hasMultipleSlides;
+    });
+    return true;
+  };
+
   const openCarouselLightbox = (imgEl) => {
     if (feedMode || !imageLightbox || !imageLightboxImg || !slides.length) return;
-    const current = slides[getVisualIndex()];
-    const src = getLightboxImageSrc(imgEl, current);
-    if (!src) return;
+    if (!setCarouselLightboxContent(getVisualIndex(), imgEl)) return;
 
     carouselLightboxReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     carouselLightboxWasAutoplayRunning = autoplayRunning;
@@ -1329,18 +1479,11 @@ async function initCarouselModule() {
       autoTimer = null;
     }
 
-    imageLightboxImg.src = src;
-    imageLightboxImg.alt = current?.title ? `Imagen ampliada: ${current.title}` : imgEl?.alt || "Imagen ampliada";
-    if (imageLightboxTitle) {
-      imageLightboxTitle.textContent = current?.title || "Imagen del Centro de Recursos Visuales de Actividad Laboral";
-    }
-    if (imageLightboxMeta) {
-      imageLightboxMeta.textContent = current ? formatMeta(current) : "";
-    }
     imageLightbox.classList.add("is-open");
     imageLightbox.setAttribute("aria-hidden", "false");
     document.body.classList.add("dm-carousel-lightbox-open");
     requestAnimationFrame(() => {
+      syncCarouselLightboxMediaGeometry();
       imageLightboxDialog?.focus({ preventScroll: true });
     });
   };
@@ -1356,6 +1499,10 @@ async function initCarouselModule() {
     }
     if (imageLightboxTitle) imageLightboxTitle.textContent = "";
     if (imageLightboxMeta) imageLightboxMeta.textContent = "";
+    if (imageLightboxMedia) {
+      imageLightboxMedia.style.removeProperty("--dm-lightbox-seal-x");
+      imageLightboxMedia.style.removeProperty("--dm-lightbox-seal-y");
+    }
     if (carouselLightboxWasAutoplayRunning) {
       resetAuto();
     }
@@ -1364,15 +1511,47 @@ async function initCarouselModule() {
     carouselLightboxReturnFocus = null;
   };
 
+  const navigateCarouselLightbox = (direction) => {
+    if (!isCarouselLightboxOpen() || !slides.length) return;
+    setCarouselLightboxContent(currentIndex + direction);
+  };
+
   imageLightbox?.addEventListener("click", (event) => {
     if (event.target.closest("[data-carousel-lightbox-close]")) {
       closeCarouselLightbox();
     }
   });
+  imageLightboxPrev?.addEventListener("click", (event) => {
+    event.preventDefault();
+    navigateCarouselLightbox(-1);
+  });
+  imageLightboxNext?.addEventListener("click", (event) => {
+    event.preventDefault();
+    navigateCarouselLightbox(1);
+  });
+  imageLightboxLike?.addEventListener("click", (event) => {
+    event.preventDefault();
+    btnLike?.click();
+  });
+  imageLightboxImg?.addEventListener("load", syncCarouselLightboxMediaGeometry);
+  window.addEventListener("resize", () => {
+    if (isCarouselLightboxOpen()) syncCarouselLightboxMediaGeometry();
+  });
   imageLightboxClose?.addEventListener("click", closeCarouselLightbox);
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && isCarouselLightboxOpen()) {
+    if (!isCarouselLightboxOpen()) return;
+    if (event.key === "Escape") {
       closeCarouselLightbox();
+      return;
+    }
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      navigateCarouselLightbox(-1);
+      return;
+    }
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      navigateCarouselLightbox(1);
     }
   });
 
@@ -1426,11 +1605,7 @@ async function initCarouselModule() {
     if (likeTooltipBound) return;
     likeTooltipBound = true;
     document.addEventListener("click", (event) => {
-      if (
-        event.target.closest(
-          ".dm-post-like, .dm-comment-like, .dm-post-like-view, .dm-comment-like-view"
-        )
-      ) {
+      if (event.target.closest(".dm-post-like, .dm-comment-like")) {
         return;
       }
       closeLikeTooltips();
@@ -1588,21 +1763,6 @@ async function initCarouselModule() {
       likeBtn.appendChild(tooltip);
       likeGroup.appendChild(likeBtn);
 
-      if (likesCount > 0) {
-        const viewBtn = document.createElement("button");
-        viewBtn.type = "button";
-        viewBtn.className = "dm-comment-like-view";
-        viewBtn.setAttribute("aria-label", "Ver likes");
-        viewBtn.setAttribute("title", "Ver likes");
-        viewBtn.innerHTML =
-          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
-        viewBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          toggleLikeTooltip(likeBtn);
-        });
-        likeGroup.appendChild(viewBtn);
-      }
-
       actions.appendChild(likeGroup);
 
       const canDeleteComment = user && (isAdmin || (c.authorUid && user.uid === c.authorUid));
@@ -1641,6 +1801,11 @@ async function initCarouselModule() {
           await toggleCommentLike(slideId, commentId, user);
         } catch (err) {
           console.error("[Comentarios] like error", err);
+          setCommentStatus(
+            listEl.closest(".dm-comments")?.querySelector(".dm-comments__composer"),
+            getCarouselWriteErrorMessage(err, "No se pudo registrar el like del comentario."),
+            "error"
+          );
         }
       };
     });
@@ -1667,6 +1832,13 @@ async function initCarouselModule() {
   };
 
   const renderComments = (items = [], slideId) => {
+    const slide = slides.find((entry) => entry.id === slideId);
+    if (slide) {
+      slide.commentCount = Array.isArray(items) ? items.length : 0;
+      if (isCarouselLightboxOpen() && slides[getVisualIndex()]?.id === slideId) {
+        updateCarouselLightboxMetrics(slide);
+      }
+    }
     renderCommentItems(commentsList, commentsCount, items, slideId);
   };
 
@@ -1817,7 +1989,6 @@ async function initCarouselModule() {
     if (!postEl || !slide) return;
     const likeBtn = postEl.querySelector(".dm-post-like");
     const likeCount = postEl.querySelector(".dm-post-like-count");
-    const viewBtn = postEl.querySelector(".dm-post-like-view");
     const tooltipEl = likeBtn?.querySelector(".dm-like-tooltip");
     if (likeCount) {
       likeCount.textContent = slide.likesCount ? String(slide.likesCount) : "0";
@@ -1836,10 +2007,6 @@ async function initCarouselModule() {
           : [];
       tooltipEl.textContent = buildLikeTooltipText(names);
     }
-    if (viewBtn) {
-      const hasLikes = (slide.likesCount || 0) > 0;
-      viewBtn.hidden = !hasLikes;
-    }
   };
 
   const togglePostLike = async (postId, postEl) => {
@@ -1857,32 +2024,94 @@ async function initCarouselModule() {
       if (!result?.ok) {
         throw new Error(result?.reason || "LIKE_TOGGLE_FAILED");
       }
-      slide.likedBy = Array.isArray(result.likedBy) ? result.likedBy : [];
-      slide.likedNames = Array.isArray(result.likedNames) ? result.likedNames : [];
-      slide.likesCount = Number.isFinite(result.likesCount) ? result.likesCount : 0;
-      updateFeedLikeUI(postEl, slide);
+      applyLikeSummaryToPost(postId, result);
+      updateFeedLikeUI(postEl, getSlideById(postId) || slide);
     } catch (e) {
       console.error("Error registrando like", e);
       Swal.fire("Error", "No se pudo registrar el like.", "error");
     }
   };
 
+  const buildCarouselCommentPayload = (user, text) => ({
+    text,
+    authorUid: user?.uid || "",
+    authorName: user?.displayName || user?.email || "Usuario",
+    createdAt: serverTimestamp(),
+    likedBy: {}
+  });
+
+  const getCarouselWriteErrorMessage = (err, fallback = "No se pudo completar la acción.") => {
+    const code = String(err?.code || err?.message || "").toLowerCase();
+    if (code.includes("permission-denied")) {
+      return "No tenés permisos para publicar en esta imagen. Actualizá la sesión e intentá nuevamente.";
+    }
+    if (code.includes("unauthenticated") || code.includes("auth")) {
+      return "Necesitás iniciar sesión para publicar.";
+    }
+    if (code.includes("storage")) {
+      return "No se pudo subir la imagen. Revisá el archivo e intentá nuevamente.";
+    }
+    if (code.includes("network") || code.includes("unavailable")) {
+      return "Hay un problema de conexión. Intentá nuevamente en unos segundos.";
+    }
+    return fallback;
+  };
+
+  const ensureCommentStatusEl = (composerEl) => {
+    if (!composerEl) return null;
+    let statusEl = composerEl.querySelector(".dm-comment-status");
+    if (!statusEl) {
+      statusEl = document.createElement("p");
+      statusEl.className = "dm-comment-status";
+      statusEl.setAttribute("role", "status");
+      statusEl.setAttribute("aria-live", "polite");
+      composerEl.appendChild(statusEl);
+    }
+    return statusEl;
+  };
+
+  const setCommentStatus = (composerEl, message = "", tone = "info") => {
+    const statusEl = ensureCommentStatusEl(composerEl);
+    if (!statusEl) return;
+    statusEl.textContent = message;
+    statusEl.dataset.tone = tone;
+    statusEl.hidden = !message;
+  };
+
+  const setFeedCommentSubmitting = (postId, inputEl, submitting) => {
+    if (!postId) return;
+    if (submitting) feedCommentsSubmitting.add(postId);
+    else feedCommentsSubmitting.delete(postId);
+    const composerEl = inputEl?.closest(".dm-comments__composer");
+    const sendBtn = composerEl?.querySelector(".dm-post-comment-send");
+    if (sendBtn) {
+      sendBtn.disabled = submitting || !inputEl?.value.trim();
+      sendBtn.textContent = submitting ? "Publicando..." : "Comentar";
+    }
+    composerEl?.classList.toggle("is-submitting", submitting);
+  };
+
   const sendFeedComment = async (postId, inputEl) => {
     const user = requireUser();
     if (!user || !db || !postId || !inputEl) return;
+    if (feedCommentsSubmitting.has(postId)) return;
     const text = inputEl.value.trim();
     if (!text) return;
+    const composerEl = inputEl.closest(".dm-comments__composer");
+    setCommentStatus(composerEl, "");
+    setFeedCommentSubmitting(postId, inputEl, true);
     try {
-      await addDoc(collection(db, POSTS_COLLECTION, postId, COMMENTS_COLLECTION), {
-        text,
-        createdAt: serverTimestamp(),
-        authorName: user.displayName || user.email || "Usuario",
-        authorUid: user.uid || ""
-      });
+      await addDoc(collection(db, POSTS_COLLECTION, postId, COMMENTS_COLLECTION), buildCarouselCommentPayload(user, text));
       inputEl.value = "";
     } catch (err) {
       console.error("[Comentarios] Error publicando comentario", err);
-      Swal?.fire?.("Error", "No se pudo publicar el comentario", "error") || alert("No se pudo publicar el comentario");
+      setCommentStatus(
+        composerEl,
+        getCarouselWriteErrorMessage(err, "No se pudo publicar el comentario. Probá nuevamente."),
+        "error"
+      );
+    } finally {
+      setFeedCommentSubmitting(postId, inputEl, false);
     }
   };
 
@@ -2036,15 +2265,6 @@ async function initCarouselModule() {
               ? s.likedBy
               : [];
           const likeTooltipText = buildLikeTooltipText(likeNames);
-          const hasLikes = (s.likesCount || 0) > 0;
-          const viewLikesBtn = `<button class="dm-post-like-view" type="button" data-id="${s.id}" aria-label="Ver likes" title="Ver likes" ${
-            hasLikes ? "" : "hidden"
-          }>
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z" fill="none" stroke="currentColor" stroke-width="1.6"></path>
-                <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"></circle>
-              </svg>
-            </button>`;
           return `
         <article class="dm-post dm-carousel-slide" data-idx="${idx}" data-id="${s.id}">
           <div class="dm-post__meta-row">
@@ -2061,7 +2281,6 @@ async function initCarouselModule() {
               ❤️ <span class="dm-post-like-count">${s.likesCount ? String(s.likesCount) : "0"}</span>
               <span class="dm-like-tooltip">${likeTooltipText}</span>
             </button>
-            ${viewLikesBtn}
             <button class="dm-post-comment-toggle" type="button" data-id="${s.id}">
               💬 <span class="dm-post-comment-count">0</span>
             </button>
@@ -2108,11 +2327,6 @@ async function initCarouselModule() {
         updateFeedLikeUI(postEl, getSlideById(postId));
         const likeBtn = postEl.querySelector(".dm-post-like");
         likeBtn?.addEventListener("click", () => togglePostLike(postId, postEl));
-        const viewLikesBtn = postEl.querySelector(".dm-post-like-view");
-        viewLikesBtn?.addEventListener("click", (e) => {
-          e.stopPropagation();
-          toggleLikeTooltip(likeBtn);
-        });
         const deleteBtn = postEl.querySelector(".dm-post-delete");
         deleteBtn?.addEventListener("click", async (e) => {
           e.stopPropagation();
@@ -2148,7 +2362,12 @@ async function initCarouselModule() {
             sendFeedComment(postId, inputEl);
           }
         });
+        inputEl?.addEventListener("input", () => {
+          setCommentStatus(inputEl.closest(".dm-comments__composer"), "");
+          setFeedCommentSubmitting(postId, inputEl, feedCommentsSubmitting.has(postId));
+        });
         inputEl?.addEventListener("focus", expandComments);
+        setFeedCommentSubmitting(postId, inputEl, false);
         const commentToggle = postEl.querySelector(".dm-post-comment-toggle");
         commentToggle?.addEventListener("click", () => {
           expandComments();
@@ -2207,7 +2426,7 @@ async function initCarouselModule() {
         "aria-label",
         slideData?.title
           ? `Ampliar ${slideData.title}`
-          : "Ampliar imagen del Centro de Recursos Visuales de Actividad Laboral"
+          : `Ampliar imagen del ${VISUAL_RESOURCES_TITLE}`
       );
       img.addEventListener("click", (event) => {
         if (feedMode) return;
@@ -2371,24 +2590,39 @@ async function initCarouselModule() {
   const sendComment = async () => {
     const user = requireUser();
     if (!user) return;
+    if (isSubmittingComment) return;
     const current = slides[getVisualIndex()];
     if (!current?.id || !commentInlineInput) return;
     const text = commentInlineInput.value.trim();
     if (!text) return;
+    const composerEl = commentSendBtn?.closest(".dm-comments__composer");
+    const originalText = commentSendBtn?.textContent || "Enviar comentario";
+    setCommentStatus(composerEl, "");
+    isSubmittingComment = true;
+    composerEl?.classList.add("is-submitting");
+    if (commentSendBtn) {
+      commentSendBtn.textContent = "Publicando...";
+    }
+    syncCommentSendState();
     try {
-      await addDoc(collection(db, POSTS_COLLECTION, current.id, COMMENTS_COLLECTION), {
-        text,
-        createdAt: serverTimestamp(),
-        authorName: user.displayName || user.email || "Usuario",
-        authorUid: user.uid || ""
-      });
+      await addDoc(collection(db, POSTS_COLLECTION, current.id, COMMENTS_COLLECTION), buildCarouselCommentPayload(user, text));
       commentInlineInput.value = "";
-      syncCommentSendState();
       isComposingComment = false;
       resetAuto();
     } catch (err) {
       console.error("[Comentarios] Error publicando comentario", err);
-      Swal?.fire?.("Error", "No se pudo publicar el comentario", "error") || alert("No se pudo publicar el comentario");
+      setCommentStatus(
+        composerEl,
+        getCarouselWriteErrorMessage(err, "No se pudo publicar el comentario. Probá nuevamente."),
+        "error"
+      );
+    } finally {
+      isSubmittingComment = false;
+      composerEl?.classList.remove("is-submitting");
+      if (commentSendBtn) {
+        commentSendBtn.textContent = originalText;
+      }
+      syncCommentSendState();
     }
   };
 
@@ -2446,16 +2680,13 @@ async function initCarouselModule() {
       if (!result?.ok) {
         throw new Error(result?.reason || "LIKE_TOGGLE_FAILED");
       }
-      current.likedBy = Array.isArray(result.likedBy) ? result.likedBy : [];
-      current.likedNames = Array.isArray(result.likedNames) ? result.likedNames : [];
-      current.likesCount = Number.isFinite(result.likesCount) ? result.likesCount : 0;
-      refreshLikeUI();
+      applyLikeSummaryToPost(current.id, result);
     } catch (e) {
       console.error("Error registrando like", e);
       Swal.fire("Error", "No se pudo registrar el like.", "error");
     }
   });
-  likeCountEl?.addEventListener("mouseenter", (e) => {
+  const renderMainLikeTooltip = () => {
     const current = slides[getVisualIndex()];
     const names = current?.likedNames || [];
     likeTooltip.textContent = "";
@@ -2471,14 +2702,26 @@ async function initCarouselModule() {
       likeTooltip.appendChild(empty);
     }
     likeTooltip.classList.remove("dm-like-tooltip-hidden");
-    likeTooltip.style.top = `${e.pageY + 12}px`;
-    likeTooltip.style.left = `${e.pageX + 12}px`;
+  };
+  const positionMainLikeTooltip = (event) => {
+    if (!btnLike) return;
+    const rect = btnLike.getBoundingClientRect();
+    const pageX = event?.pageX || window.scrollX + rect.left + rect.width / 2;
+    const pageY = event?.pageY || window.scrollY + rect.bottom;
+    likeTooltip.style.top = `${pageY + 12}px`;
+    likeTooltip.style.left = `${pageX + 12}px`;
+  };
+  const showMainLikeTooltip = (event) => {
+    renderMainLikeTooltip();
+    positionMainLikeTooltip(event);
+  };
+  btnLike?.addEventListener("mouseenter", showMainLikeTooltip);
+  btnLike?.addEventListener("focus", showMainLikeTooltip);
+  btnLike?.addEventListener("mousemove", positionMainLikeTooltip);
+  btnLike?.addEventListener("mouseleave", () => {
+    likeTooltip.classList.add("dm-like-tooltip-hidden");
   });
-  likeCountEl?.addEventListener("mousemove", (e) => {
-    likeTooltip.style.top = `${e.pageY + 12}px`;
-    likeTooltip.style.left = `${e.pageX + 12}px`;
-  });
-  likeCountEl?.addEventListener("mouseleave", () => {
+  btnLike?.addEventListener("blur", () => {
     likeTooltip.classList.add("dm-like-tooltip-hidden");
   });
   btnDelete?.addEventListener("click", async () => {
@@ -2636,17 +2879,21 @@ async function initCarouselModule() {
         }
       }
       await addDoc(collection(db, POSTS_COLLECTION), {
+        type: "image",
         title,
         imageUrl: downloadURL,
         thumbUrl,
         unidadNegocio,
         unidadGestion,
+        authorUid: user.uid,
+        authorName: user.displayName || user.email || "Usuario",
         createdByUid: user.uid,
         createdByName: user.displayName || user.email || "Usuario",
         createdAt: serverTimestamp(),
         likesCount: 0,
         likedBy: [],
-        likedNames: []
+        likedNames: [],
+        commentCount: 0
       });
       loadPostsPage({ reset: true });
       titleInput.value = "";

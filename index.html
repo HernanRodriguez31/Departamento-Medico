@@ -147,7 +147,7 @@
     />
     <link
       rel="stylesheet"
-      href="assets/css/pages/index.css?v=20260508-visual-resources-1"
+      href="assets/css/pages/index.css?v=20260509-scientific-log-card-top-border-1"
     />
     <link
       rel="stylesheet"
@@ -352,6 +352,22 @@
         font-size: 12px;
         line-height: 1.4;
         z-index: 30;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transform: translateY(4px);
+        transition:
+          opacity 0.12s ease,
+          transform 0.12s ease,
+          visibility 0.12s ease;
+      }
+
+      [data-like-wrap]:hover .dm-like-popover,
+      [data-like-wrap]:focus-within .dm-like-popover {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        transform: translateY(0);
       }
 
       .dm-like-popover::before {
@@ -891,16 +907,16 @@
       .user-panel-trigger {
         display: inline-flex;
         align-items: center;
-        gap: 0.45rem;
+        gap: 0.55rem;
         cursor: pointer;
         color: #1e293b;
-        font-size: 0.9rem;
+        font-size: 0.82rem;
         font-weight: 600;
-        padding: 6px 16px;
+        padding: 6px 14px;
         border-radius: 9999px;
-        border: 1px solid rgba(0, 0, 0, 0.04);
+        border: 1px solid rgba(148, 163, 184, 0.18);
         background: #ffffff;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        box-shadow: 0 4px 18px rgba(15, 23, 42, 0.055);
         transition:
           color 0.18s ease,
           background 0.18s ease,
@@ -968,7 +984,32 @@
 
       .user-panel-trigger .user-name {
         color: #1e293b;
-        font-weight: 600;
+        font-size: 0.82rem;
+        font-weight: 650;
+        line-height: 1.1;
+      }
+
+      .user-panel-copy {
+        display: inline-flex;
+        flex-direction: column;
+        justify-content: center;
+        min-width: 0;
+        line-height: 1.05;
+      }
+
+      .user-panel-label {
+        color: #94a3b8;
+        font-size: 0.58rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        line-height: 1;
+        text-transform: uppercase;
+      }
+
+      @media (max-width: 767px) {
+        .user-panel-label {
+          display: none;
+        }
       }
 
       .ui-info {
@@ -1313,16 +1354,6 @@
         <div class="container header__container">
           <div class="header__left">
             <div class="logo-wrapper">
-              <a href="#" class="logo logo-brisa">
-                <img
-                  src="assets/images/logo-brisa-transparent.png"
-                  alt="Brisa Salud y Bienestar"
-                  class="logo-img-brisa"
-                  width="200"
-                  height="85"
-                  decoding="async"
-                />
-              </a>
               <a href="#" class="logo logo-heart">
                 <img
                   src="assets/images/logo-brisa-heart.png"
@@ -1330,6 +1361,16 @@
                   class="logo-img-heart"
                   width="80"
                   height="70"
+                  decoding="async"
+                />
+              </a>
+              <a href="#" class="logo logo-brisa">
+                <img
+                  src="assets/images/logo-brisa-transparent.png"
+                  alt="Brisa Salud y Bienestar"
+                  class="logo-img-brisa"
+                  width="200"
+                  height="85"
                   decoding="async"
                 />
               </a>
@@ -1415,12 +1456,15 @@
                       >DM</span
                     >
                   </span>
-                  <span
-                    id="user-display-name"
-                    class="user-name"
-                    data-dm-user-trigger-name
-                    >Dr. …</span
-                  >
+                  <span class="user-panel-copy">
+                    <span class="user-panel-label">Usuario</span>
+                    <span
+                      id="user-display-name"
+                      class="user-name"
+                      data-dm-user-trigger-name
+                      >Dr. …</span
+                    >
+                  </span>
                   <span
                     id="user-info-trigger"
                     class="ui-info"
@@ -2754,175 +2798,117 @@
           </div>
         </section>
 
-        <!-- HERRAMIENTAS DE INVESTIGACIÓN -->
+        <!-- BITÁCORA CIENTÍFICA -->
         <section
-          class="section reveal-on-scroll section--research"
+          class="section reveal-on-scroll scientific-log-section"
           id="investigacion"
+          aria-labelledby="scientific-log-title"
         >
-          <div class="container">
-            <div class="section__header">
-              <h2 class="section__title dm-title section-title--unified">
-                Motor de Evidencia Científica
-              </h2>
-              <span class="section__subtitle section-subtitle--compact"
-                >Acceso directo a bases de datos biomédicas e inteligencia
-                artificial clínica.</span
-              >
-            </div>
+          <div class="container scientific-log-container">
+            <a
+              class="scientific-log-card"
+              href="/bitacora-cientifica.html"
+              aria-label="Ingresar a Bitácora de Publicaciones Científicas"
+            >
+              <span class="scientific-log-card__atmosphere" aria-hidden="true"></span>
 
-            <div class="research__grid">
-              <!-- PubMed -->
-              <div class="research__card">
-                <div class="research__logo-wrapper">
+              <div class="scientific-log-card__content">
+                <div class="scientific-log-card__brand" aria-hidden="true">
                   <img
-                    src="assets/images/logo-pubmed.png"
-                    alt="PubMed Logo"
-                    class="research__logo"
-                    width="377"
-                    height="134"
+                    src="assets/images/logo-brisa-heart.png"
+                    alt=""
+                    width="873"
+                    height="1024"
                     loading="lazy"
                     decoding="async"
                   />
                 </div>
 
-                <form
-                  action="https://pubmed.ncbi.nlm.nih.gov/"
-                  method="get"
-                  target="_blank"
-                  class="research__form"
-                  onsubmit="setTimeout(() => this.reset(), 1000)"
-                >
-                  <label class="research__label">Base de Datos NLM</label>
-                  <div class="research__input-wrapper">
-                    <input
-                      type="text"
-                      name="term"
-                      placeholder="Buscar papers, autores, PMID..."
-                      class="research__input"
-                      required
-                    />
-                    <button
-                      type="submit"
-                      class="research__button research__button--blue"
-                      aria-label="Buscar en PubMed"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        class="research__icon"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                  <p class="research__caption">
-                    Búsqueda directa en National Library of Medicine
+                <div class="scientific-log-card__text">
+                  <span class="scientific-log-card__eyebrow">PORTAL CIENTÍFICO</span>
+                  <h2 class="scientific-log-card__title" id="scientific-log-title">
+                    Bitácora de Publicaciones Científicas
+                  </h2>
+                  <p class="scientific-log-card__description">
+                    Artículos, papers, revisiones y evidencia médica en un espacio ordenado y accesible.
                   </p>
-                </form>
-              </div>
-
-              <!-- Open Evidence -->
-              <div class="research__card">
-                <div class="research__logo-wrapper">
-                  <img
-                    src="assets/images/Open%20Evidence.png"
-                    alt="OpenEvidence Logo"
-                    class="research__logo--openevidence"
-                    width="1200"
-                    height="630"
-                    loading="lazy"
-                    decoding="async"
-                  />
                 </div>
-
-                <form
-                  onsubmit="
-                    event.preventDefault();
-                    const q = this.querySelector('input').value;
-                    const btn = this.querySelector('button');
-                    const icon = btn.innerHTML;
-                    if (q) {
-                      navigator.clipboard.writeText(q).then(() => {
-                        btn.innerHTML =
-                          '<svg xmlns=\'http://www.w3.org/2000/svg\' class=\'research__icon\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'currentColor\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M5 13l4 4L19 7\' /></svg>';
-                        setTimeout(() => {
-                          window.open(
-                            'https://www.openevidence.com/',
-                            '_blank',
-                          );
-                          btn.innerHTML = icon;
-                        }, 500);
-                      });
-                      this.reset();
-                    }
-                  "
-                  class="research__form"
-                >
-                  <div class="research__label-row">
-                    <label class="research__label"
-                      >Inteligencia Artificial Médica</label
-                    >
-                    <span class="dm-info-tip">
-                      <button
-                        type="button"
-                        class="dm-info-btn"
-                        aria-label="Información"
-                      >
-                        i
-                      </button>
-                      <span class="dm-info-tooltip" role="tooltip">
-                        OpenEvidence es una herramienta de IA clínica orientada
-                        a apoyar a profesionales de la salud. Participó del
-                        programa Mayo Clinic Platform Accelerate y cuenta con
-                        acuerdos de contenido con NEJM Group. En 2023 reportó un
-                        desempeño superior al 90% en el USMLE.
-                      </span>
-                    </span>
-                  </div>
-                  <div class="research__input-wrapper">
-                    <input
-                      type="text"
-                      name="query"
-                      placeholder="Escribe tu pregunta (se copiará al portapapeles)..."
-                      class="research__input"
-                      required
-                    />
-                    <button
-                      type="submit"
-                      class="research__button research__button--black"
-                      title="Buscar (copia al portapapeles)"
-                      aria-label="Buscar en OpenEvidence"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        class="research__icon"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M13 10V3L4 14h7v7l9-11h-7z"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                  <p class="research__caption">
-                    Tu pregunta se copiará automáticamente. Pega (Ctrl+V) en
-                    OpenEvidence.
-                  </p>
-                </form>
               </div>
-            </div>
+
+              <div class="scientific-log-card__visual" aria-hidden="true">
+                <svg
+                  class="scientific-log-card__illustration"
+                  viewBox="0 0 220 180"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  focusable="false"
+                >
+                  <path
+                    d="M15 137C42 121 63 144 92 128C124 111 149 129 185 109"
+                    stroke="currentColor"
+                    stroke-width="1.2"
+                    opacity=".14"
+                  />
+                  <path
+                    d="M57 22H138L173 57V141C173 147.1 168.1 152 162 152H57C50.9 152 46 147.1 46 141V33C46 26.9 50.9 22 57 22Z"
+                    fill="white"
+                    stroke="#dce8d2"
+                    stroke-width="2"
+                  />
+                  <path d="M138 22V48C138 54.1 142.9 59 149 59H173" fill="#edf5e8" />
+                  <path d="M78 22H101V63L89.5 56L78 63V22Z" fill="currentColor" opacity=".38" />
+                  <rect x="75" y="79" width="68" height="7" rx="3.5" fill="#d9dce1" />
+                  <rect x="75" y="98" width="82" height="7" rx="3.5" fill="#d9dce1" />
+                  <rect x="75" y="117" width="58" height="7" rx="3.5" fill="#d9dce1" />
+                  <rect x="74" y="123" width="15" height="29" rx="3" fill="currentColor" opacity=".13" />
+                  <rect x="99" y="111" width="15" height="41" rx="3" fill="currentColor" opacity=".19" />
+                  <rect x="124" y="101" width="15" height="51" rx="3" fill="currentColor" opacity=".25" />
+                  <circle cx="157" cy="123" r="31" fill="white" stroke="#cfd5dc" stroke-width="4.5" />
+                  <circle cx="157" cy="123" r="24" fill="#f7faf5" stroke="#e4e9df" stroke-width="2" />
+                  <path d="M179 145L202 168" stroke="#cfd5dc" stroke-width="9" stroke-linecap="round" />
+                  <path d="M144 115H169M144 124H169M144 133H163" stroke="currentColor" stroke-width="5" stroke-linecap="round" opacity=".46" />
+                  <circle cx="23" cy="72" r="5" stroke="currentColor" opacity=".12" />
+                  <circle cx="199" cy="44" r="5" stroke="currentColor" opacity=".12" />
+                  <path d="M174 42L191 52L207 43" stroke="currentColor" stroke-width="1.3" opacity=".1" />
+                  <circle cx="174" cy="42" r="4" fill="currentColor" opacity=".08" />
+                  <circle cx="191" cy="52" r="5" fill="currentColor" opacity=".09" />
+                  <circle cx="207" cy="43" r="4" fill="currentColor" opacity=".08" />
+                  <g opacity=".11" fill="currentColor">
+                    <circle cx="196" cy="92" r="2.4" />
+                    <circle cx="210" cy="92" r="2.4" />
+                    <circle cx="196" cy="106" r="2.4" />
+                    <circle cx="210" cy="106" r="2.4" />
+                  </g>
+                </svg>
+              </div>
+
+              <span class="scientific-log-card__cta" aria-hidden="true">
+                <span class="scientific-log-card__arrow">
+                  <svg
+                    class="scientific-log-card__arrow-icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    focusable="false"
+                  >
+                    <path
+                      d="M5 12H18"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                    />
+                    <path
+                      d="M13 7L18 12L13 17"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </span>
+                <span class="scientific-log-card__cta-text">Ingresar</span>
+              </span>
+            </a>
           </div>
         </section>
 
@@ -2931,7 +2917,7 @@
         <section
           class="dm-carousel-section reveal-on-scroll"
           id="carrete"
-          aria-label="Centro de Recursos Visuales de Actividad Laboral"
+          aria-label="Centro de Recursos Visuales en el Ámbito Laboral"
         >
           <div
             id="dm-muro-composer"
@@ -2984,7 +2970,7 @@
               <h2
                 class="section__title dm-title dm-title-center section-title--unified"
               >
-                <span class="dm-title-line">Centro de Recursos Visuales de Actividad Laboral</span>
+                <span class="dm-title-line">Centro de Recursos Visuales en el Ámbito Laboral</span>
               </h2>
             </div>
             <div class="dm-carousel-actions"></div>
@@ -3197,16 +3183,67 @@
             >
               &times;
             </button>
+            <button
+              id="dm-carousel-lightbox-prev"
+              class="dm-carousel-lightbox__nav dm-carousel-lightbox__nav--prev"
+              type="button"
+              aria-label="Imagen anterior"
+            >
+              ◀
+            </button>
+            <button
+              id="dm-carousel-lightbox-next"
+              class="dm-carousel-lightbox__nav dm-carousel-lightbox__nav--next"
+              type="button"
+              aria-label="Imagen siguiente"
+            >
+              ▶
+            </button>
             <figure class="dm-carousel-lightbox__figure">
-              <img
-                id="dm-carousel-lightbox-img"
-                class="dm-carousel-lightbox__img"
-                alt=""
-                decoding="async"
-              />
+              <div
+                id="dm-carousel-lightbox-media"
+                class="dm-carousel-lightbox__media"
+              >
+                <img
+                  id="dm-carousel-lightbox-img"
+                  class="dm-carousel-lightbox__img"
+                  alt=""
+                  decoding="async"
+                />
+                <img
+                  id="dm-carousel-lightbox-seal"
+                  class="dm-carousel-lightbox__seal"
+                  src="assets/images/logo-brisa-heart.png"
+                  alt=""
+                  aria-hidden="true"
+                  decoding="async"
+                  loading="lazy"
+                />
+              </div>
               <figcaption class="dm-carousel-lightbox__caption">
-                <span id="dm-carousel-lightbox-title"></span>
-                <span id="dm-carousel-lightbox-meta"></span>
+                <span class="dm-carousel-lightbox__caption-copy">
+                  <span id="dm-carousel-lightbox-title"></span>
+                  <span id="dm-carousel-lightbox-meta"></span>
+                </span>
+                <span class="dm-carousel-lightbox__metrics" aria-label="Interacciones de la imagen">
+                  <button
+                    id="dm-carousel-lightbox-like"
+                    class="dm-carousel-lightbox__like"
+                    type="button"
+                    aria-label="Me gusta"
+                  >
+                    <span class="dm-carousel-lightbox__metric-icon" aria-hidden="true">❤</span>
+                    <span class="dm-carousel-lightbox__metric-label">Me gusta</span>
+                    <span id="dm-carousel-lightbox-like-count">0</span>
+                  </button>
+                  <span
+                    class="dm-carousel-lightbox__comments"
+                    aria-label="Comentarios de la imagen"
+                  >
+                    <span class="dm-carousel-lightbox__metric-label">Comentarios</span>
+                    <span id="dm-carousel-lightbox-comments-count">0</span>
+                  </span>
+                </span>
               </figcaption>
             </figure>
           </div>
@@ -4494,17 +4531,6 @@
             }
           };
 
-          const closeAllLikePopovers = (exceptId) => {
-            if (!forumMessages) return;
-            const popovers = forumMessages.querySelectorAll(
-              "[data-like-popover]",
-            );
-            popovers.forEach((popover) => {
-              if (exceptId && popover.dataset.likePopover === exceptId) return;
-              popover.classList.add("hidden");
-            });
-          };
-
           window.toggleForumLike = async (id) => {
             if (!db) {
               console.warn("No hay conexión a Firestore para el like.");
@@ -4553,33 +4579,6 @@
                 text: "No se pudo actualizar el like.",
               });
             }
-          };
-
-          window.toggleForumLikePopover = (event, id) => {
-            if (event?.stopPropagation) event.stopPropagation();
-            if (!forumMessages) return;
-            const popover = forumMessages.querySelector(
-              `[data-like-popover="${id}"]`,
-            );
-            if (!popover) return;
-            const isHidden = popover.classList.contains("hidden");
-            closeAllLikePopovers();
-            if (isHidden) popover.classList.remove("hidden");
-          };
-
-          let likePopoverBound = false;
-          const bindLikePopoverDismiss = () => {
-            if (likePopoverBound) return;
-            likePopoverBound = true;
-            document.addEventListener("click", (event) => {
-              const target = event.target;
-              if (
-                target.closest("[data-like-eye]") ||
-                target.closest(".dm-like-popover")
-              )
-                return;
-              closeAllLikePopovers();
-            });
           };
 
           function renderMessages() {
@@ -4652,15 +4651,7 @@
                     <i data-lucide="heart" class="w-4 h-4"></i>
                     <span class="${likeCountClass} text-[11px]">${likeCount}</span>
                   </button>
-                  <button
-                    type="button"
-                    data-like-eye="true"
-                    onclick="window.toggleForumLikePopover(event, '${msg.id}')"
-                    class="text-gray-300 hover:text-gray-500 p-1 rounded-full hover:bg-gray-100 transition-all"
-                    aria-label="Ver likes">
-                    <i data-lucide="eye" class="w-4 h-4"></i>
-                  </button>
-                  <div class="dm-like-popover hidden" data-like-popover="${
+                  <div class="dm-like-popover" data-like-popover="${
                     msg.id
                   }">
                     <div class="dm-like-popover__title">Personas que dieron like</div>
@@ -5015,8 +5006,6 @@
               "Foro general: Firebase DB o elementos del DOM no disponibles.",
             );
           }
-
-          bindLikePopoverDismiss();
         })();
       </script>
       <!-- Logout Overlay -->
@@ -5430,7 +5419,7 @@
       </script>
       <script
         type="module"
-        src="assets/js/pages/index.js?v=20260508-visual-resources-1"
+        src="assets/js/pages/index.js?v=20260508-postdeploy-gallery-2"
       ></script>
       <script type="module">
         import {

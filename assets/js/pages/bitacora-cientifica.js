@@ -444,56 +444,75 @@ const openMethodologyTermPopover = (termKey = "", anchorElement) => {
   focusTarget?.focus({ preventScroll: true });
 };
 
-const renderMethodologyGuide = () => {
-  if (!els.methodologyGuideContent) return;
-  const guide = METHODOLOGY_GUIDE;
-  const nav = guide.navItems
-    .map(
-      ([target, label], index) => `
-        <button
-          type="button"
-          class="methodology-guide-nav__button"
-          data-methodology-guide-target="${escapeHtml(target)}"
-          ${index === 0 ? 'aria-current="true"' : ""}
-        >
-          ${escapeHtml(label)}
-        </button>
-      `
-    )
-    .join("");
-  els.methodologyGuideContent.innerHTML = `
-    <section class="methodology-guide-intro" aria-labelledby="methodology-guide-intro-title">
-      <div class="methodology-guide-intro__copy">
-        <p class="methodology-guide-eyebrow">Lectura rápida</p>
-        <h3 id="methodology-guide-intro-title">${escapeHtml(guide.intro.title)}</h3>
-        <p>${escapeHtml(guide.intro.text)}</p>
-      </div>
-      <div class="methodology-guide-intro__cards">
-        ${guide.intro.cards
-          .map(
-            (card) => `
-              <article class="methodology-guide-microcard">
-                <span class="methodology-guide-microcard__icon">${renderMethodologyGuideIcon(card.icon)}</span>
-                <h4>${escapeHtml(card.title)}</h4>
-                <p>${escapeHtml(card.text)}</p>
-              </article>
-            `
-          )
-          .join("")}
-      </div>
-    </section>
+const renderMethodologyGuideHeading = ({ eyebrow = "", title = "", text = "" } = {}) => `
+  <div class="methodology-guide-section__heading">
+    ${eyebrow ? `<p class="methodology-guide-eyebrow">${escapeHtml(eyebrow)}</p>` : ""}
+    ${title ? `<h3>${escapeHtml(title)}</h3>` : ""}
+    ${text ? `<p>${escapeHtml(text)}</p>` : ""}
+  </div>
+`;
 
-    <nav class="methodology-guide-nav" aria-label="Navegación de guía metodológica">
-      ${nav}
-    </nav>
+const renderMethodologyGuideMicrocards = (cards = []) => `
+  <div class="methodology-guide-intro__cards">
+    ${cards
+      .map(
+        (card) => `
+          <article class="methodology-guide-microcard">
+            <span class="methodology-guide-microcard__icon">${renderMethodologyGuideIcon(card.icon)}</span>
+            <h4>${escapeHtml(card.title)}</h4>
+            <p>${escapeHtml(card.text)}</p>
+          </article>
+        `
+      )
+      .join("")}
+  </div>
+`;
 
-    <section class="methodology-guide-section methodology-guide-section--workflow" id="methodology-guide-section-formula" aria-labelledby="methodology-guide-formula">
-      <div class="methodology-guide-section__heading">
-        <p class="methodology-guide-eyebrow">Cadena metodológica</p>
-        <h3 id="methodology-guide-formula">Fórmula visual</h3>
-      </div>
-      <ol class="methodology-guide-workflow">
-        ${guide.formula.steps
+const renderMethodologyQuickPanel = () => {
+  const steps = ["Diseño", "Objetivo", "Temporalidad", "Población", "Comparador", "Análisis"];
+  const decisionItems = [
+    {
+      icon: "git-branch",
+      question: "¿El investigador asigna una intervención?",
+      answer: "Sí: experimental / cuasi-experimental",
+      alternate: "No: observacional"
+    },
+    {
+      icon: "scan-line",
+      question: "¿Mide exposición y desenlace al mismo tiempo?",
+      answer: "Sí: transversal",
+      alternate: "No: evaluar seguimiento"
+    },
+    {
+      icon: "route",
+      question: "¿Parte de una exposición o población?",
+      answer: "Sí: cohorte",
+      alternate: "Observa desenlaces en el tiempo"
+    },
+    {
+      icon: "search",
+      question: "¿Parte del desenlace y busca exposiciones previas?",
+      answer: "Sí: caso-control",
+      alternate: "Útil para eventos raros"
+    },
+    {
+      icon: "files",
+      question: "¿Sintetiza estudios ya publicados?",
+      answer: "Sí: revisión sistemática",
+      alternate: "Si combina resultados: metaanálisis"
+    }
+  ];
+
+  return `
+    <section class="methodology-guide-panel-section methodology-guide-panel-section--hero">
+      ${renderMethodologyGuideHeading({
+        eyebrow: "Guía rápida",
+        title: "Cómo describir un estudio",
+        text:
+          "Un estudio no se define por una sola etiqueta. Se clasifica combinando qué se hizo, cuándo se midió, sobre quiénes, con qué comparador y cómo se analizaron los datos."
+      })}
+      <ol class="methodology-guide-workflow" aria-label="Cadena para describir un estudio">
+        ${steps
           .map(
             (item, index) => `
               <li class="methodology-guide-workflow__step">
@@ -506,113 +525,110 @@ const renderMethodologyGuide = () => {
       </ol>
       <div class="methodology-guide-example">
         <strong>Ejemplo</strong>
-        <span>${escapeHtml(guide.formula.example)}</span>
+        <span>Observacional · Analítico · Longitudinal · Cohorte retrospectiva · Multicéntrico · Registros clínicos.</span>
       </div>
-      <p class="methodology-guide-note">${escapeHtml(guide.formula.note)}</p>
     </section>
 
-    <section class="methodology-guide-section" id="methodology-guide-section-differences" aria-labelledby="methodology-guide-differences">
-      <div class="methodology-guide-section__heading">
-        <p class="methodology-guide-eyebrow">Conceptos que suelen confundirse</p>
-        <h3 id="methodology-guide-differences">Diferencias clave</h3>
-      </div>
-      <div class="methodology-guide-comparison-grid">
-        ${guide.keyDifferences
+    <section class="methodology-guide-panel-section">
+      ${renderMethodologyGuideHeading({
+        eyebrow: "Decisión en 30 segundos",
+        title: "Primero ubicá la lógica del estudio"
+      })}
+      <div class="methodology-guide-decision" aria-label="Árbol de decisión metodológico">
+        ${decisionItems
           .map(
-            (item) => `
-              <article class="methodology-guide-comparison-card">
-                <h4>${escapeHtml(item.title)}</h4>
-                <div class="methodology-guide-comparison-card__body">
-                  <div>
-                    <strong>${escapeHtml(item.left[0])}</strong>
-                    <p>${escapeHtml(item.left[1])}</p>
-                  </div>
-                  <span class="methodology-guide-comparison-card__vs" aria-hidden="true">vs</span>
-                  <div>
-                    <strong>${escapeHtml(item.right[0])}</strong>
-                    <p>${escapeHtml(item.right[1])}</p>
-                  </div>
-                </div>
+            (item, index) => `
+              <article class="methodology-guide-decision__card">
+                <span class="methodology-guide-decision__number">${index + 1}</span>
+                <span class="methodology-guide-decision__icon">${renderMethodologyGuideIcon(item.icon)}</span>
+                <h4>${escapeHtml(item.question)}</h4>
+                <p>${escapeHtml(item.answer)}</p>
+                <small>${escapeHtml(item.alternate)}</small>
               </article>
             `
           )
           .join("")}
       </div>
+      <p class="methodology-guide-note">
+        Mientras más completa sea la descripción metodológica, más fácil será interpretar validez, reproducibilidad y aplicabilidad.
+      </p>
     </section>
+  `;
+};
 
-    <section class="methodology-guide-section" id="methodology-guide-section-families" aria-labelledby="methodology-guide-families">
-      <div class="methodology-guide-section__heading">
-        <p class="methodology-guide-eyebrow">Tipo de evidencia</p>
-        <h3 id="methodology-guide-families">Grandes familias de estudios</h3>
-      </div>
-      <div class="methodology-guide-family-grid">
-        ${guide.families
-          .map(
-            (family) => `
-              <article class="methodology-guide-family-card">
-                <div class="methodology-guide-family-card__header">
-                  <span class="methodology-guide-family-card__icon">${renderMethodologyGuideIcon(family.icon)}</span>
-                  <div>
-                    <h4>${escapeHtml(family.title)}</h4>
-                    <p>${escapeHtml(family.subtitle)}</p>
-                  </div>
-                </div>
-                <div class="methodology-guide-family-card__items">
-                  ${family.items
-                    .map(
-                      ([label, text]) => `
-                        <div class="methodology-guide-family-card__item">
-                          <strong>${escapeHtml(label)}</strong>
-                          <span>${escapeHtml(text)}</span>
-                        </div>
-                      `
-                    )
-                    .join("")}
-                </div>
-              </article>
-            `
-          )
-          .join("")}
-      </div>
-      <aside class="methodology-guide-distinction" aria-label="No confundir revisión sistemática y metaanálisis">
-        <strong>${escapeHtml(guide.distinction.title)}</strong>
-        <div>
-          ${guide.distinction.items
-            .map(([label, text]) => `<p><span>${escapeHtml(label)}:</span> ${escapeHtml(text)}</p>`)
-            .join("")}
-        </div>
-      </aside>
-    </section>
+const renderMethodologyDesignsPanel = () => {
+  const frequentDesigns = [
+    {
+      icon: "scan-line",
+      title: "Transversal",
+      text: "Mide exposición y desenlace en un momento.",
+      badge: "Prevalencia"
+    },
+    {
+      icon: "route",
+      title: "Cohorte",
+      text: "Parte de una población o exposición y sigue desenlaces.",
+      badge: "Riesgo / incidencia"
+    },
+    {
+      icon: "search",
+      title: "Caso-control",
+      text: "Parte del desenlace y busca exposiciones previas.",
+      badge: "Odds ratio"
+    },
+    {
+      icon: "flask-conical",
+      title: "Ensayo clínico",
+      text: "Evalúa una intervención asignada por el investigador.",
+      badge: "Efecto de intervención"
+    },
+    {
+      icon: "repeat-2",
+      title: "Cuasi-experimental",
+      text: "Evalúa una intervención sin aleatorización estricta.",
+      badge: "Antes-después"
+    },
+    {
+      icon: "list-checks",
+      title: "Revisión sistemática",
+      text: "Sintetiza evidencia mediante búsqueda estructurada.",
+      badge: "Síntesis"
+    },
+    {
+      icon: "sigma",
+      title: "Metaanálisis",
+      text: "Combina estadísticamente resultados comparables.",
+      badge: "Efecto combinado"
+    }
+  ];
+  const advancedTerms = [
+    { label: "Unicéntrico", termKey: "unicentrico" },
+    { label: "Bicéntrico", termKey: "bicentrico" },
+    { label: "Multicéntrico", termKey: "multicentrico" },
+    { label: "Multinacional", termKey: "multinacional" },
+    { label: "Aleatorizado", termKey: "aleatorizado" },
+    { label: "No aleatorizado", termKey: "noAleatorizado" },
+    { label: "Por clusters", termKey: "clusters" },
+    { label: "Crossover", termKey: "crossover" },
+    { label: "Factorial", termKey: "factorial" },
+    { label: "Abierto", termKey: "abierto" },
+    { label: "Simple ciego", termKey: "simpleCiego" },
+    { label: "Doble ciego", termKey: "dobleCiego" },
+    { label: "Triple ciego", termKey: "tripleCiego" },
+    { label: "Control histórico", termKey: "historico" },
+    { label: "Placebo", termKey: "placebo" },
+    { label: "Control activo", termKey: "controlActivo" },
+    { label: "Autocontrolado", termKey: "autocontrolado" }
+  ];
 
-    <section class="methodology-guide-section" id="methodology-guide-section-classifications" aria-labelledby="methodology-guide-classifications">
-      <div class="methodology-guide-section__heading">
-        <p class="methodology-guide-eyebrow">Ejes de descripción</p>
-        <h3 id="methodology-guide-classifications">Clasificaciones clave</h3>
-      </div>
-      <div class="methodology-guide-classification-grid">
-        ${guide.classifications
-          .map(
-            (classification) => `
-              <article class="methodology-guide-classification-row">
-                <div class="methodology-guide-classification-row__copy">
-                  <h4>${escapeHtml(classification.title)}</h4>
-                  <p>${escapeHtml(classification.description || "")}</p>
-                </div>
-                <div class="methodology-guide-classification-row__terms">${renderMethodologyGuideTerms(classification.terms || [])}</div>
-              </article>
-            `
-          )
-          .join("")}
-      </div>
-    </section>
-
-    <section class="methodology-guide-section" id="methodology-guide-section-designs" aria-labelledby="methodology-guide-designs">
-      <div class="methodology-guide-section__heading">
-        <p class="methodology-guide-eyebrow">Patrones frecuentes</p>
-        <h3 id="methodology-guide-designs">Diseños más frecuentes</h3>
-      </div>
+  return `
+    <section class="methodology-guide-panel-section">
+      ${renderMethodologyGuideHeading({
+        eyebrow: "Diseños frecuentes",
+        title: "Patrones que más aparecen en lectura clínica"
+      })}
       <div class="methodology-guide-design-grid">
-        ${guide.frequentDesigns
+        ${frequentDesigns
           .map(
             (design) => `
               <article class="methodology-guide-design-card">
@@ -625,16 +641,81 @@ const renderMethodologyGuide = () => {
           )
           .join("")}
       </div>
+      <details class="methodology-guide-details">
+        <summary>
+          <span>Diseños y atributos avanzados</span>
+          ${renderMethodologyGuideIcon("chevron-down")}
+        </summary>
+        <div class="methodology-guide-details__body">
+          ${renderMethodologyGuideTerms(advancedTerms)}
+        </div>
+      </details>
     </section>
+  `;
+};
 
-    <section class="methodology-guide-section methodology-guide-section--checklist" id="methodology-guide-section-checklist" aria-labelledby="methodology-guide-checklist">
-      <div class="methodology-guide-section__heading">
-        <p class="methodology-guide-eyebrow">Checklist básico</p>
-        <h3 id="methodology-guide-checklist">Parámetros mínimos que debe informar un estudio</h3>
-        <p>Checklist básico para evaluar si el reporte permite interpretar el estudio.</p>
-      </div>
+const renderMethodologyDifferencesPanel = () => `
+  <section class="methodology-guide-panel-section">
+    ${renderMethodologyGuideHeading({
+      eyebrow: "Conceptos que suelen confundirse",
+      title: "Diferencias clave"
+    })}
+    <aside class="methodology-guide-distinction" aria-label="No confundir revisión sistemática y metaanálisis">
+      <strong>Revisión sistemática ≠ Metaanálisis</strong>
+      <p>Una revisión sistemática puede no incluir metaanálisis. El metaanálisis es una técnica estadística dentro de algunos estudios de síntesis.</p>
+    </aside>
+    <div class="methodology-guide-comparison-grid">
+      ${METHODOLOGY_GUIDE.keyDifferences
+        .map(
+          (item) => `
+            <article class="methodology-guide-comparison-card">
+              <h4>${escapeHtml(item.title)}</h4>
+              <div class="methodology-guide-comparison-card__body">
+                <div>
+                  <strong>${escapeHtml(item.left[0])}</strong>
+                  <p>${escapeHtml(item.left[1])}</p>
+                </div>
+                <span class="methodology-guide-comparison-card__vs" aria-hidden="true">vs</span>
+                <div>
+                  <strong>${escapeHtml(item.right[0])}</strong>
+                  <p>${escapeHtml(item.right[1])}</p>
+                </div>
+              </div>
+            </article>
+          `
+        )
+        .join("")}
+    </div>
+  </section>
+`;
+
+const renderMethodologyChecklistPanel = () => {
+  const trafficLight = [
+    {
+      tone: "green",
+      label: "Verde",
+      text: "Diseño, población, comparador, desenlaces y análisis están claramente definidos."
+    },
+    {
+      tone: "yellow",
+      label: "Amarillo",
+      text: "Falta información parcial sobre comparador, seguimiento o control de sesgos."
+    },
+    {
+      tone: "red",
+      label: "Rojo",
+      text: "No se define población, desenlace principal o método de análisis."
+    }
+  ];
+
+  return `
+    <section class="methodology-guide-panel-section">
+      ${renderMethodologyGuideHeading({
+        eyebrow: "Checklist básico",
+        title: "Parámetros mínimos para interpretar el reporte"
+      })}
       <div class="methodology-guide-checklist">
-        ${guide.checklistGroups
+        ${METHODOLOGY_GUIDE.checklistGroups
           .map(
             (group) => `
               <article class="methodology-guide-checklist__group">
@@ -647,90 +728,181 @@ const renderMethodologyGuide = () => {
           )
           .join("")}
       </div>
-    </section>
-
-    <section class="methodology-guide-section" id="methodology-guide-section-measures" aria-labelledby="methodology-guide-measures">
-      <div class="methodology-guide-section__heading">
-        <p class="methodology-guide-eyebrow">Lectura cuantitativa</p>
-        <h3 id="methodology-guide-measures">Medidas frecuentes</h3>
-      </div>
-      <div class="methodology-guide-table-wrap">
-        <table class="methodology-guide-table">
-          <thead>
-            <tr>
-              <th scope="col">Diseño</th>
-              <th scope="col">Medidas habituales</th>
-              <th scope="col">Uso orientativo</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${guide.commonMeasures
-              .map(
-                ([design, measures, use]) => `
-                  <tr>
-                    <th scope="row">${escapeHtml(design)}</th>
-                    <td data-label="Medidas habituales">${escapeHtml(measures)}</td>
-                    <td data-label="Uso orientativo">${escapeHtml(use)}</td>
-                  </tr>
-                `
-              )
-              .join("")}
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="methodology-guide-section" id="methodology-guide-section-reporting" aria-labelledby="methodology-guide-reporting">
-      <div class="methodology-guide-section__heading">
-        <p class="methodology-guide-eyebrow">Transparencia del reporte</p>
-        <h3 id="methodology-guide-reporting">Guías de reporte</h3>
-      </div>
-      <div class="methodology-guide-reporting-grid">
-        ${guide.reportingGuidelines
+      <div class="methodology-guide-traffic" aria-label="Semáforo metodológico">
+        ${trafficLight
           .map(
-            ([label, text]) => `
-              <span class="methodology-guide-reporting-chip">
-                ${renderMethodologyGuideIcon("book-open-check")}
-                <strong>${escapeHtml(label)}</strong>
-                <small>${escapeHtml(text)}</small>
-              </span>
+            (item) => `
+              <article class="methodology-guide-traffic__item methodology-guide-traffic__item--${escapeHtml(item.tone)}">
+                <strong>${escapeHtml(item.label)}</strong>
+                <p>${escapeHtml(item.text)}</p>
+              </article>
             `
           )
           .join("")}
       </div>
     </section>
+  `;
+};
 
+const renderMethodologyMeasuresPanel = () => `
+  <section class="methodology-guide-panel-section">
+    ${renderMethodologyGuideHeading({
+      eyebrow: "Medidas y guías",
+      title: "Lectura cuantitativa y transparencia del reporte"
+    })}
+    <div class="methodology-guide-table-wrap">
+      <table class="methodology-guide-table">
+        <thead>
+          <tr>
+            <th scope="col">Diseño</th>
+            <th scope="col">Medidas habituales</th>
+            <th scope="col">Uso orientativo</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${METHODOLOGY_GUIDE.commonMeasures
+            .map(
+              ([design, measures, use]) => `
+                <tr>
+                  <th scope="row">${escapeHtml(design)}</th>
+                  <td data-label="Medidas habituales">${escapeHtml(measures)}</td>
+                  <td data-label="Uso orientativo">${escapeHtml(use)}</td>
+                </tr>
+              `
+            )
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+    <div class="methodology-guide-reporting-grid" aria-label="Guías de reporte">
+      ${METHODOLOGY_GUIDE.reportingGuidelines
+        .map(
+          ([label, text]) => `
+            <span class="methodology-guide-reporting-chip">
+              ${renderMethodologyGuideIcon("book-open-check")}
+              <strong>${escapeHtml(label)}</strong>
+              <small>${escapeHtml(text)}</small>
+            </span>
+          `
+        )
+        .join("")}
+    </div>
     <p class="methodology-guide-closing">
-      <span>${renderMethodologyGuideIcon(guide.closing.icon)}</span>
-      <strong>${escapeHtml(guide.closing.text)}</strong>
+      <span>${renderMethodologyGuideIcon(METHODOLOGY_GUIDE.closing.icon)}</span>
+      <strong>${escapeHtml(METHODOLOGY_GUIDE.closing.text)}</strong>
     </p>
+  </section>
+`;
+
+const renderMethodologyGuide = () => {
+  if (!els.methodologyGuideContent) return;
+  const tabs = [
+    ["quick", "Guía rápida", renderMethodologyQuickPanel()],
+    ["designs", "Diseños", renderMethodologyDesignsPanel()],
+    ["differences", "Diferencias", renderMethodologyDifferencesPanel()],
+    ["checklist", "Checklist", renderMethodologyChecklistPanel()],
+    ["measures", "Medidas y guías", renderMethodologyMeasuresPanel()]
+  ];
+  const nav = tabs
+    .map(
+      ([id, label], index) => `
+        <button
+          type="button"
+          class="methodology-guide-tabs__button"
+          id="methodology-guide-tab-${escapeHtml(id)}"
+          role="tab"
+          data-methodology-guide-tab="${escapeHtml(id)}"
+          aria-selected="${index === 0 ? "true" : "false"}"
+          aria-controls="methodology-guide-panel-${escapeHtml(id)}"
+          tabindex="${index === 0 ? "0" : "-1"}"
+        >
+          ${escapeHtml(label)}
+        </button>
+      `
+    )
+    .join("");
+  const panels = tabs
+    .map(
+      ([id, label, content], index) => `
+        <section
+          class="methodology-guide-panel"
+          id="methodology-guide-panel-${escapeHtml(id)}"
+          role="tabpanel"
+          data-methodology-guide-panel="${escapeHtml(id)}"
+          aria-labelledby="methodology-guide-tab-${escapeHtml(id)}"
+          ${index === 0 ? "" : "hidden"}
+        >
+          <h3 class="sr-only">${escapeHtml(label)}</h3>
+          ${content}
+        </section>
+      `
+    )
+    .join("");
+
+  els.methodologyGuideContent.innerHTML = `
+    <section class="methodology-guide-intro" aria-labelledby="methodology-guide-intro-title">
+      <div class="methodology-guide-intro__copy">
+        <p class="methodology-guide-eyebrow">Lectura rápida</p>
+        <h3 id="methodology-guide-intro-title">${escapeHtml(METHODOLOGY_GUIDE.intro.title)}</h3>
+        <p>${escapeHtml(METHODOLOGY_GUIDE.intro.text)}</p>
+      </div>
+      ${renderMethodologyGuideMicrocards(METHODOLOGY_GUIDE.intro.cards)}
+    </section>
+
+    <div class="methodology-guide-tabs" role="tablist" aria-label="Secciones de metodología de estudios científicos">
+      ${nav}
+    </div>
+
+    <div class="methodology-guide-panels">
+      ${panels}
+    </div>
 
     <div id="methodology-term-popover" class="methodology-term-popover" hidden></div>
   `;
   if (window.lucide) window.lucide.createIcons();
 };
 
+const activateMethodologyGuideTab = (tabId = "", { focus = false } = {}) => {
+  if (!els.methodologyGuideContent || !tabId) return;
+  const tabs = $$("[data-methodology-guide-tab]", els.methodologyGuideContent);
+  const targetTab = tabs.find((button) => button.dataset.methodologyGuideTab === tabId);
+  if (!targetTab) return;
+  closeMethodologyTermPopover({ restoreFocus: false });
+  tabs.forEach((button) => {
+    const isActive = button === targetTab;
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
+    button.setAttribute("tabindex", isActive ? "0" : "-1");
+  });
+  $$("[data-methodology-guide-panel]", els.methodologyGuideContent).forEach((panel) => {
+    panel.hidden = panel.dataset.methodologyGuidePanel !== tabId;
+  });
+  els.methodologyGuideContent.scrollTo({ top: 0, behavior: "auto" });
+  if (focus) targetTab.focus({ preventScroll: true });
+  if (window.lucide) window.lucide.createIcons();
+};
+
 const handleMethodologyGuideNavigation = (event) => {
-  const trigger = event.target.closest("[data-methodology-guide-target]");
+  const trigger = event.target.closest("[data-methodology-guide-tab]");
   if (!trigger || !els.methodologyGuideContent?.contains(trigger)) return;
-  const targetId = `methodology-guide-section-${trigger.dataset.methodologyGuideTarget || ""}`;
-  const target = document.getElementById(targetId);
-  if (!target) return;
   event.preventDefault();
-  $$("[data-methodology-guide-target]", els.methodologyGuideContent).forEach((button) => {
-    if (button === trigger) {
-      button.setAttribute("aria-current", "true");
-    } else {
-      button.removeAttribute("aria-current");
-    }
-  });
-  const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
-  const nav = $(".methodology-guide-nav", els.methodologyGuideContent);
-  const offset = (nav?.offsetHeight || 0) + 16;
-  els.methodologyGuideContent.scrollTo({
-    top: Math.max(0, target.offsetTop - offset),
-    behavior: prefersReducedMotion ? "auto" : "smooth"
-  });
+  activateMethodologyGuideTab(trigger.dataset.methodologyGuideTab || "");
+};
+
+const handleMethodologyGuideKeyboard = (event) => {
+  const currentTab = event.target.closest?.("[data-methodology-guide-tab]");
+  if (!currentTab || !els.methodologyGuideContent?.contains(currentTab)) return;
+  const tabs = $$("[data-methodology-guide-tab]", els.methodologyGuideContent);
+  const currentIndex = tabs.indexOf(currentTab);
+  if (currentIndex < 0) return;
+  let nextIndex = currentIndex;
+  if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % tabs.length;
+  else if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+  else if (event.key === "Home") nextIndex = 0;
+  else if (event.key === "End") nextIndex = tabs.length - 1;
+  else if (event.key === "Enter" || event.key === " ") nextIndex = currentIndex;
+  else return;
+  event.preventDefault();
+  activateMethodologyGuideTab(tabs[nextIndex]?.dataset.methodologyGuideTab || "", { focus: true });
 };
 
 const handleMethodologyGuideTermInteraction = (event) => {
@@ -3685,6 +3857,7 @@ const bindEvents = () => {
   });
   els.methodologyGuideContent?.addEventListener("click", handleMethodologyGuideNavigation);
   els.methodologyGuideContent?.addEventListener("click", handleMethodologyGuideTermInteraction);
+  els.methodologyGuideContent?.addEventListener("keydown", handleMethodologyGuideKeyboard);
   els.methodologyGuideContent?.addEventListener("scroll", handleMethodologyGuideScroll);
   $$("[data-open-add-article]").forEach((trigger) => {
     trigger.addEventListener("click", () => openAddArticleModal(trigger));
