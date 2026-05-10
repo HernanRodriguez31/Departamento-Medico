@@ -1030,6 +1030,7 @@ const renderStaticPost = (post) => ({
   publicationDate: post.publicationDate || "",
   createdAt: toDate(post.createdAt) || toDate(post.reviewedAt),
   createdAtLabel: post.reviewedAt || "",
+  createdBy: post.createdBy || null,
   createdByUid: post.createdBy?.uid || "",
   createdByName: post.createdBy?.displayName || post.reviewer || "Departamento Médico",
   evidenceType: post.evidenceType || "Plantilla editorial",
@@ -1649,6 +1650,48 @@ const getUploaderLabel = (post) =>
   post?.createdBy?.email ||
   "Usuario del departamento";
 
+const getUploaderInitials = (post) => {
+  const label = getUploaderLabel(post);
+  const parts = String(label || "")
+    .replace(/@.+$/, "")
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return "DM";
+  const initials = parts
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+  return initials || "DM";
+};
+
+const getUploaderPhotoUrl = (post) => post?.createdBy?.photoURL || "";
+
+const getRecommendationDateLabel = (post) =>
+  post?.createdAtLabel || formatDateTime(post?.createdAt) || "Fecha no registrada";
+
+const renderPostCurator = (post) => {
+  const uploader = getUploaderLabel(post);
+  const photoUrl = getUploaderPhotoUrl(post);
+  const dateLabel = getRecommendationDateLabel(post);
+  return `
+    <div class="bitacora-post-card__curator">
+      <span class="bitacora-post-card__avatar" aria-hidden="true">
+        ${
+          photoUrl
+            ? `<img src="${escapeHtml(photoUrl)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" />`
+            : `<span>${escapeHtml(getUploaderInitials(post))}</span>`
+        }
+      </span>
+      <span class="bitacora-post-card__curator-copy">
+        <span class="bitacora-post-card__curator-label">Recomendado por</span>
+        <strong>${escapeHtml(uploader)}</strong>
+      </span>
+      <span class="bitacora-post-card__curator-date">${escapeHtml(dateLabel)}</span>
+    </div>
+  `;
+};
+
 const renderAnalysis = (post, analysisId, expanded) => `
   <div id="${analysisId}" class="bitacora-analysis bitacora-analysis-panel" ${expanded ? "" : "hidden"}>
     <section class="bitacora-analysis__lead" aria-labelledby="${analysisId}-quick">
@@ -1673,10 +1716,8 @@ const renderAnalysis = (post, analysisId, expanded) => `
 
 const renderPostMeta = (post) => {
   const rows = [
-    ["Publicación", formatDateOnly(post.publicationDate)],
-    ["Tipo", post.evidenceType || post.articleType || post.studyDesignEs],
-    ["Subido por", getUploaderLabel(post)],
-    ["Carga", post.createdAtLabel || formatDateTime(post.createdAt) || "Carga no registrada"],
+    ["Fecha de publicación", formatDateOnly(post.publicationDate)],
+    ["Tipo de estudio", post.evidenceType || post.articleType || post.studyDesignEs || post.studyType],
     ["Acceso", post.accessType]
   ].filter(([, value]) => hasMeaningfulAnalysisValue(value));
   if (!rows.length) return "";
@@ -1709,8 +1750,9 @@ const renderPost = (post) => {
   return `
     <article class="bitacora-post bitacora-post-card" data-post-id="${escapeHtml(post.id)}">
       <div class="bitacora-post-card__inner">
+        ${renderPostCurator(post)}
         <div class="bitacora-post-card__header">
-          <div class="bitacora-post-card__source-line">
+          <div class="bitacora-post-card__editorial">
             <span class="bitacora-post-card__source">${escapeHtml(post.sourceName || post.journal || "Fuente pendiente")}</span>
             ${
               hasMeaningfulAnalysisValue(methodLabel)
