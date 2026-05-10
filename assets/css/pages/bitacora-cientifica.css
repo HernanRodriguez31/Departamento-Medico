@@ -343,7 +343,7 @@ body.bitacora-page .dm-ai-shell.is-open {
 
 .bitacora-breadcrumb {
   color: var(--bitacora-green);
-  font-size: 0.86rem;
+  font-size: clamp(0.95rem, 1.1vw, 1.06rem);
   font-weight: 900;
 }
 
@@ -351,7 +351,7 @@ body.bitacora-page .dm-ai-shell.is-open {
   margin: 0;
   color: var(--bitacora-ink);
   font-family: "Inter", "Manrope", sans-serif;
-  font-size: clamp(2rem, 3.4vw, 3.35rem);
+  font-size: clamp(1.9rem, 3vw, 3rem);
   font-weight: 780;
   letter-spacing: 0;
   line-height: 1.06;
@@ -468,12 +468,14 @@ body.bitacora-page .dm-ai-shell.is-open {
 
 .bitacora-publications-panel {
   display: grid;
-  gap: 0.85rem;
-  padding: clamp(0.9rem, 1.8vw, 1.22rem);
-  border: 1px solid var(--bitacora-border);
-  border-radius: 0.85rem;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.06);
+  gap: 1rem;
+  padding: clamp(1rem, 2vw, 1.4rem);
+  border: 1px solid rgba(203, 213, 225, 0.72);
+  border-radius: 1rem;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(122, 184, 0, 0.055), transparent 34%),
+    linear-gradient(180deg, rgba(248, 251, 253, 0.98), rgba(242, 247, 250, 0.92));
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.07);
 }
 
 .bitacora-publications-header {
@@ -604,10 +606,10 @@ body.bitacora-page .dm-ai-shell.is-open {
 
 .bitacora-post-card {
   overflow: hidden;
-  border: 1px solid rgba(226, 232, 240, 0.92);
-  border-radius: 0.75rem;
-  background: var(--bitacora-card);
-  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.07);
+  border: 1px solid rgba(214, 226, 202, 0.92);
+  border-radius: 0.88rem;
+  background: rgba(255, 255, 255, 0.99);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.055);
   transition:
     border-color 160ms ease,
     box-shadow 160ms ease,
@@ -706,8 +708,77 @@ body.bitacora-page .dm-ai-shell.is-open {
 
 .bitacora-post-card__inner {
   display: grid;
+  gap: 0.76rem;
+  padding: 1.05rem 1.1rem 0.95rem;
+}
+
+.bitacora-post-card__curator {
+  display: flex;
+  align-items: center;
   gap: 0.72rem;
-  padding: 1rem 1.05rem 0.88rem;
+  min-width: 0;
+  padding: 0 0 0.8rem;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.72);
+}
+
+.bitacora-post-card__avatar {
+  display: inline-grid;
+  width: 2.3rem;
+  height: 2.3rem;
+  flex: 0 0 2.3rem;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(122, 184, 0, 0.2);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.98), rgba(239, 246, 232, 0.9)),
+    rgba(247, 251, 240, 0.95);
+  color: #315f22;
+  font-size: 0.74rem;
+  font-weight: 900;
+  box-shadow: 0 0.45rem 1.2rem rgba(47, 111, 40, 0.08);
+}
+
+.bitacora-post-card__avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bitacora-post-card__curator-copy {
+  display: grid;
+  min-width: 0;
+  gap: 0.08rem;
+}
+
+.bitacora-post-card__curator-label {
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 850;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+.bitacora-post-card__curator-copy strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--bitacora-ink);
+  font-size: 0.86rem;
+  font-weight: 850;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bitacora-post-card__curator-date {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 760;
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
 .bitacora-post-card__eyebrow {
@@ -720,12 +791,12 @@ body.bitacora-page .dm-ai-shell.is-open {
   font-weight: 850;
 }
 
-.bitacora-post-card__source-line {
+.bitacora-post-card__source-line,
+.bitacora-post-card__editorial {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.35rem;
-  margin-bottom: 0.55rem;
   line-height: 1.35;
 }
 
@@ -763,9 +834,9 @@ body.bitacora-page .dm-ai-shell.is-open {
 }
 
 .bitacora-post-card__title {
-  margin: 0.1rem 0 0.9rem;
+  margin: 0.06rem 0 0;
   color: var(--bitacora-ink);
-  font-size: clamp(1.12rem, 1.45vw, 1.42rem);
+  font-size: clamp(1.08rem, 1.35vw, 1.34rem);
   font-weight: 850;
   letter-spacing: 0;
   line-height: 1.16;
@@ -773,8 +844,8 @@ body.bitacora-page .dm-ai-shell.is-open {
 
 .bitacora-post-card__summary {
   display: -webkit-box;
-  max-width: 92%;
-  margin: 0 0 0.94rem;
+  max-width: 100%;
+  margin: 0.1rem 0 0.12rem;
   overflow: hidden;
   color: #475569;
   font-size: 0.94rem;
@@ -846,7 +917,14 @@ body.bitacora-page .dm-ai-shell.is-open {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
   gap: 0.58rem;
-  margin: 0;
+  margin: 0.08rem 0 0;
+}
+
+.bitacora-post-card__meta {
+  padding: 0.72rem 0.78rem;
+  border: 1px solid rgba(226, 232, 240, 0.72);
+  border-radius: 0.72rem;
+  background: rgba(248, 250, 252, 0.74);
 }
 
 .bitacora-post-card__meta div,
@@ -880,8 +958,9 @@ body.bitacora-page .dm-ai-shell.is-open {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.55rem;
-  padding: 0.82rem 1.05rem 0.95rem;
+  padding: 0.86rem 1.1rem 0.98rem;
   border-top: 1px solid rgba(226, 232, 240, 0.82);
+  background: rgba(250, 252, 248, 0.58);
 }
 
 .bitacora-post-card__management {
@@ -3802,7 +3881,7 @@ body.bitacora-modal-open .dm-ai-selector {
   }
 
   .bitacora-title {
-    font-size: clamp(1.85rem, 9.5vw, 2.5rem);
+    font-size: clamp(1.72rem, 8.4vw, 2.25rem);
     line-height: 1.08;
   }
 
@@ -3818,6 +3897,36 @@ body.bitacora-modal-open .dm-ai-selector {
   .bitacora-intro-segment {
     border-radius: 1rem;
     padding: 0.85rem;
+  }
+
+  .bitacora-post-card__inner {
+    padding: 0.92rem 0.88rem 0.82rem;
+  }
+
+  .bitacora-post-card__curator {
+    display: grid;
+    grid-template-columns: 2.3rem minmax(0, 1fr);
+    align-items: center;
+    gap: 0.32rem 0.68rem;
+  }
+
+  .bitacora-post-card__curator-copy strong,
+  .bitacora-post-card__curator-date {
+    white-space: normal;
+  }
+
+  .bitacora-post-card__curator-date {
+    grid-column: 2;
+    margin-left: 0;
+    font-size: 0.76rem;
+  }
+
+  .bitacora-post-card__editorial {
+    gap: 0.28rem 0.35rem;
+  }
+
+  .bitacora-post-card__meta {
+    padding: 0.68rem;
   }
 
   .bitacora-filters-card,

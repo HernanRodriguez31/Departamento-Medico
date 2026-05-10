@@ -3916,9 +3916,10 @@ body.dm-modal-open .brisa-chat-panel {
 
 /* Bitácora científica */
 .scientific-log-section {
+  --scientific-log-block-space: clamp(72px, 7vw, 96px);
   width: 100%;
   max-width: 1200px;
-  margin: clamp(72px, 7vw, 96px) auto 2rem;
+  margin: var(--scientific-log-block-space) auto 0;
   padding: 0;
   background: transparent;
   box-sizing: border-box;
@@ -3927,6 +3928,20 @@ body.dm-modal-open .brisa-chat-panel {
 #investigacion.scientific-log-section {
   padding: 0;
   background: transparent;
+}
+
+#investigacion.scientific-log-section + #carrete.dm-carousel-section {
+  --scientific-log-block-space: clamp(72px, 7vw, 96px);
+  margin-top: var(--scientific-log-block-space);
+  padding-top: clamp(24px, 2.2vw, 30px);
+}
+
+#investigacion.scientific-log-section + #carrete.dm-carousel-section.reveal-on-scroll {
+  transform: translateY(18px);
+}
+
+#investigacion.scientific-log-section + #carrete.dm-carousel-section.reveal-on-scroll.is-visible {
+  transform: translateY(0);
 }
 
 .scientific-log-container {
@@ -3941,17 +3956,17 @@ body.dm-modal-open .brisa-chat-panel {
   --scientific-log-accent: var(--brisa-green, #7ab800);
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(160px, 200px) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 400px) 76px;
   align-items: center;
-  gap: clamp(28px, 3vw, 42px);
-  min-height: clamp(310px, 22vw, 336px);
-  padding: clamp(50px, 4.5vw, 64px) clamp(46px, 5vw, 62px);
+  gap: clamp(22px, 2vw, 32px);
+  min-height: clamp(318px, 22vw, 348px);
+  padding: clamp(44px, 4vw, 58px) clamp(44px, 4.8vw, 60px);
   overflow: hidden;
   color: #142033;
   text-decoration: none;
   background:
     radial-gradient(circle at 12% 50%, rgba(122, 184, 0, 0.075), transparent 31%),
-    radial-gradient(circle at 82% 45%, rgba(122, 184, 0, 0.065), transparent 34%),
+    radial-gradient(circle at 82% 45%, rgba(34, 166, 179, 0.06), transparent 34%),
     #ffffff;
   border: 1px solid rgba(122, 184, 0, 0.24);
   border-radius: 28px;
@@ -3993,7 +4008,8 @@ body.dm-modal-open .brisa-chat-panel {
   pointer-events: none;
   background:
     radial-gradient(circle at 16% 52%, rgba(122, 184, 0, 0.052), transparent 24%),
-    radial-gradient(circle at 82% 50%, rgba(122, 184, 0, 0.045), transparent 27%),
+    radial-gradient(circle at 80% 48%, rgba(34, 166, 179, 0.072), transparent 31%),
+    radial-gradient(circle at 90% 78%, rgba(47, 111, 159, 0.04), transparent 24%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(250, 252, 248, 0.58));
 }
 
@@ -4069,16 +4085,20 @@ body.dm-modal-open .brisa-chat-panel {
 }
 
 .scientific-log-card__visual {
-  justify-self: center;
-  color: var(--scientific-log-accent);
-  opacity: 0.68;
+  justify-self: end;
+  width: clamp(360px, 28vw, 400px);
+  max-width: 100%;
+  opacity: 1;
+  filter: drop-shadow(0 18px 28px rgba(15, 23, 42, 0.08));
 }
 
-.scientific-log-card__illustration {
+.scientific-log-visual__image {
   display: block;
   width: 100%;
-  max-width: 198px;
   height: auto;
+  max-height: 225px;
+  object-fit: contain;
+  object-position: center;
 }
 
 .scientific-log-card__cta {
@@ -4131,13 +4151,20 @@ body.dm-modal-open .brisa-chat-panel {
 
 @media (max-width: 900px) {
   .scientific-log-section {
+    --scientific-log-block-space: 64px;
     width: calc(100% - 48px);
   }
 
+  #investigacion.scientific-log-section + #carrete.dm-carousel-section {
+    --scientific-log-block-space: 64px;
+    margin-top: var(--scientific-log-block-space);
+    padding-top: 22px;
+  }
+
   .scientific-log-card {
-    grid-template-columns: minmax(0, 1fr) minmax(145px, 175px) 68px;
+    grid-template-columns: minmax(0, 1fr) minmax(252px, 300px) 66px;
     gap: 22px;
-    min-height: 300px;
+    min-height: 310px;
     padding: 44px 36px;
     border-radius: 26px;
   }
@@ -4171,6 +4198,10 @@ body.dm-modal-open .brisa-chat-panel {
     font-size: 1rem;
   }
 
+  .scientific-log-card__visual {
+    width: min(100%, 320px);
+  }
+
   .scientific-log-card__arrow {
     width: 54px;
     height: 54px;
@@ -4184,15 +4215,26 @@ body.dm-modal-open .brisa-chat-panel {
 
 @media (max-width: 640px) {
   .scientific-log-section {
+    --scientific-log-block-space: clamp(48px, 12vw, 64px);
     width: calc(100% - 32px);
-    margin-top: clamp(48px, 12vw, 64px);
+    margin-top: var(--scientific-log-block-space);
     padding-top: 0;
-    padding-bottom: 3.5rem;
+    padding-bottom: 0;
+  }
+
+  #investigacion.scientific-log-section + #carrete.dm-carousel-section {
+    --scientific-log-block-space: clamp(48px, 12vw, 64px);
+    margin-top: var(--scientific-log-block-space);
+    padding-top: 18px;
+  }
+
+  #investigacion.scientific-log-section + #carrete.dm-carousel-section.reveal-on-scroll {
+    transform: translateY(16px);
   }
 
   .scientific-log-card {
     grid-template-columns: 1fr;
-    gap: 24px;
+    gap: 22px;
     min-height: 0;
     padding: 38px 26px 30px;
     border-radius: 24px;
@@ -4232,8 +4274,8 @@ body.dm-modal-open .brisa-chat-panel {
 
   .scientific-log-card__visual {
     justify-self: start;
-    width: min(100%, 180px);
-    opacity: 0.64;
+    width: min(100%, 310px);
+    opacity: 1;
   }
 
   .scientific-log-card__cta {
