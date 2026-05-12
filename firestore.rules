@@ -411,6 +411,14 @@ service cloud.firestore {
       allow list, create, update, delete: if false;
     }
 
+    match /usernames/{username} {
+      allow read, write: if false;
+    }
+
+    match /securityAuditLogs/{logId} {
+      allow read, write: if false;
+    }
+
     match /usuarios/{uid} {
       allow get: if signedIn();
       // TODO: reemplazar alias login por callable; con rules no se puede impedir enumeración por consultas limit(1) repetidas.

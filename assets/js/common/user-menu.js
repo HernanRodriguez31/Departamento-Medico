@@ -1,9 +1,26 @@
-import { onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import {
+  EmailAuthProvider,
+  onAuthStateChanged,
+  reauthenticateWithCredential,
+  updatePassword,
+  updateProfile,
+  verifyBeforeUpdateEmail
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { getFirebase } from "./firebaseClient.js";
 import { logger, once as logOnce } from "./app-logger.js";
+import { bindPasswordVisibility } from "../shared/passwordVisibility.js";
 import { performManagedLogout } from "../shared/sessionGuard.js?v=20260305-session-1";
+import {
+  adminIssueTemporaryPassword,
+  adminResolveUser,
+  adminSendPasswordReset,
+  recordEmailChangeRequested,
+  recordMyPasswordChange,
+  syncMyAuthEmail,
+  updateMyProfile as updateMyProfileCallable
+} from "../services/UserSecurityService.js";
 import {
   buildInitials,
   resolveNameFromDoc,
@@ -349,7 +366,894 @@ const updateText = (el, value) => {
   el.textContent = value || "";
 };
 
+const hasPasswordProvider = (user) =>
+  Array.isArray(user?.providerData) &&
+  user.providerData.some((provider) => provider?.providerId === "password");
+
+const mapPasswordError = (error) => {
+  const code = String(error?.code || "");
+  if (code.includes("wrong-password") || code.includes("invalid-credential")) {
+    return "La contraseña actual no es correcta.";
+  }
+  if (code.includes("weak-password")) return "La nueva contraseña es débil.";
+  if (code.includes("requires-recent-login")) return "La sesión requiere reautenticación.";
+  if (code.includes("too-many-requests")) return "Demasiados intentos. Reintentá más tarde.";
+  return "No se pudo completar la operación.";
+};
+
+const mapEmailError = (error) => {
+  const code = String(error?.code || "");
+  if (code.includes("wrong-password") || code.includes("invalid-credential")) {
+    return "La contraseña actual no es correcta.";
+  }
+  if (code.includes("invalid-email")) return "El correo ingresado no es válido.";
+  if (code.includes("email-already-in-use")) return "Ese correo ya está registrado.";
+  if (code.includes("requires-recent-login")) return "La sesión requiere reautenticación.";
+  if (code.includes("too-many-requests")) return "Demasiados intentos. Reintentá más tarde.";
+  return "No se pudo actualizar el correo.";
+};
+
+let userSecurityModal = null;
+
+const ensureUserSecurityStyles = () => {
+  if (document.getElementById("dm-user-security-styles")) return;
+  const style = document.createElement("style");
+  style.id = "dm-user-security-styles";
+  style.textContent = `
+    .user-menu__security-action {
+      width: 100%;
+      border: 0;
+      background: rgba(122, 184, 0, 0.06);
+      font: inherit;
+      cursor: pointer;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #263449;
+      border-radius: 14px;
+      transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+    }
+    .user-menu__security-action:hover {
+      background: rgba(122, 184, 0, 0.12);
+      color: #1f2a3d;
+      transform: translateY(-1px);
+    }
+    .user-menu__security-icon {
+      width: 19px;
+      height: 19px;
+      color: #7ab800;
+      flex: 0 0 auto;
+    }
+    .user-menu__security-icon svg,
+    .password-visibility-toggle svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .user-menu__security-action .user-menu__label {
+      font-weight: 800;
+    }
+    .user-security-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 10040;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      background: rgba(248, 250, 252, 0.74);
+      -webkit-backdrop-filter: blur(18px) saturate(1.15);
+      backdrop-filter: blur(18px) saturate(1.15);
+    }
+    .user-security-modal[hidden] { display: none; }
+    .user-security-modal__dialog {
+      width: min(100%, 820px);
+      max-height: min(88vh, 820px);
+      overflow: auto;
+      border: 1px solid rgba(122, 184, 0, 0.24);
+      border-radius: 24px;
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(248, 251, 255, 0.88));
+      box-shadow: 0 32px 96px rgba(15, 23, 42, 0.18);
+      color: #182033;
+      scrollbar-gutter: stable;
+    }
+    .user-security-modal__header,
+    .user-security-modal__section {
+      padding: clamp(18px, 3vw, 26px);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+    }
+    .user-security-modal__header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .user-security-modal__section {
+      position: relative;
+      background: rgba(255, 255, 255, 0.38);
+    }
+    .user-security-modal__section::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: clamp(18px, 3vw, 26px);
+      width: 72px;
+      height: 3px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #7ab800, rgba(122, 184, 0, 0.2));
+    }
+    .user-security-modal__header h2,
+    .user-security-modal__section h3 {
+      margin: 0;
+      line-height: 1.15;
+      letter-spacing: 0;
+      color: #111827;
+    }
+    .user-security-modal__header h2 { font-size: clamp(1.35rem, 3vw, 1.9rem); }
+    .user-security-modal__section h3 { font-size: 1.08rem; }
+    .user-security-modal__section-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    .user-security-modal__section-header p {
+      margin-top: 5px;
+      color: #66788f;
+      font-size: 0.9rem;
+    }
+    .user-security-modal__section-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 7px;
+      color: #5e9900;
+      font-size: 0.72rem;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .user-security-modal__section-card {
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.58);
+      padding: clamp(14px, 2.5vw, 18px);
+      box-shadow: 0 16px 36px rgba(15, 23, 42, 0.06);
+    }
+    .user-security-modal__section-card h4 {
+      margin: 0 0 6px;
+      font-size: 1rem;
+      line-height: 1.2;
+      color: #111827;
+    }
+    .user-security-modal__section p {
+      margin: 8px 0 0;
+      color: #64748b;
+      line-height: 1.5;
+    }
+    .user-security-modal__close {
+      width: 40px;
+      height: 40px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: #fff;
+      color: #334155;
+      cursor: pointer;
+      font-size: 1.4rem;
+      line-height: 1;
+    }
+    .user-security-modal__grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .user-security-modal__field {
+      display: grid;
+      gap: 6px;
+      color: #344256;
+      font-size: 0.82rem;
+      font-weight: 800;
+    }
+    .user-security-modal__field--wide { grid-column: 1 / -1; }
+    .user-security-modal input {
+      width: 100%;
+      box-sizing: border-box;
+      min-height: 46px;
+      border: 1px solid rgba(148, 163, 184, 0.45);
+      border-radius: 14px;
+      padding: 10px 12px;
+      font: inherit;
+      background: rgba(255, 255, 255, 0.94);
+      color: #182033;
+    }
+    .user-security-modal input[readonly],
+    .user-security-modal input:disabled {
+      background: rgba(241, 245, 249, 0.84);
+      color: #64748b;
+    }
+    .user-security-modal input:focus {
+      outline: none;
+      border-color: #7ab800;
+      box-shadow: 0 0 0 4px rgba(122, 184, 0, 0.16);
+    }
+    .user-security-modal__email-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: end;
+      margin-top: 14px;
+    }
+    .user-security-modal__email-panel {
+      margin: 14px 0;
+      border: 1px solid rgba(122, 184, 0, 0.2);
+      border-radius: 18px;
+      padding: 14px;
+      background: rgba(240, 253, 244, 0.58);
+    }
+    .user-security-modal__password-wrap {
+      position: relative;
+      display: block;
+    }
+    .user-security-modal__password-wrap input {
+      padding-right: 48px;
+    }
+    .password-visibility-toggle {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 34px;
+      height: 34px;
+      display: inline-grid;
+      place-items: center;
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: #6b7b90;
+      cursor: pointer;
+    }
+    .password-visibility-toggle:hover,
+    .password-visibility-toggle:focus-visible {
+      color: #5e9900;
+      background: rgba(122, 184, 0, 0.12);
+      outline: none;
+    }
+    .user-security-modal__actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 14px;
+    }
+    .user-security-modal__button {
+      min-height: 42px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.36);
+      padding: 0 16px;
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+      background: #fff;
+      color: #334155;
+    }
+    .user-security-modal__button--secondary {
+      background: rgba(255, 255, 255, 0.66);
+      color: #40516a;
+    }
+    .user-security-modal__button--primary {
+      border-color: #7ab800;
+      background: #7ab800;
+      color: #fff;
+      box-shadow: 0 14px 28px rgba(122, 184, 0, 0.2);
+    }
+    .user-security-modal__status {
+      margin-top: 12px;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: rgba(122, 184, 0, 0.12);
+      color: #365314;
+      font-size: 0.86rem;
+      font-weight: 700;
+    }
+    .user-security-modal__status[data-variant="error"] {
+      background: rgba(239, 68, 68, 0.12);
+      color: #991b1b;
+    }
+    .user-security-modal__results {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .user-security-modal__result {
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      border-radius: 14px;
+      background: rgba(248, 250, 252, 0.74);
+      padding: 12px;
+      cursor: pointer;
+      text-align: left;
+      display: grid;
+      gap: 8px;
+    }
+    .user-security-modal__result-title {
+      font-weight: 900;
+      color: #182033;
+    }
+    .user-security-modal__result-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px 12px;
+      color: #52647a;
+      font-size: 0.84rem;
+    }
+    .user-security-modal__result-grid strong {
+      color: #334155;
+      font-weight: 900;
+    }
+    .user-security-modal__result[aria-selected="true"] {
+      border-color: #7ab800;
+      box-shadow: 0 0 0 3px rgba(122, 184, 0, 0.14);
+    }
+    .user-security-modal__temp {
+      margin-top: 12px;
+      border: 1px solid rgba(122, 184, 0, 0.24);
+      border-radius: 16px;
+      padding: 12px;
+      background: rgba(240, 253, 244, 0.72);
+    }
+    .user-security-modal__temp code {
+      display: block;
+      padding: 10px;
+      border-radius: 12px;
+      background: #111827;
+      color: #fff;
+      font-size: 1rem;
+      overflow-wrap: anywhere;
+    }
+    @media (max-width: 640px) {
+      .user-security-modal__grid { grid-template-columns: 1fr; }
+      .user-security-modal__email-row { grid-template-columns: 1fr; }
+      .user-security-modal__result-grid { grid-template-columns: 1fr; }
+      .user-security-modal__actions { justify-content: stretch; }
+      .user-security-modal__button { width: 100%; }
+    }
+  `;
+  document.head.appendChild(style);
+};
+
+const setModalStatus = (el, message = "", variant = "info") => {
+  if (!el) return;
+  el.textContent = message;
+  el.dataset.variant = variant;
+  el.hidden = !message;
+};
+
+const ensureUserSecurityModal = () => {
+  if (userSecurityModal) return userSecurityModal;
+  ensureUserSecurityStyles();
+  const overlay = document.createElement("div");
+  overlay.className = "user-security-modal";
+  overlay.hidden = true;
+  overlay.innerHTML = `
+    <section class="user-security-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="user-security-title">
+      <header class="user-security-modal__header">
+        <div>
+          <h2 id="user-security-title">Mi perfil y seguridad</h2>
+          <p>Gestioná tus datos visibles y el acceso a tu cuenta.</p>
+        </div>
+        <button class="user-security-modal__close" type="button" data-security-close aria-label="Cerrar">×</button>
+      </header>
+      <section class="user-security-modal__section">
+        <div class="user-security-modal__section-header">
+          <div>
+            <span class="user-security-modal__section-kicker">Perfil</span>
+            <h3>Datos de cuenta</h3>
+            <p>Actualizá tu nombre visible, usuario y datos de contacto verificados.</p>
+          </div>
+        </div>
+        <div class="user-security-modal__section-card">
+          <div class="user-security-modal__email-row">
+            <label class="user-security-modal__field">
+              Email
+              <input data-profile-email type="email" readonly />
+            </label>
+            <button class="user-security-modal__button user-security-modal__button--secondary" type="button" data-email-change-toggle>Cambiar correo</button>
+          </div>
+          <div class="user-security-modal__email-panel" data-email-change-panel hidden>
+            <p data-email-external hidden>Tu correo se administra desde el proveedor externo.</p>
+            <form data-email-form>
+              <div class="user-security-modal__grid">
+                <label class="user-security-modal__field">
+                  Nuevo correo
+                  <input data-email-new type="email" autocomplete="email" />
+                </label>
+                <label class="user-security-modal__field" data-password-field>
+                  Contraseña actual
+                  <span class="user-security-modal__password-wrap">
+                    <input data-email-current-password type="password" autocomplete="current-password" />
+                    <button class="password-visibility-toggle" type="button" data-password-visibility></button>
+                  </span>
+                </label>
+              </div>
+              <p>Te enviaremos un correo de verificación. El email visible se actualizará cuando Firebase Auth confirme el cambio.</p>
+              <div class="user-security-modal__actions">
+                <button class="user-security-modal__button" type="button" data-email-cancel>Cancelar</button>
+                <button class="user-security-modal__button user-security-modal__button--primary" type="submit">Actualizar correo</button>
+              </div>
+            </form>
+            <p class="user-security-modal__status" data-email-status hidden></p>
+          </div>
+          <form data-profile-form>
+            <div class="user-security-modal__grid">
+              <label class="user-security-modal__field">
+                Usuario / alias
+                <input data-profile-username type="text" autocomplete="username" autocapitalize="off" spellcheck="false" />
+              </label>
+              <label class="user-security-modal__field">
+                Nombre visible
+                <input data-profile-display-name type="text" autocomplete="name" />
+              </label>
+            </div>
+            <p>La imagen de perfil se gestiona desde “Cambiar imagen de perfil” en este mismo menú.</p>
+            <div class="user-security-modal__actions">
+              <button class="user-security-modal__button user-security-modal__button--primary" type="submit">Guardar perfil</button>
+            </div>
+            <p class="user-security-modal__status" data-profile-status hidden></p>
+          </form>
+        </div>
+      </section>
+      <section class="user-security-modal__section">
+        <div class="user-security-modal__section-header">
+          <div>
+            <span class="user-security-modal__section-kicker">Seguridad</span>
+            <h3>Contraseña y acceso</h3>
+            <p>Gestioná la contraseña local de tu cuenta con reautenticación segura.</p>
+          </div>
+        </div>
+        <div class="user-security-modal__section-card">
+          <form data-password-form>
+            <div class="user-security-modal__grid">
+              <label class="user-security-modal__field user-security-modal__field--wide" data-password-field>
+                Contraseña actual
+                <span class="user-security-modal__password-wrap">
+                  <input data-password-current type="password" autocomplete="current-password" />
+                  <button class="password-visibility-toggle" type="button" data-password-visibility></button>
+                </span>
+              </label>
+              <label class="user-security-modal__field" data-password-field>
+                Nueva contraseña
+                <span class="user-security-modal__password-wrap">
+                  <input data-password-new type="password" autocomplete="new-password" />
+                  <button class="password-visibility-toggle" type="button" data-password-visibility></button>
+                </span>
+              </label>
+              <label class="user-security-modal__field" data-password-field>
+                Confirmar nueva contraseña
+                <span class="user-security-modal__password-wrap">
+                  <input data-password-confirm type="password" autocomplete="new-password" />
+                  <button class="password-visibility-toggle" type="button" data-password-visibility></button>
+                </span>
+              </label>
+            </div>
+            <p>Por seguridad, se solicitará reautenticación con tu contraseña actual.</p>
+            <div class="user-security-modal__actions">
+              <button class="user-security-modal__button user-security-modal__button--primary" type="submit">Cambiar contraseña</button>
+            </div>
+          </form>
+          <div data-provider-external hidden>
+            <p>Tu cuenta usa un proveedor externo. La contraseña se administra desde ese proveedor.</p>
+          </div>
+          <p class="user-security-modal__status" data-password-status hidden></p>
+        </div>
+      </section>
+      <section class="user-security-modal__section user-security-modal__admin" data-admin-section hidden>
+        <div class="user-security-modal__section-header">
+          <div>
+            <span class="user-security-modal__section-kicker">SuperAdmin</span>
+            <h3>Administración de usuarios</h3>
+            <p>Acciones restringidas a superAdmin. Todas las operaciones quedan auditadas.</p>
+          </div>
+        </div>
+        <div class="user-security-modal__section-card admin-reset-user-panel">
+          <h4>Restablecer usuario</h4>
+          <p>Para ver esta sección tu usuario debe tener claim superAdmin y haber iniciado sesión nuevamente después de asignarlo.</p>
+          <div class="user-security-modal__grid">
+            <label class="user-security-modal__field user-security-modal__field--wide">
+              Buscar por usuario, email o UID
+              <input data-admin-query type="text" autocomplete="off" spellcheck="false" />
+            </label>
+          </div>
+          <div class="user-security-modal__actions">
+            <button class="user-security-modal__button" type="button" data-admin-search>Buscar usuario</button>
+            <button class="user-security-modal__button" type="button" data-admin-reset-email>Enviar recuperación por email</button>
+            <button class="user-security-modal__button user-security-modal__button--primary" type="button" data-admin-temp>Generar contraseña temporal</button>
+          </div>
+          <div class="user-security-modal__results" data-admin-results></div>
+          <label class="user-security-modal__field user-security-modal__field--wide">
+            Confirmación textual
+            <input data-admin-confirm type="text" placeholder="Escribí RESTABLECER para continuar" autocomplete="off" />
+          </label>
+          <p>La acción quedará auditada. No se almacena la contraseña temporal.</p>
+          <div class="user-security-modal__temp" data-admin-temp-result hidden>
+            <p>Esta contraseña se muestra una sola vez. Entregala por un canal seguro. El usuario deberá cambiarla al ingresar.</p>
+            <code data-admin-temp-password></code>
+            <div class="user-security-modal__actions">
+              <button class="user-security-modal__button" type="button" data-admin-copy-temp>Copiar</button>
+            </div>
+          </div>
+          <p class="user-security-modal__status" data-admin-status hidden></p>
+        </div>
+      </section>
+    </section>
+  `;
+  document.body.appendChild(overlay);
+  bindPasswordVisibility(overlay);
+  userSecurityModal = {
+    overlay,
+    dialog: overlay.querySelector(".user-security-modal__dialog"),
+    close: overlay.querySelector("[data-security-close]"),
+    profileForm: overlay.querySelector("[data-profile-form]"),
+    profileEmail: overlay.querySelector("[data-profile-email]"),
+    profileDisplayName: overlay.querySelector("[data-profile-display-name]"),
+    profileUsername: overlay.querySelector("[data-profile-username]"),
+    profileStatus: overlay.querySelector("[data-profile-status]"),
+    emailToggle: overlay.querySelector("[data-email-change-toggle]"),
+    emailPanel: overlay.querySelector("[data-email-change-panel]"),
+    emailForm: overlay.querySelector("[data-email-form]"),
+    emailExternal: overlay.querySelector("[data-email-external]"),
+    emailNew: overlay.querySelector("[data-email-new]"),
+    emailCurrentPassword: overlay.querySelector("[data-email-current-password]"),
+    emailCancel: overlay.querySelector("[data-email-cancel]"),
+    emailStatus: overlay.querySelector("[data-email-status]"),
+    passwordForm: overlay.querySelector("[data-password-form]"),
+    passwordCurrent: overlay.querySelector("[data-password-current]"),
+    passwordNew: overlay.querySelector("[data-password-new]"),
+    passwordConfirm: overlay.querySelector("[data-password-confirm]"),
+    passwordStatus: overlay.querySelector("[data-password-status]"),
+    providerExternal: overlay.querySelector("[data-provider-external]"),
+    adminSection: overlay.querySelector("[data-admin-section]"),
+    adminQuery: overlay.querySelector("[data-admin-query]"),
+    adminSearch: overlay.querySelector("[data-admin-search]"),
+    adminResetEmail: overlay.querySelector("[data-admin-reset-email]"),
+    adminTemp: overlay.querySelector("[data-admin-temp]"),
+    adminConfirm: overlay.querySelector("[data-admin-confirm]"),
+    adminResults: overlay.querySelector("[data-admin-results]"),
+    adminStatus: overlay.querySelector("[data-admin-status]"),
+    adminTempResult: overlay.querySelector("[data-admin-temp-result]"),
+    adminTempPassword: overlay.querySelector("[data-admin-temp-password]"),
+    adminCopyTemp: overlay.querySelector("[data-admin-copy-temp]"),
+    selectedUser: null,
+    lastFocus: null
+  };
+  return userSecurityModal;
+};
+
+const clearTemporaryPassword = (modal) => {
+  modal.adminTempPassword.textContent = "";
+  modal.adminTempResult.hidden = true;
+};
+
+const closeUserSecurityModal = () => {
+  const modal = ensureUserSecurityModal();
+  clearTemporaryPassword(modal);
+  modal.emailNew.value = "";
+  modal.emailCurrentPassword.value = "";
+  modal.emailPanel.hidden = true;
+  modal.overlay.hidden = true;
+  document.body.classList.remove("dm-modal-open");
+  modal.lastFocus?.focus?.();
+};
+
+const renderAdminResults = (modal, users = []) => {
+  modal.adminResults.textContent = "";
+  modal.selectedUser = null;
+  users.forEach((user) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "user-security-modal__result";
+    button.setAttribute("aria-selected", "false");
+    const title = document.createElement("span");
+    title.className = "user-security-modal__result-title";
+    title.textContent = user.displayName || "Usuario";
+    const grid = document.createElement("span");
+    grid.className = "user-security-modal__result-grid";
+    [
+      ["Nombre", user.displayName || "Usuario"],
+      ["Usuario", user.username || "sin usuario"],
+      ["Email", user.emailMasked || "sin email"],
+      ["Provider", (user.providerIds || []).join(", ") || "sin proveedor"],
+      ["Estado", user.active === false ? "inactivo" : "activo"],
+      ["Acceso", user.forcePasswordChange ? "cambio obligatorio activo" : "sin bloqueo"],
+    ].forEach(([label, value]) => {
+      const item = document.createElement("span");
+      const strong = document.createElement("strong");
+      strong.textContent = `${label}: `;
+      item.append(strong, document.createTextNode(value));
+      grid.appendChild(item);
+    });
+    button.append(title, grid);
+    button.addEventListener("click", () => {
+      Array.from(modal.adminResults.children).forEach((child) =>
+        child.setAttribute("aria-selected", "false")
+      );
+      button.setAttribute("aria-selected", "true");
+      modal.selectedUser = user;
+      setModalStatus(modal.adminStatus, `Seleccionado: ${user.displayName || user.uid}`, "info");
+      clearTemporaryPassword(modal);
+    });
+    modal.adminResults.appendChild(button);
+  });
+  if (!users.length) {
+    const empty = document.createElement("p");
+    empty.textContent = "No se encontraron usuarios.";
+    modal.adminResults.appendChild(empty);
+  }
+};
+
+const bindUserSecurityModal = (modal) => {
+  if (modal.bound) return;
+  modal.bound = true;
+  modal.close.addEventListener("click", closeUserSecurityModal);
+  modal.overlay.addEventListener("click", (event) => {
+    if (event.target === modal.overlay) closeUserSecurityModal();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (modal.overlay.hidden) return;
+    if (event.key === "Escape") closeUserSecurityModal();
+  });
+};
+
+const openUserSecurityModal = async ({ auth, db, user, docData, menu }) => {
+  if (!user) return;
+  const modal = ensureUserSecurityModal();
+  bindUserSecurityModal(modal);
+  modal.lastFocus = document.activeElement;
+  modal.profileEmail.value = user.email || docData?.email || "";
+  modal.profileDisplayName.value = resolveDisplayName(user, docData);
+  modal.profileUsername.value = docData?.username || docData?.usernameLower || "";
+  modal.emailNew.value = "";
+  modal.emailCurrentPassword.value = "";
+  modal.emailPanel.hidden = true;
+  modal.passwordCurrent.value = "";
+  modal.passwordNew.value = "";
+  modal.passwordConfirm.value = "";
+  modal.adminQuery.value = "";
+  modal.adminConfirm.value = "";
+  modal.adminResults.textContent = "";
+  modal.selectedUser = null;
+  clearTemporaryPassword(modal);
+  setModalStatus(modal.profileStatus, "", "info");
+  setModalStatus(modal.emailStatus, "", "info");
+  setModalStatus(modal.passwordStatus, "", "info");
+  setModalStatus(modal.adminStatus, "", "info");
+
+  const passwordProvider = hasPasswordProvider(user);
+  modal.passwordForm.hidden = !passwordProvider;
+  modal.providerExternal.hidden = passwordProvider;
+  modal.emailForm.hidden = !passwordProvider;
+  modal.emailExternal.hidden = passwordProvider;
+
+  try {
+    const syncResult = await syncMyAuthEmail();
+    if (syncResult?.email) modal.profileEmail.value = syncResult.email;
+  } catch (error) {
+    // Keep the modal usable if email sync is unavailable.
+  }
+
+  let isSuperAdmin = false;
+  try {
+    const token = await user.getIdTokenResult();
+    const claims = token?.claims || {};
+    isSuperAdmin = claims.superAdmin === true;
+  } catch (error) {
+    isSuperAdmin = false;
+  }
+  modal.adminSection.hidden = !isSuperAdmin;
+
+  modal.profileForm.onsubmit = async (event) => {
+    event.preventDefault();
+    try {
+      setModalStatus(modal.profileStatus, "Guardando perfil...", "info");
+      const result = await updateMyProfileCallable({
+        displayName: modal.profileDisplayName.value,
+        username: modal.profileUsername.value,
+      });
+      const profile = result.profile || {};
+      const nextName = profile.displayName || modal.profileDisplayName.value.trim();
+      updateText(menu.triggerName, nextName);
+      updateText(menu.fullname, nextName);
+      try {
+        localStorage.setItem("user_nombre", nextName);
+      } catch (e) {}
+      setUserProfileCache(user.uid, { displayName: nextName });
+      setModalStatus(modal.profileStatus, "Perfil actualizado.", "info");
+    } catch (error) {
+      setModalStatus(modal.profileStatus, "No se pudo guardar el perfil.", "error");
+    }
+  };
+
+  modal.emailToggle.onclick = () => {
+    modal.emailPanel.hidden = !modal.emailPanel.hidden;
+    setModalStatus(modal.emailStatus, "", "info");
+    modal.emailNew.value = "";
+    modal.emailCurrentPassword.value = "";
+    if (!modal.emailPanel.hidden && passwordProvider) {
+      window.setTimeout(() => modal.emailNew?.focus(), 0);
+    }
+  };
+
+  modal.emailCancel.onclick = () => {
+    modal.emailPanel.hidden = true;
+    modal.emailNew.value = "";
+    modal.emailCurrentPassword.value = "";
+    setModalStatus(modal.emailStatus, "", "info");
+  };
+
+  modal.emailForm.onsubmit = async (event) => {
+    event.preventDefault();
+    if (!passwordProvider) {
+      setModalStatus(modal.emailStatus, "Tu correo se administra desde el proveedor externo.", "error");
+      return;
+    }
+    const nextEmail = (modal.emailNew.value || "").trim().toLowerCase();
+    const currentPassword = modal.emailCurrentPassword.value || "";
+    if (!nextEmail || !currentPassword) {
+      setModalStatus(modal.emailStatus, "Completá el nuevo correo y tu contraseña actual.", "error");
+      return;
+    }
+    try {
+      setModalStatus(modal.emailStatus, "Enviando verificación de correo...", "info");
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(user, credential);
+      await verifyBeforeUpdateEmail(user, nextEmail);
+      await recordEmailChangeRequested({ newEmail: nextEmail });
+      modal.emailNew.value = "";
+      modal.emailCurrentPassword.value = "";
+      setModalStatus(
+        modal.emailStatus,
+        "Te enviamos un correo de verificación. El cambio se aplicará cuando confirmes desde ese email.",
+        "info"
+      );
+    } catch (error) {
+      setModalStatus(modal.emailStatus, mapEmailError(error), "error");
+    }
+  };
+
+  modal.passwordForm.onsubmit = async (event) => {
+    event.preventDefault();
+    const currentPassword = modal.passwordCurrent.value || "";
+    const nextPassword = modal.passwordNew.value || "";
+    const confirmPassword = modal.passwordConfirm.value || "";
+    if (!currentPassword || !nextPassword) {
+      setModalStatus(modal.passwordStatus, "Completá la contraseña actual y la nueva.", "error");
+      return;
+    }
+    if (nextPassword !== confirmPassword) {
+      setModalStatus(modal.passwordStatus, "La confirmación no coincide.", "error");
+      return;
+    }
+    try {
+      setModalStatus(modal.passwordStatus, "Actualizando contraseña...", "info");
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(user, credential);
+      await updatePassword(user, nextPassword);
+      try {
+        await recordMyPasswordChange();
+      } catch (e) {}
+      modal.passwordCurrent.value = "";
+      modal.passwordNew.value = "";
+      modal.passwordConfirm.value = "";
+      setModalStatus(modal.passwordStatus, "Contraseña actualizada.", "info");
+    } catch (error) {
+      setModalStatus(modal.passwordStatus, mapPasswordError(error), "error");
+    }
+  };
+
+  modal.adminSearch.onclick = async () => {
+    try {
+      clearTemporaryPassword(modal);
+      setModalStatus(modal.adminStatus, "Buscando usuario...", "info");
+      const result = await adminResolveUser({ query: modal.adminQuery.value });
+      renderAdminResults(modal, result.users || []);
+      setModalStatus(modal.adminStatus, "", "info");
+    } catch (error) {
+      renderAdminResults(modal, []);
+      setModalStatus(modal.adminStatus, "No se pudo buscar el usuario.", "error");
+    }
+  };
+
+  modal.adminResetEmail.onclick = async () => {
+    if (!modal.selectedUser?.uid) {
+      setModalStatus(modal.adminStatus, "Seleccioná un usuario.", "error");
+      return;
+    }
+    try {
+      setModalStatus(modal.adminStatus, "Registrando recuperación por email...", "info");
+      await adminSendPasswordReset({ uid: modal.selectedUser.uid });
+      setModalStatus(modal.adminStatus, "Recuperación por email registrada. No se expuso ningún link.", "info");
+    } catch (error) {
+      setModalStatus(modal.adminStatus, "No se pudo generar la recuperación por email.", "error");
+    }
+  };
+
+  modal.adminTemp.onclick = async () => {
+    if (!modal.selectedUser?.uid) {
+      setModalStatus(modal.adminStatus, "Seleccioná un usuario.", "error");
+      return;
+    }
+    if (modal.adminConfirm.value.trim() !== "RESTABLECER") {
+      setModalStatus(modal.adminStatus, "Escribí RESTABLECER para continuar.", "error");
+      return;
+    }
+    try {
+      clearTemporaryPassword(modal);
+      setModalStatus(modal.adminStatus, "Generando contraseña temporal...", "info");
+      const result = await adminIssueTemporaryPassword({
+        uid: modal.selectedUser.uid,
+        confirmation: modal.adminConfirm.value.trim(),
+      });
+      modal.adminTempPassword.textContent = result.temporaryPassword || "";
+      modal.adminTempResult.hidden = false;
+      modal.adminConfirm.value = "";
+      setModalStatus(modal.adminStatus, "Contraseña temporal generada.", "info");
+    } catch (error) {
+      setModalStatus(modal.adminStatus, "No se pudo generar la contraseña temporal.", "error");
+    }
+  };
+
+  modal.adminCopyTemp.onclick = async () => {
+    const value = modal.adminTempPassword.textContent || "";
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      setModalStatus(modal.adminStatus, "Contraseña temporal copiada.", "info");
+    } catch (error) {
+      setModalStatus(modal.adminStatus, "No se pudo copiar.", "error");
+    }
+  };
+
+  modal.overlay.hidden = false;
+  document.body.classList.add("dm-modal-open");
+  window.setTimeout(() => modal.profileDisplayName?.focus(), 0);
+};
+
+const injectSecurityAction = (menu, onClick) => {
+  if (!menu.dropdown || menu.dropdown.querySelector("[data-dm-user-security-open]")) return;
+  const action = document.createElement("button");
+  action.type = "button";
+  action.className = "user-menu__row user-menu__row--subtle user-menu__security-action";
+  action.setAttribute("data-dm-user-security-open", "1");
+  action.innerHTML = `
+    <span class="user-menu__security-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" focusable="false">
+        <path d="M12 3.2 19 6v5.2c0 4.4-2.8 8.3-7 9.7-4.2-1.4-7-5.3-7-9.7V6l7-2.8Z" />
+        <path d="m9 12.1 2 2 4.1-4.4" />
+      </svg>
+    </span>
+    <span class="user-menu__label">Mi perfil y seguridad</span>
+  `;
+  action.addEventListener("click", onClick);
+  const avatarRow = menu.dropdown.querySelector("[data-dm-user-avatar-upload-row]");
+  if (avatarRow?.nextSibling) {
+    menu.dropdown.insertBefore(action, avatarRow.nextSibling);
+    return;
+  }
+  if (menu.logoutBtn) {
+    menu.dropdown.insertBefore(action, menu.logoutBtn);
+    return;
+  }
+  menu.dropdown.appendChild(action);
+};
+
 const initMenuInstance = (container, { auth, db, storage }) => {
+  if (container.dataset.dmUserMenuReady === "1") return;
+  container.dataset.dmUserMenuReady = "1";
   const menu = {
     container,
     trigger: container.querySelector("[data-dm-user-trigger]"),
@@ -429,8 +1333,16 @@ const initMenuInstance = (container, { auth, db, storage }) => {
   }
 
   let currentUser = null;
+  let currentDocData = null;
+  injectSecurityAction(menu, (event) => {
+    event.preventDefault();
+    closeDropdown();
+    openUserSecurityModal({ auth, db, user: currentUser, docData: currentDocData, menu });
+  });
+
   const updateFromUser = async (user) => {
     currentUser = user || null;
+    currentDocData = null;
     if (!user) {
       updateText(menu.triggerName, "Invitado");
       updateText(menu.fullname, "Invitado");
@@ -453,6 +1365,7 @@ const initMenuInstance = (container, { auth, db, storage }) => {
     } catch (err) {
       warnOnce("userdoc", "No se pudo leer el perfil del usuario.", err);
     }
+    currentDocData = docData;
 
     const displayName = resolveDisplayName(user, docData);
     updateText(menu.triggerName, displayName);

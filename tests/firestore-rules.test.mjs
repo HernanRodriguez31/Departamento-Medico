@@ -47,6 +47,20 @@ beforeEach(async () => {
       readAt: null,
       createdAt: Timestamp.now()
     });
+    await setDoc(doc(db, "usuarios", "user-a"), {
+      nombre: "Dr. Usuario A",
+      displayName: "Dr. Usuario A",
+      email: "usuario.a@example.test",
+      avatarUrl: "https://example.test/avatar-a.jpg",
+      avatarUpdatedAt: Timestamp.now(),
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    });
+    await setDoc(doc(db, "dm_session_controls", "user-a"), {
+      uid: "user-a",
+      forcePasswordChange: true,
+      updatedAt: Timestamp.now()
+    });
     await setDoc(doc(db, "dm_carousel", "post-a"), {
       type: "text",
       text: "Post visible",
@@ -157,6 +171,60 @@ test("admin_whitelist blocks client writes", async () => {
   await assertFails(
     setDoc(doc(authedDb("user-a"), "admin_whitelist", "user-a"), {
       role: "admin"
+    })
+  );
+});
+
+test("security audit, usernames and session controls block client writes", async () => {
+  const db = authedDb("user-a");
+  await assertFails(
+    setDoc(doc(db, "securityAuditLogs", "log-a"), {
+      eventType: "admin_temp_password_issued",
+      createdAt: Timestamp.now()
+    })
+  );
+  await assertFails(
+    setDoc(doc(db, "usernames", "usuarioa"), {
+      uid: "user-a",
+      createdAt: Timestamp.now()
+    })
+  );
+  await assertFails(
+    setDoc(doc(db, "dm_session_controls", "user-a"), {
+      uid: "user-a",
+      forcePasswordChange: false,
+      updatedAt: Timestamp.now()
+    })
+  );
+});
+
+test("owner can read own session control and others cannot", async () => {
+  await assertSucceeds(getDoc(doc(authedDb("user-a"), "dm_session_controls", "user-a")));
+  await assertFails(getDoc(doc(authedDb("user-b"), "dm_session_controls", "user-a")));
+});
+
+test("usuarios keeps sensitive fields blocked while avatar update remains allowed", async () => {
+  const db = authedDb("user-a");
+  await assertSucceeds(
+    updateDoc(doc(db, "usuarios", "user-a"), {
+      avatarUrl: "https://example.test/avatar-a-v2.jpg",
+      avatarUpdatedAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertFails(
+    updateDoc(doc(db, "usuarios", "user-a"), {
+      role: "admin"
+    })
+  );
+  await assertFails(
+    updateDoc(doc(db, "usuarios", "user-a"), {
+      security: { forcePasswordChange: false }
+    })
+  );
+  await assertFails(
+    updateDoc(doc(db, "usuarios", "user-a"), {
+      superAdmin: true
     })
   );
 });

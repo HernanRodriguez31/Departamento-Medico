@@ -27,11 +27,15 @@ const {
   toggleCommentLikedByMap,
   normalizeCounterValue,
 } = require("./feed/integrity");
+const {
+  createUserSecurityCallables,
+} = require("./admin/userSecurity");
 
 // Inicializacion
 admin.initializeApp();
 const db = admin.firestore();
 setGlobalOptions({ region: "us-central1" });
+Object.assign(exports, createUserSecurityCallables({ admin, db }));
 
 // A PARTIR DE AQUI VAN LOS EXPORTS (No tocar los exports existentes)
 const getMessagingClient = () => admin.messaging();

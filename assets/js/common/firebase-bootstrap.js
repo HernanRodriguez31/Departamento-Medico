@@ -1,7 +1,16 @@
 import { getApps, initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getStorage } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+import {
+  connectAuthEmulator,
+  getAuth
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import {
+  connectFirestoreEmulator,
+  getFirestore
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import {
+  connectStorageEmulator,
+  getStorage
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 export const FIREBASE_APP_NAME = "AuthApp";
 
@@ -17,6 +26,7 @@ export const DEFAULT_FIREBASE_CONFIG = {
 const getWindow = () => (typeof window !== "undefined" ? window : null);
 
 let cachedServices = null;
+let emulatorsConnected = false;
 
 export const resolveFirebaseConfig = () => {
   const target = getWindow();
@@ -46,6 +56,14 @@ export const getFirebaseServices = () => {
     db: getFirestore(app),
     storage: getStorage(app)
   };
+  const host = getWindow()?.location?.hostname;
+  const isLocalHost = host === "localhost" || host === "127.0.0.1";
+  if (isLocalHost && !emulatorsConnected) {
+    emulatorsConnected = true;
+    connectAuthEmulator(cachedServices.auth, "http://127.0.0.1:9099", { disableWarnings: true });
+    connectFirestoreEmulator(cachedServices.db, "127.0.0.1", 8080);
+    connectStorageEmulator(cachedServices.storage, "127.0.0.1", 9199);
+  }
   return cachedServices;
 };
 
