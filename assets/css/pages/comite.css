@@ -784,6 +784,256 @@ body.comite-variant-alt .project-stage-dot.is-inactive {
     right: 0.54rem;
 }
 
+#committee-subtitle.committee-subtitle--hidden {
+    display: none;
+}
+
+.committee-purpose {
+    --purpose-green: var(--brisa-green, var(--brand-green, #65B32E));
+    --purpose-green-soft: rgba(101, 179, 46, 0.10);
+    --purpose-green-border: rgba(101, 179, 46, 0.22);
+    --purpose-green-line: rgba(101, 179, 46, 0.22);
+    --purpose-text: var(--brisa-text, #0f172a);
+    --purpose-muted: #4f6078;
+
+    width: min(900px, calc(100% - 32px));
+    margin: clamp(18px, 2vw, 22px) auto 34px;
+    position: relative;
+    z-index: 2;
+    text-align: left;
+}
+
+.committee-purpose__details {
+    width: 100%;
+}
+
+.committee-purpose__summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    user-select: none;
+}
+
+.committee-purpose__summary::-webkit-details-marker {
+    display: none;
+}
+
+.committee-purpose__summary::marker {
+    content: "";
+}
+
+.committee-purpose__trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    width: auto;
+    max-width: min(100%, 460px);
+    padding: 7px 13px 7px 15px;
+    border-radius: 999px;
+    color: var(--purpose-green);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.48));
+    border: 1px solid var(--purpose-green-border);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.88),
+        0 7px 20px rgba(15, 23, 42, 0.045);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    backdrop-filter: blur(18px) saturate(160%);
+    transition:
+        transform 180ms ease,
+        border-color 180ms ease,
+        background 180ms ease,
+        box-shadow 180ms ease;
+}
+
+.committee-purpose__summary:hover .committee-purpose__trigger {
+    transform: translateY(-1px);
+    border-color: rgba(101, 179, 46, 0.34);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.92),
+        0 10px 26px rgba(15, 23, 42, 0.065);
+}
+
+.committee-purpose__summary:focus-visible {
+    outline: none;
+}
+
+.committee-purpose__summary:focus-visible .committee-purpose__trigger {
+    outline: 3px solid rgba(101, 179, 46, 0.22);
+    outline-offset: 4px;
+}
+
+.committee-purpose__summary-label {
+    font-size: 0.8rem;
+    line-height: 1;
+    font-weight: 760;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+}
+
+.committee-purpose__chevron {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 17px;
+    height: 17px;
+    color: currentColor;
+    opacity: 0.85;
+    transition: transform 180ms ease;
+}
+
+.committee-purpose__details[open] .committee-purpose__chevron {
+    transform: rotate(180deg);
+}
+
+.committee-purpose__panel {
+    margin-top: 13px;
+    padding: 22px 24px;
+    border-radius: 26px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.80), rgba(255, 255, 255, 0.58));
+    border: 1px solid rgba(101, 179, 46, 0.17);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.84),
+        0 18px 48px rgba(15, 23, 42, 0.07);
+    -webkit-backdrop-filter: blur(22px) saturate(165%);
+    backdrop-filter: blur(22px) saturate(165%);
+    display: grid;
+    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.36fr) minmax(0, 1.08fr);
+    column-gap: 0;
+}
+
+.committee-purpose__block {
+    position: relative;
+    min-width: 0;
+    padding: 0 24px;
+}
+
+.committee-purpose__block:first-child {
+    padding-left: 0;
+}
+
+.committee-purpose__block:last-child {
+    padding-right: 0;
+}
+
+.committee-purpose__block + .committee-purpose__block::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 2px;
+    bottom: 2px;
+    width: 1px;
+    background: linear-gradient(
+        to bottom,
+        transparent 0%,
+        rgba(101, 179, 46, 0.10) 10%,
+        rgba(101, 179, 46, 0.24) 50%,
+        rgba(101, 179, 46, 0.10) 90%,
+        transparent 100%
+    );
+}
+
+.committee-purpose__block h3 {
+    margin: 0 0 9px;
+    color: var(--purpose-green);
+    font-size: 0.71rem;
+    line-height: 1.2;
+    font-weight: 850;
+    text-transform: uppercase;
+    letter-spacing: 0.085em;
+}
+
+.committee-purpose__block p {
+    margin: 0;
+    color: var(--purpose-muted);
+    font-size: 0.91rem;
+    line-height: 1.54;
+    font-weight: 500;
+}
+
+@media (max-width: 900px) {
+    .committee-purpose {
+        width: min(720px, calc(100% - 24px));
+        margin-top: 16px;
+        margin-bottom: 28px;
+    }
+
+    .committee-purpose__panel {
+        grid-template-columns: 1fr;
+        padding: 18px;
+        row-gap: 0;
+    }
+
+    .committee-purpose__block,
+    .committee-purpose__block:first-child,
+    .committee-purpose__block:last-child {
+        padding: 0;
+    }
+
+    .committee-purpose__block + .committee-purpose__block {
+        margin-top: 16px;
+        padding-top: 16px;
+    }
+
+    .committee-purpose__block + .committee-purpose__block::before {
+        left: 0;
+        right: 0;
+        top: 0;
+        bottom: auto;
+        width: auto;
+        height: 1px;
+        background: linear-gradient(
+            to right,
+            transparent 0%,
+            rgba(101, 179, 46, 0.10) 12%,
+            rgba(101, 179, 46, 0.22) 50%,
+            rgba(101, 179, 46, 0.10) 88%,
+            transparent 100%
+        );
+    }
+}
+
+@media (max-width: 560px) {
+    .committee-purpose {
+        width: min(100% - 20px, 520px);
+        margin-top: 14px;
+        margin-bottom: 24px;
+    }
+
+    .committee-purpose__trigger {
+        max-width: 100%;
+        padding: 8px 12px 8px 14px;
+    }
+
+    .committee-purpose__summary-label {
+        font-size: 0.75rem;
+        white-space: normal;
+        text-align: center;
+        line-height: 1.2;
+    }
+
+    .committee-purpose__panel {
+        border-radius: 22px;
+        padding: 16px;
+    }
+
+    .committee-purpose__block p {
+        font-size: 0.88rem;
+        line-height: 1.5;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .committee-purpose__trigger,
+    .committee-purpose__chevron {
+        transition: none;
+    }
+}
+
 
 .committee-edit-trigger[data-tooltip]::after {
     content: attr(data-tooltip);

@@ -1823,7 +1823,7 @@ async function joinCurrentCommittee() {
                     </button>
                 </div>
             </div>
-            <p id="committee-subtitle" class="text-lg text-gray-500 max-w-2xl mx-auto mt-2">Estándares de calidad y seguridad del paciente.</p>
+            <p id="committee-subtitle" class="text-lg text-gray-500 max-w-2xl mx-auto mt-2 committee-subtitle--hidden">Estándares de calidad y seguridad del paciente.</p>
             <div id="meta-edit-fields" class="hidden flex flex-col items-center gap-2 mt-3">
                 <input id="meta-title-input" type="text"
                     class="w-full max-w-xl text-center text-2xl sm:text-3xl font-extrabold text-gray-900 border border-gray-200 rounded-lg px-3 py-2 shadow-sm focus:ring-2 focus:ring-brisa focus:outline-none">
@@ -1837,6 +1837,34 @@ async function joinCurrentCommittee() {
                         class="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 font-semibold shadow-sm hover:bg-gray-200">Cancelar</button>
                 </div>
             </div>
+            <section class="committee-purpose" aria-label="Objetivo, descripción y a quién convoca">
+                <details class="committee-purpose__details">
+                    <summary class="committee-purpose__summary">
+                        <span class="committee-purpose__trigger">
+                            <span class="committee-purpose__summary-label">Objetivo · Descripción · A quién convoca</span>
+                            <span class="committee-purpose__chevron" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" focusable="false">
+                                    <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+                                </svg>
+                            </span>
+                        </span>
+                    </summary>
+                    <div class="committee-purpose__panel">
+                        <article class="committee-purpose__block">
+                            <h3>Objetivo</h3>
+                            <p>Promover una atención médica segura, consistente y medible, mediante el análisis de incidentes, desvíos, procesos asistenciales, indicadores y oportunidades de mejora continua.</p>
+                        </article>
+                        <article class="committee-purpose__block">
+                            <h3>Descripción</h3>
+                            <p>Este comité se enfoca en mejorar cómo se trabaja. Revisa incidentes y casi incidentes, identifica riesgos asistenciales, ordena flujos de reporte, propone acciones correctivas y transforma la experiencia operativa en estándares compartidos de calidad y seguridad.</p>
+                        </article>
+                        <article class="committee-purpose__block">
+                            <h3>A quién convoca</h3>
+                            <p>Colegas con interés o experiencia en calidad asistencial, seguridad del paciente, auditoría médica, análisis de procesos, indicadores, mejora continua y gestión de desvíos.</p>
+                        </article>
+                    </div>
+                </details>
+            </section>
         </div>
 
         <!-- Dashboard Stats -->
