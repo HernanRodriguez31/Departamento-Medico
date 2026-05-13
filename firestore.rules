@@ -215,9 +215,21 @@ service cloud.firestore {
           "type",
           "title",
           "text",
+          "briefDescription",
+          "longDescription",
+          "artAuthor",
+          "artYear",
+          "artWorkType",
+          "artLocation",
           "imageUrl",
           "imagePath",
           "thumbUrl",
+          "imageAspect",
+          "imageWidth",
+          "imageHeight",
+          "imageCrop",
+          "imageOriginalName",
+          "imageColorPipeline",
           "authorName",
           "authorUid",
           "businessUnit",
@@ -257,9 +269,21 @@ service cloud.firestore {
           "type",
           "title",
           "text",
+          "briefDescription",
+          "longDescription",
+          "artAuthor",
+          "artYear",
+          "artWorkType",
+          "artLocation",
           "imageUrl",
           "imagePath",
           "thumbUrl",
+          "imageAspect",
+          "imageWidth",
+          "imageHeight",
+          "imageCrop",
+          "imageOriginalName",
+          "imageColorPipeline",
           "authorName",
           "businessUnit",
           "managementUnit",
@@ -303,6 +327,41 @@ service cloud.firestore {
       return signedIn()
         && onlyKeys(["text", "authorUid", "authorName", "createdAt", "likedBy"])
         && request.resource.data.authorUid == request.auth.uid;
+    }
+
+    function validCarouselCommentCreate() {
+      return signedIn()
+        && onlyKeys([
+          "text",
+          "authorUid",
+          "authorName",
+          "createdAt",
+          "likedBy",
+          "parentCommentId",
+          "rootCommentId",
+          "replyDepth",
+          "replyToCommentId",
+          "replyToAuthorName",
+          "deleted",
+          "deletedAt",
+          "deletedBy"
+        ])
+        && request.resource.data.authorUid == request.auth.uid;
+    }
+
+    function validCarouselCommentUpdate() {
+      return isAdmin()
+        || (
+          isOwnedByCurrentUser(resource.data)
+          && (
+            changedOnly(["text", "updatedAt"])
+            || (
+              changedOnly(["deleted", "deletedAt", "deletedBy", "updatedAt"])
+              && request.resource.data.deleted == true
+              && request.resource.data.deletedBy == request.auth.uid
+            )
+          )
+        );
     }
 
     function validCommentLikeUpdate() {
@@ -368,6 +427,257 @@ service cloud.firestore {
           || request.resource.data.committeeRole == "vocal"
         )
         && request.resource.data.isLeader == false;
+    }
+
+    function validOwnLikedByUpdate() {
+      return signedIn()
+        && changedOnly(["likedBy"])
+        && request.resource.data.likedBy is map
+        && resource.data.likedBy is map
+        && request.resource.data.likedBy.diff(resource.data.likedBy).affectedKeys().hasOnly([request.auth.uid]);
+    }
+
+    function validCommitteeNoteCreate() {
+      return signedIn()
+        && onlyKeys([
+          "committeeId",
+          "scope",
+          "projectId",
+          "projectTitle",
+          "text",
+          "authorUid",
+          "authorName",
+          "createdAt",
+          "updatedAt",
+          "likedBy"
+        ])
+        && request.resource.data.authorUid == request.auth.uid
+        && request.resource.data.likedBy is map;
+    }
+
+    function validCommitteeNoteTextUpdate() {
+      return (isOwnedByCurrentUser(resource.data) || isAdmin())
+        && changedOnly(["text", "updatedAt", "updatedByUid", "updatedByName"])
+        && request.resource.data.updatedByUid == request.auth.uid;
+    }
+
+    function validCalendarEventCreate() {
+      return signedIn()
+        && onlyKeys([
+          "title",
+          "note",
+          "dateKey",
+          "startDateKey",
+          "endDateKey",
+          "allDay",
+          "startMinutes",
+          "endMinutes",
+          "colorKey",
+          "calendarScope",
+          "committeeId",
+          "committeeName",
+          "createdByUid",
+          "createdByName",
+          "createdAt",
+          "updatedAt"
+        ])
+        && request.resource.data.createdByUid == request.auth.uid;
+    }
+
+    function validCalendarEventUpdate() {
+      return (isOwnedByCurrentUser(resource.data) || isAdmin())
+        && changedOnly([
+          "title",
+          "note",
+          "dateKey",
+          "startDateKey",
+          "endDateKey",
+          "allDay",
+          "startMinutes",
+          "endMinutes",
+          "colorKey",
+          "updatedAt"
+        ]);
+    }
+
+    function isBitacoraArticleOwner(data) {
+      return signedIn()
+        && hasKey(data, "createdBy")
+        && data.createdBy is map
+        && data.createdBy.uid == request.auth.uid;
+    }
+
+    function isBitacoraCommentOwner(data) {
+      return signedIn()
+        && hasKey(data, "createdBy")
+        && data.createdBy is map
+        && data.createdBy.uid == request.auth.uid;
+    }
+
+    function validBitacoraArticleCreate() {
+      return signedIn()
+        && onlyKeys([
+          "title",
+          "sourceName",
+          "journal",
+          "authors",
+          "sourceDomain",
+          "officialUrl",
+          "doi",
+          "pmid",
+          "pmcid",
+          "nctId",
+          "pii",
+          "studyType",
+          "evidenceType",
+          "publicationDate",
+          "originalLanguage",
+          "articleType",
+          "studyLocation",
+          "studyDesignEs",
+          "studyContextEs",
+          "studyPopulationEs",
+          "studyLocationEs",
+          "studyPeriodEs",
+          "briefDescriptionEs",
+          "expandedDescriptionEs",
+          "expandedDescriptionSections",
+          "expandedDescriptionQuality",
+          "cardSummaryEs",
+          "executiveSummary",
+          "executiveSummaryEs",
+          "abstractSummaryEs",
+          "objectiveEs",
+          "clinicalQuestion",
+          "clinicalQuestionEs",
+          "mainMessageEs",
+          "mainResult",
+          "mainResultEs",
+          "methodologyEs",
+          "keyPointsEs",
+          "limitationsEs",
+          "localApplicabilityEs",
+          "occupationalHealthRelevanceEs",
+          "methodologyProfile",
+          "tags",
+          "accessType",
+          "userComment",
+          "sourcePages",
+          "extractionSource",
+          "originalFileName",
+          "storagePath",
+          "fileSize",
+          "documentContentType",
+          "contentHash",
+          "pageCount",
+          "status",
+          "extractionStatus",
+          "extractionConfidence",
+          "extractionWarnings",
+          "createdBy",
+          "updatedBy",
+          "createdAt",
+          "updatedAt"
+        ])
+        && request.resource.data.createdBy is map
+        && request.resource.data.createdBy.uid == request.auth.uid
+        && request.resource.data.updatedBy is map
+        && request.resource.data.updatedBy.uid == request.auth.uid;
+    }
+
+    function validBitacoraArticleUpdate() {
+      return (isBitacoraArticleOwner(resource.data) || isAdmin())
+        && changedOnly([
+          "title",
+          "sourceName",
+          "journal",
+          "authors",
+          "sourceDomain",
+          "officialUrl",
+          "doi",
+          "pmid",
+          "pmcid",
+          "nctId",
+          "pii",
+          "studyType",
+          "evidenceType",
+          "publicationDate",
+          "originalLanguage",
+          "articleType",
+          "studyLocation",
+          "studyDesignEs",
+          "studyContextEs",
+          "studyPopulationEs",
+          "studyLocationEs",
+          "studyPeriodEs",
+          "briefDescriptionEs",
+          "expandedDescriptionEs",
+          "expandedDescriptionSections",
+          "expandedDescriptionQuality",
+          "cardSummaryEs",
+          "executiveSummary",
+          "executiveSummaryEs",
+          "abstractSummaryEs",
+          "objectiveEs",
+          "clinicalQuestion",
+          "clinicalQuestionEs",
+          "mainMessageEs",
+          "mainResult",
+          "mainResultEs",
+          "methodologyEs",
+          "keyPointsEs",
+          "limitationsEs",
+          "localApplicabilityEs",
+          "occupationalHealthRelevanceEs",
+          "methodologyProfile",
+          "tags",
+          "accessType",
+          "userComment",
+          "sourcePages",
+          "extractionSource",
+          "originalFileName",
+          "storagePath",
+          "fileSize",
+          "documentContentType",
+          "contentHash",
+          "pageCount",
+          "status",
+          "extractionStatus",
+          "extractionConfidence",
+          "extractionWarnings",
+          "updatedBy",
+          "updatedAt"
+        ])
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(["updatedBy"])
+          || (
+            request.resource.data.updatedBy is map
+            && request.resource.data.updatedBy.uid == request.auth.uid
+          )
+        );
+    }
+
+    function validBitacoraLikeCreate(uid) {
+      return isOwner(uid)
+        && onlyKeys(["uid", "displayName", "email", "photoURL", "createdAt"])
+        && request.resource.data.uid == request.auth.uid;
+    }
+
+    function validBitacoraCommentCreate() {
+      return signedIn()
+        && onlyKeys(["text", "createdBy", "createdAt", "updatedAt", "status", "deletedAt", "deletedBy"])
+        && request.resource.data.createdBy is map
+        && request.resource.data.createdBy.uid == request.auth.uid
+        && request.resource.data.status == "visible";
+    }
+
+    function validBitacoraCommentUpdate() {
+      return (isBitacoraCommentOwner(resource.data) || isAdmin())
+        && changedOnly(["text", "updatedAt", "status", "deletedAt", "deletedBy"])
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(["deletedBy"])
+          || request.resource.data.deletedBy == request.auth.uid
+        );
     }
 
     // CAMBIO AQUI: Solo permitimos LEER la configuración (el candado cerrado)
@@ -469,12 +779,8 @@ service cloud.firestore {
 
       match /comments/{commentId} {
         allow read: if signedIn();
-        allow create: if validCommentCreate();
-        allow update: if (
-            isOwnedByCurrentUser(resource.data)
-            && changedOnly(["text", "updatedAt"])
-          )
-          || isAdmin();
+        allow create: if validCarouselCommentCreate();
+        allow update: if validCarouselCommentUpdate();
         allow delete: if isOwnedByCurrentUser(resource.data) || isAdmin();
       }
 
@@ -526,6 +832,34 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /bitacoraArticles/{articleId} {
+      allow read: if signedIn();
+      allow create: if validBitacoraArticleCreate();
+      allow update: if validBitacoraArticleUpdate();
+      allow delete: if isBitacoraArticleOwner(resource.data) || isAdmin();
+
+      match /likes/{uid} {
+        allow read: if signedIn();
+        allow create: if validBitacoraLikeCreate(uid);
+        allow update: if false;
+        allow delete: if isOwner(uid);
+      }
+
+      match /comments/{commentId} {
+        allow read: if signedIn();
+        allow create: if validBitacoraCommentCreate();
+        allow update: if validBitacoraCommentUpdate();
+        allow delete: if false;
+
+        match /likes/{uid} {
+          allow read: if signedIn();
+          allow create: if validBitacoraLikeCreate(uid);
+          allow update: if false;
+          allow delete: if isOwner(uid);
+        }
+      }
+    }
+
     match /artifacts/{appId}/public/data/committee_meta/{committeeId} {
       allow read: if signedIn();
       // TODO: sembrar metadata por backend/Admin SDK para cerrar también el bootstrap cliente.
@@ -557,6 +891,21 @@ service cloud.firestore {
       allow read: if signedIn();
       allow create: if validCommitteeMessageCreate();
       allow update: if validCommitteeMessageUpdate();
+      allow delete: if isOwnedByCurrentUser(resource.data) || isAdmin();
+    }
+
+    match /artifacts/{appId}/public/data/committee_notes/{noteId} {
+      allow read: if signedIn();
+      allow create: if validCommitteeNoteCreate();
+      allow update: if validCommitteeNoteTextUpdate()
+        || validOwnLikedByUpdate();
+      allow delete: if isOwnedByCurrentUser(resource.data) || isAdmin();
+    }
+
+    match /artifacts/{appId}/public/data/calendar_events/{eventId} {
+      allow read: if signedIn();
+      allow create: if validCalendarEventCreate();
+      allow update: if validCalendarEventUpdate();
       allow delete: if isOwnedByCurrentUser(resource.data) || isAdmin();
     }
 

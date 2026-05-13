@@ -24,6 +24,144 @@ const APP_ID = "departamento-medico-brisa";
 
 let testEnv;
 
+const committeeNotePayload = (uid, overrides = {}) => ({
+  committeeId: "comite_bioetica",
+  scope: "committee",
+  projectId: null,
+  projectTitle: "",
+  text: "Nota sintética de comité",
+  authorUid: uid,
+  authorName: uid === "user-a" ? "Dr. Usuario A" : "Dr. Usuario B",
+  createdAt: Timestamp.now(),
+  updatedAt: Timestamp.now(),
+  likedBy: {},
+  ...overrides
+});
+
+const calendarEventPayload = (uid, overrides = {}) => ({
+  title: "Actividad sintética",
+  note: "Nota de prueba",
+  dateKey: "2026-05-13",
+  startDateKey: "2026-05-13",
+  endDateKey: "2026-05-13",
+  allDay: true,
+  colorKey: "green",
+  calendarScope: "home",
+  createdByUid: uid,
+  createdByName: uid === "user-a" ? "Dr. Usuario A" : "Dr. Usuario B",
+  createdAt: Timestamp.now(),
+  updatedAt: Timestamp.now(),
+  ...overrides
+});
+
+const bitacoraUser = (uid) => ({
+  uid,
+  displayName: uid === "admin-a" ? "Admin A" : uid === "user-b" ? "Dr. Usuario B" : "Dr. Usuario A",
+  email: `${uid}@example.test`
+});
+
+const bitacoraArticlePayload = (uid, overrides = {}) => ({
+  title: "Artículo sintético",
+  sourceName: "Fuente de prueba",
+  journal: "Revista de prueba",
+  authors: ["Equipo médico"],
+  sourceDomain: "example.test",
+  officialUrl: "https://example.test/article",
+  studyType: "observacional",
+  evidenceType: "síntesis",
+  tags: ["salud"],
+  status: "pending_review",
+  extractionStatus: "manual",
+  methodologyProfile: {},
+  sourcePages: [],
+  extractionWarnings: [],
+  createdBy: bitacoraUser(uid),
+  updatedBy: bitacoraUser(uid),
+  createdAt: Timestamp.now(),
+  updatedAt: Timestamp.now(),
+  ...overrides
+});
+
+const bitacoraLikePayload = (uid) => ({
+  ...bitacoraUser(uid),
+  createdAt: Timestamp.now()
+});
+
+const bitacoraCommentPayload = (uid, overrides = {}) => ({
+  text: "Comentario sintético",
+  createdBy: bitacoraUser(uid),
+  createdAt: Timestamp.now(),
+  updatedAt: Timestamp.now(),
+  status: "visible",
+  deletedAt: null,
+  deletedBy: "",
+  ...overrides
+});
+
+const carouselArtPayload = (uid, overrides = {}) => ({
+  type: "art_gallery",
+  title: "Obra sintética",
+  text: "Descripción breve",
+  briefDescription: "Descripción breve",
+  longDescription: "Descripción extendida",
+  artAuthor: "Autor sintético",
+  artYear: "2026",
+  artWorkType: "Pintura",
+  artLocation: "Sala de prueba",
+  imageUrl: "https://example.test/art.jpg",
+  imagePath: `dm_carousel/${uid}/art.jpg`,
+  thumbUrl: "https://example.test/art-thumb.jpg",
+  imageAspect: "landscape",
+  imageWidth: 1200,
+  imageHeight: 800,
+  authorUid: uid,
+  authorName: "Dr. Usuario A",
+  createdByUid: uid,
+  createdByName: "Dr. Usuario A",
+  createdAt: Timestamp.now(),
+  updatedAt: Timestamp.now(),
+  likesCount: 0,
+  likedBy: [],
+  likedNames: [],
+  commentCount: 0,
+  ...overrides
+});
+
+const carouselHobbyPayload = (uid, overrides = {}) => ({
+  ...carouselArtPayload(uid, {
+    type: "team_hobbies",
+    title: "Hobby sintético",
+    artWorkType: "Foto del equipo",
+    imagePath: `dm_carousel/${uid}/hobby.jpg`,
+    imageCrop: {
+      zoom: 1,
+      offsetX: 0,
+      offsetY: 0,
+      frameAspect: 1
+    },
+    imageOriginalName: "hobby.jpg",
+    imageColorPipeline: "original"
+  }),
+  ...overrides
+});
+
+const carouselCommentPayload = (uid, overrides = {}) => ({
+  text: "Comentario sintético",
+  authorUid: uid,
+  authorName: uid === "user-b" ? "Dr. Usuario B" : "Dr. Usuario A",
+  createdAt: Timestamp.now(),
+  likedBy: {},
+  parentCommentId: null,
+  rootCommentId: overrides.rootCommentId || "",
+  replyDepth: 0,
+  replyToCommentId: null,
+  replyToAuthorName: "",
+  deleted: false,
+  deletedAt: null,
+  deletedBy: "",
+  ...overrides
+});
+
 before(async () => {
   testEnv = await initializeTestEnvironment({
     projectId: PROJECT_ID,
@@ -129,6 +267,26 @@ beforeEach(async () => {
         createdAt: Timestamp.now(),
         likedBy: {}
       }
+    );
+    await setDoc(
+      doc(db, "artifacts", APP_ID, "public", "data", "committee_notes", "note-a"),
+      committeeNotePayload("user-a", {
+        likedBy: {
+          "user-b": "Dr. Usuario B"
+        }
+      })
+    );
+    await setDoc(
+      doc(db, "artifacts", APP_ID, "public", "data", "calendar_events", "event-a"),
+      calendarEventPayload("user-a")
+    );
+    await setDoc(
+      doc(db, "bitacoraArticles", "article-a"),
+      bitacoraArticlePayload("user-a")
+    );
+    await setDoc(
+      doc(db, "bitacoraArticles", "article-a", "comments", "comment-a"),
+      bitacoraCommentPayload("user-a")
     );
   });
 });
@@ -423,6 +581,319 @@ test("unauthenticated user cannot read or write source committee routes", async 
         createdAt: Timestamp.now()
       }
     )
+  );
+});
+
+test("committee_notes allows authenticated board use without anonymous or foreign writes", async () => {
+  const ownerDb = authedDb("user-a");
+  const otherDb = authedDb("user-b");
+  const adminDb = authedAdminDb("admin-a");
+  const notePath = ["artifacts", APP_ID, "public", "data", "committee_notes", "note-a"];
+
+  await assertSucceeds(getDoc(doc(ownerDb, ...notePath)));
+  await assertFails(getDoc(doc(unauthedDb(), ...notePath)));
+  await assertSucceeds(
+    setDoc(
+      doc(ownerDb, "artifacts", APP_ID, "public", "data", "committee_notes", "note-new"),
+      committeeNotePayload("user-a")
+    )
+  );
+  await assertFails(
+    setDoc(
+      doc(ownerDb, "artifacts", APP_ID, "public", "data", "committee_notes", "note-spoofed"),
+      committeeNotePayload("user-b")
+    )
+  );
+  await assertSucceeds(
+    updateDoc(doc(ownerDb, ...notePath), {
+      text: "Nota actualizada por el autor",
+      updatedAt: Timestamp.now(),
+      updatedByUid: "user-a",
+      updatedByName: "Dr. Usuario A"
+    })
+  );
+  await assertSucceeds(
+    updateDoc(doc(ownerDb, ...notePath), {
+      likedBy: {
+        "user-a": "Dr. Usuario A",
+        "user-b": "Dr. Usuario B"
+      }
+    })
+  );
+  await assertFails(
+    updateDoc(doc(otherDb, ...notePath), {
+      text: "Cambio ajeno",
+      updatedAt: Timestamp.now(),
+      updatedByUid: "user-b",
+      updatedByName: "Dr. Usuario B"
+    })
+  );
+  await assertFails(
+    updateDoc(doc(otherDb, ...notePath), {
+      likedBy: {
+        "user-b": "Dr. Usuario B"
+      }
+    })
+  );
+  await assertSucceeds(
+    updateDoc(doc(adminDb, ...notePath), {
+      text: "Nota moderada",
+      updatedAt: Timestamp.now(),
+      updatedByUid: "admin-a",
+      updatedByName: "Admin A"
+    })
+  );
+  await assertFails(deleteDoc(doc(otherDb, ...notePath)));
+  await assertSucceeds(deleteDoc(doc(ownerDb, ...notePath)));
+});
+
+test("calendar_events allows authenticated owners and admins while blocking anonymous and foreign writes", async () => {
+  const ownerDb = authedDb("user-a");
+  const otherDb = authedDb("user-b");
+  const adminDb = authedAdminDb("admin-a");
+  const eventPath = ["artifacts", APP_ID, "public", "data", "calendar_events", "event-a"];
+
+  await assertSucceeds(getDoc(doc(ownerDb, ...eventPath)));
+  await assertFails(getDoc(doc(unauthedDb(), ...eventPath)));
+  await assertSucceeds(
+    setDoc(
+      doc(ownerDb, "artifacts", APP_ID, "public", "data", "calendar_events", "event-new"),
+      calendarEventPayload("user-a")
+    )
+  );
+  await assertFails(
+    setDoc(
+      doc(ownerDb, "artifacts", APP_ID, "public", "data", "calendar_events", "event-spoofed"),
+      calendarEventPayload("user-b")
+    )
+  );
+  await assertSucceeds(
+    updateDoc(doc(ownerDb, ...eventPath), {
+      title: "Actividad actualizada",
+      note: "Nota actualizada",
+      dateKey: "2026-05-14",
+      startDateKey: "2026-05-14",
+      endDateKey: "2026-05-14",
+      allDay: true,
+      colorKey: "blue",
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertFails(
+    updateDoc(doc(otherDb, ...eventPath), {
+      title: "Cambio ajeno",
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertSucceeds(
+    updateDoc(doc(adminDb, ...eventPath), {
+      title: "Actividad moderada",
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertFails(deleteDoc(doc(otherDb, ...eventPath)));
+  await assertSucceeds(deleteDoc(doc(ownerDb, ...eventPath)));
+});
+
+test("bitacoraArticles allows article owners admins likes and comments with scoped writes", async () => {
+  const ownerDb = authedDb("user-a");
+  const otherDb = authedDb("user-b");
+  const adminDb = authedAdminDb("admin-a");
+  const articleRef = doc(ownerDb, "bitacoraArticles", "article-a");
+
+  await assertSucceeds(getDoc(articleRef));
+  await assertFails(getDoc(doc(unauthedDb(), "bitacoraArticles", "article-a")));
+  await assertSucceeds(
+    setDoc(doc(ownerDb, "bitacoraArticles", "article-new"), bitacoraArticlePayload("user-a"))
+  );
+  await assertFails(
+    setDoc(doc(ownerDb, "bitacoraArticles", "article-spoofed"), bitacoraArticlePayload("user-b"))
+  );
+  await assertSucceeds(
+    updateDoc(articleRef, {
+      title: "Artículo actualizado",
+      updatedBy: bitacoraUser("user-a"),
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertFails(
+    updateDoc(doc(otherDb, "bitacoraArticles", "article-a"), {
+      title: "Cambio ajeno",
+      updatedBy: bitacoraUser("user-b"),
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertSucceeds(
+    updateDoc(doc(adminDb, "bitacoraArticles", "article-a"), {
+      status: "published",
+      updatedBy: bitacoraUser("admin-a"),
+      updatedAt: Timestamp.now()
+    })
+  );
+
+  await assertSucceeds(
+    setDoc(doc(ownerDb, "bitacoraArticles", "article-a", "likes", "user-a"), bitacoraLikePayload("user-a"))
+  );
+  await assertFails(
+    setDoc(doc(ownerDb, "bitacoraArticles", "article-a", "likes", "user-b"), bitacoraLikePayload("user-b"))
+  );
+  await assertFails(
+    updateDoc(doc(ownerDb, "bitacoraArticles", "article-a", "likes", "user-a"), {
+      displayName: "Nombre alterado"
+    })
+  );
+  await assertSucceeds(deleteDoc(doc(ownerDb, "bitacoraArticles", "article-a", "likes", "user-a")));
+
+  await assertSucceeds(
+    setDoc(
+      doc(otherDb, "bitacoraArticles", "article-a", "comments", "comment-b"),
+      bitacoraCommentPayload("user-b")
+    )
+  );
+  await assertFails(
+    setDoc(
+      doc(unauthedDb(), "bitacoraArticles", "article-a", "comments", "comment-guest"),
+      bitacoraCommentPayload("guest")
+    )
+  );
+  await assertSucceeds(
+    updateDoc(doc(ownerDb, "bitacoraArticles", "article-a", "comments", "comment-a"), {
+      text: "Comentario editado",
+      status: "visible",
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertFails(
+    updateDoc(doc(otherDb, "bitacoraArticles", "article-a", "comments", "comment-a"), {
+      text: "Comentario ajeno",
+      status: "visible",
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertSucceeds(
+    updateDoc(doc(ownerDb, "bitacoraArticles", "article-a", "comments", "comment-a"), {
+      text: "Comentario eliminado",
+      status: "deleted",
+      deletedAt: Timestamp.now(),
+      deletedBy: "user-a",
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertSucceeds(
+    setDoc(
+      doc(otherDb, "bitacoraArticles", "article-a", "comments", "comment-a", "likes", "user-b"),
+      bitacoraLikePayload("user-b")
+    )
+  );
+  await assertFails(
+    updateDoc(doc(otherDb, "bitacoraArticles", "article-a", "comments", "comment-a", "likes", "user-b"), {
+      displayName: "Nombre alterado"
+    })
+  );
+  await assertSucceeds(
+    deleteDoc(doc(otherDb, "bitacoraArticles", "article-a", "comments", "comment-a", "likes", "user-b"))
+  );
+  await assertFails(deleteDoc(doc(otherDb, "bitacoraArticles", "article-a")));
+  await assertSucceeds(deleteDoc(doc(ownerDb, "bitacoraArticles", "article-a")));
+});
+
+test("dm_carousel supports art gallery and hobbies fields while keeping like fields protected", async () => {
+  const ownerDb = authedDb("user-a");
+  const otherDb = authedDb("user-b");
+
+  await assertSucceeds(
+    setDoc(doc(ownerDb, "dm_carousel", "art-post"), carouselArtPayload("user-a"))
+  );
+  await assertSucceeds(
+    updateDoc(doc(ownerDb, "dm_carousel", "art-post"), {
+      briefDescription: "Descripción ajustada",
+      longDescription: "Texto extendido ajustado",
+      artAuthor: "Autor ajustado",
+      artYear: "2027",
+      artWorkType: "Fotografía",
+      artLocation: "Hall central",
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertSucceeds(
+    setDoc(doc(ownerDb, "dm_carousel", "hobby-post"), carouselHobbyPayload("user-a"))
+  );
+  await assertSucceeds(
+    updateDoc(doc(ownerDb, "dm_carousel", "hobby-post"), {
+      briefDescription: "Descripción del hobby ajustada",
+      imageCrop: {
+        zoom: 1.2,
+        offsetX: 4,
+        offsetY: -2,
+        frameAspect: 1
+      },
+      imageAspect: "square",
+      imageWidth: 900,
+      imageHeight: 900,
+      imageOriginalName: "hobby-editado.jpg",
+      imageColorPipeline: "original",
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertFails(
+    updateDoc(doc(ownerDb, "dm_carousel", "hobby-post"), {
+      likesCount: 99
+    })
+  );
+  await assertFails(
+    updateDoc(doc(otherDb, "dm_carousel", "hobby-post"), {
+      briefDescription: "Cambio ajeno",
+      updatedAt: Timestamp.now()
+    })
+  );
+});
+
+test("dm_carousel comments support hobbies replies and soft delete without direct like-map updates", async () => {
+  const ownerDb = authedDb("user-a");
+  const otherDb = authedDb("user-b");
+
+  await assertSucceeds(
+    setDoc(
+      doc(otherDb, "dm_carousel", "post-a", "comments", "comment-b"),
+      carouselCommentPayload("user-b", {
+        rootCommentId: "comment-b"
+      })
+    )
+  );
+  await assertSucceeds(
+    setDoc(
+      doc(otherDb, "dm_carousel", "post-a", "comments", "reply-b"),
+      carouselCommentPayload("user-b", {
+        parentCommentId: "comment-a",
+        rootCommentId: "comment-a",
+        replyDepth: 1,
+        replyToCommentId: "comment-a",
+        replyToAuthorName: "Dr. Usuario A"
+      })
+    )
+  );
+  await assertSucceeds(
+    updateDoc(doc(otherDb, "dm_carousel", "post-a", "comments", "comment-b"), {
+      deleted: true,
+      deletedAt: Timestamp.now(),
+      deletedBy: "user-b",
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertFails(
+    updateDoc(doc(otherDb, "dm_carousel", "post-a", "comments", "comment-a"), {
+      deleted: true,
+      deletedAt: Timestamp.now(),
+      deletedBy: "user-b",
+      updatedAt: Timestamp.now()
+    })
+  );
+  await assertFails(
+    updateDoc(doc(ownerDb, "dm_carousel", "post-a", "comments", "comment-a"), {
+      likedBy: {
+        "user-a": "Dr. Usuario A"
+      }
+    })
   );
 });
 
