@@ -69,3 +69,14 @@ test("user security menu includes profile and superAdmin UI gates", () => {
   assert.doesNotMatch(source, /contrase(?:ñ|n)a maestra/i);
   assert.doesNotMatch(source, /backdoor/i);
 });
+
+test("user menu dropdown styles are centralized and scoped", () => {
+  const source = readFileSync("assets/js/common/user-menu.js", "utf8");
+  assert.match(source, /dm-user-menu-styles/);
+  assert.match(source, /body \[data-dm-user-menu\]/);
+  assert.match(source, /\[data-dm-user-dropdown\]\.user-panel-dropdown/);
+  assert.match(source, /display: none !important/);
+  assert.match(source, /user-menu__security-action/);
+  assert.match(source, /user-menu__logout/);
+  assert.match(source, /focus-visible/);
+});
