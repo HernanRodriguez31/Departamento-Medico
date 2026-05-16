@@ -661,12 +661,8 @@ const getWrappedFirebaseErrorText = (error) =>
 
 const getLocalFirebaseHint = () => {
   const host = window.location.hostname;
-  const isLocal = host === "localhost" || host === "127.0.0.1" || host === "::1";
-  const params = new URLSearchParams(window.location.search || "");
-  const usingEmulators = window.__DM_FIREBASE_EMULATORS_ENABLED__ === true || params.get("dmEmulators") === "1";
-  return isLocal && !usingEmulators
-    ? " Estás probando en local conectado a Firebase real; verificá que las reglas productivas estén desplegadas o abrí la página con ?dmEmulators=1."
-    : "";
+  const isLocal = host === "localhost" || host === "127.0.0.1";
+  return isLocal ? " Estás probando en local conectado a Firebase real." : "";
 };
 
 const withFirebaseStage = (stage, error) => {
@@ -2004,8 +2000,7 @@ const handleCommentDelete = async (postId, commentId) => {
 const initReturnHomeLink = () => {
   const link = els.returnHome;
   if (!link) return;
-  const params = new URLSearchParams(window.location.search);
-  link.href = params.get("dmEmulators") === "1" ? "/index.html?dmEmulators=1" : "/index.html";
+  link.href = "/index.html";
 };
 
 const initScrollUp = () => {

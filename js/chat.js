@@ -20,6 +20,7 @@ import {
   FieldPath
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getFirebase } from "../assets/js/common/firebaseClient.js";
+import { isLocalRealBackend } from "../assets/js/common/firebase-bootstrap.js";
 import { COLLECTIONS } from "../assets/js/common/collections.js";
 import { safeText } from "../assets/js/utils/safe-dom.js";
 import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate.js";
@@ -3209,6 +3210,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
 
   async function updatePresenceStatus(user, profile, online) {
     if (!user || !db) return;
+    if (isLocalRealBackend()) return;
     lastPresenceUser = user;
     lastPresenceProfile = profile || lastPresenceProfile || {};
     try {
@@ -3232,6 +3234,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
 
   async function markOffline() {
     if (!lastPresenceUser || !db) return;
+    if (isLocalRealBackend()) return;
     try {
       await setDoc(
         doc(db, PRESENCE_COLLECTION, lastPresenceUser.uid),

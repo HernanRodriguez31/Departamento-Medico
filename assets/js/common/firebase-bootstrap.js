@@ -1,16 +1,7 @@
 import { getApps, initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import {
-  connectAuthEmulator,
-  getAuth
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import {
-  connectFirestoreEmulator,
-  getFirestore
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import {
-  connectStorageEmulator,
-  getStorage
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 export const FIREBASE_APP_NAME = "AuthApp";
 
@@ -26,7 +17,25 @@ export const DEFAULT_FIREBASE_CONFIG = {
 const getWindow = () => (typeof window !== "undefined" ? window : null);
 
 let cachedServices = null;
-let emulatorsConnected = false;
+
+export const isLocalHost = () => {
+  const host = getWindow()?.location?.hostname;
+  return host === "localhost" || host === "127.0.0.1";
+};
+
+export const isLocalRealBackend = () => isLocalHost();
+
+export const shouldUseFirebaseEmulators = () => false;
+
+export const resolveFirebaseBackendMode = () => "real";
+
+export const installBackendModeGlobals = (target = getWindow()) => {
+  if (!target) return "real";
+  target.__DM_BACKEND_MODE__ = "real";
+  target.__DM_LOCAL_REAL_BACKEND__ = isLocalRealBackend();
+  target.__DM_FIREBASE_EMULATORS_ENABLED__ = false;
+  return "real";
+};
 
 export const resolveFirebaseConfig = () => {
   const target = getWindow();
@@ -49,6 +58,7 @@ export const getFirebaseApp = () => {
 
 export const getFirebaseServices = () => {
   if (cachedServices) return cachedServices;
+  installBackendModeGlobals();
   const app = getFirebaseApp();
   cachedServices = {
     app,
@@ -56,20 +66,13 @@ export const getFirebaseServices = () => {
     db: getFirestore(app),
     storage: getStorage(app)
   };
-  const host = getWindow()?.location?.hostname;
-  const isLocalHost = host === "localhost" || host === "127.0.0.1";
-  if (isLocalHost && !emulatorsConnected) {
-    emulatorsConnected = true;
-    connectAuthEmulator(cachedServices.auth, "http://127.0.0.1:9099", { disableWarnings: true });
-    connectFirestoreEmulator(cachedServices.db, "127.0.0.1", 8080);
-    connectStorageEmulator(cachedServices.storage, "127.0.0.1", 9199);
-  }
   return cachedServices;
 };
 
 export const installFirebaseGlobals = (target = getWindow()) => {
   const services = getFirebaseServices();
   if (!target) return services;
+  installBackendModeGlobals(target);
   target.__FIREBASE_CONFIG__ = resolveFirebaseConfig();
   target.__FIREBASE_APP__ = services.app;
   target.__FIREBASE_AUTH__ = services.auth;

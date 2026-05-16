@@ -240,12 +240,8 @@ const resolveExtractionEndpoint = (endpoint) => {
   if (window.BITACORA_AI_EXTRACT_ENDPOINT) return window.BITACORA_AI_EXTRACT_ENDPOINT;
 
   const host = window.location.hostname;
-  const port = window.location.port;
   const isLocalHost = host === "localhost" || host === "127.0.0.1";
-  const isFirebaseEmulator = isLocalHost && port === "5002";
-  if (isLocalHost && !isFirebaseEmulator) {
-    return PUBLISHED_FUNCTION_ENDPOINT;
-  }
+  if (isLocalHost) return PUBLISHED_FUNCTION_ENDPOINT;
   return DEFAULT_ENDPOINT;
 };
 
@@ -254,10 +250,8 @@ const resolveDocumentExtractionEndpoint = (endpoint) => {
   if (typeof window === "undefined") return DEFAULT_DOCUMENT_ENDPOINT;
   if (window.BITACORA_DOCUMENT_EXTRACT_ENDPOINT) return window.BITACORA_DOCUMENT_EXTRACT_ENDPOINT;
   const host = window.location.hostname;
-  const port = window.location.port;
   const isLocalHost = host === "localhost" || host === "127.0.0.1";
-  const isFirebaseEmulator = isLocalHost && port === "5002";
-  if (isLocalHost && !isFirebaseEmulator) return PUBLISHED_DOCUMENT_FUNCTION_ENDPOINT;
+  if (isLocalHost) return PUBLISHED_DOCUMENT_FUNCTION_ENDPOINT;
   return DEFAULT_DOCUMENT_ENDPOINT;
 };
 

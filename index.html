@@ -11,8 +11,11 @@
         // 1. Detectar Móvil
         var isMobile = window.matchMedia("(max-width: 1024px)").matches;
         var isDesktopForced = window.location.search.indexOf("desktop=1") > -1;
+        var isLocalHost =
+          window.location.hostname === "localhost" ||
+          window.location.hostname === "127.0.0.1";
         // 2. Si es Móvil...
-        if (isMobile && !isDesktopForced) {
+        if (isMobile && !isDesktopForced && !isLocalHost) {
           // ¡NO revelamos la página! Sigue invisible (display: none).
           // Redirigimos inmediatamente.
           window.location.replace("/app/index.html" + window.location.hash);

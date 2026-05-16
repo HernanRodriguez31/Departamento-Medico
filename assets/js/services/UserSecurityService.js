@@ -1,5 +1,4 @@
 import {
-  connectFunctionsEmulator,
   getFunctions,
   httpsCallable
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
@@ -7,17 +6,11 @@ import { getFirebase } from "../common/firebaseClient.js";
 
 const FUNCTIONS_REGION = "us-central1";
 const callableCache = new Map();
-let functionsEmulatorConnected = false;
 
 const getCallable = (name) => {
   if (callableCache.has(name)) return callableCache.get(name);
   const { app } = getFirebase();
   const functions = getFunctions(app, FUNCTIONS_REGION);
-  const host = typeof window !== "undefined" ? window.location?.hostname : "";
-  if (!functionsEmulatorConnected && (host === "localhost" || host === "127.0.0.1")) {
-    functionsEmulatorConnected = true;
-    connectFunctionsEmulator(functions, "127.0.0.1", 5001);
-  }
   const callable = httpsCallable(functions, name);
   callableCache.set(name, callable);
   return callable;

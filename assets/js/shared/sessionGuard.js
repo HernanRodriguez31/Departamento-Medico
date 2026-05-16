@@ -2,6 +2,7 @@ import { onAuthStateChanged, signOut, updatePassword } from "https://www.gstatic
 import { doc, onSnapshot, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { buildLoginRedirectUrl } from "./authGate.js";
 import { bindPasswordVisibility } from "./passwordVisibility.js";
+import { isLocalRealBackend } from "../common/firebase-bootstrap.js";
 import {
   completeForcedPasswordChange,
   getMySessionControl
@@ -146,6 +147,7 @@ const stopForcedLogoutListener = () => {
 
 const markPresenceOffline = async (db, uid) => {
   if (!db || !uid) return;
+  if (isLocalRealBackend()) return;
   try {
     await setDoc(
       doc(db, PRESENCE_COLLECTION, uid),

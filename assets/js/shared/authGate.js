@@ -1,5 +1,6 @@
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { auth as sharedAuth } from "../common/firebaseClient.js";
+import { isLocalHost } from "../common/firebase-bootstrap.js";
 
 const normalizeHash = (value) => {
   if (!value) return "";
@@ -17,6 +18,7 @@ export const resolveNextHash = (fallbackHash = "") => {
 };
 
 export const buildLoginRedirectUrl = (fallbackHash = "") => {
+  if (isLocalHost()) return "/login.html";
   const nextHash = resolveNextHash(fallbackHash);
   const query = nextHash ? `?next=${encodeURIComponent(nextHash)}` : "";
   return `/login.html${query}`;

@@ -31,6 +31,7 @@ import {
   getDownloadURL
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { getFirebase } from "../common/firebaseClient.js";
+import { isLocalRealBackend } from "../common/firebase-bootstrap.js";
 import { buildCommitteeMemberWritePayload } from "../common/committee-member-roles.js";
 import { COLLECTIONS } from "../common/collections.js";
 import { requireAuth, buildLoginRedirectUrl } from "../shared/authGate.js";
@@ -1249,9 +1250,11 @@ async function initCarouselModule() {
         console.error("[Visitas] Error leyendo contador", err);
       }
     );
-    setDoc(visitsRef, { count: increment(1), updatedAt: serverTimestamp() }, { merge: true }).catch((err) =>
-      console.error("[Visitas] Error sumando visita", err)
-    );
+    if (!isLocalRealBackend()) {
+      setDoc(visitsRef, { count: increment(1), updatedAt: serverTimestamp() }, { merge: true }).catch((err) =>
+        console.error("[Visitas] Error sumando visita", err)
+      );
+    }
     visitsSubscribed = true;
   };
 
@@ -3202,14 +3205,6 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
       return;
     }
     if (action.tagName === "A") {
-      const params = new URLSearchParams(window.location.search || "");
-      const href = action.getAttribute("href") || "";
-      if (params.get("dmEmulators") === "1" && href.startsWith("/")) {
-        event?.preventDefault();
-        const target = new URL(href, window.location.origin);
-        target.searchParams.set("dmEmulators", "1");
-        window.location.href = `${target.pathname}${target.search}${target.hash}`;
-      }
       closePortalMenu();
       return;
     }

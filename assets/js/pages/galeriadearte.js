@@ -1054,8 +1054,7 @@ const handleCommentDelete = async (postId, commentId) => {
 const initReturnHomeLink = () => {
   const link = els.returnHome;
   if (!link) return;
-  const params = new URLSearchParams(window.location.search);
-  link.href = params.get("dmEmulators") === "1" ? "/index.html?dmEmulators=1" : "/index.html";
+  link.href = "/index.html";
 };
 
 const initScrollUp = () => {

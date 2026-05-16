@@ -362,38 +362,6 @@
         text-align: left;
         line-height: 1.4;
       }
-
-      .local-emulator-notice {
-        display: none;
-        align-items: flex-start;
-        gap: 0.55rem;
-        margin: 0.95rem 0 0;
-        padding: 0.7rem 0.8rem;
-        color: #526274;
-        font-size: 0.77rem;
-        line-height: 1.35;
-        text-align: left;
-        background: rgba(248, 250, 252, 0.7);
-        border: 1px solid rgba(122, 184, 0, 0.22);
-        border-radius: 14px;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
-      }
-
-      .local-emulator-notice.is-visible {
-        display: flex;
-      }
-
-      .local-emulator-notice::before {
-        content: "";
-        flex: 0 0 auto;
-        width: 8px;
-        height: 8px;
-        margin-top: 0.32rem;
-        border-radius: 999px;
-        background: var(--primary-color);
-        box-shadow: 0 0 0 4px rgba(122, 184, 0, 0.13);
-      }
-
       .loading {
         opacity: 0.7;
         pointer-events: none;
@@ -1138,14 +1106,6 @@
             >
 
             <p id="error-msg" class="error"></p>
-            <p
-              id="local-emulator-notice"
-              class="local-emulator-notice"
-              data-local-emulator-notice
-              hidden
-            >
-              Modo emulador local. Usá usuarios sintéticos; las credenciales productivas no aplican.
-            </p>
           </div>
         </form>
       </div>
@@ -1248,21 +1208,14 @@
         where,
       } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
       import { getFirebase } from "/assets/js/common/firebaseClient.js";
+      import { isLocalHost } from "/assets/js/common/firebase-bootstrap.js";
       import { enforceForcedPasswordChangeIfNeeded } from "/assets/js/shared/sessionGuard.js";
 
       const { auth, db } = getFirebase();
       const loginForm = document.getElementById("login-form");
-      const isLocalHost =
-        window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1";
+      const isLocalHostMode = isLocalHost();
       let loginInProgress = false;
       let forgotLastFocus = null;
-
-      const localEmulatorNotice = document.getElementById("local-emulator-notice");
-      if (isLocalHost && localEmulatorNotice) {
-        localEmulatorNotice.hidden = false;
-        localEmulatorNotice.classList.add("is-visible");
-      }
 
       const normalizeCredential = (value = "") => {
         const raw = String(value || "").trim();
@@ -1335,6 +1288,9 @@
         }
 
         if (!docSnap.exists()) {
+          if (isLocalHostMode) {
+            return displayName;
+          }
           try {
             await setDoc(
               docRef,
@@ -1453,6 +1409,7 @@
       cleanupRootServiceWorker();
 
       const getRedirectTarget = () => {
+        if (isLocalHostMode) return "/index.html";
         const isMobile = window.matchMedia("(max-width: 1024px)").matches;
         return isMobile ? "/app/index.html#carrete" : "/index.html";
       };
@@ -1621,9 +1578,7 @@
             error.code === "auth/user-not-found" ||
             error.code === "auth/wrong-password"
           ) {
-            msg = isLocalHost
-              ? "Usuario local no encontrado o contraseña incorrecta en el emulador. Usá un usuario sintético creado para pruebas locales."
-              : "Error al iniciar sesión.";
+            msg = "Error al iniciar sesión.";
           } else if (error.code === "auth/too-many-requests") {
             msg = "Demasiados intentos. Intenta más tarde.";
           }

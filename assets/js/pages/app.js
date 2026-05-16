@@ -31,6 +31,7 @@ import {
   getDownloadURL
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { getFirebase } from "../common/firebaseClient.js";
+import { isLocalRealBackend } from "../common/firebase-bootstrap.js";
 import { buildCommitteeMemberWritePayload } from "../common/committee-member-roles.js";
 import { COLLECTIONS } from "../common/collections.js";
 import { requireAuth, buildLoginRedirectUrl } from "../shared/authGate.js";
@@ -1384,11 +1385,13 @@ async function initCarouselModule() {
         });
       }
     );
-    setDoc(visitsRef, { count: increment(1), updatedAt: serverTimestamp() }, { merge: true }).catch((err) =>
-      once("visits-increment", () => {
-        logger.warn("[Visitas] Error sumando visita", err);
-      })
-    );
+    if (!isLocalRealBackend()) {
+      setDoc(visitsRef, { count: increment(1), updatedAt: serverTimestamp() }, { merge: true }).catch((err) =>
+        once("visits-increment", () => {
+          logger.warn("[Visitas] Error sumando visita", err);
+        })
+      );
+    }
     visitsSubscribed = true;
   };
 

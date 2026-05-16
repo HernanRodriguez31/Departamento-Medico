@@ -34,9 +34,9 @@ test("login forgot-password modal exposes administrator contact only", () => {
   assert.match(html, /HRodriguez@pan-energy\.com/);
   assert.match(html, /11 2454-2499/);
   assert.match(html, /wa\.me\/5491124542499/);
-  assert.match(html, /data-local-emulator-notice/);
-  assert.match(html, /Modo emulador local/);
-  assert.match(html, /Usuario local no encontrado o contraseña incorrecta en el emulador/);
+  assert.doesNotMatch(html, /data-local-emulator-notice/);
+  assert.doesNotMatch(html, /Modo emulador local/);
+  assert.doesNotMatch(html, /Usuario local no encontrado o contraseña incorrecta en el emulador/);
   assert.doesNotMatch(html, /contrase(?:ñ|n)a maestra/i);
   assert.doesNotMatch(html, /backdoor/i);
 });
