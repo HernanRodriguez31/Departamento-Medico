@@ -1099,6 +1099,7 @@ async function initCarouselModule() {
   };
 
   const requestLikeAggregateRepair = async (post = {}) => {
+    if (isLocalRealBackend()) return;
     if (!post.id || !post.likesAggregateStale || pendingLikeAggregateRepairs.has(post.id)) return;
     pendingLikeAggregateRepairs.add(post.id);
     try {
@@ -3465,6 +3466,24 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
 
   window.addEventListener("resize", updateHeaderHeightVar, { passive: true });
   document.addEventListener("keydown", handleCubeKeyNav);
+  document.addEventListener("keydown", (event) => {
+    if (!mq.matches) return;
+    if (event.key !== "Escape") return;
+    if (isTextInput(event.target)) return;
+    const portalOpen = Boolean(portalWrapper?.classList.contains("is-open"));
+    const aiOpen = isAssistantMenuOpen();
+    if (!portalOpen && !aiOpen) return;
+    event.preventDefault();
+    event.stopPropagation();
+    closeAllMenus();
+    if (portalOpen) {
+      suppressPortalFocusOpen = true;
+      portalButton?.focus({ preventScroll: true });
+    } else if (aiOpen) {
+      suppressAiFocusOpen = true;
+      fab?.focus({ preventScroll: true });
+    }
+  });
   document.addEventListener("keydown", (event) => {
     if (!mq.matches) return;
     if (event.key !== "ArrowLeft") return;
