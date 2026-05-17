@@ -563,26 +563,26 @@ async function initCarouselModule() {
       const committeeId = card.getAttribute("data-committee-id");
       const statsDiv = card.querySelector(".committee-stats");
       if (!committeeId || !statsDiv) return;
-      cardStats.set(committeeId, statsDiv.querySelectorAll(".committee-stat-value"));
+      const values = statsDiv.querySelectorAll(".committee-stat-value");
+      cardStats.set(committeeId, {
+        members: statsDiv.querySelector('[data-committee-stat="members"]') || values[0],
+        projects: statsDiv.querySelector('[data-committee-stat="projects"]') || values[1],
+      });
     });
 
-    const setCardValues = (committeeId, members = "...", projects = "...") => {
+    const setCardValues = (committeeId, members = 0, projects = 0) => {
       const values = cardStats.get(committeeId);
       if (!values) return;
-      if (values[0]) values[0].textContent = String(members);
-      if (values[1]) values[1].textContent = String(projects);
+      if (values.members) values.members.textContent = String(members);
+      if (values.projects) values.projects.textContent = String(projects);
     };
-    const setAllCardValues = (members = "...", projects = "...") => {
+    const setAllCardValues = (members = 0, projects = 0) => {
       committeeIds.forEach((committeeId) => setCardValues(committeeId, members, projects));
-    };
-    const getNumericStage = (topic) => {
-      const rawStage = Number(topic?.stage);
-      return Number.isFinite(rawStage) && rawStage > 0 ? rawStage : 1;
     };
 
     if (!db) {
-      setAllCardValues("...", "...");
-      setKpis(committeesTotal || "—", "—", "—");
+      setAllCardValues(0, 0);
+      setKpis(committeesTotal || 0, 0, 0);
       return;
     }
 
@@ -591,6 +591,7 @@ async function initCarouselModule() {
     const committeeStatsState = {
       membersById: new Map(),
       topicsById: new Map(),
+      projectsTotal: 0,
       membersReady: false,
       topicsReady: false,
     };
@@ -599,34 +600,31 @@ async function initCarouselModule() {
       if (subscriptionSeq !== committeeStatsSubscriptionSeq) return;
 
       if (!committeeStatsState.membersReady || !committeeStatsState.topicsReady) {
-        setAllCardValues("...", "...");
-        setKpis(committeesTotal || "—", "—", "—");
+        setAllCardValues(0, 0);
+        setKpis(committeesTotal || 0, 0, 0);
         return;
       }
 
       let membersTotal = 0;
-      let activeProjectsTotal = 0;
 
       committeeIds.forEach((committeeId) => {
         const memberCount = committeeStatsState.membersById.get(committeeId) || 0;
         const topics = committeeStatsState.topicsById.get(committeeId) || [];
         const projectCount = topics.length;
-        const activeProjectCount = topics.filter((topic) => getNumericStage(topic) < 5).length;
 
         setCardValues(committeeId, memberCount, projectCount);
         membersTotal += memberCount;
-        activeProjectsTotal += activeProjectCount;
       });
 
-      setKpis(committeesTotal, membersTotal, activeProjectsTotal);
+      setKpis(committeesTotal, membersTotal, committeeStatsState.projectsTotal);
 
       if (window.lucide && typeof window.lucide.createIcons === "function") {
         window.lucide.createIcons();
       }
     };
 
-    setAllCardValues("...", "...");
-    setKpis(committeesTotal || "—", "—", "—");
+    setAllCardValues(0, 0);
+    setKpis(committeesTotal || 0, 0, 0);
 
     const membersRef = collection(db, ...committeeDataPath("committee_members"));
     committeeMembersStatsUnsub = onSnapshot(
@@ -646,7 +644,10 @@ async function initCarouselModule() {
       },
       (err) => {
         if (subscriptionSeq !== committeeStatsSubscriptionSeq) return;
-        console.error("Error fetching committee member stats:", err);
+        committeeStatsState.membersById = new Map();
+        committeeStatsState.membersReady = true;
+        console.warn("Error fetching committee member stats:", err);
+        renderCommitteeStats();
       }
     );
 
@@ -656,8 +657,10 @@ async function initCarouselModule() {
       (snap) => {
         if (subscriptionSeq !== committeeStatsSubscriptionSeq) return;
         const topicsById = new Map();
+        let projectsTotal = 0;
         snap.docs.forEach((docSnap) => {
           const data = docSnap.data() || {};
+          projectsTotal += 1;
           const committeeId = data.committeeId;
           if (!committeeIdSet.has(committeeId)) return;
           const currentTopics = topicsById.get(committeeId) || [];
@@ -665,12 +668,17 @@ async function initCarouselModule() {
           topicsById.set(committeeId, currentTopics);
         });
         committeeStatsState.topicsById = topicsById;
+        committeeStatsState.projectsTotal = projectsTotal;
         committeeStatsState.topicsReady = true;
         renderCommitteeStats();
       },
       (err) => {
         if (subscriptionSeq !== committeeStatsSubscriptionSeq) return;
-        console.error("Error fetching committee topic stats:", err);
+        committeeStatsState.topicsById = new Map();
+        committeeStatsState.projectsTotal = 0;
+        committeeStatsState.topicsReady = true;
+        console.warn("Error fetching committee topic stats:", err);
+        renderCommitteeStats();
       }
     );
   };
