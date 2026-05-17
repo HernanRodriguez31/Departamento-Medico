@@ -640,11 +640,11 @@ const buildModalMarkup = () => `
     <form class="department-calendar-modal__form" data-calendar-form>
       <label class="department-calendar-modal__field">
         <span>Título</span>
-        <input type="text" maxlength="140" required data-calendar-input="title" />
+        <input type="text" name="calendar-title" maxlength="140" required data-calendar-input="title" />
       </label>
       <label class="department-calendar-modal__field">
         <span>Nota</span>
-        <textarea rows="4" maxlength="4000" data-calendar-input="note" placeholder="Contexto, recordatorio o descripción breve."></textarea>
+        <textarea name="calendar-note" rows="4" maxlength="4000" data-calendar-input="note" placeholder="Contexto, recordatorio o descripción breve."></textarea>
       </label>
       <div class="department-calendar-modal__section department-calendar-modal__section--schedule">
         <div class="department-calendar-modal__section-head">
@@ -661,11 +661,11 @@ const buildModalMarkup = () => `
         <div class="department-calendar-modal__schedule">
           <label class="department-calendar-modal__field">
             <span>Desde</span>
-            <input type="date" min="${MIN_DATE_KEY}" max="${MAX_DATE_KEY}" required data-calendar-input="startDate" />
+            <input type="date" name="calendar-start-date" min="${MIN_DATE_KEY}" max="${MAX_DATE_KEY}" required data-calendar-input="startDate" />
           </label>
           <label class="department-calendar-modal__field">
             <span>Hasta</span>
-            <input type="date" min="${MIN_DATE_KEY}" max="${MAX_DATE_KEY}" required data-calendar-input="endDate" />
+            <input type="date" name="calendar-end-date" min="${MIN_DATE_KEY}" max="${MAX_DATE_KEY}" required data-calendar-input="endDate" />
           </label>
           <label class="department-calendar-modal__switch">
             <span class="department-calendar-modal__switch-copy">
@@ -673,7 +673,7 @@ const buildModalMarkup = () => `
               <small>Los eventos de varios días se registran siempre sin horario.</small>
             </span>
             <span class="department-calendar-modal__switch-control">
-              <input type="checkbox" data-calendar-input="allDay" />
+              <input type="checkbox" name="calendar-all-day" data-calendar-input="allDay" />
               <span class="department-calendar-modal__switch-track">
                 <span class="department-calendar-modal__switch-thumb"></span>
               </span>
@@ -689,6 +689,7 @@ const buildModalMarkup = () => `
                 step="1"
                 inputmode="numeric"
                 autocomplete="off"
+                name="calendar-start-hour"
                 placeholder="HH"
                 class="department-calendar-modal__time-part"
                 data-calendar-input="startHour"
@@ -703,6 +704,7 @@ const buildModalMarkup = () => `
                 step="1"
                 inputmode="numeric"
                 autocomplete="off"
+                name="calendar-start-minute"
                 placeholder="MM"
                 class="department-calendar-modal__time-part"
                 data-calendar-input="startMinute"
@@ -721,6 +723,7 @@ const buildModalMarkup = () => `
                 step="1"
                 inputmode="numeric"
                 autocomplete="off"
+                name="calendar-end-hour"
                 placeholder="HH"
                 class="department-calendar-modal__time-part"
                 data-calendar-input="endHour"
@@ -735,6 +738,7 @@ const buildModalMarkup = () => `
                 step="1"
                 inputmode="numeric"
                 autocomplete="off"
+                name="calendar-end-minute"
                 placeholder="MM"
                 class="department-calendar-modal__time-part"
                 data-calendar-input="endMinute"
