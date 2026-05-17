@@ -6479,7 +6479,164 @@ html.has-reveal .dm-reveal.is-visible {
   }
 }
 
+#comites .comite__card{
+  --committee-members-x: -0.28rem;
+  --committee-projects-x: 0.28rem;
+  --committee-members-y: -0.14rem;
+  --committee-projects-y: -0.14rem;
+}
 
+#comites .comite__card[data-committee-id="comite_ejecutivo_emergencias"]{
+  --committee-members-x: -0.32rem;
+  --committee-projects-x: 0.32rem;
+  --committee-members-y: -0.14rem;
+  --committee-projects-y: -0.14rem;
+}
+
+#comites .comite__card[data-committee-id="comite_salud_ocupacional"]{
+  --committee-members-x: -0.3rem;
+  --committee-projects-x: 0.3rem;
+  --committee-members-y: -0.14rem;
+  --committee-projects-y: -0.14rem;
+}
+
+#comites .comite__card[data-committee-id="comite_calidad_seguridad"]{
+  --committee-members-x: -0.3rem;
+  --committee-projects-x: 0.3rem;
+  --committee-members-y: -0.14rem;
+  --committee-projects-y: -0.14rem;
+}
+
+#comites .comite__card[data-committee-id="comite_salud_digital"]{
+  --committee-members-x: -0.32rem;
+  --committee-projects-x: 0.32rem;
+  --committee-members-y: -0.13rem;
+  --committee-projects-y: -0.13rem;
+}
+
+#comites .comite__card[data-committee-id="comite_docencia_investigacion"]{
+  --committee-members-x: -0.34rem;
+  --committee-projects-x: 0.34rem;
+  --committee-members-y: -0.13rem;
+  --committee-projects-y: -0.13rem;
+}
+
+#comites .comite__card[data-committee-id="comite_farmacia_terapeutica"]{
+  --committee-members-x: -0.32rem;
+  --committee-projects-x: 0.32rem;
+  --committee-members-y: -0.14rem;
+  --committee-projects-y: -0.14rem;
+}
+
+#comites .comite__card[data-committee-id="comite_bioetica"]{
+  --committee-members-x: -0.34rem;
+  --committee-projects-x: 0.34rem;
+  --committee-members-y: -0.13rem;
+  --committee-projects-y: -0.13rem;
+}
+
+#comites .comite__image-wrap .comite__metrics{
+  position: absolute;
+  z-index: 3;
+  left: clamp(3.05rem, 12%, 3.55rem);
+  right: clamp(3.05rem, 12%, 3.55rem);
+  bottom: clamp(1.22rem, 6.7%, 1.9rem);
+  width: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(6.2rem, 32%) minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  pointer-events: none;
+  backdrop-filter: none;
+}
+
+#comites .comite__image-wrap .comite__metrics .committee-stat-item{
+  min-height: clamp(2rem, 7.2vw, 2.45rem) !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.12rem !important;
+  text-align: center !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+#comites .comite__image-wrap .comite__metrics .committee-stat-item--members{
+  grid-column: 1;
+  justify-self: start !important;
+  transform: translate(var(--committee-members-x), var(--committee-members-y));
+  width: min(100%, 5.85rem);
+}
+
+#comites .comite__image-wrap .comite__metrics .committee-stat-item--projects{
+  grid-column: 3;
+  justify-self: end !important;
+  transform: translate(var(--committee-projects-x), var(--committee-projects-y));
+  width: min(100%, 5.85rem);
+}
+
+#comites .comite__image-wrap .comite__metrics .committee-stat-value{
+  color: var(--first-color, var(--brisa-green, #7ab800)) !important;
+  font-size: clamp(0.94rem, 1.05vw, 1.06rem) !important;
+  font-weight: 840 !important;
+  line-height: 1 !important;
+  font-variant-numeric: tabular-nums;
+}
+
+#comites .comite__image-wrap .comite__metrics .committee-stat-label{
+  color: var(--first-color, var(--brisa-green, #7ab800)) !important;
+  display: block !important;
+  width: auto;
+  min-width: 5.2rem;
+  overflow-wrap: anywhere;
+  font-size: clamp(0.5rem, 0.58vw, 0.58rem) !important;
+  font-weight: 780 !important;
+  letter-spacing: 0.035em !important;
+  line-height: 1.05 !important;
+  text-align: center !important;
+  text-transform: uppercase !important;
+  white-space: normal !important;
+}
+
+@media (max-width: 640px){
+  #comites .comite__card{
+    --committee-members-x: -0.14rem;
+    --committee-projects-x: 0.14rem;
+    --committee-members-y: -0.1rem;
+    --committee-projects-y: -0.1rem;
+  }
+
+  #comites .comite__image-wrap .comite__metrics{
+    left: clamp(1rem, 8%, 1.35rem);
+    right: clamp(1rem, 8%, 1.35rem);
+    bottom: clamp(1.05rem, 6.2%, 1.4rem);
+    grid-template-columns: minmax(0, 1fr) minmax(5.7rem, 30%) minmax(0, 1fr) !important;
+  }
+
+  #comites .comite__image-wrap .comite__metrics .committee-stat-item{
+    min-height: 2rem !important;
+    width: min(100%, 5.6rem);
+  }
+
+  #comites .comite__image-wrap .comite__metrics .committee-stat-value{
+    font-size: clamp(0.82rem, 3.7vw, 0.94rem) !important;
+  }
+
+  #comites .comite__image-wrap .comite__metrics .committee-stat-label{
+    font-size: clamp(0.47rem, 2.1vw, 0.53rem) !important;
+    letter-spacing: 0.03em !important;
+  }
+}
 
 /* === Hero KPIs === */
 .section.text-center .section__subtitle {
