@@ -72,15 +72,18 @@ const buildInitials = (name) => {
 const resolveAvatarUrlFromDoc = (data = {}, identity = {}) => {
   const displayName = identity.name || resolveNameFromDoc(data);
   return (
+    data.photoURL ||
     data.avatarUrl ||
-    data.defaultAvatarUrl ||
+    data.imageUrl ||
+    data.profileImage ||
+    data.foto ||
+    data.profilePhotoUrl ||
     resolveDefaultAvatarUrl({
       uid: identity.uid || data.uid || data.id || "",
       email: identity.email || data.email || data.correo || data.mail || "",
       name: displayName
     }) ||
-    data.profilePhotoUrl ||
-    data.photoURL ||
+    data.defaultAvatarUrl ||
     ""
   );
 };
@@ -241,11 +244,27 @@ const applyAvatarElement = (el, profile) => {
   const img =
     el.matches("img") ? el : el.querySelector("[data-author-avatar], [data-avatar-img], [data-dm-avatar-img]");
   const fallback = el.querySelector("[data-avatar-fallback], [data-dm-avatar-fallback]");
+  const showFallback = () => {
+    if (img) img.hidden = true;
+    if (fallback) fallback.hidden = false;
+    if (el.dataset) delete el.dataset.hasAvatar;
+  };
+  const showImage = () => {
+    if (img) img.hidden = false;
+    if (fallback) fallback.hidden = true;
+    if (el.dataset) el.dataset.hasAvatar = "1";
+  };
   if (img) {
+    img.alt = displayName;
     if (avatarUrl) {
+      img.hidden = true;
+      img.onload = () => showImage();
+      img.onerror = () => showFallback();
       img.src = buildAvatarSrc(avatarUrl, avatarUpdatedAt);
-      img.hidden = false;
-      img.alt = displayName;
+      if (img.complete) {
+        if (img.naturalWidth > 0) showImage();
+        else showFallback();
+      }
     } else {
       img.hidden = true;
     }
@@ -254,15 +273,9 @@ const applyAvatarElement = (el, profile) => {
     if (fallback.dataset.avatarFallback === "initials" || fallback.dataset.dmAvatarFallback === "initials") {
       fallback.textContent = initials;
     }
-    fallback.hidden = Boolean(avatarUrl);
+    fallback.hidden = Boolean(avatarUrl && (!img || (img.complete && img.naturalWidth > 0)));
   }
-  if (el.dataset) {
-    if (avatarUrl) {
-      el.dataset.hasAvatar = "1";
-    } else {
-      delete el.dataset.hasAvatar;
-    }
-  }
+  if (!avatarUrl) showFallback();
 };
 
 const hydrateAvatars = async (root = document) => {

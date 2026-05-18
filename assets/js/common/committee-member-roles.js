@@ -4,12 +4,6 @@ const COMMITTEE_ROLE_PRIORITY = Object.freeze({
   vocal: 2,
 });
 
-const DEPARTMENT_ROLE_PRIORITY = Object.freeze({
-  directora: 0,
-  subdirector: 1,
-  coordinador: 2,
-});
-
 export const COMMITTEE_MEMBER_GROUPS = Object.freeze([
   {
     key: "referentes",
@@ -46,6 +40,7 @@ const DEPARTMENT_ROLE_LABELS = Object.freeze({
 const DEPARTMENT_ROLE_BY_UID = Object.freeze({});
 
 const departmentRoleByNormalizedName = new Map();
+const warnedCommitteeRoles = new Set();
 
 const registerDepartmentRole = (departmentRole, names = []) => {
   names.forEach((name) => {
@@ -92,11 +87,39 @@ export function normalizeCommitteeMemberName(value) {
     .trim();
 }
 
+function normalizeCommitteeRoleValue(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s/]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function warnCommitteeRoleOnce(key, message) {
+  if (warnedCommitteeRoles.has(key)) return;
+  warnedCommitteeRoles.add(key);
+  console.warn(message);
+}
+
 export function resolveCommitteeRole(member = {}) {
-  const role = String(member.committeeRole || "").trim().toLowerCase();
-  if (role === "referente" || role === "secretario" || role === "vocal") {
-    return role;
+  const rawRole = String(member.committeeRole || "").trim();
+  const role = normalizeCommitteeRoleValue(rawRole);
+  if (role === "referente" || role === "coordinador" || role === "lider" || role === "responsable" || role === "presidente" || role === "chair") {
+    return "referente";
   }
+  if (role === "secretario" || role === "secretaria" || role === "secretaria/o" || role === "secretary") {
+    return "secretario";
+  }
+  if (role === "vocal" || role === "miembro" || role === "integrante" || role === "member" || role === "participante") {
+    return "vocal";
+  }
+  if (!rawRole) {
+    warnCommitteeRoleOnce("empty", "committee_members: committeeRole vacio; se renderiza segun isLeader o como vocal.");
+    return member.isLeader === true ? "referente" : "vocal";
+  }
+  warnCommitteeRoleOnce(`unknown:${role}`, `committee_members: committeeRole no mapeado "${rawRole}"; se renderiza segun isLeader o como vocal.`);
   return member.isLeader === true ? "referente" : "vocal";
 }
 
@@ -128,7 +151,19 @@ export function decorateCommitteeMember(member = {}) {
     committeeRoleLabel: getCommitteeRoleLabel(committeeRole),
     departmentRoleLabel: getDepartmentRoleLabel(departmentRole),
     sortName: normalizeCommitteeMemberName(member.name),
+    sortArrival: getCommitteeMemberArrivalMillis(member.createdAt),
   };
+}
+
+export function getCommitteeMemberArrivalMillis(value) {
+  if (!value) return 0;
+  if (typeof value.toMillis === "function") return value.toMillis();
+  if (typeof value?.seconds === "number") {
+    return value.seconds * 1000 + Math.floor((value.nanoseconds || 0) / 1000000);
+  }
+  if (value instanceof Date) return value.getTime();
+  const parsed = typeof value === "number" ? value : new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 export function sortCommitteeMembers(members = []) {
@@ -140,10 +175,9 @@ export function sortCommitteeMembers(members = []) {
         (COMMITTEE_ROLE_PRIORITY[right.committeeRole] ?? COMMITTEE_ROLE_PRIORITY.vocal);
       if (committeePriority !== 0) return committeePriority;
 
-      const departmentPriority =
-        (DEPARTMENT_ROLE_PRIORITY[left.departmentRole] ?? Number.MAX_SAFE_INTEGER) -
-        (DEPARTMENT_ROLE_PRIORITY[right.departmentRole] ?? Number.MAX_SAFE_INTEGER);
-      if (departmentPriority !== 0) return departmentPriority;
+      if (left.sortArrival !== right.sortArrival) {
+        return right.sortArrival - left.sortArrival;
+      }
 
       return left.sortName.localeCompare(right.sortName, "es");
     });
