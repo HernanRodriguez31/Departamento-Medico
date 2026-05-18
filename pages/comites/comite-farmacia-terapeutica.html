@@ -73,6 +73,7 @@
         import { escapeHTML, escapeAttribute } from "../../assets/js/utils/safe-dom.js";
         import { initSessionGuard } from "../../assets/js/shared/sessionGuard.js?v=20260305-session-1";
         import { initUserMenu } from "../../assets/js/common/user-menu.js?v=20260430-orgtree-avatars-1";
+        import { buildInitials, hydrateAvatars } from "../../assets/js/common/user-profiles.js?v=20260430-orgtree-avatars-1";
         import { initDepartmentCalendar } from "../../assets/js/common/department-calendar.js?v=20260506-committee-calendars-1";
         import { createCommitteeNotesController } from "../../assets/js/common/committee-notes.js?v=20260507-board-x-center-1";
 
@@ -594,44 +595,58 @@
             `;
         }
 
-        function renderCommitteeMemberCard(member) {
-            const resolvedRole = member.committeeRole || 'vocal';
-            const iconName = resolvedRole === 'referente' ? 'shield' : 'user';
+        function getCommitteeMemberAvatarUid(member = {}) {
+            const uid = member.userUid || member.uid || member.userId || member.memberUid || member.memberId || member.profileId || "";
+            return String(uid || "").trim();
+        }
+
+        function renderCommitteeMemberAvatar(member, resolvedRole) {
+            const avatarUid = getCommitteeMemberAvatarUid(member);
+            const displayName = member.name || "Integrante";
+            const uidAttr = avatarUid ? ` data-dm-avatar-uid="${escapeAttribute(avatarUid)}"` : "";
             return `
-                <article class="committee-member-card committee-member-card--lane committee-member-card--role-${escapeAttribute(resolvedRole)} group/member">
-                    <div class="committee-member-card__main">
-                        <div class="committee-member-card__identity">
-                            <div class="committee-member-card__avatar" data-committee-role="${escapeAttribute(resolvedRole)}">
-                                <i data-lucide="${iconName}" class="w-5 h-5"></i>
-                            </div>
-                            <div class="committee-member-card__details committee-member-card__copy">
-                                <h4 class="committee-member-card__name">${escapeHTML(member.name || 'Sin nombre')}</h4>
-                                ${renderCommitteeMemberMetadata(member)}
-                                <div class="committee-member-card__badges">
-                                    ${renderCommitteeMemberBadges(member)}
+                        <div class="committee-member-card__avatar committee-member-card__avatar--profile" data-committee-role="${escapeAttribute(resolvedRole)}"${uidAttr} data-dm-avatar-name="${escapeAttribute(displayName)}" data-dm-author="${escapeAttribute(displayName)}">
+                            <img class="committee-member-card__avatar-img" data-dm-avatar-img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="${escapeAttribute(displayName)}" hidden>
+                            <span class="committee-member-card__avatar-fallback" data-dm-avatar-fallback="initials" aria-hidden="true">${escapeHTML(buildInitials(displayName))}</span>
+                        </div>
+                    `;
+        }
+
+        function renderCommitteeMemberCard(member) {
+            const resolvedRole = member.committeeRole || "vocal";
+            return `
+                        <article class="committee-member-card committee-member-card--lane committee-member-card--role-${escapeAttribute(resolvedRole)} group/member">
+                            <div class="committee-member-card__main">
+                                <div class="committee-member-card__identity">
+                                    ${renderCommitteeMemberAvatar(member, resolvedRole)}
+                                    <div class="committee-member-card__details committee-member-card__copy">
+                                        <h4 class="committee-member-card__name">${escapeHTML(member.name || "Sin nombre")}</h4>
+                                        ${renderCommitteeMemberMetadata(member)}
+                                        <div class="committee-member-card__badges">
+                                            ${renderCommitteeMemberBadges(member)}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                    ${isAdmin ? `
-                    <div class="committee-member-card__tools">
-                        <button
-                            type="button"
-                            class="committee-member-card__menu-trigger"
-                            data-member-menu-trigger
-                            data-member-id="${escapeAttribute(member.id)}"
-                            data-current-role="${escapeAttribute(resolvedRole)}"
-                            aria-haspopup="menu"
-                            aria-controls="committee-member-role-menu-floating"
-                            aria-expanded="false"
-                            title="Acciones del integrante">
-                            <span class="sr-only">Acciones del integrante</span>
-                            <i data-lucide="ellipsis" class="w-4 h-4"></i>
-                        </button>
-                    </div>
-                    ` : ''}
-                </article>
-            `;
+                            ${isAdmin ? `
+                            <div class="committee-member-card__tools">
+                                <button
+                                    type="button"
+                                    class="committee-member-card__menu-trigger"
+                                    data-member-menu-trigger
+                                    data-member-id="${escapeAttribute(member.id)}"
+                                    data-current-role="${escapeAttribute(resolvedRole)}"
+                                    aria-haspopup="menu"
+                                    aria-controls="committee-member-role-menu-floating"
+                                    aria-expanded="false"
+                                    title="Acciones del integrante">
+                                    <span class="sr-only">Acciones del integrante</span>
+                                    <i data-lucide="ellipsis" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                            ` : ""}
+                        </article>
+                    `;
         }
 
         // --- Render Functions ---
@@ -810,25 +825,33 @@
             };
 
             const buildVocalRows = () => {
-                const slotPattern = vocales.length > 8 ? [3, 5, 7] : [3, 5];
-                const extraCount = Math.max(0, vocales.length - slotPattern.reduce((sum, count) => sum + count, 0));
-                const extraRows = extraCount ? Array.from({ length: Math.ceil(extraCount / 7) }, () => 7) : [];
-                const rowSizes = [...slotPattern, ...extraRows];
+                if (!vocales.length) {
+                    return '<div class="committee-members-tree__empty" role="status">Sin vocales asignados</div>';
+                }
+
+                const rowPattern = [2, 3, 4, 5];
+                const rows = [];
                 let cursor = 0;
+                let rowIndex = 0;
 
-                return rowSizes.map((size, rowIndex) => {
-                    const cells = Array.from({ length: size }, () => {
-                        const member = vocales[cursor];
-                        cursor += 1;
-                        return renderTreeNode(member ? renderCommitteeMemberCard(member) : renderMemberPlaceholder('vocal', 'Vocal'));
-                    }).join('');
+                while (cursor < vocales.length) {
+                    const capacity = rowPattern[rowIndex] || 5;
+                    const rowMembers = vocales.slice(cursor, cursor + capacity);
+                    cursor += rowMembers.length;
 
-                    return `
-                        <div class="committee-members-tree__vocal-row committee-members-tree__vocal-row--${rowIndex + 1}" style="--tree-columns: ${size}">
-                            ${cells}
-                        </div>
-                    `;
-                }).join('');
+                    const cells = rowMembers
+                        .map((member) => renderTreeNode(renderCommitteeMemberCard(member)))
+                        .join('');
+
+                    rows.push(`
+                                    <div class="committee-members-tree__vocal-row committee-members-tree__vocal-row--${rowIndex + 1}" style="--tree-columns: ${rowMembers.length}">
+                                        ${cells}
+                                    </div>
+                                `);
+                    rowIndex += 1;
+                }
+
+                return rows.join('');
             };
 
             container.innerHTML = `
@@ -850,6 +873,9 @@
             `;
 
             if (window.lucide) window.lucide.createIcons();
+            hydrateAvatars(container).catch((error) => {
+                console.warn("No se pudieron hidratar avatares de integrantes.", error);
+            });
         }
 
         const resolveValue = (obj, keys, fallback = "") => {
