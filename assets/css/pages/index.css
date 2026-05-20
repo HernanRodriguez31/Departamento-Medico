@@ -4915,16 +4915,19 @@ body.dm-modal-open .brisa-chat-panel {
   color: #7AB800;
 }
 
-#btn-portal:focus,
-#btn-portal:focus-visible,
-#btn-portal.active {
+#btn-portal:focus {
+  outline: none;
+}
+
+#btn-portal:focus-visible {
   border: 2px solid #7AB800 !important;
   outline: none;
   color: #7AB800;
   background-color: #f7fcf0;
 }
 
-#btn-portal:focus .nav-icon,
+#btn-portal.active,
+#btn-portal:focus-visible .nav-icon,
 #btn-portal.active .nav-icon {
   color: #7AB800 !important;
 }
@@ -6853,16 +6856,19 @@ html.has-reveal .dm-reveal.is-visible {
   transform: translateY(-50%) translateX(0);
 }
 
-#btn-portal:focus,
-#btn-portal:focus-visible,
-#btn-portal.active {
+#btn-portal:focus {
+  outline: none;
+}
+
+#btn-portal:focus-visible {
   border: 2px solid #7AB800 !important;
   outline: none;
   color: #7AB800;
   background-color: #f7fcf0;
 }
 
-#btn-portal:focus .nav-icon,
+#btn-portal.active,
+#btn-portal:focus-visible .nav-icon,
 #btn-portal.active .nav-icon {
   color: #7AB800 !important;
 }

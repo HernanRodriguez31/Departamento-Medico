@@ -3114,6 +3114,9 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
   let keyboardNavActive = false;
   let suppressAiFocusOpen = false;
   let suppressPortalFocusOpen = false;
+  const SIDEBAR_CUBE_SELECTION_MS = 3000;
+  const cubeSelectionTimers = new WeakMap();
+  const transientSelectedCubes = new Set();
 
   const refreshNavCubes = () => {
     navCubes = Array.from(sidebar.querySelectorAll(".dm-cube"));
@@ -3227,9 +3230,53 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
     closePortalMenu();
   };
 
+  const clearCubeSelectionTimer = (btn) => {
+    const timer = cubeSelectionTimers.get(btn);
+    if (timer) window.clearTimeout(timer);
+    cubeSelectionTimers.delete(btn);
+  };
+
+  const clearTransientCubeSelection = (btn) => {
+    if (!btn) return;
+    clearCubeSelectionTimer(btn);
+    btn.classList.remove("is-selected");
+    transientSelectedCubes.delete(btn);
+  };
+
+  const clearAllCubeSelections = () => {
+    refreshNavCubes();
+    navCubes.forEach(clearTransientCubeSelection);
+    transientSelectedCubes.forEach(clearTransientCubeSelection);
+  };
+
+  const markCubeSelectedTemporarily = (btn) => {
+    if (!btn) return;
+    refreshNavCubes();
+    navCubes.forEach((cube) => {
+      if (cube !== btn) clearTransientCubeSelection(cube);
+    });
+    transientSelectedCubes.forEach((cube) => {
+      if (cube !== btn) clearTransientCubeSelection(cube);
+    });
+    clearCubeSelectionTimer(btn);
+    btn.classList.add("is-selected");
+    transientSelectedCubes.add(btn);
+    const timer = window.setTimeout(() => {
+      btn.classList.remove("is-selected");
+      cubeSelectionTimers.delete(btn);
+      transientSelectedCubes.delete(btn);
+    }, SIDEBAR_CUBE_SELECTION_MS);
+    cubeSelectionTimers.set(btn, timer);
+  };
+
+  const pressCubeBriefly = (btn) => {
+    if (!btn) return;
+    btn.classList.add("is-pressed");
+    window.setTimeout(() => btn.classList.remove("is-pressed"), 150);
+  };
+
   const clearCubeSelection = ({ closePicker = false } = {}) => {
-    if (!navCubes.length) return;
-    navCubes.forEach((btn) => btn.classList.remove("is-selected"));
+    clearAllCubeSelections();
     if (closePicker) closeAllMenus();
     const activeEl = document.activeElement;
     if (activeEl && navCubes.includes(activeEl)) {
@@ -3241,9 +3288,8 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
     refreshNavCubes();
     if (!navCubes.length) return;
     const safeIndex = Math.min(Math.max(index, 0), navCubes.length - 1);
-    navCubes.forEach((btn) => btn.classList.remove("is-selected"));
     const nextBtn = navCubes[safeIndex];
-    nextBtn.classList.add("is-selected");
+    markCubeSelectedTemporarily(nextBtn);
     activeCubeIndex = safeIndex;
     if (focus) nextBtn.focus({ preventScroll: true });
     if (scroll && !isAssistantCube(nextBtn)) scrollToCubeTarget(nextBtn);
@@ -3308,19 +3354,20 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
           if (isPortalCube(btn)) {
             event.preventDefault();
             event.stopPropagation();
+            pressCubeBriefly(btn);
+            markCubeSelectedTemporarily(btn);
             togglePortalMenu();
             return;
           }
           if (isAssistantCube(btn)) {
             event.stopPropagation();
-            btn.classList.add("is-pressed");
-            window.setTimeout(() => btn.classList.remove("is-pressed"), 150);
+            pressCubeBriefly(btn);
+            markCubeSelectedTemporarily(btn);
             toggleAiMenu();
             return;
           }
           if (isExternalCube(btn)) return;
-          btn.classList.add("is-pressed");
-          window.setTimeout(() => btn.classList.remove("is-pressed"), 150);
+          pressCubeBriefly(btn);
           setActiveCube(navCubes.indexOf(btn), { scroll: true });
         },
         { passive: false }
@@ -3570,6 +3617,8 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
       event.preventDefault();
       event.stopPropagation();
       suppressAiFocusOpen = false;
+      pressCubeBriefly(fab);
+      markCubeSelectedTemporarily(fab);
       toggleAiMenu();
     });
   }
