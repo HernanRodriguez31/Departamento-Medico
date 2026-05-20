@@ -41,6 +41,7 @@ import { initUserMenu } from "../common/user-menu.js?v=20260430-orgtree-avatars-
 import { hydrateAvatars } from "../common/user-profiles.js?v=20260430-orgtree-avatars-1";
 import { initSessionGuard } from "../shared/sessionGuard.js?v=20260305-session-1";
 import { initPdfViewer } from "../common/pdf-viewer.js";
+import { initDocumentVideoViewer } from "../common/document-video-viewer.js";
 import { initDepartmentCalendar } from "../common/department-calendar.js?v=20260506-committee-calendars-1";
 import {
   syncCarouselLikeAggregateForCurrentUser,
@@ -3588,6 +3589,7 @@ const boot = () => {
     calendarContext: { scope: "home" },
   });
   initPdfViewer();
+  initDocumentVideoViewer();
   initUserMenu({ variant: "desktop" });
   const assistantShell = initAssistantShell({ variant: "desktop" });
   initDesktopQuickSidebar({ assistantShell });

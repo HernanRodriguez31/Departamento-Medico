@@ -196,6 +196,28 @@
         box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
       }
 
+      #documentacion .dm-doc-grid {
+        display: grid;
+        grid-template-columns: repeat(1, minmax(0, 1fr));
+        gap: 1rem;
+        width: 100%;
+        max-width: 76rem;
+        margin: 0 auto 4rem;
+        padding: 0 1rem;
+      }
+
+      @media (min-width: 640px) {
+        #documentacion .dm-doc-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (min-width: 1180px) {
+        #documentacion .dm-doc-grid {
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+      }
+
       #documentacion .dm-doc-card {
         --dm-doc-accent: #2563eb;
         --dm-doc-accent-soft: #eff6ff;
@@ -228,6 +250,20 @@
         --dm-doc-shadow-hover: rgba(122, 184, 0, 0.25);
       }
 
+      #documentacion .dm-doc-card--teal {
+        --dm-doc-accent: #0f766e;
+        --dm-doc-accent-soft: #f0fdfa;
+        --dm-doc-border-hover: #5eead4;
+        --dm-doc-shadow-hover: rgba(15, 118, 110, 0.2);
+      }
+
+      #documentacion .dm-doc-card--video {
+        --dm-doc-accent: #475569;
+        --dm-doc-accent-soft: #f1f5f9;
+        --dm-doc-border-hover: #94a3b8;
+        --dm-doc-shadow-hover: rgba(71, 85, 105, 0.2);
+      }
+
       #documentacion .dm-doc-card:hover {
         transform: translateY(-0.25rem);
         border-color: var(--dm-doc-border-hover);
@@ -241,7 +277,7 @@
         font-size: 1.05rem;
         font-weight: 700;
         line-height: 1.25;
-        white-space: nowrap;
+        overflow-wrap: anywhere;
         transition: color 0.3s ease;
       }
 
@@ -2417,21 +2453,19 @@
                 Documentación y Normativa
               </h2>
             </div>
-            <div
-              class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 justify-center max-w-5xl mx-auto mb-16 w-full px-4"
-            >
-              <!-- Button 1: Documento Estructural -->
+            <div class="dm-doc-grid">
+              <!-- Button 1: Documento Fundacional -->
               <a
                 href="/assets/docs/documento-base-departamento-medico-brisa.pdf"
                 target="_blank"
                 rel="noopener noreferrer"
                 data-pdf-viewer-trigger
-                data-pdf-title="Documento Estructural"
+                data-pdf-title="Documento Fundacional del Departamento Médico"
                 data-pdf-src="/assets/docs/documento-base-departamento-medico-brisa.pdf"
                 data-pdf-download="documento-base-departamento-medico-brisa.pdf"
                 class="dm-doc-card dm-doc-card--blue"
               >
-                <span class="dm-doc-card__title">Documento Estructural</span>
+                <span class="dm-doc-card__title">Documento Fundacional del Departamento Médico</span>
                 <span class="dm-doc-card__body">
                   <span class="dm-doc-card__icon">
                     <i data-lucide="file-text"></i>
@@ -2442,29 +2476,7 @@
                 </span>
               </a>
 
-              <!-- Button 2: Modelo del Departamento -->
-              <a
-                href="/assets/docs/presentacion-departamento-medico.pdf"
-                target="_blank"
-                rel="noopener noreferrer"
-                data-pdf-viewer-trigger
-                data-pdf-title="Modelo del Departamento"
-                data-pdf-src="/assets/docs/presentacion-departamento-medico.pdf"
-                data-pdf-download="presentacion-departamento-medico.pdf"
-                class="dm-doc-card dm-doc-card--blue"
-              >
-                <span class="dm-doc-card__title">Modelo del Departamento</span>
-                <span class="dm-doc-card__body">
-                  <span class="dm-doc-card__icon">
-                    <i data-lucide="presentation"></i>
-                  </span>
-                  <span class="dm-doc-card__desc">
-                    Ver propósito, estructura y funcionamiento
-                  </span>
-                </span>
-              </a>
-
-              <!-- Button 3: Documento de Conformación -->
+              <!-- Button 2: Conformación de Comités -->
               <a
                 href="/assets/docs/procedimiento-conformacion-comites-medicos.pdf"
                 target="_blank"
@@ -2482,6 +2494,49 @@
                   </span>
                   <span class="dm-doc-card__desc">
                     Ver integrantes y roles
+                  </span>
+                </span>
+              </a>
+
+              <!-- Button 3: Presentación del Departamento -->
+              <a
+                href="/assets/docs/presentacion-departamento-medico.pdf"
+                target="_blank"
+                rel="noopener noreferrer"
+                data-pdf-viewer-trigger
+                data-pdf-title="Presentación del Departamento"
+                data-pdf-src="/assets/docs/presentacion-departamento-medico.pdf"
+                data-pdf-download="presentacion-departamento-medico.pdf"
+                class="dm-doc-card dm-doc-card--teal"
+              >
+                <span class="dm-doc-card__title">Presentación del Departamento</span>
+                <span class="dm-doc-card__body">
+                  <span class="dm-doc-card__icon">
+                    <i data-lucide="presentation"></i>
+                  </span>
+                  <span class="dm-doc-card__desc">
+                    Ver propósito, estructura y funcionamiento
+                  </span>
+                </span>
+              </a>
+
+              <!-- Button 4: Video Institucional -->
+              <a
+                href="/assets/docs/Presentacio%CC%81n%20Departamento%20Me%CC%81dico%20Brisa.mp4"
+                rel="noopener noreferrer"
+                data-document-video-trigger
+                data-video-title="Video Institucional Presentación del Departamento"
+                data-video-src="/assets/docs/Presentacio%CC%81n%20Departamento%20Me%CC%81dico%20Brisa.mp4"
+                data-video-download="Presentación Departamento Médico Brisa.mp4"
+                class="dm-doc-card dm-doc-card--video"
+              >
+                <span class="dm-doc-card__title">Video Institucional Presentación del Departamento</span>
+                <span class="dm-doc-card__body">
+                  <span class="dm-doc-card__icon">
+                    <i data-lucide="play-circle"></i>
+                  </span>
+                  <span class="dm-doc-card__desc">
+                    Ver presentación audiovisual
                   </span>
                 </span>
               </a>

@@ -41,6 +41,8 @@ import { logger, once, throttle } from "../common/app-logger.js";
 import { initUserMenu } from "../common/user-menu.js?v=20260305-session-1";
 import { hydrateAvatars } from "../common/user-profiles.js";
 import { initSessionGuard } from "../shared/sessionGuard.js?v=20260305-session-1";
+import { initPdfViewer } from "../common/pdf-viewer.js";
+import { initDocumentVideoViewer } from "../common/document-video-viewer.js";
 import {
   toggleCarouselCommentLikeForCurrentUser,
   toggleCarouselLikeForCurrentUser,
@@ -2959,6 +2961,8 @@ const boot = () => {
   initSessionGuard({ auth, db, fallbackHash: "#carrete" });
   initUserMenu({ variant: "mobile" });
   initAssistantShell({ variant: "mobile" });
+  initPdfViewer();
+  initDocumentVideoViewer();
   initCarouselModule().catch((err) => {
     throttle("muro-init", 60000, () => {
       logger.error("[Muro] Error inicializando", err);
