@@ -3383,12 +3383,12 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
 
     const getProfile = (cube) => {
       if (isAssistantCube(cube)) {
-        return { tiltX: 5.2, tiltY: 6.8, shift: 2.6, contentShift: 4.8, spring: 0.2 };
+        return { tiltX: 3.2, tiltY: 4.2, shift: 1.6, contentShift: 2.8, spring: 0.18 };
       }
       if (isPortalCube(cube)) {
-        return { tiltX: 5.8, tiltY: 7.4, shift: 2.8, contentShift: 5.4, spring: 0.21 };
+        return { tiltX: 3.6, tiltY: 4.8, shift: 1.8, contentShift: 3.2, spring: 0.19 };
       }
-      return { tiltX: 7.2, tiltY: 8.6, shift: 3.4, contentShift: 6.4, spring: 0.22 };
+      return { tiltX: 4.2, tiltY: 5.4, shift: 2.1, contentShift: 3.8, spring: 0.19 };
     };
 
     const getState = (cube) => {
@@ -3492,11 +3492,11 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
         rx: -y * profile.tiltX,
         ry: x * profile.tiltY,
         x: x * profile.shift,
-        y: y * profile.shift * 0.7,
+        y: y * profile.shift * 0.62,
         contentX: x * profile.contentShift,
-        contentY: y * profile.contentShift * 0.58,
-        glareX: clamp(50 + x * 42, 8, 92),
-        glareY: clamp(30 + y * 40, 8, 88),
+        contentY: y * profile.contentShift * 0.48,
+        glareX: clamp(50 + x * 34, 12, 88),
+        glareY: clamp(30 + y * 30, 12, 82),
       };
 
       cube.classList.add("is-cube-motion-active");
@@ -3520,7 +3520,7 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
       if (isMotionBound) return;
       motionCubes = queryCubes();
       motionCubes.forEach((cube, index) => {
-        cube.style.setProperty("--dm-cube-enter-delay", `${Math.min(index * 42, 260)}ms`);
+        cube.style.setProperty("--dm-cube-enter-delay", `${Math.min(index * 34, 210)}ms`);
         cube.addEventListener("pointerenter", handlePointerEnter, { passive: true });
         cube.addEventListener("pointermove", handlePointerMove, { passive: true });
         cube.addEventListener("pointerleave", resetMotionTarget, { passive: true });
