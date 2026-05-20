@@ -3018,9 +3018,31 @@
             aria-label="Publicar novedad"
           >
             <div class="dm-muro-composer__inner">
-              <div class="dm-muro-avatar" aria-hidden="true">
-                <i data-lucide="user"></i>
-              </div>
+              <button
+                class="dm-muro-avatar"
+                type="button"
+                data-dm-avatar-current
+                data-dm-muro-user-trigger
+                aria-label="Abrir menú de usuario"
+                aria-controls="user-panel-dropdown"
+                aria-haspopup="menu"
+                aria-expanded="false"
+              >
+                <img
+                  class="dm-avatar-img"
+                  data-dm-avatar-img
+                  src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="
+                  alt=""
+                  loading="eager"
+                  decoding="async"
+                  hidden
+                />
+                <span
+                  class="dm-avatar-fallback"
+                  data-dm-avatar-fallback="initials"
+                  aria-hidden="true"
+                >DM</span>
+              </button>
               <div class="dm-muro-field">
                 <input
                   id="dm-muro-input"

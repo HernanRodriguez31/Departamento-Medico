@@ -4063,6 +4063,7 @@ img {
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     -ms-overflow-style: none;
+    touch-action: pan-x pan-y pinch-zoom;
 }
 
 .dm-mobile-pager-track::-webkit-scrollbar {
@@ -4092,7 +4093,27 @@ img {
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-y: contain;
+    touch-action: pan-y pinch-zoom;
     box-sizing: border-box;
+}
+
+.dm-mobile-page__ghost-preview {
+    min-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    color: rgba(100, 116, 139, 0.58);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(248, 250, 252, 0.72));
+    pointer-events: none;
+}
+
+.dm-mobile-page__ghost-label {
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
 }
 
 .dm-mobile-page__scroller--foro,
@@ -4303,7 +4324,7 @@ img {
         overflow-x: hidden;
         overscroll-behavior-x: none;
         overscroll-behavior-y: contain;
-        touch-action: pan-y;
+        touch-action: pan-y pinch-zoom;
         padding-bottom: 16px;
         background: transparent;
     }
@@ -4327,7 +4348,7 @@ img {
     body.dm-mobile-pager-mode .main {
         overflow: hidden;
         padding-bottom: 0;
-        touch-action: auto;
+        touch-action: pan-x pan-y pinch-zoom;
         overscroll-behavior-x: none;
         overscroll-behavior-y: none;
     }
@@ -4368,6 +4389,7 @@ img {
 
     .dm-bottom-nav {
         display: flex;
+        touch-action: manipulation;
     }
 
     body[data-view] .main > section,
@@ -4764,7 +4786,7 @@ img {
 
     body.dm-mobile-pager-mode[data-view="foro"] #brisa-chat-root,
     body.dm-mobile-pager-mode[data-view="foro"] #brisa-chat-root .brisa-chat-fab {
-        --brisa-chat-mobile-fab-bottom: calc(var(--bottom-nav-h, 0px) + 74px + env(safe-area-inset-bottom));
+        --brisa-chat-mobile-fab-bottom: calc(var(--bottom-nav-h, 64px) + var(--dm-mobile-floating-zone, 92px) + var(--dm-mobile-safe-bottom, env(safe-area-inset-bottom)));
     }
 
     body.dm-mobile-pager-mode .dm-mobile-page[data-view="foro"] .dm-foro-composer__intro,

@@ -3,77 +3,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Departamento Médico website loaded');
 
-    const disableZoomGestures = () => {
-        const isTouch =
-            'ontouchstart' in window ||
-            navigator.maxTouchPoints > 0 ||
-            navigator.msMaxTouchPoints > 0
-        if (!isTouch) return
-
-        const isEditable = (el) => {
-            if (!el) return false
-            const tag = el.tagName ? el.tagName.toLowerCase() : ''
-            if (tag === 'input' || tag === 'textarea' || tag === 'select') return true
-            return el.isContentEditable === true
-        }
-
-        const preventGesture = (event) => {
-            event.preventDefault()
-        }
-
-        ;['gesturestart', 'gesturechange', 'gestureend'].forEach((type) => {
-            document.addEventListener(type, preventGesture, { passive: false })
-        })
-
-        let pinchActive = false
-        const preventPinchMove = (event) => {
-            if (event.touches && event.touches.length > 1 && event.cancelable) {
-                event.preventDefault()
-            }
-        }
-        const handlePinchStart = (event) => {
-            if (!event.touches || event.touches.length < 2 || pinchActive) return
-            pinchActive = true
-            document.addEventListener('touchmove', preventPinchMove, { passive: false })
-        }
-        const handlePinchEnd = (event) => {
-            const touches = event.touches ? event.touches.length : 0
-            if (pinchActive && touches < 2) {
-                pinchActive = false
-                document.removeEventListener('touchmove', preventPinchMove)
-            }
-        }
-
-        document.addEventListener('touchstart', handlePinchStart, { passive: true })
-        document.addEventListener('touchend', handlePinchEnd, { passive: true })
-        document.addEventListener('touchcancel', handlePinchEnd, { passive: true })
-
-        let lastTouchEnd = 0
-        document.addEventListener(
-            'touchend',
-            (event) => {
-                if (isEditable(event.target)) return
-                const now = Date.now()
-                if (now - lastTouchEnd <= 300) {
-                    event.preventDefault()
-                }
-                lastTouchEnd = now
-            },
-            { passive: false }
-        )
-
-        document.addEventListener(
-            'dblclick',
-            (event) => {
-                if (isEditable(event.target)) return
-                event.preventDefault()
-            },
-            { passive: false }
-        )
-    }
-
-    disableZoomGestures()
-
     /*==================== SHOW MENU ====================*/
     const navMenu = document.getElementById('nav-menu'),
         navToggle = document.getElementById('nav-toggle'),
@@ -839,16 +768,18 @@ document.addEventListener('DOMContentLoaded', () => {
         return shell
     }
 
-    function sanitizeGhostClone(root) {
-        if (!root) return
-        const nodes = [root, ...root.querySelectorAll('*')]
-        nodes.forEach((node) => {
-            if (node.id) node.removeAttribute('id')
-            node.setAttribute('aria-hidden', 'true')
-            if (node.matches('a, button, input, textarea, select, iframe, video')) {
-                node.setAttribute('tabindex', '-1')
-            }
-        })
+    function createGhostPreview(viewId) {
+        const normalized = normalizeViewId(viewId)
+        const preview = document.createElement('div')
+        preview.className = `dm-mobile-page__ghost-preview dm-mobile-page__ghost-preview--${normalized}`
+        preview.setAttribute('aria-hidden', 'true')
+
+        const label = document.createElement('span')
+        label.className = 'dm-mobile-page__ghost-label'
+        label.textContent = normalized === 'foro' ? 'Foro' : 'Muro'
+
+        preview.appendChild(label)
+        return preview
     }
 
     function moveViewNodesIntoPager(viewId) {
@@ -905,11 +836,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const scroller = page?.querySelector('.dm-mobile-page__scroller')
         if (!scroller) return
         scroller.innerHTML = ''
-        getViewNodes(viewId).forEach((node) => {
-            const clone = node.cloneNode(true)
-            sanitizeGhostClone(clone)
-            scroller.appendChild(clone)
-        })
+        scroller.appendChild(createGhostPreview(viewId))
     }
 
     function scheduleGhostRefresh(viewId) {
@@ -930,20 +857,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function bindGhostObservers() {
-        if (!window.MutationObserver) return
         ;['muro', 'foro'].forEach((viewId) => {
-            getViewNodes(viewId).forEach((node) => {
-                const observer = new MutationObserver(() => {
-                    scheduleGhostRefresh(viewId)
-                })
-                observer.observe(node, {
-                    childList: true,
-                    subtree: true,
-                    characterData: true,
-                    attributes: true
-                })
-                pagerState.mutationObservers.push(observer)
-            })
             refreshGhostPage(viewId)
         })
     }

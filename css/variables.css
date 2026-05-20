@@ -93,6 +93,10 @@
     --z-fixed: 100;
     --z-modal: 1000;
     --bottom-nav-h: 64px;
+    --dm-mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
+    --dm-mobile-floating-gap: 16px;
+    --dm-mobile-floating-zone: 92px;
+    --dm-mobile-chat-fab-size: 56px;
 }
 
 /* Responsive Typography */

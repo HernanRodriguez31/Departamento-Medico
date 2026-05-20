@@ -94,6 +94,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const bottomNavLinks = bottomNav ? bottomNav.querySelectorAll('[data-route]') : []
     const appShellQuery = window.matchMedia('(max-width: 768px)')
     const displayModeQuery = window.matchMedia('(display-mode: standalone)')
+    const rootStyle = document.documentElement.style
+    const headerEl = document.getElementById('header')
+    const muroComposer = document.getElementById('dm-muro-composer')
+    const muroUserTrigger = document.querySelector('[data-dm-muro-user-trigger]')
+    const userPanelTrigger = document.getElementById('user-panel-trigger')
+    const layoutSyncDelays = [120, 360, 720, 1200]
+    let mobileLayoutRaf = 0
     const viewAlias = {
         carrete: 'carrete',
         muro: 'carrete',
@@ -105,6 +112,52 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const isAppShell = () => appShellQuery.matches || displayModeQuery.matches
+
+    const syncMobileLayoutVars = () => {
+        if (!isAppShell()) return
+        const headerRect = headerEl ? headerEl.getBoundingClientRect() : null
+        const headerH = headerRect
+            ? Math.round((headerRect.bottom > 0 ? headerRect.bottom : headerRect.height) || 0)
+            : 0
+        const composerH = muroComposer ? Math.round(muroComposer.getBoundingClientRect().height || 0) : 0
+        if (headerH > 0) rootStyle.setProperty('--app-header-h', `${headerH}px`)
+        if (composerH > 0) rootStyle.setProperty('--dm-muro-offset', `${composerH}px`)
+    }
+
+    const scheduleMobileLayoutSync = () => {
+        if (mobileLayoutRaf) cancelAnimationFrame(mobileLayoutRaf)
+        mobileLayoutRaf = requestAnimationFrame(() => {
+            mobileLayoutRaf = 0
+            syncMobileLayoutVars()
+        })
+    }
+
+    const scheduleMobileLayoutSyncSeries = () => {
+        scheduleMobileLayoutSync()
+        layoutSyncDelays.forEach((delay) => {
+            window.setTimeout(scheduleMobileLayoutSync, delay)
+        })
+    }
+
+    const syncMuroUserTriggerState = () => {
+        if (!muroUserTrigger || !userPanelTrigger) return
+        const expanded = userPanelTrigger.getAttribute('aria-expanded') || 'false'
+        muroUserTrigger.setAttribute('aria-expanded', expanded)
+    }
+
+    if (muroUserTrigger && userPanelTrigger) {
+        muroUserTrigger.addEventListener('click', (event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            userPanelTrigger.click()
+            syncMuroUserTriggerState()
+        })
+        syncMuroUserTriggerState()
+        if (window.MutationObserver) {
+            const observer = new MutationObserver(syncMuroUserTriggerState)
+            observer.observe(userPanelTrigger, { attributes: true, attributeFilter: ['aria-expanded'] })
+        }
+    }
 
     const unlockScrollIfSafe = () => {
         const html = document.documentElement
@@ -151,6 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.dataset.view = route
         updateNavState(route)
         unlockScrollIfSafe()
+        scheduleMobileLayoutSyncSeries()
     }
 
     const handleShellChange = () => setViewFromHash()
@@ -166,6 +220,10 @@ document.addEventListener('DOMContentLoaded', () => {
         displayModeQuery.addListener(handleShellChange)
     }
     window.addEventListener('hashchange', setViewFromHash)
+    window.addEventListener('resize', scheduleMobileLayoutSync)
+    window.addEventListener('load', scheduleMobileLayoutSyncSeries, { once: true })
+    window.visualViewport?.addEventListener('resize', scheduleMobileLayoutSync)
+    headerEl?.addEventListener('transitionend', scheduleMobileLayoutSync)
     setViewFromHash()
 
     /*==================== REFERENTES: DESKTOP OPEN ====================*/

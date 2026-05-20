@@ -240,8 +240,8 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
         --dm-fab-bottom: 18px;
         --brisa-chat-fab-left: 18px;
-        --brisa-chat-fab-right: 8px;
-        --brisa-chat-mobile-fab-bottom: calc(var(--bottom-nav-h, 0px) + 36px + env(safe-area-inset-bottom));
+        --brisa-chat-fab-right: var(--dm-mobile-floating-gap, 16px);
+        --brisa-chat-mobile-fab-bottom: calc(var(--bottom-nav-h, 64px) + var(--dm-mobile-floating-zone, 92px) + var(--dm-mobile-safe-bottom, env(safe-area-inset-bottom)));
         --brisa-chat-panel-width: 18rem;
         --brisa-chat-panel-gap: 16px;
         --brisa-chat-window-gap: 18px;
@@ -303,7 +303,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         width: 100%;
         height: 100%;
         pointer-events: auto;
-        touch-action: none;
+        touch-action: manipulation;
         -webkit-user-select: none;
         user-select: none;
         -webkit-tap-highlight-color: transparent;
@@ -756,9 +756,9 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
         #brisa-chat-pill-tray { display: none !important; }
         .brisa-chat-fab {
           left: auto;
-          right: var(--brisa-chat-fab-right, 8px);
+          right: var(--brisa-chat-fab-right, var(--dm-mobile-floating-gap, 16px));
           top: auto;
-          bottom: var(--brisa-chat-mobile-fab-bottom, calc(var(--bottom-nav-h, 0px) + 36px + env(safe-area-inset-bottom)));
+          bottom: var(--brisa-chat-mobile-fab-bottom, calc(var(--bottom-nav-h, 64px) + var(--dm-mobile-floating-zone, 92px) + var(--dm-mobile-safe-bottom, env(safe-area-inset-bottom))));
         }
         .brisa-chat-fab .brisa-chat-panel {
           width: min(21rem, calc(100vw - 16px));
@@ -859,9 +859,9 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
 
       @media (max-width: 768px), (display-mode: standalone) {
         .app-shell #brisa-chat-root .brisa-chat-fab {
-          bottom: var(--brisa-chat-mobile-fab-bottom, calc(var(--bottom-nav-h, 0px) + 36px + env(safe-area-inset-bottom)));
+          bottom: var(--brisa-chat-mobile-fab-bottom, calc(var(--bottom-nav-h, 64px) + var(--dm-mobile-floating-zone, 92px) + var(--dm-mobile-safe-bottom, env(safe-area-inset-bottom))));
           left: auto;
-          right: var(--brisa-chat-fab-right, 8px);
+          right: var(--brisa-chat-fab-right, var(--dm-mobile-floating-gap, 16px));
         }
       }
 

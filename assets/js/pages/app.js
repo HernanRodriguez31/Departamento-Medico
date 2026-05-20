@@ -43,6 +43,7 @@ import { hydrateAvatars } from "../common/user-profiles.js";
 import { initSessionGuard } from "../shared/sessionGuard.js?v=20260305-session-1";
 import { initPdfViewer } from "../common/pdf-viewer.js";
 import { initDocumentVideoViewer } from "../common/document-video-viewer.js";
+import { sanitizeURL } from "../utils/safe-dom.js";
 import {
   toggleCarouselCommentLikeForCurrentUser,
   toggleCarouselLikeForCurrentUser,
@@ -842,7 +843,12 @@ async function initCarouselModule() {
       createdAt: data.createdAt,
       likesCount,
       likedBy,
-      likedNames
+      likedNames,
+      commentCount: Number.isFinite(data.commentCount)
+        ? Math.max(0, data.commentCount)
+        : Number.isFinite(data.commentsCount)
+        ? Math.max(0, data.commentsCount)
+        : 0
     };
   };
 
@@ -876,117 +882,221 @@ async function initCarouselModule() {
     return Number.isFinite(asNumber) ? asNumber : 0;
   };
 
-  const buildFeedPostMarkup = (s, idx) => {
-    const description = formatPostDescription(s);
-    const fullUrl = s.imageUrl;
-    const thumbUrl = s.thumbUrl || "";
-    const displaySrc = thumbUrl || fullUrl || "";
-    const blurClass = thumbUrl ? " is-blur" : "";
-    const isPriority = idx < 2;
-    const loadingAttr = isPriority ? "eager" : "lazy";
-    const fetchPriorityAttr = isPriority ? "high" : "low";
-    const initialSrc = isPriority ? displaySrc : TRANSPARENT_PIXEL;
-    const media = fullUrl
-      ? `
-      <div class="dm-carousel-media dm-post__media is-loading">
-        <img class="dm-carousel-img dm-post-img img-fade-in${blurClass}"
-          src="${initialSrc}"
-          data-src="${displaySrc}"
-          data-full="${fullUrl}"
-          data-thumb="${thumbUrl}"
-          alt="${s.title || "Imagen de la galería"}"
-          loading="${loadingAttr}"
-          decoding="async"
-          fetchpriority="${fetchPriorityAttr}"
-          width="1200"
-          height="900" />
-        <span class="dm-img-skeleton" aria-hidden="true"></span>
-      </div>
-      `
-      : "";
-    const descBlock = description ? `<div class="dm-post__desc">${description}</div>` : "";
-    const currentUser = auth?.currentUser;
-    const ownerId = s.createdByUid || s.authorUid || "";
-    const authorUid = s.createdByUid || s.authorUid || "";
-    const authorName = s.createdByName || s.authorName || s.author || s.createdBy || "Usuario";
-    const avatarSlot = `
-      <div class="dm-post__avatar" data-author-uid="${escapeHtml(authorUid)}" data-author-name="${escapeHtml(authorName)}">
-        <img class="dm-post__avatar-img" data-author-avatar
-          src="${TRANSPARENT_PIXEL}" alt="Avatar"
-          loading="lazy" decoding="async" hidden />
-        <span class="dm-post__avatar-fallback" data-avatar-fallback="initials"></span>
-      </div>
-    `;
-    const canDelete = currentUser && (isAdmin || (ownerId && ownerId === currentUser.uid));
-    const deleteBtn = canDelete
-      ? `<button class="dm-post-delete" type="button" data-id="${s.id}" aria-label="Borrar publicación" title="Borrar">
-          <svg class="dm-post-delete__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path d="M3 6h18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
-            <path d="M8 6V4h8v2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
-            <path d="M6 6l1 14h10l1-14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
-            <path d="M10 11v6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
-            <path d="M14 11v6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
-          </svg>
-        </button>`
-      : "";
-    const likeNames =
-      Array.isArray(s.likedNames) && s.likedNames.length
-        ? s.likedNames
-        : Array.isArray(s.likedBy)
-        ? s.likedBy
-        : [];
-    const likeTooltipText = buildLikeTooltipText(likeNames);
-    const hasLikes = (s.likesCount || 0) > 0;
-    const viewLikesBtn = `<button class="dm-post-like-view" type="button" data-id="${s.id}" aria-label="Ver likes" title="Ver likes" ${
-      hasLikes ? "" : "hidden"
-    }>
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z" fill="none" stroke="currentColor" stroke-width="1.6"></path>
-          <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"></circle>
-        </svg>
-      </button>`;
-    return `
-      <article class="dm-post dm-carousel-slide" data-idx="${idx}" data-id="${s.id}">
-        <div class="dm-post__meta-row">
-          <div class="dm-post__meta">
-            ${avatarSlot}
-            <span class="dm-post__meta-text">${formatPostMeta(s)}</span>
-          </div>
-          ${deleteBtn}
-        </div>
-        ${descBlock}
-        ${media}
-        <div class="dm-post__actions">
-          <button class="dm-post-like" type="button" data-id="${s.id}">
-            ❤️ <span class="dm-post-like-count">${s.likesCount ? String(s.likesCount) : "0"}</span>
-            <span class="dm-like-tooltip">${likeTooltipText}</span>
-          </button>
-          ${viewLikesBtn}
-          <button class="dm-post-comment-toggle" type="button" data-id="${s.id}">
-            💬 <span class="dm-post-comment-count">0</span>
-          </button>
-        </div>
-        <div class="dm-comments dm-comments--inline dm-post-comments is-collapsed is-empty" data-post-id="${s.id}">
-          <div class="dm-comments__header">
-            <div class="dm-comments__title">Comentarios</div>
-            <div class="dm-comments__count">0</div>
-          </div>
-          <div class="dm-comments__list"></div>
-          <form class="dm-comments__composer dm-post-comment-form">
-            <div class="dm-comment-inline">
-              <textarea class="dm-post-comment-input" rows="1" placeholder="Escribe un comentario..." aria-label="Comentar publicación"></textarea>
-            </div>
-            <button class="dm-comment-submit dm-post-comment-send" type="submit">Comentar</button>
-          </form>
-        </div>
-      </article>
-    `;
+  const SVG_NS = "http://www.w3.org/2000/svg";
+
+  const setAttrs = (el, attrs = {}) => {
+    Object.entries(attrs).forEach(([key, value]) => {
+      if (value == null || value === false) return;
+      el.setAttribute(key, String(value));
+    });
+    return el;
+  };
+
+  const createSvg = ({ className = "", paths = [], circles = [] } = {}) => {
+    const svg = document.createElementNS(SVG_NS, "svg");
+    setAttrs(svg, {
+      class: className,
+      viewBox: "0 0 24 24",
+      "aria-hidden": "true",
+      focusable: "false"
+    });
+    paths.forEach((attrs) => svg.appendChild(setAttrs(document.createElementNS(SVG_NS, "path"), attrs)));
+    circles.forEach((attrs) => svg.appendChild(setAttrs(document.createElementNS(SVG_NS, "circle"), attrs)));
+    return svg;
+  };
+
+  const createTrashIcon = (className = "") =>
+    createSvg({
+      className,
+      paths: [
+        { d: "M3 6h18", fill: "none", stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round", "stroke-linejoin": "round" },
+        { d: "M8 6V4h8v2", fill: "none", stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round", "stroke-linejoin": "round" },
+        { d: "M6 6l1 14h10l1-14", fill: "none", stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round", "stroke-linejoin": "round" },
+        { d: "M10 11v6", fill: "none", stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round", "stroke-linejoin": "round" },
+        { d: "M14 11v6", fill: "none", stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round", "stroke-linejoin": "round" }
+      ]
+    });
+
+  const createEyeIcon = () =>
+    createSvg({
+      paths: [
+        { d: "M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z", fill: "none", stroke: "currentColor", "stroke-width": "1.6" }
+      ],
+      circles: [{ cx: "12", cy: "12", r: "3.2", fill: "none", stroke: "currentColor", "stroke-width": "1.6" }]
+    });
+
+  const sanitizeFeedImageUrl = (value) =>
+    sanitizeURL(value, {
+      allowRelative: true,
+      allowedProtocols: ["https:"],
+      allowLocalHttp: true
+    });
+
+  const setPostId = (el, postId) => {
+    el.dataset.id = String(postId || "");
+    return el;
   };
 
   const createFeedPostElement = (post, idx) => {
-    const wrapper = document.createElement("div");
-    wrapper.innerHTML = buildFeedPostMarkup(post, idx).trim();
-    return wrapper.firstElementChild;
+    const postId = String(post?.id || "");
+    const description = formatPostDescription(post);
+    const fullUrl = sanitizeFeedImageUrl(post?.imageUrl);
+    const thumbUrl = sanitizeFeedImageUrl(post?.thumbUrl);
+    const displaySrc = thumbUrl || fullUrl;
+    const isPriority = idx < 2;
+    const initialSrc = isPriority ? displaySrc : TRANSPARENT_PIXEL;
+    const currentUser = auth?.currentUser;
+    const ownerId = post?.createdByUid || post?.authorUid || "";
+    const authorUid = post?.createdByUid || post?.authorUid || "";
+    const authorName = post?.createdByName || post?.authorName || post?.author || post?.createdBy || "Usuario";
+    const hasLikes = (post?.likesCount || 0) > 0;
+    const likeNames =
+      Array.isArray(post?.likedNames) && post.likedNames.length
+        ? post.likedNames
+        : Array.isArray(post?.likedBy)
+        ? post.likedBy
+        : [];
+    const commentCount = Number.isFinite(post?.commentCount) ? Math.max(0, post.commentCount) : 0;
+
+    const article = setPostId(document.createElement("article"), postId);
+    article.className = "dm-post dm-carousel-slide";
+    article.dataset.idx = String(idx);
+
+    const metaRow = document.createElement("div");
+    metaRow.className = "dm-post__meta-row";
+    const meta = document.createElement("div");
+    meta.className = "dm-post__meta";
+
+    const avatar = document.createElement("div");
+    avatar.className = "dm-post__avatar";
+    avatar.dataset.authorUid = String(authorUid || "");
+    avatar.dataset.authorName = String(authorName || "Usuario");
+    const avatarImg = document.createElement("img");
+    avatarImg.className = "dm-post__avatar-img";
+    avatarImg.dataset.authorAvatar = "";
+    avatarImg.src = TRANSPARENT_PIXEL;
+    avatarImg.alt = "Avatar";
+    avatarImg.loading = "lazy";
+    avatarImg.decoding = "async";
+    avatarImg.hidden = true;
+    const avatarFallback = document.createElement("span");
+    avatarFallback.className = "dm-post__avatar-fallback";
+    avatarFallback.dataset.avatarFallback = "initials";
+    avatar.append(avatarImg, avatarFallback);
+
+    const metaText = document.createElement("span");
+    metaText.className = "dm-post__meta-text";
+    metaText.textContent = formatPostMeta(post);
+    meta.append(avatar, metaText);
+    metaRow.appendChild(meta);
+
+    const canDelete = currentUser && (isAdmin || (ownerId && ownerId === currentUser.uid));
+    if (canDelete) {
+      const deleteBtn = setPostId(document.createElement("button"), postId);
+      deleteBtn.className = "dm-post-delete";
+      deleteBtn.type = "button";
+      deleteBtn.setAttribute("aria-label", "Borrar publicación");
+      deleteBtn.title = "Borrar";
+      deleteBtn.appendChild(createTrashIcon("dm-post-delete__icon"));
+      metaRow.appendChild(deleteBtn);
+    }
+    article.appendChild(metaRow);
+
+    if (description) {
+      const desc = document.createElement("div");
+      desc.className = "dm-post__desc";
+      desc.textContent = description;
+      article.appendChild(desc);
+    }
+
+    if (fullUrl && displaySrc) {
+      const media = document.createElement("div");
+      media.className = "dm-carousel-media dm-post__media is-loading";
+      const img = document.createElement("img");
+      img.className = "dm-carousel-img dm-post-img img-fade-in" + (thumbUrl ? " is-blur" : "");
+      img.src = initialSrc;
+      img.dataset.src = displaySrc;
+      img.dataset.full = fullUrl;
+      img.dataset.thumb = thumbUrl;
+      img.alt = post?.title || "Imagen de la galería";
+      img.loading = isPriority ? "eager" : "lazy";
+      img.decoding = "async";
+      img.fetchPriority = isPriority ? "high" : "low";
+      img.width = 1200;
+      img.height = 900;
+      const skeleton = document.createElement("span");
+      skeleton.className = "dm-img-skeleton";
+      skeleton.setAttribute("aria-hidden", "true");
+      media.append(img, skeleton);
+      article.appendChild(media);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "dm-post__actions";
+    const likeBtn = setPostId(document.createElement("button"), postId);
+    likeBtn.className = "dm-post-like";
+    likeBtn.type = "button";
+    likeBtn.append(document.createTextNode("❤️ "));
+    const likeCount = document.createElement("span");
+    likeCount.className = "dm-post-like-count";
+    likeCount.textContent = post?.likesCount ? String(post.likesCount) : "0";
+    const likeTooltipEl = document.createElement("span");
+    likeTooltipEl.className = "dm-like-tooltip";
+    likeTooltipEl.textContent = buildLikeTooltipText(likeNames);
+    likeBtn.append(likeCount, likeTooltipEl);
+
+    const viewLikesBtn = setPostId(document.createElement("button"), postId);
+    viewLikesBtn.className = "dm-post-like-view";
+    viewLikesBtn.type = "button";
+    viewLikesBtn.setAttribute("aria-label", "Ver likes");
+    viewLikesBtn.title = "Ver likes";
+    viewLikesBtn.hidden = !hasLikes;
+    viewLikesBtn.appendChild(createEyeIcon());
+
+    const commentToggle = setPostId(document.createElement("button"), postId);
+    commentToggle.className = "dm-post-comment-toggle";
+    commentToggle.type = "button";
+    commentToggle.append(document.createTextNode("💬 "));
+    const commentCountEl = document.createElement("span");
+    commentCountEl.className = "dm-post-comment-count";
+    commentCountEl.textContent = String(commentCount);
+    commentToggle.appendChild(commentCountEl);
+    actions.append(likeBtn, viewLikesBtn, commentToggle);
+    article.appendChild(actions);
+
+    const comments = document.createElement("div");
+    comments.className = "dm-comments dm-comments--inline dm-post-comments is-collapsed is-empty";
+    comments.dataset.postId = postId;
+    const commentsHeader = document.createElement("div");
+    commentsHeader.className = "dm-comments__header";
+    const commentsTitle = document.createElement("div");
+    commentsTitle.className = "dm-comments__title";
+    commentsTitle.textContent = "Comentarios";
+    const commentsCount = document.createElement("div");
+    commentsCount.className = "dm-comments__count";
+    commentsCount.textContent = String(commentCount);
+    commentsHeader.append(commentsTitle, commentsCount);
+    const commentsList = document.createElement("div");
+    commentsList.className = "dm-comments__list";
+    const commentForm = document.createElement("form");
+    commentForm.className = "dm-comments__composer dm-post-comment-form";
+    const commentInline = document.createElement("div");
+    commentInline.className = "dm-comment-inline";
+    const commentInput = document.createElement("textarea");
+    commentInput.className = "dm-post-comment-input";
+    commentInput.rows = 1;
+    commentInput.placeholder = "Escribe un comentario...";
+    commentInput.setAttribute("aria-label", "Comentar publicación");
+    commentInline.appendChild(commentInput);
+    const commentSubmit = document.createElement("button");
+    commentSubmit.className = "dm-comment-submit dm-post-comment-send";
+    commentSubmit.type = "submit";
+    commentSubmit.textContent = "Comentar";
+    commentForm.append(commentInline, commentSubmit);
+    comments.append(commentsHeader, commentsList, commentForm);
+    article.appendChild(comments);
+
+    return article;
   };
 
   const syncFeedIndices = () => {
@@ -994,6 +1104,15 @@ async function initCarouselModule() {
     track.querySelectorAll(".dm-post").forEach((postEl, idx) => {
       postEl.dataset.idx = String(idx);
     });
+  };
+
+  const getFeedPostElementById = (postId) => {
+    if (!track || !postId) return null;
+    const rawId = String(postId);
+    if (window.CSS?.escape) {
+      return track.querySelector(`.dm-post[data-id="${window.CSS.escape(rawId)}"]`);
+    }
+    return Array.from(track.querySelectorAll(".dm-post")).find((el) => el.dataset.id === rawId) || null;
   };
 
   const wireFeedPostElement = (postEl) => {
@@ -1024,14 +1143,20 @@ async function initCarouselModule() {
     const actionCountEl = postEl.querySelector(".dm-post-comment-count");
     const commentsWrap = postEl.querySelector(".dm-post-comments");
     commentsWrap?.classList.add("is-collapsed");
-    subscribeCommentsForPost(postId, listEl, countEl, actionCountEl, postEl);
     const formEl = postEl.querySelector(".dm-post-comment-form");
     const inputEl = postEl.querySelector(".dm-post-comment-input");
+    const collapseComments = () => {
+      if (!commentsWrap) return;
+      commentsWrap.classList.add("is-collapsed");
+      commentsWrap.classList.remove("is-expanded");
+      unsubscribeFeedCommentsForPost(postId);
+    };
     const expandComments = () => {
       if (!commentsWrap) return;
       commentsWrap.classList.remove("is-collapsed");
       commentsWrap.classList.add("is-expanded");
       commentsWrap.classList.remove("is-empty");
+      subscribeCommentsForPost(postId, listEl, countEl, actionCountEl, postEl);
       inputEl?.focus();
     };
     formEl?.addEventListener("submit", (e) => {
@@ -1046,8 +1171,13 @@ async function initCarouselModule() {
     });
     inputEl?.addEventListener("focus", expandComments);
     const commentToggle = postEl.querySelector(".dm-post-comment-toggle");
-    commentToggle?.addEventListener("click", () => {
-      expandComments();
+    commentToggle?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (commentsWrap?.classList.contains("is-expanded")) {
+        collapseComments();
+      } else {
+        expandComments();
+      }
     });
     commentsWrap?.addEventListener("click", () => {
       if (commentsWrap.classList.contains("is-collapsed")) {
@@ -1172,7 +1302,7 @@ async function initCarouselModule() {
 
   const updateFeedPostElement = (post) => {
     if (!track || !post) return;
-    const postEl = track.querySelector(`.dm-post[data-id="${post.id}"]`);
+    const postEl = getFeedPostElementById(post.id);
     if (!postEl) return;
     const metaEl = postEl.querySelector(".dm-post__meta-text");
     if (metaEl) metaEl.textContent = formatPostMeta(post);
@@ -1200,6 +1330,15 @@ async function initCarouselModule() {
       metaRow?.insertAdjacentElement("afterend", descNode);
     }
     updateFeedLikeUI(postEl, post);
+    const safeCommentCount = Number.isFinite(post.commentCount) ? Math.max(0, post.commentCount) : 0;
+    const actionCountEl = postEl.querySelector(".dm-post-comment-count");
+    const commentsCountEl = postEl.querySelector(".dm-comments__count");
+    if (actionCountEl && !feedCommentSubscriptions.has(post.id)) {
+      actionCountEl.textContent = String(safeCommentCount);
+    }
+    if (commentsCountEl && !feedCommentSubscriptions.has(post.id)) {
+      commentsCountEl.textContent = String(safeCommentCount);
+    }
   };
 
   const subscribeTopPosts = () => {
@@ -1253,8 +1392,9 @@ async function initCarouselModule() {
           removedIds.forEach((id) => {
             postsById.delete(id);
             feedPosts = feedPosts.filter((post) => post.id !== id);
+            unsubscribeFeedCommentsForPost(id);
             if (feedMode) {
-              const postEl = track?.querySelector(`.dm-post[data-id="${id}"]`);
+              const postEl = getFeedPostElementById(id);
               if (postEl) {
                 postEl.remove();
                 renderedPostIds.delete(id);
@@ -2048,8 +2188,15 @@ async function initCarouselModule() {
     feedCommentSubscriptions.clear();
   };
 
+  const unsubscribeFeedCommentsForPost = (postId) => {
+    const unsubscribe = feedCommentSubscriptions.get(postId);
+    if (typeof unsubscribe === "function") unsubscribe();
+    feedCommentSubscriptions.delete(postId);
+  };
+
   const subscribeCommentsForPost = (postId, listEl, countEl, actionCountEl, postEl) => {
     if (!db || !postId || !listEl || appState.permissionDenied) return;
+    if (feedCommentSubscriptions.has(postId)) return;
     const q = query(collection(db, POSTS_COLLECTION, postId, COMMENTS_COLLECTION), orderBy("createdAt", "asc"));
     const commentsWrap = postEl?.querySelector(".dm-post-comments");
     const unsubscribe = onSnapshot(

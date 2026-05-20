@@ -231,6 +231,8 @@ const getUserProfile = async (uid, { db, fallbackName } = {}) => {
 
 const applyAvatarElement = (el, profile) => {
   if (!el) return;
+  const isCurrentAvatarSlot =
+    el.matches("[data-dm-avatar-current]") || Boolean(el.closest?.("[data-dm-avatar-current]"));
   const nameFromData =
     el.dataset.dmAuthor ||
     el.dataset.authorName ||
@@ -244,6 +246,9 @@ const applyAvatarElement = (el, profile) => {
   const img =
     el.matches("img") ? el : el.querySelector("[data-author-avatar], [data-avatar-img], [data-dm-avatar-img]");
   const fallback = el.querySelector("[data-avatar-fallback], [data-dm-avatar-fallback]");
+  if (fallback && (fallback.dataset.avatarFallback === "initials" || fallback.dataset.dmAvatarFallback === "initials")) {
+    fallback.textContent = initials;
+  }
   const showFallback = () => {
     if (img) img.hidden = true;
     if (fallback) fallback.hidden = false;
@@ -256,26 +261,42 @@ const applyAvatarElement = (el, profile) => {
   };
   if (img) {
     img.alt = displayName;
+    if (isCurrentAvatarSlot) {
+      img.loading = "eager";
+      img.decoding = "async";
+    }
     if (avatarUrl) {
-      img.hidden = true;
-      img.onload = () => showImage();
+      const avatarSrc = buildAvatarSrc(avatarUrl, avatarUpdatedAt);
+      img.dataset.avatarSrc = avatarSrc;
+      img.onload = null;
       img.onerror = () => showFallback();
-      img.src = buildAvatarSrc(avatarUrl, avatarUpdatedAt);
-      if (img.complete) {
-        if (img.naturalWidth > 0) showImage();
+      if (img.getAttribute("src") === avatarSrc && img.complete && img.naturalWidth > 0) {
+        showImage();
+        return;
+      }
+      showFallback();
+      const showLoadedImage = () => {
+        if (img.dataset.avatarSrc !== avatarSrc) return;
+        img.src = avatarSrc;
+        showImage();
+      };
+      const probe = new Image();
+      probe.onload = showLoadedImage;
+      probe.onerror = () => {
+        if (img.dataset.avatarSrc === avatarSrc) showFallback();
+      };
+      probe.src = avatarSrc;
+      if (probe.complete) {
+        if (probe.naturalWidth > 0) showLoadedImage();
         else showFallback();
       }
+      return;
     } else {
+      delete img.dataset.avatarSrc;
       img.hidden = true;
     }
   }
-  if (fallback) {
-    if (fallback.dataset.avatarFallback === "initials" || fallback.dataset.dmAvatarFallback === "initials") {
-      fallback.textContent = initials;
-    }
-    fallback.hidden = Boolean(avatarUrl && (!img || (img.complete && img.naturalWidth > 0)));
-  }
-  if (!avatarUrl) showFallback();
+  showFallback();
 };
 
 const hydrateAvatars = async (root = document) => {

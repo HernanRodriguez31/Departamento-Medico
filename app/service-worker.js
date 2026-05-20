@@ -1,17 +1,20 @@
 const CACHE_PREFIX = "brisa-app-";
 // Bump this whenever we change precached assets (CSS/JS) to ensure clients
 // receive the updated files instead of an older cached copy.
-const CACHE_VERSION = "v20";
+const CACHE_VERSION = "v21";
 const CACHE = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const APP_SHELL_URL = "/app/index.html";
 const OFFLINE_URL = "/offline.html";
 const PRECACHE_URLS = [
   APP_SHELL_URL,
   OFFLINE_URL,
-  "/css/app.css",
+  "/css/variables.css",
+  "/css/app.css?v=20260309-foro-spacing-7",
+  "/css/structure.css",
+  "/assets/css/core-contrast.css",
   "/assets/css/pages/app.css?v=20260307-chat-aladdin-1",
   "/assets/js/pages/app.js?v=20260306-chat-desktop-layout-1",
-  "/js/chat.js?v=20260307-chat-aladdin-1",
+  "/js/chat.js?v=20260508-boti-header-2",
   "/js/app-mobile.js"
 ];
 
@@ -45,7 +48,7 @@ const normalizeRouteUrl = (route) => {
     return new URL(`/app/index.html${route}`, self.location.origin).href;
   }
   if (route.startsWith("#")) {
-    return new URL(`/index.html${route}`, self.location.origin).href;
+    return new URL(`/app/index.html${route}`, self.location.origin).href;
   }
 
   try {
@@ -317,7 +320,11 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (url.pathname.startsWith("/assets/")) {
+  if (
+    url.pathname.startsWith("/assets/") ||
+    url.pathname.startsWith("/css/") ||
+    url.pathname.startsWith("/js/")
+  ) {
     event.respondWith(cacheFirst(request));
   }
 });

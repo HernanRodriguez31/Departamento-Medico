@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Dto Médico</title>
     <meta name="description" content="Espacio de trabajo colaborativo para el crecimiento colectivo.">
     <meta name="application-name" content="Dto Médico">
@@ -661,7 +661,7 @@
             cursor: pointer;
             pointer-events: auto;
             opacity: 0;
-            touch-action: none;
+            touch-action: manipulation;
             -webkit-user-select: none;
             user-select: none;
             transform: translateY(24px);
@@ -1352,7 +1352,7 @@
             .brisa-chat-fab {
                 left: auto;
                 right: 8px;
-                bottom: calc(var(--bottom-nav-h) + 36px + env(safe-area-inset-bottom));
+                bottom: var(--brisa-chat-mobile-fab-bottom, calc(var(--bottom-nav-h, 64px) + var(--dm-mobile-floating-zone, 92px) + var(--dm-mobile-safe-bottom, env(safe-area-inset-bottom))));
             }
 
             .brisa-chat-panel {

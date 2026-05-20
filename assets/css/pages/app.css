@@ -316,6 +316,32 @@ html {
   fill: none;
 }
 
+@media (max-width: 768px), (display-mode: standalone) {
+  .dm-muro-composer__inner {
+    gap: 8px;
+  }
+
+  #dm-muro-input {
+    min-height: 44px;
+    padding: 9px 12px;
+  }
+
+  .dm-muro-action,
+  .dm-muro-send {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+
+  .dm-muro-action svg,
+  .dm-muro-send svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
 
 .dm-post__header {
   padding: 12px 14px 6px;
@@ -1562,7 +1588,7 @@ html {
     max-width: 520px;
     z-index: 90;
     margin: 0;
-    padding: 10px 12px;
+    padding: 8px 10px;
     border: 1px solid #e5e7eb;
     border-radius: 16px;
     background: rgba(255, 255, 255, 0.96);
@@ -3067,7 +3093,7 @@ html {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.24);
   cursor: pointer;
   pointer-events: auto;
-  touch-action: none;
+  touch-action: manipulation;
   -webkit-user-select: none;
   user-select: none;
 }
@@ -3761,8 +3787,8 @@ body.dm-modal-open .brisa-chat-panel {
 @media (max-width: 768px) {
   .brisa-chat-fab {
     left: auto;
-    right: 8px;
-    bottom: calc(var(--bottom-nav-h) + 36px + env(safe-area-inset-bottom));
+    right: var(--dm-mobile-floating-gap, 16px);
+    bottom: var(--brisa-chat-mobile-fab-bottom, calc(var(--bottom-nav-h, 64px) + var(--dm-mobile-floating-zone, 92px) + var(--dm-mobile-safe-bottom, env(safe-area-inset-bottom))));
   }
 
   .brisa-chat-panel {
@@ -3794,14 +3820,17 @@ body.dm-modal-open .brisa-chat-panel {
 /* PWA mobile: chat flotante por encima del tab-bar */
 .app-shell #brisa-chat-root {
   display: block !important;
-  --brisa-chat-mobile-fab-bottom: calc(var(--bottom-nav-h) + 36px + env(safe-area-inset-bottom));
-  --brisa-chat-fab-right: 8px;
+  --dm-chat-fab-size: var(--dm-mobile-chat-fab-size, 56px);
+  --brisa-chat-mobile-fab-bottom: calc(var(--bottom-nav-h, 64px) + var(--dm-mobile-floating-zone, 92px) + var(--dm-mobile-safe-bottom, env(safe-area-inset-bottom)));
+  --brisa-chat-fab-right: var(--dm-mobile-floating-gap, 16px);
 }
 
 .app-shell #brisa-chat-root .brisa-chat-fab {
-  bottom: var(--brisa-chat-mobile-fab-bottom, calc(var(--bottom-nav-h) + 36px + env(safe-area-inset-bottom)));
+  bottom: var(--brisa-chat-mobile-fab-bottom, calc(var(--bottom-nav-h, 64px) + var(--dm-mobile-floating-zone, 92px) + var(--dm-mobile-safe-bottom, env(safe-area-inset-bottom))));
   left: var(--brisa-chat-fab-left, auto);
-  right: var(--brisa-chat-fab-right, 8px);
+  right: var(--brisa-chat-fab-right, var(--dm-mobile-floating-gap, 16px));
+  width: var(--dm-chat-fab-size, var(--dm-mobile-chat-fab-size, 56px));
+  height: var(--dm-chat-fab-size, var(--dm-mobile-chat-fab-size, 56px));
 }
 
 .app-shell #brisa-chat-root .brisa-chat-panel {

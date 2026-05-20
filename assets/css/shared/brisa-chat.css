@@ -38,7 +38,7 @@
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.24);
   cursor: pointer;
   pointer-events: auto;
-  touch-action: none;
+  touch-action: manipulation;
   -webkit-user-select: none;
   user-select: none;
 }
@@ -750,9 +750,10 @@
 @media (max-width: 768px), (display-mode: standalone) {
   .brisa-chat-fab {
     left: auto;
-    right: 8px;
-    bottom: calc(
-      var(--bottom-nav-h) + 36px + env(safe-area-inset-bottom)
+    right: var(--dm-mobile-floating-gap, 16px);
+    bottom: var(
+      --brisa-chat-mobile-fab-bottom,
+      calc(var(--bottom-nav-h, 64px) + var(--dm-mobile-floating-zone, 92px) + var(--dm-mobile-safe-bottom, env(safe-area-inset-bottom)))
     );
   }
 
