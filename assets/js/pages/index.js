@@ -3358,6 +3358,210 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
     clearCubeSelection({ closePicker: true });
   };
 
+  const initDesktopSidebarCubeMotion = () => {
+    if (typeof window.matchMedia !== "function") return () => {};
+
+    const motionMq = window.matchMedia("(min-width: 1024px) and (hover: hover) and (pointer: fine)");
+    const reducedMotionMq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const states = new WeakMap();
+    let motionCubes = [];
+    let isMotionBound = false;
+
+    const neutral = () => ({
+      rx: 0,
+      ry: 0,
+      x: 0,
+      y: 0,
+      contentX: 0,
+      contentY: 0,
+      glareX: 50,
+      glareY: 28,
+    });
+
+    const cloneMotion = (motion) => ({ ...motion });
+    const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+    const getProfile = (cube) => {
+      if (isAssistantCube(cube)) {
+        return { tiltX: 5.2, tiltY: 6.8, shift: 2.6, contentShift: 4.8, spring: 0.2 };
+      }
+      if (isPortalCube(cube)) {
+        return { tiltX: 5.8, tiltY: 7.4, shift: 2.8, contentShift: 5.4, spring: 0.21 };
+      }
+      return { tiltX: 7.2, tiltY: 8.6, shift: 3.4, contentShift: 6.4, spring: 0.22 };
+    };
+
+    const getState = (cube) => {
+      let state = states.get(cube);
+      if (!state) {
+        const base = neutral();
+        state = {
+          active: false,
+          raf: 0,
+          profile: getProfile(cube),
+          current: cloneMotion(base),
+          target: cloneMotion(base),
+        };
+        states.set(cube, state);
+      }
+      return state;
+    };
+
+    const clearMotionVars = (cube) => {
+      [
+        "--dm-cube-rx",
+        "--dm-cube-ry",
+        "--dm-cube-motion-x",
+        "--dm-cube-motion-y",
+        "--dm-cube-content-x",
+        "--dm-cube-content-y",
+        "--dm-cube-glare-x",
+        "--dm-cube-glare-y",
+      ].forEach((property) => cube.style.removeProperty(property));
+    };
+
+    const setMotionVars = (cube, motion) => {
+      cube.style.setProperty("--dm-cube-rx", `${motion.rx.toFixed(2)}deg`);
+      cube.style.setProperty("--dm-cube-ry", `${motion.ry.toFixed(2)}deg`);
+      cube.style.setProperty("--dm-cube-motion-x", `${motion.x.toFixed(2)}px`);
+      cube.style.setProperty("--dm-cube-motion-y", `${motion.y.toFixed(2)}px`);
+      cube.style.setProperty("--dm-cube-content-x", `${motion.contentX.toFixed(2)}px`);
+      cube.style.setProperty("--dm-cube-content-y", `${motion.contentY.toFixed(2)}px`);
+      cube.style.setProperty("--dm-cube-glare-x", `${motion.glareX.toFixed(1)}%`);
+      cube.style.setProperty("--dm-cube-glare-y", `${motion.glareY.toFixed(1)}%`);
+    };
+
+    const cancelFrame = (cube) => {
+      const state = states.get(cube);
+      if (state?.raf) {
+        window.cancelAnimationFrame(state.raf);
+        state.raf = 0;
+      }
+    };
+
+    const finishReset = (cube) => {
+      const state = getState(cube);
+      const base = neutral();
+      state.active = false;
+      state.current = cloneMotion(base);
+      state.target = cloneMotion(base);
+      cube.classList.remove("is-cube-motion-active");
+      clearMotionVars(cube);
+    };
+
+    const stepMotion = (cube) => {
+      const state = getState(cube);
+      let maxDelta = 0;
+
+      Object.keys(state.current).forEach((key) => {
+        const nextValue = state.current[key] + (state.target[key] - state.current[key]) * state.profile.spring;
+        maxDelta = Math.max(maxDelta, Math.abs(state.target[key] - nextValue));
+        state.current[key] = nextValue;
+      });
+
+      setMotionVars(cube, state.current);
+
+      if (maxDelta > 0.06) {
+        state.raf = window.requestAnimationFrame(() => stepMotion(cube));
+        return;
+      }
+
+      state.current = cloneMotion(state.target);
+      setMotionVars(cube, state.current);
+      state.raf = 0;
+      if (!state.active) finishReset(cube);
+    };
+
+    const startMotion = (cube) => {
+      const state = getState(cube);
+      if (state.raf) return;
+      state.raf = window.requestAnimationFrame(() => stepMotion(cube));
+    };
+
+    const updateMotionTarget = (cube, event) => {
+      const rect = cube.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+
+      const state = getState(cube);
+      const profile = state.profile;
+      const x = clamp(((event.clientX - rect.left) / rect.width - 0.5) * 2, -1, 1);
+      const y = clamp(((event.clientY - rect.top) / rect.height - 0.5) * 2, -1, 1);
+
+      state.active = true;
+      state.target = {
+        rx: -y * profile.tiltX,
+        ry: x * profile.tiltY,
+        x: x * profile.shift,
+        y: y * profile.shift * 0.7,
+        contentX: x * profile.contentShift,
+        contentY: y * profile.contentShift * 0.58,
+        glareX: clamp(50 + x * 42, 8, 92),
+        glareY: clamp(30 + y * 40, 8, 88),
+      };
+
+      cube.classList.add("is-cube-motion-active");
+      startMotion(cube);
+    };
+
+    const resetMotionTarget = (event) => {
+      const cube = event.currentTarget;
+      const state = getState(cube);
+      state.active = false;
+      state.target = neutral();
+      startMotion(cube);
+    };
+
+    const handlePointerEnter = (event) => updateMotionTarget(event.currentTarget, event);
+    const handlePointerMove = (event) => updateMotionTarget(event.currentTarget, event);
+
+    const queryCubes = () => Array.from(sidebar.querySelectorAll(".dm-cube"));
+
+    const bindMotion = () => {
+      if (isMotionBound) return;
+      motionCubes = queryCubes();
+      motionCubes.forEach((cube, index) => {
+        cube.style.setProperty("--dm-cube-enter-delay", `${Math.min(index * 42, 260)}ms`);
+        cube.addEventListener("pointerenter", handlePointerEnter, { passive: true });
+        cube.addEventListener("pointermove", handlePointerMove, { passive: true });
+        cube.addEventListener("pointerleave", resetMotionTarget, { passive: true });
+        cube.addEventListener("pointercancel", resetMotionTarget, { passive: true });
+      });
+      isMotionBound = true;
+    };
+
+    const unbindMotion = () => {
+      if (!isMotionBound) return;
+      motionCubes.forEach((cube) => {
+        cube.removeEventListener("pointerenter", handlePointerEnter);
+        cube.removeEventListener("pointermove", handlePointerMove);
+        cube.removeEventListener("pointerleave", resetMotionTarget);
+        cube.removeEventListener("pointercancel", resetMotionTarget);
+        cancelFrame(cube);
+        finishReset(cube);
+        cube.style.removeProperty("--dm-cube-enter-delay");
+      });
+      motionCubes = [];
+      isMotionBound = false;
+    };
+
+    const syncMotion = () => {
+      unbindMotion();
+      if (motionMq.matches && !reducedMotionMq.matches) bindMotion();
+    };
+
+    if (typeof motionMq.addEventListener === "function") {
+      motionMq.addEventListener("change", syncMotion);
+      reducedMotionMq.addEventListener("change", syncMotion);
+    } else if (typeof motionMq.addListener === "function") {
+      motionMq.addListener(syncMotion);
+      reducedMotionMq.addListener(syncMotion);
+    }
+
+    return syncMotion;
+  };
+
+  const syncSidebarCubeMotion = initDesktopSidebarCubeMotion();
+
   bindCubeHandlers();
 
   if (fab) {
@@ -3472,6 +3676,7 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
 
   syncDesktopState();
   updateHeaderHeightVar();
+  syncSidebarCubeMotion();
 
   window.addEventListener("resize", updateHeaderHeightVar, { passive: true });
   document.addEventListener("keydown", handleCubeKeyNav);
@@ -3513,10 +3718,15 @@ function initDesktopQuickSidebar({ assistantShell } = {}) {
   }
 
   // MediaQueryList compatibility
+  const handleDesktopStateChange = () => {
+    syncDesktopState();
+    syncSidebarCubeMotion();
+  };
+
   if (typeof mq.addEventListener === "function") {
-    mq.addEventListener("change", syncDesktopState);
+    mq.addEventListener("change", handleDesktopStateChange);
   } else if (typeof mq.addListener === "function") {
-    mq.addListener(syncDesktopState);
+    mq.addListener(handleDesktopStateChange);
   }
 }
 
