@@ -91,6 +91,7 @@ test("root mobile muro uses current user avatar without changing desktop title c
   const html = readFileSync("index.html", "utf8");
   const css = readFileSync("assets/css/pages/index.css", "utf8");
   const source = readFileSync("js/app.js", "utf8");
+  const chatSource = readFileSync("js/chat.js", "utf8");
   const userMenuSource = readFileSync("assets/js/common/user-menu.js", "utf8");
   const userProfilesSource = readFileSync("assets/js/common/user-profiles.js", "utf8");
 
@@ -114,13 +115,24 @@ test("root mobile muro uses current user avatar without changing desktop title c
   assert.match(mobileRules, /\.header \[data-dm-user-menu\] \[data-dm-user-trigger\]\.user-panel-trigger\s*\{[\s\S]*opacity:\s*0 !important/);
   assert.match(mobileRules, /\.dm-muro-composer\s*\{[\s\S]*top:\s*var\(--app-header-h,\s*64px\)/);
   assert.match(mobileRules, /body\[data-view="carrete"\]\s*\{[\s\S]*--dm-muro-feed-gap:\s*14px/);
-  assert.match(mobileRules, /body\[data-view="carrete"\]\s*\{[\s\S]*--dm-muro-feed-anchor-compensation:\s*10px/);
-  assert.match(mobileRules, /body\[data-view="carrete"\] #carrete\.dm-carousel-section\.is-feed-mode\s*\{[\s\S]*padding-top:\s*calc\(var\(--dm-muro-offset,\s*68px\) \+ var\(--dm-muro-feed-gap,\s*14px\) \+ var\(--dm-muro-feed-anchor-compensation,\s*10px\)\)/);
-  assert.match(mobileRules, /body\[data-view="carrete"\] #investigacion\.scientific-log-section \+ #carrete\.dm-carousel-section\.is-feed-mode\s*\{[\s\S]*padding-top:\s*calc\(var\(--dm-muro-offset,\s*68px\) \+ var\(--dm-muro-feed-gap,\s*14px\) \+ var\(--dm-muro-feed-anchor-compensation,\s*10px\)\)/);
+  assert.match(mobileRules, /body\[data-view="carrete"\]\s*\{[\s\S]*--dm-muro-feed-anchor-compensation:\s*12px/);
+  assert.match(mobileRules, /body\[data-view="carrete"\]\s*\{[\s\S]*--dm-muro-end-bottom-gap:\s*8px/);
+  assert.match(mobileRules, /body\[data-view="carrete"\] #carrete\.dm-carousel-section\.is-feed-mode\s*\{[\s\S]*padding-top:\s*calc\(var\(--dm-muro-offset,\s*68px\) \+ var\(--dm-muro-feed-gap,\s*14px\) \+ var\(--dm-muro-feed-anchor-compensation,\s*12px\)\)[\s\S]*padding-bottom:\s*6px[\s\S]*min-height:\s*auto[\s\S]*height:\s*auto/);
+  assert.match(mobileRules, /body\[data-view="carrete"\] #carrete\.dm-carousel-section\.is-feed-mode\s*\{[\s\S]*margin-bottom:\s*0/);
+  assert.match(mobileRules, /body\[data-view="carrete"\]:has\(#carrete \.dm-feed-end:not\(\[hidden\]\)\) #carrete\.dm-carousel-section\.is-feed-mode\s*\{[\s\S]*margin-bottom:\s*0/);
+  assert.match(mobileRules, /body\[data-view="carrete"\] #investigacion\.scientific-log-section \+ #carrete\.dm-carousel-section\.is-feed-mode\s*\{[\s\S]*padding-top:\s*calc\(var\(--dm-muro-offset,\s*68px\) \+ var\(--dm-muro-feed-gap,\s*14px\) \+ var\(--dm-muro-feed-anchor-compensation,\s*12px\)\)/);
   assert.match(mobileRules, /body\.dm-muro-hidden\[data-view="carrete"\] #carrete\.dm-carousel-section\.is-feed-mode\s*\{[\s\S]*padding-top:\s*0\.3rem/);
   assert.match(mobileRules, /body\.dm-muro-hidden\[data-view="carrete"\] #investigacion\.scientific-log-section \+ #carrete\.dm-carousel-section\.is-feed-mode\s*\{[\s\S]*padding-top:\s*0\.3rem/);
   assert.match(mobileRules, /body\[data-view="carrete"\] #carrete\.reveal-on-scroll\s*\{[\s\S]*contain:\s*none !important[\s\S]*transform:\s*none !important[\s\S]*will-change:\s*auto !important/);
   assert.match(mobileRules, /body\[data-view="carrete"\] #carrete \.dm-carousel-header\s*\{[\s\S]*display:\s*none/);
+  assert.match(mobileRules, /body\[data-view="carrete"\] #carrete \.dm-carousel-track\s*\{[\s\S]*padding-bottom:\s*0/);
+  assert.match(mobileRules, /body\[data-view="carrete"\] \.dm-feed-sentinel\s*\{[\s\S]*padding:\s*4px 0 var\(--dm-muro-end-bottom-gap,\s*8px\)/);
+  assert.doesNotMatch(mobileRules, /body\[data-view="carrete"\] \.dm-feed-sentinel\s*\{[\s\S]*padding:[^;]*var\(--bottom-nav-h/);
+  assert.match(mobileRules, /body\[data-view="carrete"\] \.visitas-wrap--standalone\s*\{[\s\S]*display:\s*none !important/);
+  assert.match(mobileRules, /body\[data-view="carrete"\] #scroll-up\s*\{[\s\S]*left:\s*50%[\s\S]*right:\s*auto[\s\S]*width:\s*42px[\s\S]*height:\s*42px[\s\S]*transform:\s*translate\(-50%,\s*14px\)/);
+  assert.match(mobileRules, /body\[data-view="carrete"\] #scroll-up \.scrollup__icon\s*\{[\s\S]*width:\s*20px[\s\S]*height:\s*20px/);
+  assert.match(mobileRules, /body\[data-view="carrete"\] #scroll-up\.show-scroll\s*\{[\s\S]*bottom:\s*calc\(var\(--bottom-nav-h,\s*64px\) \+ 18px \+ env\(safe-area-inset-bottom\)\)[\s\S]*transform:\s*translate\(-50%,\s*0\)/);
+  assert.match(mobileRules, /body\[data-view="carrete"\]:has\(#carrete \.dm-feed-end:not\(\[hidden\]\)\) #scroll-up\s*\{[\s\S]*opacity:\s*0[\s\S]*pointer-events:\s*none[\s\S]*transform:\s*translate\(-50%,\s*10px\)/);
   assert.ok(css.indexOf('body[data-view="carrete"] #carrete .dm-carousel-header') > mobileRulesStart);
 
   assert.match(source, /const syncMobileLayoutVars = \(\) =>/);
@@ -128,6 +140,10 @@ test("root mobile muro uses current user avatar without changing desktop title c
   assert.match(source, /rootStyle\.setProperty\('--dm-muro-offset'/);
   assert.match(source, /document\.querySelector\('\[data-dm-muro-user-trigger\]'\)/);
   assert.match(source, /userPanelTrigger\.click\(\)/);
+  assert.match(source, /muroComposer\.classList\.toggle\('is-hidden',\s*shouldHide\)/);
+  assert.match(source, /document\.body\.classList\.toggle\('dm-muro-hidden',\s*shouldHide\)/);
+  assert.match(source, /window\.addEventListener\('scroll',\s*scheduleMuroComposerScrollState,\s*\{\s*passive:\s*true\s*\}\)/);
+  assert.match(chatSource, /#brisa-chat-root\.brisa-chat-root--mobile-open \.brisa-chat-mobile-stack\s*\{[\s\S]*max-height:\s*min\(82dvh,\s*calc\(100dvh - var\(--bottom-nav-h,\s*64px\) - 28px - env\(safe-area-inset-bottom\)\)\) !important/);
   assert.match(userMenuSource, /const updateCurrentAvatarSlots = \(profile,\s*displayName\) =>/);
   assert.match(userMenuSource, /avatarUrl:\s*profile\?\.avatarUrl \|\| ""/);
   assert.match(userMenuSource, /photoURL:\s*docData\?\.photoURL \|\| user\?\.photoURL \|\| ""/);

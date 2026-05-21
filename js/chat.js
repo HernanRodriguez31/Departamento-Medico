@@ -1098,6 +1098,7 @@ import { requireAuth, buildLoginRedirectUrl } from "../assets/js/shared/authGate
 
         #brisa-chat-root.brisa-chat-root--mobile-open .brisa-chat-mobile-stack {
           pointer-events: auto;
+          max-height: min(82dvh, calc(100dvh - var(--bottom-nav-h, 64px) - 28px - env(safe-area-inset-bottom))) !important;
         }
 
         #brisa-chat-root.brisa-chat-root--mobile-open .brisa-chat-fab {

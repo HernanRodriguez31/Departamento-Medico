@@ -101,6 +101,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const userPanelTrigger = document.getElementById('user-panel-trigger')
     const layoutSyncDelays = [120, 360, 720, 1200]
     let mobileLayoutRaf = 0
+    let muroComposerScrollRaf = 0
+    let lastMuroScrollY = window.scrollY || 0
     const viewAlias = {
         carrete: 'carrete',
         muro: 'carrete',
@@ -143,6 +145,46 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!muroUserTrigger || !userPanelTrigger) return
         const expanded = userPanelTrigger.getAttribute('aria-expanded') || 'false'
         muroUserTrigger.setAttribute('aria-expanded', expanded)
+    }
+
+    const isMuroComposerFocused = () =>
+        Boolean(muroComposer && muroComposer.contains(document.activeElement))
+
+    const setMuroComposerHidden = (hidden) => {
+        if (!muroComposer) return
+        const shouldHide =
+            Boolean(hidden) &&
+            isAppShell() &&
+            document.body.dataset.view === 'carrete' &&
+            !isMuroComposerFocused()
+        muroComposer.classList.toggle('is-hidden', shouldHide)
+        document.body.classList.toggle('dm-muro-hidden', shouldHide)
+    }
+
+    const syncMuroComposerScrollState = () => {
+        const y = window.scrollY || 0
+        if (!muroComposer || !isAppShell() || document.body.dataset.view !== 'carrete') {
+            setMuroComposerHidden(false)
+            lastMuroScrollY = y
+            return
+        }
+        const delta = y - lastMuroScrollY
+        const headerH = headerEl ? Math.round(headerEl.getBoundingClientRect().height || 0) : 64
+        const threshold = Math.max(140, headerH + 80)
+        if (y <= threshold || delta < -6 || isMuroComposerFocused()) {
+            setMuroComposerHidden(false)
+        } else if (delta > 8) {
+            setMuroComposerHidden(true)
+        }
+        lastMuroScrollY = y
+    }
+
+    const scheduleMuroComposerScrollState = () => {
+        if (muroComposerScrollRaf) return
+        muroComposerScrollRaf = requestAnimationFrame(() => {
+            muroComposerScrollRaf = 0
+            syncMuroComposerScrollState()
+        })
     }
 
     if (muroUserTrigger && userPanelTrigger) {
@@ -194,6 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const setViewFromHash = () => {
         if (!isAppShell()) {
             document.body.removeAttribute('data-view')
+            setMuroComposerHidden(false)
             return
         }
         const raw = (window.location.hash || '').replace('#', '').trim().toLowerCase()
@@ -202,6 +245,8 @@ document.addEventListener('DOMContentLoaded', () => {
             history.replaceState(null, '', `#${route}`)
         }
         document.body.dataset.view = route
+        setMuroComposerHidden(false)
+        lastMuroScrollY = window.scrollY || 0
         updateNavState(route)
         unlockScrollIfSafe()
         scheduleMobileLayoutSyncSeries()
@@ -221,9 +266,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     window.addEventListener('hashchange', setViewFromHash)
     window.addEventListener('resize', scheduleMobileLayoutSync)
+    window.addEventListener('scroll', scheduleMuroComposerScrollState, { passive: true })
     window.addEventListener('load', scheduleMobileLayoutSyncSeries, { once: true })
     window.visualViewport?.addEventListener('resize', scheduleMobileLayoutSync)
     headerEl?.addEventListener('transitionend', scheduleMobileLayoutSync)
+    muroComposer?.addEventListener('focusin', () => setMuroComposerHidden(false))
     setViewFromHash()
 
     /*==================== REFERENTES: DESKTOP OPEN ====================*/
