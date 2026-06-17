@@ -1425,12 +1425,10 @@ async function joinCurrentCommittee() {
             // Form Handlers
             document.getElementById('form-add-topic').addEventListener('submit', async (e) => {
                 e.preventDefault();
-                if (db) {
-                    const allowed = await ensureAdmin();
-                    if (!allowed) {
-                        Swal.fire('Acceso restringido', 'Solo administradores pueden agregar proyectos.', 'error');
-                        return;
-                    }
+                const currentUser = auth?.currentUser;
+                if (db && !currentUser) {
+                    Swal.fire('Sesión requerida', 'Iniciá sesión para crear un proyecto.', 'error');
+                    return;
                 }
                 const title = document.getElementById('new-topic-title').value;
                 const date = document.getElementById('new-topic-date').value;
@@ -1454,6 +1452,7 @@ async function joinCurrentCommittee() {
                             projectNumber,
                             docLinks,
                             stage: 1,
+                            createdByUid: currentUser.uid,
                             createdAt: serverTimestamp()
                         });
                     } catch (e) { console.error(e); }
