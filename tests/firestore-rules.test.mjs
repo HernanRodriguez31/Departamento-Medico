@@ -38,6 +38,19 @@ const committeeNotePayload = (uid, overrides = {}) => ({
   ...overrides
 });
 
+const committeeTopicPayload = (uid, overrides = {}) => ({
+  title: "Proyecto sintético",
+  startDate: "2026-06-17",
+  proposedBy: "Dr. Usuario A",
+  committeeId: "comite_bioetica",
+  projectNumber: 1,
+  docLinks: {},
+  stage: 1,
+  createdByUid: uid,
+  createdAt: Timestamp.now(),
+  ...overrides
+});
+
 const calendarEventPayload = (uid, overrides = {}) => ({
   title: "Actividad sintética",
   note: "Nota de prueba",
@@ -508,27 +521,54 @@ test("authenticated user cannot self-join committee_members as referente", async
   );
 });
 
-test("non-admin cannot create committee_topics and admin can create them", async () => {
+test("committee_topics: cualquier autenticado crea con ownership propio; editar/borrar siguen admin-only", async () => {
+  const userDb = authedDb("user-a");
+  const otherDb = authedDb("user-b");
+  const adminDb = authedAdminDb("admin-a");
+  const topicsPath = ["artifacts", APP_ID, "public", "data", "committee_topics"];
+
+  // Cualquier usuario autenticado puede CREAR su propio proyecto.
+  await assertSucceeds(
+    setDoc(doc(userDb, ...topicsPath, "topic-user-own"), committeeTopicPayload("user-a"))
+  );
+
+  // No puede falsificar el propietario (createdByUid ajeno).
+  await assertFails(
+    setDoc(doc(userDb, ...topicsPath, "topic-spoofed"), committeeTopicPayload("user-b"))
+  );
+
+  // No puede crear sin registrar el propietario.
+  await assertFails(
+    setDoc(doc(userDb, ...topicsPath, "topic-no-owner"), {
+      committeeId: "comite_bioetica",
+      title: "Proyecto sin dueño",
+      stage: 1,
+      createdAt: Timestamp.now()
+    })
+  );
+
+  // No puede inyectar campos fuera de la forma permitida.
   await assertFails(
     setDoc(
-      doc(authedDb("user-a"), "artifacts", APP_ID, "public", "data", "committee_topics", "topic-no-admin"),
-      {
-        committeeId: "comite_bioetica",
-        title: "Proyecto restringido",
-        createdAt: Timestamp.now()
-      }
+      doc(userDb, ...topicsPath, "topic-extra-field"),
+      committeeTopicPayload("user-a", { hackedField: true })
     )
   );
+
+  // El admin conserva su capacidad de crear.
   await assertSucceeds(
-    setDoc(
-      doc(authedAdminDb("admin-a"), "artifacts", APP_ID, "public", "data", "committee_topics", "topic-admin"),
-      {
-        committeeId: "comite_bioetica",
-        title: "Proyecto admin",
-        createdAt: Timestamp.now()
-      }
-    )
+    setDoc(doc(adminDb, ...topicsPath, "topic-admin"), committeeTopicPayload("admin-a"))
   );
+
+  // Editar/borrar proyectos siguen siendo admin-only: ningún no-admin puede,
+  // ni siquiera sobre un proyecto propio (flat-topic-a se sembró sin dueño).
+  await assertFails(updateDoc(doc(userDb, ...topicsPath, "flat-topic-a"), { stage: 3 }));
+  await assertFails(updateDoc(doc(otherDb, ...topicsPath, "flat-topic-a"), { stage: 3 }));
+  await assertFails(deleteDoc(doc(userDb, ...topicsPath, "flat-topic-a")));
+
+  // El admin sí puede editar y borrar.
+  await assertSucceeds(updateDoc(doc(adminDb, ...topicsPath, "flat-topic-a"), { stage: 3 }));
+  await assertSucceeds(deleteDoc(doc(adminDb, ...topicsPath, "flat-topic-a")));
 });
 
 test("unauthenticated user cannot read or write source committee routes", async () => {
