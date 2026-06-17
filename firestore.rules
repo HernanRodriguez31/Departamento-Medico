@@ -429,12 +429,12 @@ service cloud.firestore {
         && request.resource.data.isLeader == false;
     }
 
-    function validCommitteeTopicCreate() {
-      // Crear proyecto de comité: cualquier usuario autenticado, siempre que
-      // registre su propio uid en createdByUid (anti-spoofing) y la forma del
-      // documento esté acotada. La edición/borrado siguen siendo admin-only.
-      return signedIn()
-        && onlyKeys([
+    function validCommitteeTopicShape() {
+      // Forma válida de un proyecto de comité (committee_topics): acota los
+      // campos permitidos y valida title/committeeId. Reutilizada por create y update.
+      // nextMeeting (updateTopicDate) y finishedDate (updateTopicStage al llegar a
+      // etapa 5) son campos de dominio escritos por las ediciones reales del frontend.
+      return onlyKeys([
           "title",
           "startDate",
           "proposedBy",
@@ -443,13 +443,22 @@ service cloud.firestore {
           "docLinks",
           "stage",
           "createdAt",
-          "createdByUid"
+          "createdByUid",
+          "nextMeeting",
+          "finishedDate"
         ])
-        && request.resource.data.createdByUid == request.auth.uid
         && request.resource.data.title is string
         && request.resource.data.title.size() > 0
         && request.resource.data.title.size() <= 300
         && request.resource.data.committeeId is string;
+    }
+
+    function validCommitteeTopicCreate() {
+      // Crear proyecto: cualquier usuario autenticado que registre su propio uid
+      // en createdByUid (anti-spoofing) y respete la forma del documento.
+      return signedIn()
+        && validCommitteeTopicShape()
+        && request.resource.data.createdByUid == request.auth.uid;
     }
 
     function validOwnLikedByUpdate() {
@@ -909,8 +918,16 @@ service cloud.firestore {
       // Crear proyecto: habilitado para cualquier usuario autenticado que registre
       // su propio uid (createdByUid). isAdmin() se conserva para no romper flujos admin.
       allow create: if isAdmin() || validCommitteeTopicCreate();
-      // Editar/borrar proyectos (incluidos los ajenos) siguen siendo admin-only.
-      allow update, delete: if isAdmin();
+      // Editar (modelo colaborativo): cualquier usuario autenticado puede editar
+      // cualquier proyecto, sin alterar la autoría (createdByUid) y respetando la forma.
+      allow update: if isAdmin()
+        || (
+          signedIn()
+          && request.resource.data.createdByUid == resource.data.createdByUid
+          && validCommitteeTopicShape()
+        );
+      // Borrar proyectos sigue siendo admin-only.
+      allow delete: if isAdmin();
     }
 
     match /artifacts/{appId}/public/data/committee_messages/{messageId} {
