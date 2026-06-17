@@ -1743,7 +1743,7 @@
           .addEventListener("submit", async (e) => {
             e.preventDefault();
             const currentUser = auth?.currentUser;
-            if (db && !currentUser) {
+            if (db && !currentUser?.uid) {
               Swal.fire(
                 "Sesión requerida",
                 "Iniciá sesión para crear un proyecto.",
@@ -1793,6 +1793,11 @@
                 );
               } catch (e) {
                 console.error(e);
+                Swal.fire(
+                  "No se pudo crear el proyecto",
+                  "Ocurrió un error al guardar el proyecto. Intentá nuevamente.",
+                  "error",
+                );
               }
             }
             document.getElementById("new-topic-title").value = "";
