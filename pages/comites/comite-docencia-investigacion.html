@@ -433,7 +433,7 @@
         ];
 
         function renderProjectActionCluster(topic) {
-            if (!isAdmin) return '';
+            if (!auth?.currentUser?.uid) return '';
             return `
                 <div class="committee-project-card__actions">
                     <button
@@ -443,6 +443,7 @@
                         title="Editar proyecto">
                         <i data-lucide="pencil" class="w-4 h-4"></i>
                     </button>
+                    ${isAdmin ? `
                     <button
                         type="button"
                         onclick="window.deleteTopic(${safeInlineJsString(topic.id)})"
@@ -450,13 +451,14 @@
                         title="Eliminar proyecto">
                         <i data-lucide="trash-2" class="w-4 h-4"></i>
                     </button>
+                    ` : ''}
                 </div>
             `;
         }
 
         function renderProjectMeetingChip(topic) {
             const meetingValue = topic.nextMeeting ? formatDate(topic.nextMeeting) : 'Sin fecha';
-            if (isAdmin) {
+            if (auth?.currentUser?.uid) {
                 return `
                     <label class="committee-project-card__meta-item committee-project-card__meta-item--meeting">
                         <span class="committee-project-card__meta-label">Próxima reunión</span>
@@ -502,7 +504,7 @@
                                     <span class="committee-project-card__step-dot" aria-hidden="true">${segment.step}</span>
                                     <span class="committee-project-card__step-label">${escapeHTML(shortLabel)}</span>
                                 `;
-                if (!isAdmin) {
+                if (!auth?.currentUser?.uid) {
                     return `
                                 <span class="${segmentClass}" aria-label="${segment.step}. ${escapeAttribute(label)}${segment.current ? ', etapa actual' : ''}" data-stage-tooltip="${escapeAttribute(tooltip)}">
                                     ${stepContent}
@@ -1093,6 +1095,12 @@ async function joinCurrentCommittee() {
             const current = state.topics.find(t => t.id === id);
             if (!current) return;
 
+            const currentUser = auth?.currentUser;
+            if (!currentUser?.uid) {
+                Swal.fire('Sesión requerida', 'Iniciá sesión para editar un proyecto.', 'error');
+                return;
+            }
+
             const manualLinks = getManualDocLinks(current);
             const result = await Swal.fire({
                 title: 'Editar proyecto',
@@ -1148,7 +1156,7 @@ async function joinCurrentCommittee() {
                 );
             } catch (e) {
                 console.error('Error actualizando proyecto:', e);
-                alert('Ocurrió un error al guardar los cambios del proyecto.');
+                Swal.fire('No se pudo actualizar', 'Ocurrió un error al guardar los cambios del proyecto. Intentá nuevamente.', 'error');
             }
         };
 
@@ -1161,6 +1169,12 @@ async function joinCurrentCommittee() {
                 newStage = stage - 1; // Revert
             }
 
+            const currentUser = auth?.currentUser;
+            if (db && !currentUser?.uid) {
+                Swal.fire('Sesión requerida', 'Iniciá sesión para editar un proyecto.', 'error');
+                return;
+            }
+
             if (db) {
                 try {
                     const updates = { stage: newStage };
@@ -1170,7 +1184,10 @@ async function joinCurrentCommittee() {
                         updates.finishedDate = null; // Clear finished date if reverting
                     }
                     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'committee_topics', id), updates);
-                } catch (e) { console.error(e); }
+                } catch (e) {
+                    console.error(e);
+                    Swal.fire('No se pudo actualizar', 'Ocurrió un error al actualizar la etapa del proyecto. Intentá nuevamente.', 'error');
+                }
             } else {
                 // Mock Update
                 topic.stage = newStage;
@@ -1184,10 +1201,18 @@ async function joinCurrentCommittee() {
         };
 
         window.updateTopicDate = async (id, date) => {
+            const currentUser = auth?.currentUser;
+            if (db && !currentUser?.uid) {
+                Swal.fire('Sesión requerida', 'Iniciá sesión para editar un proyecto.', 'error');
+                return;
+            }
             if (db) {
                 try {
                     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'committee_topics', id), { nextMeeting: date });
-                } catch (e) { console.error(e); }
+                } catch (e) {
+                    console.error(e);
+                    Swal.fire('No se pudo actualizar', 'Ocurrió un error al guardar la próxima reunión. Intentá nuevamente.', 'error');
+                }
             } else {
                 // Mock Update
                 const topic = state.topics.find(t => t.id === id);
