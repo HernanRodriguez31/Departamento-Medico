@@ -557,7 +557,7 @@
                               STEP_SHORT_LABELS[segment.step - 1] || label;
                             const stageInfo = STAGE_DEFINITIONS[segment.step];
                             const tooltip = stageInfo
-                              ? stageInfo.title + ": " + stageInfo.description
+                              ? stageInfo.title + (stageInfo.desc ? ": " + stageInfo.desc : "")
                               : label;
                             const segmentClass = `committee-project-card__step${segment.active ? " is-active" : ""}${segment.current ? " is-current" : ""}${segment.step < stageMeta.stage ? " is-complete" : ""}`;
                             const stepContent = `
