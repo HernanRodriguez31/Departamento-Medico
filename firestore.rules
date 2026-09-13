@@ -2,7 +2,8 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() {
-      return request.auth != null;
+      // Las identidades federadas del hub (hubOnly) solo acceden a la pizarra.
+      return request.auth != null && request.auth.token.get("hubOnly", false) != true;
     }
 
     function isOwner(uid) {
@@ -940,6 +941,100 @@ service cloud.firestore {
       allow create: if validCalendarEventCreate();
       allow update: if validCalendarEventUpdate();
       allow delete: if isOwnedByCurrentUser(resource.data) || isAdmin();
+    }
+
+    // ==================================================================
+    // Departamento de Salud Brisa (hub): pizarra de comités
+    // Colecciones: hub_committees, hub_projects.
+    // - Lectura: cualquier sesión de este proyecto, incluidas las identidades
+    //   federadas de Enfermería (claims hubOnly + hubDept) que emite hubExchange.
+    // - Escritura: cada departamento sobre su columna (dept); los admins del
+    //   proyecto sobre ambas. Forma y autoría validadas.
+    // Las identidades federadas quedan EXCLUIDAS del resto de las reglas
+    // porque signedIn() rechaza hubOnly == true.
+    // ==================================================================
+    function hubSignedIn() {
+      return request.auth != null;
+    }
+
+    function hubDept() {
+      return request.auth.token.get("hubDept", "medico");
+    }
+
+    function hubCanEdit(dept) {
+      return hubSignedIn() && (dept == hubDept() || isAdmin());
+    }
+
+    function validHubReferents(list) {
+      return list is list && list.size() <= 20;
+    }
+
+    function validHubUpdatedBy(data) {
+      return data.updatedBy is map
+        && data.updatedBy.uid == request.auth.uid
+        && data.updatedBy.name is string
+        && data.updatedBy.name.size() <= 120
+        && data.updatedBy.dept in ["medico", "enfermeria"];
+    }
+
+    function validHubCommittee(data) {
+      return data.keys().hasOnly(["dept", "title", "description", "referents", "order", "createdAt", "updatedAt", "updatedBy"])
+        && data.dept in ["medico", "enfermeria"]
+        && data.title is string
+        && data.title.size() > 0
+        && data.title.size() <= 120
+        && data.description is string
+        && data.description.size() <= 2000
+        && validHubReferents(data.referents)
+        && data.order is number
+        && data.createdAt is timestamp
+        && data.updatedAt == request.time
+        && validHubUpdatedBy(data);
+    }
+
+    function validHubProject(data) {
+      return data.keys().hasOnly(["dept", "committeeId", "title", "content", "status", "referents", "order", "createdAt", "updatedAt", "updatedBy"])
+        && data.dept in ["medico", "enfermeria"]
+        && data.committeeId is string
+        && data.committeeId.size() > 0
+        && exists(/databases/$(database)/documents/hub_committees/$(data.committeeId))
+        && get(/databases/$(database)/documents/hub_committees/$(data.committeeId)).data.dept == data.dept
+        && data.title is string
+        && data.title.size() > 0
+        && data.title.size() <= 160
+        && data.content is string
+        && data.content.size() <= 4000
+        && data.status in ["en_curso", "planificado", "pausado", "finalizado"]
+        && validHubReferents(data.referents)
+        && data.order is number
+        && data.createdAt is timestamp
+        && data.updatedAt == request.time
+        && validHubUpdatedBy(data);
+    }
+
+    match /hub_committees/{committeeId} {
+      allow read: if hubSignedIn();
+      allow create: if hubCanEdit(request.resource.data.dept)
+        && validHubCommittee(request.resource.data)
+        && request.resource.data.createdAt == request.time;
+      allow update: if hubCanEdit(resource.data.dept)
+        && request.resource.data.dept == resource.data.dept
+        && request.resource.data.createdAt == resource.data.createdAt
+        && validHubCommittee(request.resource.data);
+      allow delete: if hubCanEdit(resource.data.dept);
+    }
+
+    match /hub_projects/{projectId} {
+      allow read: if hubSignedIn();
+      allow create: if hubCanEdit(request.resource.data.dept)
+        && validHubProject(request.resource.data)
+        && request.resource.data.createdAt == request.time;
+      allow update: if hubCanEdit(resource.data.dept)
+        && request.resource.data.dept == resource.data.dept
+        && request.resource.data.committeeId == resource.data.committeeId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && validHubProject(request.resource.data);
+      allow delete: if hubCanEdit(resource.data.dept);
     }
 
     match /artifacts/{document=**} {

@@ -9,6 +9,7 @@
     "rules": "storage.rules"
   },
   "hosting": {
+    "site": "departamento-medico-brisa",
     "public": ".",
     "ignore": [
       "firebase.json",

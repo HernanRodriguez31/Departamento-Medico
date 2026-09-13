@@ -36,6 +36,7 @@ admin.initializeApp();
 const db = admin.firestore();
 setGlobalOptions({ region: "us-central1" });
 Object.assign(exports, createUserSecurityCallables({ admin, db }));
+Object.assign(exports, require("./hub").createHubCallables({ admin, db }));
 
 // A PARTIR DE AQUI VAN LOS EXPORTS (No tocar los exports existentes)
 const getMessagingClient = () => admin.messaging();
