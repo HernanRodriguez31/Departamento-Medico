@@ -1159,7 +1159,7 @@ test("hub: cada departamento crea y edita comités solo en su columna; el admin 
   await assertFails(setDoc(doc(medicoDb, "hub_committees", "hc-2"), hubCommitteePayload("user-a", "enfermeria")));
   await assertSucceeds(setDoc(doc(nursingDb, "hub_committees", "hc-3"), hubCommitteePayload("enf_nurse-1", "enfermeria")));
   await assertFails(setDoc(doc(nursingDb, "hub_committees", "hc-4"), hubCommitteePayload("enf_nurse-1", "medico")));
-  await assertSucceeds(setDoc(doc(adminDb("admin-a"), "hub_committees", "hc-5"), hubCommitteePayload("admin-a", "enfermeria")));
+  await assertSucceeds(setDoc(doc(authedAdminDb("admin-a"), "hub_committees", "hc-5"), hubCommitteePayload("admin-a", "enfermeria")));
 
   await assertSucceeds(
     updateDoc(doc(medicoDb, "hub_committees", "hc-1"), {
