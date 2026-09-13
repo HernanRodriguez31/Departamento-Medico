@@ -946,27 +946,31 @@ service cloud.firestore {
     // ==================================================================
     // Departamento de Salud Brisa (hub): pizarra de comités
     // Colecciones: hub_committees, hub_projects.
-    // - Lectura: cualquier sesión de este proyecto, incluidas las identidades
-    //   federadas de Enfermería (claims hubOnly + hubDept) que emite hubExchange.
-    // - Escritura: cada departamento sobre su columna (dept); los admins del
-    //   proyecto sobre ambas. Forma y autoría validadas.
-    // Las identidades federadas quedan EXCLUIDAS del resto de las reglas
-    // porque signedIn() rechaza hubOnly == true.
+    // Acceso por CLAVE GENÉRICA compartida: la pizarra se abre con un usuario
+    // Firebase único (BOARD_EMAIL) cuya contraseña es la "clave de la pizarra".
+    // Solo ese usuario (o un admin del proyecto) lee y escribe la pizarra; la
+    // clave es la barrera real. Ninguna otra sesión (portal Médico, etc.) ve la
+    // pizarra. Forma y autoría validadas.
     // ==================================================================
-    function hubSignedIn() {
-      return request.auth != null;
+    function hubBoardEmail() {
+      return "pizarra@brisasaludybienestar.com";
     }
 
-    function hubDept() {
-      return request.auth.token.get("hubDept", "medico");
+    function hubBoardUser() {
+      return request.auth != null
+        && request.auth.token.email == hubBoardEmail();
     }
 
-    function hubCanEdit(dept) {
-      return hubSignedIn() && (dept == hubDept() || isAdmin());
+    function hubCanBoard() {
+      return hubBoardUser() || isAdmin();
     }
 
     function validHubReferents(list) {
       return list is list && list.size() <= 20;
+    }
+
+    function validHubEje(data) {
+      return !("eje" in data) || (data.eje is string && data.eje.size() <= 60);
     }
 
     function validHubUpdatedBy(data) {
@@ -978,7 +982,7 @@ service cloud.firestore {
     }
 
     function validHubCommittee(data) {
-      return data.keys().hasOnly(["dept", "title", "description", "referents", "order", "createdAt", "updatedAt", "updatedBy"])
+      return data.keys().hasOnly(["dept", "title", "description", "referents", "eje", "order", "createdAt", "updatedAt", "updatedBy"])
         && data.dept in ["medico", "enfermeria"]
         && data.title is string
         && data.title.size() > 0
@@ -986,6 +990,7 @@ service cloud.firestore {
         && data.description is string
         && data.description.size() <= 2000
         && validHubReferents(data.referents)
+        && validHubEje(data)
         && data.order is number
         && data.createdAt is timestamp
         && data.updatedAt == request.time
@@ -1013,28 +1018,28 @@ service cloud.firestore {
     }
 
     match /hub_committees/{committeeId} {
-      allow read: if hubSignedIn();
-      allow create: if hubCanEdit(request.resource.data.dept)
+      allow read: if hubCanBoard();
+      allow create: if hubCanBoard()
         && validHubCommittee(request.resource.data)
         && request.resource.data.createdAt == request.time;
-      allow update: if hubCanEdit(resource.data.dept)
+      allow update: if hubCanBoard()
         && request.resource.data.dept == resource.data.dept
         && request.resource.data.createdAt == resource.data.createdAt
         && validHubCommittee(request.resource.data);
-      allow delete: if hubCanEdit(resource.data.dept);
+      allow delete: if hubCanBoard();
     }
 
     match /hub_projects/{projectId} {
-      allow read: if hubSignedIn();
-      allow create: if hubCanEdit(request.resource.data.dept)
+      allow read: if hubCanBoard();
+      allow create: if hubCanBoard()
         && validHubProject(request.resource.data)
         && request.resource.data.createdAt == request.time;
-      allow update: if hubCanEdit(resource.data.dept)
+      allow update: if hubCanBoard()
         && request.resource.data.dept == resource.data.dept
         && request.resource.data.committeeId == resource.data.committeeId
         && request.resource.data.createdAt == resource.data.createdAt
         && validHubProject(request.resource.data);
-      allow delete: if hubCanEdit(resource.data.dept);
+      allow delete: if hubCanBoard();
     }
 
     match /artifacts/{document=**} {

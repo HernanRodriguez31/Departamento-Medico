@@ -1094,20 +1094,24 @@ test("dm_carousel comments still allow legit comment create delete and block dir
 
 /* ------------------------------------------------------------------ */
 /* Departamento de Salud Brisa (hub): pizarra de comités               */
+/* Acceso por clave genérica compartida (usuario BOARD_EMAIL) o admin.  */
 /* ------------------------------------------------------------------ */
 
-const federatedNursingDb = (uid = "enf_nurse-1") =>
-  testEnv
-    .authenticatedContext(uid, { hubOnly: true, hubDept: "enfermeria", hubEmail: "nurse@example.test" })
-    .firestore();
+const HUB_BOARD_EMAIL = "pizarra@brisasaludybienestar.com";
 
-const hubUpdatedBy = (uid, dept, name = "Integrante") => ({ uid, name, dept });
+// Usuario compartido de la pizarra: cualquier uid con el email de la pizarra
+// en el token (así lo emite Firebase Auth al iniciar sesión con la clave).
+const hubBoardDb = (uid = "board-user") =>
+  testEnv.authenticatedContext(uid, { email: HUB_BOARD_EMAIL }).firestore();
+
+const hubUpdatedBy = (uid, dept, name = "Equipo de Salud") => ({ uid, name, dept });
 
 const hubCommitteePayload = (uid, dept, overrides = {}) => ({
   dept,
   title: "Comité sintético",
   description: "Descripción sintética",
   referents: ["Referente A"],
+  eje: "",
   order: 1,
   createdAt: serverTimestamp(),
   updatedAt: serverTimestamp(),
@@ -1136,6 +1140,7 @@ const seedHubCommittee = async (id, dept) => {
       title: `Comité ${dept}`,
       description: "",
       referents: [],
+      eje: "",
       order: 1,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
@@ -1144,112 +1149,84 @@ const seedHubCommittee = async (id, dept) => {
   });
 };
 
-test("hub: la pizarra se lee con cualquier sesión del proyecto o federada, nunca sin sesión", async () => {
+test("hub: la pizarra solo se lee con la clave (usuario compartido) o admin, nunca con otra sesión ni sin sesión", async () => {
   await seedHubCommittee("hc-medico", "medico");
-  await assertSucceeds(getDoc(doc(authedDb("user-a"), "hub_committees", "hc-medico")));
-  await assertSucceeds(getDoc(doc(federatedNursingDb(), "hub_committees", "hc-medico")));
-  await assertSucceeds(getDocs(collection(federatedNursingDb(), "hub_projects")));
+  await assertSucceeds(getDoc(doc(hubBoardDb(), "hub_committees", "hc-medico")));
+  await assertSucceeds(getDoc(doc(authedAdminDb("admin-a"), "hub_committees", "hc-medico")));
+  await assertFails(getDoc(doc(authedDb("user-a"), "hub_committees", "hc-medico")));
   await assertFails(getDoc(doc(unauthedDb(), "hub_committees", "hc-medico")));
 });
 
-test("hub: cada departamento crea y edita comités solo en su columna; el admin en ambas", async () => {
-  const medicoDb = authedDb("user-a");
-  const nursingDb = federatedNursingDb();
-  await assertSucceeds(setDoc(doc(medicoDb, "hub_committees", "hc-1"), hubCommitteePayload("user-a", "medico")));
-  await assertFails(setDoc(doc(medicoDb, "hub_committees", "hc-2"), hubCommitteePayload("user-a", "enfermeria")));
-  await assertSucceeds(setDoc(doc(nursingDb, "hub_committees", "hc-3"), hubCommitteePayload("enf_nurse-1", "enfermeria")));
-  await assertFails(setDoc(doc(nursingDb, "hub_committees", "hc-4"), hubCommitteePayload("enf_nurse-1", "medico")));
-  await assertSucceeds(setDoc(doc(authedAdminDb("admin-a"), "hub_committees", "hc-5"), hubCommitteePayload("admin-a", "enfermeria")));
+test("hub: el usuario de la pizarra crea y edita comités en ambas columnas; una sesión ajena no", async () => {
+  const board = hubBoardDb("board-1");
+  await assertSucceeds(setDoc(doc(board, "hub_committees", "hc-1"), hubCommitteePayload("board-1", "medico")));
+  await assertSucceeds(setDoc(doc(board, "hub_committees", "hc-2"), hubCommitteePayload("board-1", "enfermeria")));
+  await assertFails(setDoc(doc(authedDb("user-a"), "hub_committees", "hc-3"), hubCommitteePayload("user-a", "medico")));
 
   await assertSucceeds(
-    updateDoc(doc(medicoDb, "hub_committees", "hc-1"), {
+    updateDoc(doc(board, "hub_committees", "hc-1"), {
       title: "Comité editado",
+      eje: "Calidad y seguridad",
       updatedAt: serverTimestamp(),
-      updatedBy: hubUpdatedBy("user-a", "medico")
+      updatedBy: hubUpdatedBy("board-1", "medico")
     })
   );
   await assertFails(
-    updateDoc(doc(nursingDb, "hub_committees", "hc-1"), {
-      title: "Edición ajena",
-      updatedAt: serverTimestamp(),
-      updatedBy: hubUpdatedBy("enf_nurse-1", "enfermeria")
-    })
-  );
-  await assertFails(
-    updateDoc(doc(medicoDb, "hub_committees", "hc-1"), {
+    updateDoc(doc(board, "hub_committees", "hc-1"), {
       dept: "enfermeria",
       updatedAt: serverTimestamp(),
-      updatedBy: hubUpdatedBy("user-a", "medico")
+      updatedBy: hubUpdatedBy("board-1", "medico")
     })
   );
-  await assertFails(deleteDoc(doc(nursingDb, "hub_committees", "hc-1")));
-  await assertSucceeds(deleteDoc(doc(medicoDb, "hub_committees", "hc-1")));
+  await assertFails(deleteDoc(doc(authedDb("user-a"), "hub_committees", "hc-1")));
+  await assertSucceeds(deleteDoc(doc(board, "hub_committees", "hc-1")));
 });
 
-test("hub: la forma del comité se valida (autoría, campos extra, tamaños, timestamp)", async () => {
-  const medicoDb = authedDb("user-a");
-  await assertFails(
-    setDoc(doc(medicoDb, "hub_committees", "hc-bad-1"), hubCommitteePayload("user-b", "medico"))
-  );
-  await assertFails(
-    setDoc(doc(medicoDb, "hub_committees", "hc-bad-2"), hubCommitteePayload("user-a", "medico", { extra: true }))
-  );
-  await assertFails(
-    setDoc(doc(medicoDb, "hub_committees", "hc-bad-3"), hubCommitteePayload("user-a", "medico", { title: "" }))
-  );
-  await assertFails(
-    setDoc(doc(medicoDb, "hub_committees", "hc-bad-4"), hubCommitteePayload("user-a", "medico", { title: "x".repeat(121) }))
-  );
-  await assertFails(
-    setDoc(doc(medicoDb, "hub_committees", "hc-bad-5"), hubCommitteePayload("user-a", "medico", { updatedAt: Timestamp.now() }))
-  );
-  await assertFails(
-    setDoc(doc(medicoDb, "hub_committees", "hc-bad-6"), hubCommitteePayload("user-a", "medico", { referents: "no-es-lista" }))
-  );
+test("hub: la forma del comité se valida (autoría, campos extra, tamaños, eje, timestamp)", async () => {
+  const board = hubBoardDb("board-1");
+  await assertFails(setDoc(doc(board, "hub_committees", "hc-bad-1"), hubCommitteePayload("otro-uid", "medico")));
+  await assertFails(setDoc(doc(board, "hub_committees", "hc-bad-2"), hubCommitteePayload("board-1", "medico", { extra: true })));
+  await assertFails(setDoc(doc(board, "hub_committees", "hc-bad-3"), hubCommitteePayload("board-1", "medico", { title: "" })));
+  await assertFails(setDoc(doc(board, "hub_committees", "hc-bad-4"), hubCommitteePayload("board-1", "medico", { title: "x".repeat(121) })));
+  await assertFails(setDoc(doc(board, "hub_committees", "hc-bad-5"), hubCommitteePayload("board-1", "medico", { updatedAt: Timestamp.now() })));
+  await assertFails(setDoc(doc(board, "hub_committees", "hc-bad-6"), hubCommitteePayload("board-1", "medico", { referents: "no-es-lista" })));
+  await assertFails(setDoc(doc(board, "hub_committees", "hc-bad-7"), hubCommitteePayload("board-1", "medico", { eje: 123 })));
 });
 
 test("hub: los proyectos pertenecen a un comité existente del mismo departamento", async () => {
   await seedHubCommittee("hc-medico", "medico");
   await seedHubCommittee("hc-enf", "enfermeria");
-  const medicoDb = authedDb("user-a");
-  const nursingDb = federatedNursingDb();
+  const board = hubBoardDb("board-1");
 
-  await assertSucceeds(setDoc(doc(medicoDb, "hub_projects", "hp-1"), hubProjectPayload("user-a", "medico", "hc-medico")));
-  await assertFails(setDoc(doc(medicoDb, "hub_projects", "hp-2"), hubProjectPayload("user-a", "medico", "hc-enf")));
-  await assertFails(setDoc(doc(medicoDb, "hub_projects", "hp-3"), hubProjectPayload("user-a", "medico", "hc-inexistente")));
-  await assertFails(setDoc(doc(nursingDb, "hub_projects", "hp-4"), hubProjectPayload("enf_nurse-1", "enfermeria", "hc-medico")));
-  await assertSucceeds(setDoc(doc(nursingDb, "hub_projects", "hp-5"), hubProjectPayload("enf_nurse-1", "enfermeria", "hc-enf")));
+  await assertSucceeds(setDoc(doc(board, "hub_projects", "hp-1"), hubProjectPayload("board-1", "medico", "hc-medico")));
+  await assertFails(setDoc(doc(board, "hub_projects", "hp-2"), hubProjectPayload("board-1", "medico", "hc-enf")));
+  await assertFails(setDoc(doc(board, "hub_projects", "hp-3"), hubProjectPayload("board-1", "medico", "hc-inexistente")));
+  await assertSucceeds(setDoc(doc(board, "hub_projects", "hp-5"), hubProjectPayload("board-1", "enfermeria", "hc-enf")));
   await assertFails(
-    setDoc(doc(medicoDb, "hub_projects", "hp-6"), hubProjectPayload("user-a", "medico", "hc-medico", { status: "otro" }))
+    setDoc(doc(board, "hub_projects", "hp-6"), hubProjectPayload("board-1", "medico", "hc-medico", { status: "otro" }))
   );
 
   await assertSucceeds(
-    updateDoc(doc(medicoDb, "hub_projects", "hp-1"), {
+    updateDoc(doc(board, "hub_projects", "hp-1"), {
       status: "finalizado",
       order: 2,
       updatedAt: serverTimestamp(),
-      updatedBy: hubUpdatedBy("user-a", "medico")
+      updatedBy: hubUpdatedBy("board-1", "medico")
     })
   );
   await assertFails(
-    updateDoc(doc(medicoDb, "hub_projects", "hp-1"), {
+    updateDoc(doc(board, "hub_projects", "hp-1"), {
       committeeId: "hc-enf",
       updatedAt: serverTimestamp(),
-      updatedBy: hubUpdatedBy("user-a", "medico")
+      updatedBy: hubUpdatedBy("board-1", "medico")
     })
   );
-  await assertFails(deleteDoc(doc(nursingDb, "hub_projects", "hp-1")));
-  await assertSucceeds(deleteDoc(doc(medicoDb, "hub_projects", "hp-1")));
+  await assertFails(deleteDoc(doc(authedDb("user-a"), "hub_projects", "hp-1")));
+  await assertSucceeds(deleteDoc(doc(board, "hub_projects", "hp-1")));
 });
 
-test("hub: una identidad federada no accede a nada fuera de la pizarra", async () => {
-  const nursingDb = federatedNursingDb();
-  await assertFails(getDoc(doc(nursingDb, "usuarios", "user-a")));
-  await assertFails(getDocs(collection(nursingDb, "dm_posts")));
-  await assertFails(
-    getDocs(collection(nursingDb, "artifacts", APP_ID, "public", "data", "committee_topics"))
-  );
-  await assertFails(
-    setDoc(doc(nursingDb, "usuarios", "enf_nurse-1"), { nombre: "Intruso" })
-  );
+test("hub: una sesión ajena no lista la pizarra por el solo hecho de estar autenticada", async () => {
+  const user = authedDb("user-a");
+  await assertFails(getDocs(collection(user, "hub_committees")));
+  await assertFails(getDocs(collection(user, "hub_projects")));
 });
