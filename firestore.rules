@@ -973,6 +973,12 @@ service cloud.firestore {
       return !("eje" in data) || (data.eje is string && data.eje.size() <= 60);
     }
 
+    // vinculo: "" (automático), "ninguno" (nunca emparejar) o el id del comité
+    // afín del otro departamento (la app escribe las dos puntas).
+    function validHubVinculo(data) {
+      return !("vinculo" in data) || (data.vinculo is string && data.vinculo.size() <= 64);
+    }
+
     function validHubUpdatedBy(data) {
       return data.updatedBy is map
         && data.updatedBy.uid == request.auth.uid
@@ -982,7 +988,7 @@ service cloud.firestore {
     }
 
     function validHubCommittee(data) {
-      return data.keys().hasOnly(["dept", "title", "description", "referents", "eje", "order", "createdAt", "updatedAt", "updatedBy"])
+      return data.keys().hasOnly(["dept", "title", "description", "referents", "eje", "vinculo", "order", "createdAt", "updatedAt", "updatedBy"])
         && data.dept in ["medico", "enfermeria"]
         && data.title is string
         && data.title.size() > 0
@@ -991,6 +997,7 @@ service cloud.firestore {
         && data.description.size() <= 2000
         && validHubReferents(data.referents)
         && validHubEje(data)
+        && validHubVinculo(data)
         && data.order is number
         && data.createdAt is timestamp
         && data.updatedAt == request.time

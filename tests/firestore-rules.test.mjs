@@ -1191,6 +1191,16 @@ test("hub: la forma del comité se valida (autoría, campos extra, tamaños, eje
   await assertFails(setDoc(doc(board, "hub_committees", "hc-bad-5"), hubCommitteePayload("board-1", "medico", { updatedAt: Timestamp.now() })));
   await assertFails(setDoc(doc(board, "hub_committees", "hc-bad-6"), hubCommitteePayload("board-1", "medico", { referents: "no-es-lista" })));
   await assertFails(setDoc(doc(board, "hub_committees", "hc-bad-7"), hubCommitteePayload("board-1", "medico", { eje: 123 })));
+  await assertFails(setDoc(doc(board, "hub_committees", "hc-bad-8"), hubCommitteePayload("board-1", "medico", { vinculo: 123 })));
+  await assertSucceeds(setDoc(doc(board, "hub_committees", "hc-ok-1"), hubCommitteePayload("board-1", "medico", { vinculo: "ninguno" })));
+  await assertSucceeds(
+    updateDoc(doc(board, "hub_committees", "hc-ok-1"), {
+      vinculo: "hc-otro-id",
+      order: 3,
+      updatedAt: serverTimestamp(),
+      updatedBy: hubUpdatedBy("board-1", "medico")
+    })
+  );
 });
 
 test("hub: los proyectos pertenecen a un comité existente del mismo departamento", async () => {
