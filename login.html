@@ -1056,7 +1056,7 @@
         }
         if (search.get("access") === "unavailable") params.set("msg", "unavailable");
         if (search.get("passwordChanged") === "1") params.set("msg", "passwordChanged");
-        location.replace("https://salud.brisasaludybienestar.com/?" + params.toString());
+        location.replace("https://departamento-salud-brisa.web.app/?" + params.toString());
       })();
     </script>
   </head>
@@ -1153,7 +1153,7 @@
             <a
               id="hub-return"
               class="forgot-password"
-              href="https://salud.brisasaludybienestar.com/"
+              href="https://departamento-salud-brisa.web.app/"
               hidden
               >Volver al inicio de Salud Brisa</a
             >
@@ -1284,7 +1284,7 @@
       // El ingreso con contraseña se hace en el hub. Este login canjea el token
       // de traspaso (#hub=...) por la sesión propia del portal; si se entra
       // directo, la guardia del <head> redirige al hub (salvo ?legacy=1).
-      const HUB_URL = "https://salud.brisasaludybienestar.com/";
+      const HUB_URL = "https://departamento-salud-brisa.web.app/";
       const HUB_DEPT = "medico";
       const hubParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
       const hubToken = hubParams.get("hub") || "";
