@@ -1026,7 +1026,39 @@
           font-size: 0.72rem;
         }
       }
+
+      /* Departamento de Salud Brisa: en modo traspaso el overlay aparece de inmediato */
+      html.hub-handoff .session-overlay {
+        opacity: 1;
+        visibility: visible;
+      }
+      html.hub-handoff .login-card {
+        visibility: hidden;
+      }
     </style>
+    <!-- Departamento de Salud Brisa: el ingreso con contraseña se hace en el hub -->
+    <script>
+      (function () {
+        var host = location.hostname;
+        if (host === "localhost" || host === "127.0.0.1") return;
+        var hash = location.hash.replace(/^#/, "");
+        if (/(^|&)hub=/.test(hash)) {
+          document.documentElement.classList.add("hub-handoff");
+          return;
+        }
+        var search = new URLSearchParams(location.search);
+        if (search.get("legacy") === "1") return;
+        var params = new URLSearchParams();
+        params.set("dept", "medico");
+        var next = String(search.get("next") || "");
+        if (next && (next.charAt(0) === "#" || (next.charAt(0) === "/" && next.indexOf("//") !== 0)) && next.length <= 300) {
+          params.set("next", next);
+        }
+        if (search.get("access") === "unavailable") params.set("msg", "unavailable");
+        if (search.get("passwordChanged") === "1") params.set("msg", "passwordChanged");
+        location.replace("https://departamento-salud-brisa.web.app/?" + params.toString());
+      })();
+    </script>
   </head>
 
   <body>
@@ -1118,6 +1150,13 @@
             >
 
             <p id="error-msg" class="error"></p>
+            <a
+              id="hub-return"
+              class="forgot-password"
+              href="https://departamento-salud-brisa.web.app/"
+              hidden
+              >Volver al inicio de Salud Brisa</a
+            >
           </div>
         </form>
       </div>
@@ -1219,7 +1258,7 @@
 
     <!-- FIREBASE AND AUTH LOGIC DO NOT TOUCH -->
     <script type="module">
-      import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+      import { signInWithCustomToken, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
       import {
         collection,
         doc,
@@ -1240,6 +1279,39 @@
       const isLocalHostMode = isLocalHost();
       let loginInProgress = false;
       let forgotLastFocus = null;
+
+      // ---- Departamento de Salud Brisa (hub de acceso) ----------------------
+      // El ingreso con contraseña se hace en el hub. Este login canjea el token
+      // de traspaso (#hub=...) por la sesión propia del portal; si se entra
+      // directo, la guardia del <head> redirige al hub (salvo ?legacy=1).
+      const HUB_URL = "https://departamento-salud-brisa.web.app/";
+      const HUB_DEPT = "medico";
+      const hubParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+      const hubToken = hubParams.get("hub") || "";
+      const hubSearch = new URLSearchParams(window.location.search);
+      const legacyLogin = hubSearch.get("legacy") === "1";
+      const sanitizeHubNext = (value = "") => {
+        const raw = String(value || "").trim();
+        if (!raw) return "";
+        if (raw.startsWith("#")) return raw.length <= 200 ? raw : "";
+        if (raw.startsWith("/") && !raw.startsWith("//") && !raw.includes("\\")) {
+          return raw.length <= 300 ? raw : "";
+        }
+        return "";
+      };
+      const hubNext = sanitizeHubNext(hubParams.get("next") || hubSearch.get("next") || "");
+      const buildHubUrl = () => {
+        const params = new URLSearchParams();
+        params.set("dept", HUB_DEPT);
+        if (hubNext) params.set("next", hubNext);
+        return `${HUB_URL}?${params.toString()}`;
+      };
+      const showHubReturnLink = () => {
+        const link = document.getElementById("hub-return");
+        if (!link) return;
+        link.href = buildHubUrl();
+        link.hidden = false;
+      };
 
       const normalizeCredential = (value = "") => {
         const raw = String(value || "").trim();
@@ -1435,7 +1507,9 @@
       const getRedirectTarget = () => {
         if (isLocalHostMode) return "/index.html";
         const isMobile = window.matchMedia("(max-width: 1024px)").matches;
-        return isMobile ? "/app/index.html#carrete" : "/index.html";
+        if (isMobile) return "/app/index.html#carrete";
+        // `next` (hash) llega desde la guardia de sesión a través del hub.
+        return hubNext && hubNext.startsWith("#") ? `/index.html${hubNext}` : "/index.html";
       };
 
       const formatDisplayName = (emailValue = "") => {
@@ -1635,6 +1709,51 @@
       }
 
       // El submit del formulario gestiona el Enter.
+
+      // ---- Departamento de Salud Brisa: canje del token de traspaso -----------
+      const clearHubToken = () => {
+        try {
+          history.replaceState(null, "", window.location.pathname + window.location.search);
+        } catch (e) {}
+      };
+      const hubHandoffLogin = async () => {
+        const overlay = document.getElementById("login-overlay");
+        if (overlay) overlay.classList.add("active");
+        loginInProgress = true;
+        try {
+          const credential = await signInWithCustomToken(auth, hubToken);
+          clearHubToken();
+          const user = credential.user;
+          await finalizeLogin(user, { profileEmail: user.email || "" });
+          await enforceForcedPasswordChangeIfNeeded({ auth, db, user });
+          window.location.replace(getRedirectTarget());
+        } catch (error) {
+          console.error("Hub handoff error:", error);
+          clearHubToken();
+          document.documentElement.classList.remove("hub-handoff");
+          if (overlay) overlay.classList.remove("active");
+          loginInProgress = false;
+          const code = String(error?.code || "");
+          let msg = "No se pudo completar el ingreso. Volvé al inicio para reintentar.";
+          if (code === "profile_read_failed") {
+            msg = "No se pudo leer el perfil del usuario. Volvé al inicio y reintentá.";
+          } else if (code === "profile_create_failed") {
+            msg = "No se pudo crear el perfil del usuario. Volvé al inicio y reintentá.";
+          } else if (code.includes("custom-token") || code.includes("invalid")) {
+            msg = "El enlace de acceso venció. Volvé al inicio para ingresar.";
+          } else if (code === "auth/user-disabled") {
+            msg = "La cuenta está deshabilitada. Contactá al administrador.";
+          }
+          mostrarError(msg);
+          showHubReturnLink();
+        }
+      };
+
+      if (hubToken) {
+        hubHandoffLogin();
+      } else if (!legacyLogin && !isLocalHostMode) {
+        window.location.replace(buildHubUrl());
+      }
     </script>
   </body>
 </html>

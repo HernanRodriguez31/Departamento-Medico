@@ -14,6 +14,7 @@ import {
   getDocs,
   limit,
   query,
+  serverTimestamp,
   setDoc,
   Timestamp,
   updateDoc
@@ -1089,4 +1090,380 @@ test("dm_carousel comments still allow legit comment create delete and block dir
   await assertSucceeds(
     deleteDoc(doc(authedDb("user-a"), "dm_carousel", "post-a", "comments", "comment-a"))
   );
+});
+
+/* ------------------------------------------------------------------ */
+/* Departamento de Salud Brisa (hub): pizarra de comités               */
+/* Acceso por clave genérica compartida (usuario BOARD_EMAIL) o admin.  */
+/* ------------------------------------------------------------------ */
+
+const HUB_BOARD_EMAIL = "pizarra@brisasaludybienestar.com";
+
+// Usuario compartido de la pizarra: cualquier uid con el email de la pizarra
+// en el token (así lo emite Firebase Auth al iniciar sesión con la clave).
+const hubBoardDb = (uid = "board-user") =>
+  testEnv.authenticatedContext(uid, { email: HUB_BOARD_EMAIL }).firestore();
+
+const hubUpdatedBy = (uid, dept, name = "Equipo de Salud") => ({ uid, name, dept });
+
+const hubCommitteePayload = (uid, dept, overrides = {}) => ({
+  dept,
+  title: "Comité sintético",
+  description: "Descripción sintética",
+  referents: ["Referente A"],
+  eje: "",
+  order: 1,
+  createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp(),
+  updatedBy: hubUpdatedBy(uid, dept),
+  ...overrides
+});
+
+const hubProjectPayload = (uid, dept, committeeId, overrides = {}) => ({
+  dept,
+  committeeId,
+  title: "Proyecto sintético",
+  content: "Contenido sintético",
+  status: "en_curso",
+  referents: [],
+  order: 1,
+  createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp(),
+  updatedBy: hubUpdatedBy(uid, dept),
+  ...overrides
+});
+
+const seedHubCommittee = async (id, dept) => {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "hub_committees", id), {
+      dept,
+      title: `Comité ${dept}`,
+      description: "",
+      referents: [],
+      eje: "",
+      order: 1,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+      updatedBy: hubUpdatedBy("seed", dept)
+    });
+  });
+};
+
+test("hub: la pizarra solo se lee con la clave (usuario compartido) o admin, nunca con otra sesión ni sin sesión", async () => {
+  await seedHubCommittee("hc-medico", "medico");
+  await assertSucceeds(getDoc(doc(hubBoardDb(), "hub_committees", "hc-medico")));
+  await assertSucceeds(getDoc(doc(authedAdminDb("admin-a"), "hub_committees", "hc-medico")));
+  await assertFails(getDoc(doc(authedDb("user-a"), "hub_committees", "hc-medico")));
+  await assertFails(getDoc(doc(unauthedDb(), "hub_committees", "hc-medico")));
+});
+
+test("hub: el usuario de la pizarra crea y edita comités en ambas columnas; una sesión ajena no", async () => {
+  const board = hubBoardDb("board-1");
+  await assertSucceeds(setDoc(doc(board, "hub_committees", "hc-1"), hubCommitteePayload("board-1", "medico")));
+  await assertSucceeds(setDoc(doc(board, "hub_committees", "hc-2"), hubCommitteePayload("board-1", "enfermeria")));
+  await assertFails(setDoc(doc(authedDb("user-a"), "hub_committees", "hc-3"), hubCommitteePayload("user-a", "medico")));
+
+  await assertSucceeds(
+    updateDoc(doc(board, "hub_committees", "hc-1"), {
+      title: "Comité editado",
+      eje: "Calidad y seguridad",
+      updatedAt: serverTimestamp(),
+      updatedBy: hubUpdatedBy("board-1", "medico")
+    })
+  );
+  await assertFails(
+    updateDoc(doc(board, "hub_committees", "hc-1"), {
+      dept: "enfermeria",
+      updatedAt: serverTimestamp(),
+      updatedBy: hubUpdatedBy("board-1", "medico")
+    })
+  );
+  await assertFails(deleteDoc(doc(authedDb("user-a"), "hub_committees", "hc-1")));
+  await assertSucceeds(deleteDoc(doc(board, "hub_committees", "hc-1")));
+});
+
+test("hub: la forma del comité se valida (autoría, campos extra, tamaños, eje, timestamp)", async () => {
+  const board = hubBoardDb("board-1");
+  await assertFails(setDoc(doc(board, "hub_committees", "hc-bad-1"), hubCommitteePayload("otro-uid", "medico")));
+  await assertFails(setDoc(doc(board, "hub_committees", "hc-bad-2"), hubCommitteePayload("board-1", "medico", { extra: true })));
+  await assertFails(setDoc(doc(board, "hub_committees", "hc-bad-3"), hubCommitteePayload("board-1", "medico", { title: "" })));
+  await assertFails(setDoc(doc(board, "hub_committees", "hc-bad-4"), hubCommitteePayload("board-1", "medico", { title: "x".repeat(121) })));
+  await assertFails(setDoc(doc(board, "hub_committees", "hc-bad-5"), hubCommitteePayload("board-1", "medico", { updatedAt: Timestamp.now() })));
+  await assertFails(setDoc(doc(board, "hub_committees", "hc-bad-6"), hubCommitteePayload("board-1", "medico", { referents: "no-es-lista" })));
+  await assertFails(setDoc(doc(board, "hub_committees", "hc-bad-7"), hubCommitteePayload("board-1", "medico", { eje: 123 })));
+  await assertFails(setDoc(doc(board, "hub_committees", "hc-bad-8"), hubCommitteePayload("board-1", "medico", { vinculo: 123 })));
+  await assertSucceeds(setDoc(doc(board, "hub_committees", "hc-ok-1"), hubCommitteePayload("board-1", "medico", { vinculo: "ninguno" })));
+  await assertSucceeds(
+    updateDoc(doc(board, "hub_committees", "hc-ok-1"), {
+      vinculo: "hc-otro-id",
+      order: 3,
+      updatedAt: serverTimestamp(),
+      updatedBy: hubUpdatedBy("board-1", "medico")
+    })
+  );
+});
+
+test("hub: los proyectos pertenecen a un comité existente del mismo departamento", async () => {
+  await seedHubCommittee("hc-medico", "medico");
+  await seedHubCommittee("hc-enf", "enfermeria");
+  const board = hubBoardDb("board-1");
+
+  await assertSucceeds(setDoc(doc(board, "hub_projects", "hp-1"), hubProjectPayload("board-1", "medico", "hc-medico")));
+  await assertFails(setDoc(doc(board, "hub_projects", "hp-2"), hubProjectPayload("board-1", "medico", "hc-enf")));
+  await assertFails(setDoc(doc(board, "hub_projects", "hp-3"), hubProjectPayload("board-1", "medico", "hc-inexistente")));
+  await assertSucceeds(setDoc(doc(board, "hub_projects", "hp-5"), hubProjectPayload("board-1", "enfermeria", "hc-enf")));
+  await assertFails(
+    setDoc(doc(board, "hub_projects", "hp-6"), hubProjectPayload("board-1", "medico", "hc-medico", { status: "otro" }))
+  );
+
+  await assertSucceeds(
+    updateDoc(doc(board, "hub_projects", "hp-1"), {
+      status: "finalizado",
+      order: 2,
+      updatedAt: serverTimestamp(),
+      updatedBy: hubUpdatedBy("board-1", "medico")
+    })
+  );
+  await assertFails(
+    updateDoc(doc(board, "hub_projects", "hp-1"), {
+      committeeId: "hc-enf",
+      updatedAt: serverTimestamp(),
+      updatedBy: hubUpdatedBy("board-1", "medico")
+    })
+  );
+  await assertFails(deleteDoc(doc(authedDb("user-a"), "hub_projects", "hp-1")));
+  await assertSucceeds(deleteDoc(doc(board, "hub_projects", "hp-1")));
+});
+
+test("hub: una sesión ajena no lista la pizarra por el solo hecho de estar autenticada", async () => {
+  const user = authedDb("user-a");
+  await assertFails(getDocs(collection(user, "hub_committees")));
+  await assertFails(getDocs(collection(user, "hub_projects")));
+});
+
+// ---------------------------------------------------------------------------
+// Escritorio de proyecto: subcolecciones de committee_topics/{topicId}
+// ---------------------------------------------------------------------------
+const desktopPath = (topicId, ...rest) => ["artifacts", APP_ID, "public", "data", "committee_topics", topicId, ...rest];
+
+const desktopStamp = (uid, overrides = {}) => ({
+  createdByUid: uid,
+  createdByName: uid === "user-a" ? "Dr. Usuario A" : "Dr. Usuario B",
+  createdAt: Timestamp.now(),
+  updatedAt: Timestamp.now(),
+  updatedByUid: uid,
+  updatedByName: uid === "user-a" ? "Dr. Usuario A" : "Dr. Usuario B",
+  ...overrides
+});
+
+const desktopConfigPayload = (uid, overrides = {}) => ({
+  committeeId: "comite_bioetica",
+  schemaVersion: 1,
+  description: "",
+  wallpaper: "brisa",
+  team: [],
+  seeded: true,
+  ...desktopStamp(uid),
+  ...overrides
+});
+
+const desktopItemPayload = (uid, overrides = {}) => ({
+  type: "link",
+  name: "Protocolo v1",
+  parentId: "",
+  url: "https://panamericanenergy.sharepoint.com/:w:/t/DepartamentoMdico/demo",
+  kind: "word",
+  note: "",
+  pinned: false,
+  archived: false,
+  order: 1,
+  ...desktopStamp(uid),
+  ...overrides
+});
+
+const desktopTaskPayload = (uid, overrides = {}) => ({
+  title: "Redactar borrador",
+  details: "",
+  status: "todo",
+  priority: "alta",
+  assignee: "Dr. Usuario B",
+  assigneeUid: "user-b",
+  dueDate: "2026-10-01",
+  order: 1,
+  doneAt: null,
+  archived: false,
+  ...desktopStamp(uid),
+  ...overrides
+});
+
+const desktopNotePayload = (uid, overrides = {}) => ({
+  kind: "acta",
+  title: "Acta reunión de avance",
+  body: "ACTA DE REUNIÓN",
+  meetingDate: "2026-09-14",
+  pinned: false,
+  archived: false,
+  ...desktopStamp(uid),
+  ...overrides
+});
+
+test("escritorio: config se crea una sola vez como 'config', se edita en colaboración y solo admin la borra", async () => {
+  const userDb = authedDb("user-a");
+  const otherDb = authedDb("user-b");
+  const adminDb = authedAdminDb("admin-a");
+
+  await assertSucceeds(setDoc(doc(userDb, ...desktopPath("flat-topic-a", "desktop_meta", "config")), desktopConfigPayload("user-a")));
+  await assertFails(setDoc(doc(userDb, ...desktopPath("flat-topic-a", "desktop_meta", "otro")), desktopConfigPayload("user-a")));
+  await assertFails(setDoc(doc(userDb, ...desktopPath("topic-x", "desktop_meta", "config")), desktopConfigPayload("user-b")));
+  await assertFails(setDoc(doc(userDb, ...desktopPath("topic-y", "desktop_meta", "config")), desktopConfigPayload("user-a", { hacked: true })));
+  await assertFails(setDoc(doc(userDb, ...desktopPath("topic-z", "desktop_meta", "config")), desktopConfigPayload("user-a", { description: "x".repeat(2001) })));
+
+  // Otro integrante edita fondo y objetivo (colaborativo) sin tocar la autoría.
+  await assertSucceeds(
+    updateDoc(doc(otherDb, ...desktopPath("flat-topic-a", "desktop_meta", "config")), {
+      wallpaper: "aurora",
+      description: "Objetivo del proyecto",
+      team: [{ name: "Dr. Usuario B", role: "responsable", uid: "user-b", unit: "" }],
+      updatedAt: serverTimestamp(),
+      updatedByUid: "user-b",
+      updatedByName: "Dr. Usuario B"
+    })
+  );
+  await assertFails(updateDoc(doc(otherDb, ...desktopPath("flat-topic-a", "desktop_meta", "config")), { createdByUid: "user-b" }));
+  await assertFails(updateDoc(doc(otherDb, ...desktopPath("flat-topic-a", "desktop_meta", "config")), { updatedByUid: "user-a" }));
+  await assertFails(getDoc(doc(unauthedDb(), ...desktopPath("flat-topic-a", "desktop_meta", "config"))));
+  await assertSucceeds(getDoc(doc(otherDb, ...desktopPath("flat-topic-a", "desktop_meta", "config"))));
+  await assertFails(deleteDoc(doc(userDb, ...desktopPath("flat-topic-a", "desktop_meta", "config"))));
+  await assertSucceeds(deleteDoc(doc(adminDb, ...desktopPath("flat-topic-a", "desktop_meta", "config"))));
+});
+
+test("escritorio: archivos, tareas y actas — alta propia, forma validada, edición colaborativa, borrado autor/admin", async () => {
+  const userDb = authedDb("user-a");
+  const otherDb = authedDb("user-b");
+  const adminDb = authedAdminDb("admin-a");
+  const items = (id) => doc(userDb, ...desktopPath("flat-topic-a", "desktop_items", id));
+
+  await assertSucceeds(setDoc(items("item-1"), desktopItemPayload("user-a")));
+  await assertSucceeds(setDoc(items("folder-1"), desktopItemPayload("user-a", { type: "folder", name: "Documentos", url: "", kind: "folder" })));
+  await assertFails(setDoc(items("item-spoof"), desktopItemPayload("user-b")));
+  await assertFails(setDoc(items("item-http"), desktopItemPayload("user-a", { url: "http://inseguro.test/x" })));
+  await assertFails(setDoc(items("item-js"), desktopItemPayload("user-a", { url: "javascript:alert(1)" })));
+  await assertFails(setDoc(items("item-type"), desktopItemPayload("user-a", { type: "exe" })));
+  await assertFails(setDoc(items("item-extra"), desktopItemPayload("user-a", { hacked: true })));
+  await assertFails(setDoc(items("item-name"), desktopItemPayload("user-a", { name: "" })));
+
+  // Colaborativo: otro usuario mueve, renombra y archiva; no altera la autoría ni la fecha de alta.
+  await assertSucceeds(
+    updateDoc(doc(otherDb, ...desktopPath("flat-topic-a", "desktop_items", "item-1")), {
+      parentId: "folder-1",
+      name: "Protocolo v2",
+      archived: true,
+      updatedAt: serverTimestamp(),
+      updatedByUid: "user-b",
+      updatedByName: "Dr. Usuario B"
+    })
+  );
+  await assertFails(updateDoc(doc(otherDb, ...desktopPath("flat-topic-a", "desktop_items", "item-1")), { createdByUid: "user-b" }));
+  await assertFails(updateDoc(doc(otherDb, ...desktopPath("flat-topic-a", "desktop_items", "item-1")), { createdAt: Timestamp.now() }));
+  await assertFails(updateDoc(doc(otherDb, ...desktopPath("flat-topic-a", "desktop_items", "item-1")), { url: "http://inseguro.test" }));
+  await assertFails(deleteDoc(doc(otherDb, ...desktopPath("flat-topic-a", "desktop_items", "item-1"))));
+  await assertSucceeds(deleteDoc(doc(userDb, ...desktopPath("flat-topic-a", "desktop_items", "item-1"))));
+  await assertSucceeds(deleteDoc(doc(adminDb, ...desktopPath("flat-topic-a", "desktop_items", "folder-1"))));
+
+  const tasks = (id) => doc(userDb, ...desktopPath("flat-topic-a", "desktop_tasks", id));
+  await assertSucceeds(setDoc(tasks("task-1"), desktopTaskPayload("user-a")));
+  await assertFails(setDoc(tasks("task-status"), desktopTaskPayload("user-a", { status: "otro" })));
+  await assertFails(setDoc(tasks("task-priority"), desktopTaskPayload("user-a", { priority: "urgente" })));
+  await assertFails(setDoc(tasks("task-spoof"), desktopTaskPayload("user-b")));
+  await assertSucceeds(
+    updateDoc(doc(otherDb, ...desktopPath("flat-topic-a", "desktop_tasks", "task-1")), {
+      status: "done",
+      doneAt: Timestamp.now(),
+      updatedAt: serverTimestamp(),
+      updatedByUid: "user-b",
+      updatedByName: "Dr. Usuario B"
+    })
+  );
+  await assertFails(deleteDoc(doc(otherDb, ...desktopPath("flat-topic-a", "desktop_tasks", "task-1"))));
+  await assertSucceeds(deleteDoc(doc(userDb, ...desktopPath("flat-topic-a", "desktop_tasks", "task-1"))));
+
+  const notes = (id) => doc(userDb, ...desktopPath("flat-topic-a", "desktop_notes", id));
+  await assertSucceeds(setDoc(notes("note-1"), desktopNotePayload("user-a")));
+  await assertFails(setDoc(notes("note-kind"), desktopNotePayload("user-a", { kind: "pdf" })));
+  await assertFails(setDoc(notes("note-title"), desktopNotePayload("user-a", { title: "" })));
+  await assertFails(setDoc(notes("note-body"), desktopNotePayload("user-a", { body: "x".repeat(20001) })));
+  await assertSucceeds(
+    updateDoc(doc(otherDb, ...desktopPath("flat-topic-a", "desktop_notes", "note-1")), {
+      body: "ACTA DE REUNIÓN\nAcuerdos: enviar bibliografía.",
+      updatedAt: serverTimestamp(),
+      updatedByUid: "user-b",
+      updatedByName: "Dr. Usuario B"
+    })
+  );
+  await assertFails(deleteDoc(doc(otherDb, ...desktopPath("flat-topic-a", "desktop_notes", "note-1"))));
+  await assertSucceeds(deleteDoc(doc(adminDb, ...desktopPath("flat-topic-a", "desktop_notes", "note-1"))));
+
+  // Listado por cualquier autenticado; nunca sin sesión.
+  await assertSucceeds(getDocs(collection(otherDb, ...desktopPath("flat-topic-a", "desktop_items"))));
+  await assertFails(getDocs(collection(unauthedDb(), ...desktopPath("flat-topic-a", "desktop_items"))));
+});
+
+test("escritorio: la actividad es inmutable y siempre con autor propio", async () => {
+  const userDb = authedDb("user-a");
+  const otherDb = authedDb("user-b");
+  const adminDb = authedAdminDb("admin-a");
+  const ref = doc(userDb, ...desktopPath("flat-topic-a", "desktop_activity", "act-1"));
+  await assertSucceeds(setDoc(ref, { action: "created", entity: "item", label: "Protocolo v1", authorUid: "user-a", authorName: "Dr. Usuario A", createdAt: Timestamp.now() }));
+  await assertFails(setDoc(doc(userDb, ...desktopPath("flat-topic-a", "desktop_activity", "act-2")), { action: "created", entity: "item", label: "x", authorUid: "user-b", authorName: "B", createdAt: Timestamp.now() }));
+  await assertFails(setDoc(doc(userDb, ...desktopPath("flat-topic-a", "desktop_activity", "act-3")), { action: "created", entity: "item", label: "x", authorUid: "user-a", createdAt: Timestamp.now(), extra: 1 }));
+  await assertFails(updateDoc(ref, { label: "editado" }));
+  await assertFails(updateDoc(doc(otherDb, ...desktopPath("flat-topic-a", "desktop_activity", "act-1")), { label: "editado" }));
+  await assertFails(deleteDoc(ref));
+  await assertFails(deleteDoc(doc(adminDb, ...desktopPath("flat-topic-a", "desktop_activity", "act-1"))));
+  await assertSucceeds(getDocs(collection(otherDb, ...desktopPath("flat-topic-a", "desktop_activity"))));
+});
+
+test("calendar_events: los eventos de proyecto (projectId) se editan y borran en colaboración; enlaces solo https", async () => {
+  const userDb = authedDb("user-a");
+  const otherDb = authedDb("user-b");
+  const eventsPath = ["artifacts", APP_ID, "public", "data", "calendar_events"];
+  const projectEvent = (uid, overrides = {}) =>
+    calendarEventPayload(uid, {
+      calendarScope: "committee",
+      committeeId: "comite_bioetica",
+      committeeName: "Comité de Bioética",
+      projectId: "flat-topic-a",
+      projectTitle: "Proyecto A",
+      eventKind: "reunion",
+      link: "https://teams.microsoft.com/l/meetup-join/demo",
+      allDay: false,
+      startMinutes: 600,
+      endMinutes: 660,
+      ...overrides
+    });
+
+  await assertSucceeds(setDoc(doc(userDb, ...eventsPath, "pe-1"), projectEvent("user-a")));
+  await assertFails(setDoc(doc(userDb, ...eventsPath, "pe-http"), projectEvent("user-a", { link: "http://inseguro.test/reunion" })));
+  await assertFails(setDoc(doc(userDb, ...eventsPath, "pe-extra"), projectEvent("user-a", { hacked: true })));
+
+  // Otro integrante reprograma la reunión del proyecto (colaborativo) y la borra.
+  await assertSucceeds(
+    updateDoc(doc(otherDb, ...eventsPath, "pe-1"), {
+      title: "Reunión reprogramada",
+      dateKey: "2026-05-20",
+      startDateKey: "2026-05-20",
+      endDateKey: "2026-05-20",
+      eventKind: "hito",
+      link: "",
+      updatedAt: serverTimestamp()
+    })
+  );
+  await assertFails(updateDoc(doc(otherDb, ...eventsPath, "pe-1"), { projectId: "otro-proyecto", updatedAt: serverTimestamp() }));
+  await assertFails(updateDoc(doc(otherDb, ...eventsPath, "pe-1"), { createdByUid: "user-b", updatedAt: serverTimestamp() }));
+  await assertSucceeds(deleteDoc(doc(otherDb, ...eventsPath, "pe-1")));
+
+  // Un evento SIN projectId conserva la política previa: solo autor o admin editan/borran.
+  await assertFails(updateDoc(doc(otherDb, ...eventsPath, "event-a"), { title: "Ajeno", updatedAt: serverTimestamp() }));
+  await assertFails(deleteDoc(doc(otherDb, ...eventsPath, "event-a")));
+  await assertSucceeds(updateDoc(doc(userDb, ...eventsPath, "event-a"), { title: "Propio", updatedAt: serverTimestamp() }));
 });
