@@ -5596,3 +5596,48 @@ body.comite-detail-premium-v2 .committee-board-note__like {
         font-size: 1.05rem;
     }
 }
+
+/* ==========================================================================
+   Escritorio de proyecto: acceso desde las tarjetas de proyecto (20260914)
+   ========================================================================== */
+body.comite-detail-premium-v2 .committee-project-card--desktop {
+    cursor: pointer;
+}
+
+body.comite-detail-premium-v2 .committee-project-card__title-link {
+    color: inherit;
+    text-decoration: none;
+    outline: none;
+}
+
+body.comite-detail-premium-v2 .committee-project-card__title-link:hover,
+body.comite-detail-premium-v2 .committee-project-card__title-link:focus-visible {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+}
+
+body.comite-detail-premium-v2 .committee-project-card__title-link--finished:hover,
+body.comite-detail-premium-v2 .committee-project-card__title-link--finished:focus-visible {
+    color: #5f9414;
+}
+
+body.comite-detail-premium-v2 .committee-project-card__doc-icons .doc-icon-desktop {
+    border-color: transparent;
+    background: linear-gradient(135deg, #7ab800, #5f9414);
+    color: #ffffff;
+    box-shadow: 0 4px 10px rgba(122, 184, 0, 0.3);
+}
+
+body.comite-detail-premium-v2 .committee-project-card__doc-icons .doc-icon-desktop:hover,
+body.comite-detail-premium-v2 .committee-project-card__doc-icons .doc-icon-desktop:focus-visible {
+    background: linear-gradient(135deg, #86c70b, #5f9414);
+    color: #ffffff;
+    border-color: transparent;
+    transform: translateY(-1px);
+}
+
+body.comite-detail-premium-v2 .committee-project-card__doc-actions--finished .committee-project-card__doc-icons .doc-icon-desktop {
+    background: linear-gradient(135deg, #7ab800, #5f9414);
+    color: #ffffff;
+}

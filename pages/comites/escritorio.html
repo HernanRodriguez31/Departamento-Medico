@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Escritorio de proyecto | Departamento Médico</title>
+    <meta name="description" content="Escritorio colaborativo del proyecto: archivos en Teams y SharePoint, calendario, tareas, actas, pizarra y equipo.">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#f6faf3">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="../../assets/images/logo-identity.png">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="../../css/variables.css?v=20260914-escritorio-1">
+    <link rel="stylesheet" href="../../assets/css/pages/project-desktop.css?v=20260914-escritorio-1">
+
+    <script type="module" src="../../assets/js/pages/project-desktop/main.js?v=20260914-escritorio-1"></script>
+</head>
+
+<body class="pd-body" data-wallpaper="brisa">
+    <noscript>
+        <div class="pd-boot__card">
+            <h1>Escritorio de proyecto</h1>
+            <p>Esta pantalla necesita JavaScript habilitado.</p>
+        </div>
+    </noscript>
+
+    <div id="pd-boot" class="pd-boot" aria-live="polite">
+        <div class="pd-boot__card pd-boot__card--loading">
+            <img src="../../assets/images/logo-brisa-transparent.png" alt="Brisa Salud y Bienestar" width="180" height="100" decoding="async">
+            <p class="pd-boot__title">Preparando el escritorio del proyecto…</p>
+            <span class="pd-boot__spinner" aria-hidden="true"></span>
+        </div>
+    </div>
+
+    <div id="pd-root" class="pd-root" hidden>
+        <header id="pd-menubar" class="pd-menubar" role="menubar" aria-label="Barra de menú del escritorio"></header>
+
+        <main id="pd-desktop" class="pd-desktop" aria-label="Escritorio del proyecto">
+            <section id="pd-widgets" class="pd-widgets" aria-label="Resumen del proyecto"></section>
+            <section id="pd-icons" class="pd-icons" aria-label="Íconos del escritorio"></section>
+            <div id="pd-windows" class="pd-windows" aria-live="polite"></div>
+        </main>
+
+        <footer id="pd-dock" class="pd-dock"></footer>
+    </div>
+</body>
+
+</html>

@@ -483,6 +483,125 @@ service cloud.firestore {
         && request.resource.data.updatedByUid == request.auth.uid;
     }
 
+    // ==================================================================
+    // Escritorio de proyecto (subcolecciones de committee_topics) y eventos
+    // de calendario asociados a un proyecto (calendar_events.projectId).
+    // Modelo colaborativo: cualquier usuario autenticado del portal lee y edita;
+    // la autoría (createdByUid/createdAt) es inmutable; borrar definitivo solo
+    // autor o admin. Forma y tamaños validados por colección.
+    // ==================================================================
+    function deskStr(data, key, max) {
+      return data[key] is string && data[key].size() <= max;
+    }
+
+    function deskOptStr(data, key, max) {
+      return !hasKey(data, key) || deskStr(data, key, max);
+    }
+
+    function deskOptBool(data, key) {
+      return !hasKey(data, key) || data[key] is bool;
+    }
+
+    function deskOptNumber(data, key) {
+      return !hasKey(data, key) || data[key] is number;
+    }
+
+    function deskHttpsUrl(data, key) {
+      return !hasKey(data, key)
+        || data[key] == ""
+        || (data[key] is string && data[key].size() <= 2000 && data[key].matches('https://.*'));
+    }
+
+    function deskCommonKeys() {
+      return ["createdByUid", "createdByName", "createdAt", "updatedAt", "updatedByUid", "updatedByName"];
+    }
+
+    function deskAuthorStamp(data) {
+      // Alta: el autor es quien escribe; nombres acotados.
+      return data.createdByUid == request.auth.uid
+        && deskOptStr(data, "createdByName", 160)
+        && deskOptStr(data, "updatedByName", 160)
+        && (!hasKey(data, "updatedByUid") || data.updatedByUid == request.auth.uid);
+    }
+
+    function deskUpdateStamp(data) {
+      // Edición colaborativa: autoría y fecha de alta inmutables.
+      return data.createdByUid == resource.data.createdByUid
+        && data.createdAt == resource.data.createdAt
+        && (!hasKey(data, "updatedByUid") || data.updatedByUid == request.auth.uid)
+        && deskOptStr(data, "updatedByName", 160);
+    }
+
+    function validDesktopConfig(data) {
+      return data.keys().hasOnly(["committeeId", "schemaVersion", "description", "wallpaper", "team", "seeded"].concat(deskCommonKeys()))
+        && deskStr(data, "committeeId", 80)
+        && deskOptNumber(data, "schemaVersion")
+        && deskOptStr(data, "description", 2000)
+        && deskOptStr(data, "wallpaper", 40)
+        && (!hasKey(data, "team") || (data.team is list && data.team.size() <= 40))
+        && deskOptBool(data, "seeded");
+    }
+
+    function validDesktopItem(data) {
+      return data.keys().hasOnly(["type", "name", "parentId", "url", "kind", "note", "pinned", "archived", "order"].concat(deskCommonKeys()))
+        && (data.type in ["folder", "link"])
+        && deskStr(data, "name", 200)
+        && data.name.size() > 0
+        && deskOptStr(data, "parentId", 128)
+        && deskHttpsUrl(data, "url")
+        && deskOptStr(data, "kind", 40)
+        && deskOptStr(data, "note", 1000)
+        && deskOptBool(data, "pinned")
+        && deskOptBool(data, "archived")
+        && deskOptNumber(data, "order");
+    }
+
+    function validDesktopTask(data) {
+      return data.keys().hasOnly(["title", "details", "status", "priority", "assignee", "assigneeUid", "dueDate", "order", "doneAt", "archived"].concat(deskCommonKeys()))
+        && deskStr(data, "title", 300)
+        && data.title.size() > 0
+        && deskOptStr(data, "details", 2000)
+        && (data.status in ["todo", "doing", "done"])
+        && (!hasKey(data, "priority") || (data.priority in ["alta", "media", "baja"]))
+        && deskOptStr(data, "assignee", 120)
+        && deskOptStr(data, "assigneeUid", 128)
+        && deskOptStr(data, "dueDate", 10)
+        && deskOptNumber(data, "order")
+        && deskOptBool(data, "archived");
+    }
+
+    function validDesktopNote(data) {
+      return data.keys().hasOnly(["kind", "title", "body", "meetingDate", "pinned", "archived"].concat(deskCommonKeys()))
+        && (data.kind in ["acta", "nota", "informe"])
+        && deskStr(data, "title", 200)
+        && data.title.size() > 0
+        && deskOptStr(data, "body", 20000)
+        && deskOptStr(data, "meetingDate", 10)
+        && deskOptBool(data, "pinned")
+        && deskOptBool(data, "archived");
+    }
+
+    function validDesktopActivity(data) {
+      return data.keys().hasOnly(["action", "entity", "label", "authorUid", "authorName", "createdAt"])
+        && deskStr(data, "action", 40)
+        && deskStr(data, "entity", 30)
+        && deskOptStr(data, "label", 300)
+        && data.authorUid == request.auth.uid
+        && deskOptStr(data, "authorName", 160);
+    }
+
+    function validCalendarProjectFields(data) {
+      // Campos opcionales que vinculan un evento con un proyecto (escritorio).
+      return deskOptStr(data, "projectId", 128)
+        && deskOptStr(data, "projectTitle", 300)
+        && deskOptStr(data, "eventKind", 20)
+        && deskHttpsUrl(data, "link");
+    }
+
+    function isProjectCalendarEvent(data) {
+      return hasKey(data, "projectId") && data.projectId is string && data.projectId.size() > 0;
+    }
+
     function validCalendarEventCreate() {
       return signedIn()
         && onlyKeys([
@@ -501,13 +620,19 @@ service cloud.firestore {
           "createdByUid",
           "createdByName",
           "createdAt",
-          "updatedAt"
+          "updatedAt",
+          "projectId",
+          "projectTitle",
+          "eventKind",
+          "link"
         ])
-        && request.resource.data.createdByUid == request.auth.uid;
+        && request.resource.data.createdByUid == request.auth.uid
+        && validCalendarProjectFields(request.resource.data);
     }
 
     function validCalendarEventUpdate() {
-      return (isOwnedByCurrentUser(resource.data) || isAdmin())
+      // Eventos de proyecto (projectId): edición colaborativa de cualquier autenticado.
+      return (isOwnedByCurrentUser(resource.data) || isAdmin() || (signedIn() && isProjectCalendarEvent(resource.data)))
         && changedOnly([
           "title",
           "note",
@@ -518,8 +643,12 @@ service cloud.firestore {
           "startMinutes",
           "endMinutes",
           "colorKey",
-          "updatedAt"
-        ]);
+          "updatedAt",
+          "eventKind",
+          "link",
+          "projectTitle"
+        ])
+        && validCalendarProjectFields(request.resource.data);
     }
 
     function isBitacoraArticleOwner(data) {
@@ -940,7 +1069,63 @@ service cloud.firestore {
       allow read: if signedIn();
       allow create: if validCalendarEventCreate();
       allow update: if validCalendarEventUpdate();
+      allow delete: if isOwnedByCurrentUser(resource.data)
+        || isAdmin()
+        || (signedIn() && isProjectCalendarEvent(resource.data));
+    }
+
+    // ==================================================================
+    // Escritorio de proyecto: subcolecciones de cada committee_topics/{topicId}
+    // ==================================================================
+    match /artifacts/{appId}/public/data/committee_topics/{topicId}/desktop_meta/{docId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && docId == "config"
+        && validDesktopConfig(request.resource.data)
+        && deskAuthorStamp(request.resource.data);
+      allow update: if signedIn()
+        && validDesktopConfig(request.resource.data)
+        && deskUpdateStamp(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /artifacts/{appId}/public/data/committee_topics/{topicId}/desktop_items/{itemId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && validDesktopItem(request.resource.data)
+        && deskAuthorStamp(request.resource.data);
+      allow update: if signedIn()
+        && validDesktopItem(request.resource.data)
+        && deskUpdateStamp(request.resource.data);
       allow delete: if isOwnedByCurrentUser(resource.data) || isAdmin();
+    }
+
+    match /artifacts/{appId}/public/data/committee_topics/{topicId}/desktop_tasks/{taskId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && validDesktopTask(request.resource.data)
+        && deskAuthorStamp(request.resource.data);
+      allow update: if signedIn()
+        && validDesktopTask(request.resource.data)
+        && deskUpdateStamp(request.resource.data);
+      allow delete: if isOwnedByCurrentUser(resource.data) || isAdmin();
+    }
+
+    match /artifacts/{appId}/public/data/committee_topics/{topicId}/desktop_notes/{noteId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && validDesktopNote(request.resource.data)
+        && deskAuthorStamp(request.resource.data);
+      allow update: if signedIn()
+        && validDesktopNote(request.resource.data)
+        && deskUpdateStamp(request.resource.data);
+      allow delete: if isOwnedByCurrentUser(resource.data) || isAdmin();
+    }
+
+    match /artifacts/{appId}/public/data/committee_topics/{topicId}/desktop_activity/{entryId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && validDesktopActivity(request.resource.data);
+      allow update, delete: if false;
     }
 
     // ==================================================================

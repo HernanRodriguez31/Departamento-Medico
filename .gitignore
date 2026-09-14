@@ -32,3 +32,6 @@ build/
 .svelte-kit/
 .turbo/
 .eslintcache
+
+# Escritorio de proyecto: registros de despliegue
+tools/escritorio/deploy-*.log

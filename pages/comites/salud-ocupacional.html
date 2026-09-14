@@ -52,7 +52,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
     
     <link rel="stylesheet" href="../../assets/css/shared/department-calendar.css?v=20260506-committee-calendars-1">
-    <link rel="stylesheet" href="../../assets/css/pages/comite.css?v=20260507-board-x-center-1">
+    <link rel="stylesheet" href="../../assets/css/pages/comite.css?v=20260914-escritorio-1">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/es.js"></script>
 <!-- Firebase SDKs -->
@@ -86,6 +86,7 @@
             groupCommitteeMembers
         } from "../../assets/js/common/committee-member-roles.js";
         import { escapeHTML, escapeAttribute } from "../../assets/js/utils/safe-dom.js";
+        import { buildProjectDesktopUrl, installProjectDesktopCardLinks } from "../../assets/js/common/project-desktop-link.js?v=20260914-escritorio-1";
         import { initSessionGuard } from "../../assets/js/shared/sessionGuard.js?v=20260305-session-1";
         import { initUserMenu } from "../../assets/js/common/user-menu.js?v=20260430-orgtree-avatars-1";
         import { buildInitials, hydrateAvatars } from "../../assets/js/common/user-profiles.js?v=20260430-orgtree-avatars-1";
@@ -110,6 +111,12 @@
             initSessionGuard({ auth, db, loginPath: "../../login.html" });
         }
         initUserMenu({ variant: "desktop" });
+        // Escritorio de proyecto: clic en la tarjeta o en el botón abre escritorio.html
+        window.openProjectDesktop = (topicId) => {
+            const url = buildProjectDesktopUrl(COMMITTEE_ID, topicId);
+            if (url) window.location.href = url;
+        };
+        installProjectDesktopCardLinks({ root: document, committeeId: COMMITTEE_ID });
         let isAdmin = false;
         let committeeNotesController = null;
 
@@ -199,6 +206,9 @@
                 <div class="committee-project-card__doc-actions${modifier}">
                     <span class="committee-project-card__doc-label">${label}</span>
                     <div class="doc-actions committee-project-card__doc-icons" aria-label="Accesos de trabajo de ${escapeAttribute(topic.title || 'proyecto')}">
+                        <button type="button" class="doc-icon doc-icon-desktop" onclick="event.stopPropagation(); window.openProjectDesktop?.(${safeInlineJsString(topic.id)})" title="Abrir escritorio del proyecto" aria-label="Abrir escritorio del proyecto">
+                            <i data-lucide="layout-dashboard"></i>
+                        </button>
                         <button type="button" class="doc-icon doc-icon-folder" data-topic-id="${escapeAttribute(topic.id)}" data-doc-type="folder" title="Carpeta del proyecto" ${hasFolder ? '' : 'disabled'}>
                             <i data-lucide="folder"></i>
                         </button>
@@ -688,10 +698,10 @@
                     ${activeTopics.map((topic) => {
                 const stageMeta = getStageMeta(topic.stage);
                 return `
-                            <article class="committee-project-card group">
+                            <article class="committee-project-card group committee-project-card--desktop" data-project-desktop-id="${escapeAttribute(topic.id)}">
                                 <div class="committee-project-card__header">
                                     <div class="committee-project-card__title-block">
-                                        <h4 class="committee-project-card__title" title="${escapeAttribute(topic.title || '')}">${escapeHTML(topic.title || 'Sin título')}</h4>
+                                        <h4 class="committee-project-card__title" title="${escapeAttribute(topic.title || '')}"><a class="committee-project-card__title-link" href="${escapeAttribute(buildProjectDesktopUrl(COMMITTEE_ID, topic.id))}" title="Abrir escritorio del proyecto">${escapeHTML(topic.title || 'Sin título')}</a></h4>
                                     </div>
                                     ${renderProjectActionCluster(topic)}
                                 </div>
@@ -738,7 +748,7 @@
                         <div class="w-6 h-6 rounded-full bg-teal-100 flex items-center justify-center text-teal-600 flex-shrink-0">
                             <i data-lucide="check" class="w-3.5 h-3.5"></i>
                         </div>
-                        <span class="text-sm font-semibold text-gray-700 whitespace-normal break-words leading-tight" title="${escapeAttribute(topic.title)}">${escapeHTML(topic.title)}</span>
+                        <span class="text-sm font-semibold text-gray-700 whitespace-normal break-words leading-tight" title="${escapeAttribute(topic.title)}"><a class="committee-project-card__title-link committee-project-card__title-link--finished" href="${escapeAttribute(buildProjectDesktopUrl(COMMITTEE_ID, topic.id))}" title="Abrir escritorio del proyecto">${escapeHTML(topic.title)}</a></span>
                     </div>
                     <div class="flex items-center justify-end gap-1 flex-shrink-0">
                         ${renderProjectDocumentActions(topic, 'finished')}

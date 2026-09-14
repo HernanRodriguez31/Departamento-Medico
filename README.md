@@ -14,6 +14,7 @@ Portal interno colaborativo para el Departamento Medico Brisa. El repo contiene 
 - `index.html`, `login.html`, `app.html`, `open.html`, `offline.html`: entradas principales.
 - `app/`: shell PWA mobile.
 - `pages/comites/`: paginas de comites.
+- `pages/comites/escritorio.html`: escritorio colaborativo de cada proyecto (ver `docs/ESCRITORIO-PROYECTOS.md`).
 - `assets/`, `css/`, `js/`: estilos, imagenes y scripts cliente.
 - `functions/`: Cloud Functions y tests backend.
 - `tests/`: tests de utilidades y reglas Firestore.
