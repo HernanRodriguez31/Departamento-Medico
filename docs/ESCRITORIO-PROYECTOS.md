@@ -129,7 +129,7 @@ Requieren `playwright` y Chromium (`npx playwright install chromium`).
 
 ```bash
 firebase deploy --only firestore:rules --project departamento-medico-brisa
-firebase deploy --only hosting:departamento-medico-brisa --project departamento-medico-brisa
+firebase deploy --only hosting --project departamento-medico-brisa
 ```
 
 Primero las reglas (sin ellas el escritorio muestra "Sin permiso para leer…"),
